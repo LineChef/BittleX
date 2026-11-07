@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol
 
+from . import gait_cycle
 from ..vision.ball_finder import BallReading, find_ball
 
 log = logging.getLogger("g2.ball_chase")
@@ -126,6 +127,9 @@ CALM_MAX_S = 0.4               # the longest the stop waits for it
 CALM_TILT_DEG = 4.0            # calm: the body within this of how it stands (the reference stand tilt, else level) ...
 CALM_STEP_DEG = 1.5            # ... and the tilt moving less than this between samples
 LEG_CORRECT = os.environ.get("G2_LEG_CORRECT", "1").strip().lower() not in ("0", "off", "false", "no")      # (UNPROVEN) a leg joint the board holds off its stand angle after a stand-up is driven back (G2_LEG_CHECK=0 turns the whole check off)
+CYCLE_STOP = os.environ.get("G2_CYCLE_STOP", "0").strip().lower() in ("1", "on", "true", "yes")      # (UNPROVEN, default OFF until the hardware A/B) a timed firmware turn / back-up ends after a whole number of gait cycles (behavior/gait_cycle.py)
+CYCLE_MAX_EXTRA_S = 0.8        # the most a turn is lengthened to reach a cycle boundary; further than that it stops on time
+PREPOSITION = os.environ.get("G2_PREPOSITION", "0").strip().lower() in ("1", "on", "true", "yes")  # (UNPROVEN, default OFF) before a firmware turn / walk the legs are eased to the skill's first frame by the Pi even when the link does not know the pose
 QUICK_MOVE_S = 3.0             # a move this soon after the last one ended goes without the pose read and the tilt check (he is standing as the last move left him): no added stillness
 STILL_SAY_S = 4.0              # stood still longer than this before a move: said in the log (the still time of every move is in the trace)
 ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
@@ -600,6 +604,11 @@ class SerialRobot:
         self.use_pick = use_pick                          # True: `kpickF`, the pick skill (it opens and closes the claw); the default is the punch
         self._fall_rad = math.radians(fall_deg)
         self._pitch, self._roll = [], []
+        self._imu_t: list = []                            # when each IMU frame was read (parallel to the END of _roll: the lists are reset at every move, this one is only trimmed)
+        self._last_poll_t: float | None = None
+        self.last_move_imu: tuple = ([], [], [])
+        self.last_cycle_stop: dict | None = None          # what the whole-cycle stop did on the last timed move
+        self.last_preposition: dict | None = None         # what the pre-position did before the last skill
         self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
         self.last_turn_deg: float | None = None
         self.last_turn_s: float | None = None
@@ -624,7 +633,10 @@ class SerialRobot:
             from ..gait.imu_parse import parse_imu_line
         except ImportError:
             from gait.imu_parse import parse_imu_line  # type: ignore
-        for line in self._lk.poll_imu():
+        lines = list(self._lk.poll_imu())
+        now = self._clock()
+        prev, self._last_poll_t = self._last_poll_t, now
+        for i, line in enumerate(lines):
             r = parse_imu_line(line)
             if r is None:
                 continue
@@ -632,6 +644,9 @@ class SerialRobot:
                 self._yaw = math.degrees(r[2])
             self._pitch.append(math.degrees(r[1]))
             self._roll.append(math.degrees(r[0]))
+            lo = now - 0.05 if prev is None else prev                 # a poll hands back a batch: its frames are spread evenly over the time since the last poll
+            self._imu_t.append(lo + (now - lo) * (i + 1) / len(lines))
+            del self._imu_t[:-4000]
             if max(abs(r[0]), abs(r[1])) > self._fall_rad:
                 p, rl = math.degrees(r[1]), math.degrees(r[0])
                 way = ("nose down" if p > 0 else "nose up") if abs(p) >= abs(rl) else ("onto the left side" if rl < 0 else "onto the right side")
@@ -694,6 +709,31 @@ class SerialRobot:
                 return
         log.warning("not steady before the pose change after %.1f s (pitch %+.0f roll %+.0f deg): going anyway", self.SETTLE_POSE_MAX_S, last[0], last[1])
 
+    def _finish_cycle(self, token: str, ran: float) -> str:
+        """Keep the gait going to the next whole cycle (user lever 1, 2026-11-06: the firmware's stop is one fast jump from the mid-stride pose to the balance pose; after whole cycles the legs are
+        back near where the gait began, so the jump is small). The period is the measured one (`--measure`), the override, or an estimate from this move's own IMU frames. Never more than
+        CYCLE_MAX_EXTRA_S longer. "ok" or "fell"; what happened is in `last_cycle_stop` for the drill's report."""
+        n = min(len(self._imu_t), len(self._roll))
+        period, src = gait_cycle.period_for(token, self._imu_t[-n:] if n else [], self._roll[-n:] if n else [], self._pitch[-n:] if n else [])
+        info = {"token": token, "ran_s": round(ran, 2), "period_s": None if period is None else round(period, 3), "source": src, "extra_s": 0.0}
+        self.last_cycle_stop = info
+        if period is None:
+            log.info("cycle stop: %s, stopping on time", src)
+            return "ok"
+        extra = gait_cycle.stop_after(ran, period, CYCLE_MAX_EXTRA_S)
+        if extra is None:
+            info["source"] += "; boundary too far"
+            log.info("cycle stop: period %.2f s (%s), next boundary more than %.1f s away: stopping on time", period, src, CYCLE_MAX_EXTRA_S)
+            return "ok"
+        t1 = self._clock()
+        while self._clock() - t1 < extra:
+            if self._fell():
+                return "fell"
+            self._sleep(0.02)
+        info["extra_s"] = round(self._clock() - t1, 2)
+        log.info("cycle stop: ran %.2f s, period %.2f s (%s), kept going %.2f s to a whole cycle", ran, period, src, info["extra_s"])
+        return "ok"
+
     def _calm_before_stop(self) -> str:
         """A firmware move ends with a stop; stopped at an arbitrary gait phase the legs are mid-stride and he can go over (13 of 18 logged falls were in turns). Wait up to CALM_MAX_S for
         a calm moment: the body near how it stands and the tilt barely changing between IMU samples. "ok" or "fell"; with no IMU frames it does not wait."""
@@ -735,6 +775,8 @@ class SerialRobot:
             if self._fell():
                 return "fell"
             yaw0 = self._yaw
+        if PREPOSITION and callable(getattr(self._lk, "ease_into", None)):
+            self.last_preposition = self._lk.ease_into(token)
         self._tx(token)
         t0, state = self._clock(), "ok"
         limit = seconds
@@ -748,6 +790,11 @@ class SerialRobot:
                 break
             self._sleep(0.02 if yaw0 is not None else 0.05)
         ran = self._clock() - t0
+        n_imu = min(len(self._imu_t), len(self._roll))
+        self.last_move_imu = (list(self._imu_t[-n_imu:]) if n_imu else [], list(self._roll[-n_imu:]) if n_imu else [], list(self._pitch[-n_imu:]) if n_imu else [])      # the gait's own frames, before the stop and the stillness after it (the cycle measurement reads them)
+        if state != "fell" and yaw0 is None and CYCLE_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF"):
+            state = self._finish_cycle(token, ran)
+            ran = self._clock() - t0
         if state != "fell" and yaw0 is None and self._calm_before_stop() == "fell":          # (a gyro-stopped line-up turn is ended on its yaw at once: waiting would turn it further)
             state = "fell"
         self.posture = "stand"

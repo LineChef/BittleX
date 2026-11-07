@@ -1054,3 +1054,63 @@ def test_the_leg_check_names_a_joint_that_holds_the_wrong_angle_after_a_stand_up
     assert [b[0] for b in bad] == [sv] and bad[0][2] == stand[sv] + 40
     monkeypatch.setenv("G2_LEG_CHECK", "0")
     assert r.leg_check() == []
+
+
+# ---- falls at transitions, the firmware-reading levers (user, 2026-11-06): whole-cycle stop and pre-position (both default off, unproven)
+
+def _timed_robot(monkeypatch, sent):
+    t = {"now": 0.0}
+    class L:
+        def send(self, c, read_reply=False, settle=0.0): sent.append((round(t["now"], 2), c)); return ""
+        def poll_imu(self): return []
+    r = bc.SerialRobot(L(), sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])
+    r._fell = lambda: False
+    r.stand_up = lambda: "ok"
+    return r, t
+
+
+def test_a_timed_turn_runs_on_to_a_whole_cycle_when_the_lever_is_on(monkeypatch, tmp_path):
+    monkeypatch.setenv("G2_GAIT_CYCLES", str(tmp_path / "c.json"))
+    monkeypatch.setenv("G2_GAIT_CYCLE_S", "0.7")
+    monkeypatch.setattr(bc, "CYCLE_STOP", True)
+    monkeypatch.setattr(bc, "STOP_CALM", False)
+    monkeypatch.setattr(bc, "POSE_GATE", False)
+    sent = []
+    r, t = _timed_robot(monkeypatch, sent)
+    assert r.turn(25.0, 1.0) == "ok"
+    stop = [x for x in sent if x[1] == "kbalance"][0][0]
+    assert 1.38 <= stop <= 1.5                                                         # 2 cycles of 0.7 s, not 1.0 s
+    assert r.last_cycle_stop["period_s"] == 0.7 and r.last_cycle_stop["extra_s"] > 0.3
+
+
+def test_with_the_lever_off_or_no_cycle_the_turn_stops_on_time(monkeypatch, tmp_path):
+    monkeypatch.setenv("G2_GAIT_CYCLES", str(tmp_path / "c.json"))
+    monkeypatch.delenv("G2_GAIT_CYCLE_S", raising=False)
+    monkeypatch.setattr(bc, "STOP_CALM", False)
+    monkeypatch.setattr(bc, "POSE_GATE", False)
+    for on in (False, True):
+        monkeypatch.setattr(bc, "CYCLE_STOP", on)
+        sent = []
+        r, t = _timed_robot(monkeypatch, sent)
+        r.turn(25.0, 1.0)
+        stop = [x for x in sent if x[1] == "kbalance"][0][0]
+        assert stop < 1.1                                                              # off: on time; on with no known period and no IMU frames: on time too
+
+
+def test_the_gyro_stopped_line_up_turn_is_never_lengthened(monkeypatch):
+    monkeypatch.setattr(bc, "CYCLE_STOP", True)
+    src = __import__("inspect").getsource(bc.SerialRobot._skill)
+    assert "yaw0 is None and CYCLE_STOP" in src
+
+
+def test_the_preposition_asks_the_link_only_when_on(monkeypatch):
+    monkeypatch.setattr(bc, "STOP_CALM", False)
+    monkeypatch.setattr(bc, "POSE_GATE", False)
+    asked = []
+    for on in (False, True):
+        monkeypatch.setattr(bc, "PREPOSITION", on)
+        sent = []
+        r, t = _timed_robot(monkeypatch, sent)
+        r._lk.ease_into = lambda token: (asked.append(token), {"cmd": token, "ran": True})[1]
+        r.turn(25.0, 0.3)
+    assert asked == ["kwkR"] and r.last_preposition == {"cmd": "kwkR", "ran": True}

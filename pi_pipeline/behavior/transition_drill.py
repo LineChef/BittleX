@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import time
 
-VARIANTS = {"baseline": (False, False), "calm": (True, False), "gate": (False, True), "both": (True, True)}      # name -> (calm stop, pose gate)
+# name -> (calm stop, pose gate, whole-cycle stop, pre-position). One lever at a time against baseline; the first two are the 2026-11-06 guards, the last two the firmware-reading levers.
+VARIANTS = {"baseline": (False, False, False, False), "calm": (True, False, False, False), "gate": (False, True, False, False), "both": (True, True, False, False),
+            "cycle": (False, False, True, False), "pre": (False, False, False, True), "cycle_pre": (False, False, True, True)}
 
 
 NEAR_FALL_DEG = 20.0      # a tilt swing this big in one phase counts as a near fall (most falls are never recorded, so variants are compared on swings too)
@@ -75,6 +77,12 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
         for k, deg in enumerate((side * turn_deg, -side * turn_deg)):
             state = robot.turn(deg, turn_s)
             note(f"turn {'right' if deg > 0 else 'left'}")
+            for what in ("last_preposition", "last_cycle_stop"):
+                if getattr(robot, what, None):
+                    say(f"   {what.replace('_', ' ')}: {getattr(robot, what)}")
+            le = getattr(getattr(robot, "_lk", None), "last_ease", None)
+            if le:
+                say(f"   link transition: {le}")
             if state == "fell":
                 fell = True
                 break
@@ -85,15 +93,47 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
     return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off)}
 
 
+MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF")
+MEASURE_S = 4.0
+
+
+def measure(robot, *, say=print, seconds: float = MEASURE_S) -> dict:
+    """Each gait for `seconds` from the stand, the IMU recorded, the cycle time found by autocorrelation and saved (gait_cycle.save). Stops at the first fall."""
+    from . import gait_cycle
+    out = {}
+    for token in MEASURE_GAITS:
+        if robot.fallen():
+            say("fell: measuring stopped")
+            break
+        state = robot._skill(token, seconds)
+        stamps, rolls, pitches = robot.last_move_imu
+        n = len(stamps)
+        est = gait_cycle.estimate(stamps, rolls, pitches) if n else None
+        rate = (n / (stamps[-1] - stamps[0])) if n > 1 and stamps[-1] > stamps[0] else 0.0
+        if est:
+            gait_cycle.save(token, est[0], est[1], n)
+            say(f"{token}: period {est[0]:.2f} s (strength {est[1]:.2f}), {n} IMU frames at {rate:.0f}/s, {state}")
+            out[token] = est
+        else:
+            say(f"{token}: no clear cycle ({n} IMU frames at {rate:.0f}/s), {state}")
+        if state == "fell":
+            break
+        robot._sleep(2.0)
+    return out
+
+
 def main() -> None:
     import argparse
 
     from . import ball_chase as chase
     ap = argparse.ArgumentParser(description="Falls at transitions: one A/B variant.")
-    ap.add_argument("--variant", choices=sorted(VARIANTS), required=True)
+    ap.add_argument("--variant", choices=sorted(VARIANTS))
+    ap.add_argument("--measure", action="store_true", help="measure each gait's cycle time from the IMU (no variant; writes ~/.local/share/g2/gait_cycles.json)")
     ap.add_argument("--cycles", type=int, default=10)
     args = ap.parse_args()
-    chase.STOP_CALM, chase.POSE_GATE = VARIANTS[args.variant]
+    if not args.measure and not args.variant:
+        ap.error("--variant or --measure is required")
+    chase.STOP_CALM, chase.POSE_GATE, chase.CYCLE_STOP, chase.PREPOSITION = VARIANTS[args.variant]
     from ..link.serial_link import SerialLink
     from ..power import battery
     link = SerialLink("/dev/serial0")
@@ -114,6 +154,9 @@ def main() -> None:
     robot = chase.SerialRobot(link)
     try:
         chase._stand_if_lying(link, "kbalance")
+        if args.measure:
+            measure(robot)
+            return
         res = run_variant(robot, args.cycles)
         if board_moves:
             res["void"] = f"the board started a move on its own during the round: {board_moves[-1]}"

@@ -234,14 +234,60 @@ class SerialLink:
     _last_motion_t: float | None = None          # when last_motion_command went out (monotonic)
     last_pose_read: dict | None = None           # the outcome of the last read_leg_pose() (ok, rows, ms, spread, pose)
 
+    last_ease: dict | None = None                 # what the last skill's transition did: {"cmd", "ran", "why", "start", "secs", "delta"} (the drill prints it; "why" says what kept a ramp from running)
+    _ease_done: str | None = None                 # a skill ease_into() already eased: send() does not ramp it a second time
+
+    def ease_into(self, command: str, start=None) -> dict:
+        """Ease the legs to `command`'s first frame NOW, from `start` (default: the pose the link knows, else the balance pose: the caller has just stopped him and let him settle), even where
+        send() would not (the pose after a gait or a stream is unknown to the link). The following send() of the same command then skips its own ramp. Returns the record (also `last_ease`)."""
+        c = command.strip()
+        rec = {"cmd": c, "ran": False, "why": "", "start": None, "secs": 0.0, "delta": 0.0}
+        self.last_ease = rec
+        try:
+            end = transitions.target(c) if c.startswith("k") and not transitions.is_plain(c) and c not in transitions.STOP_SKILLS else None
+            if end is None:
+                rec["why"] = "not an eased skill"
+                return rec
+            if start is None:
+                start = transitions.pose_after(self.last_motion_command)
+                rec["start"] = "known pose"
+            if start is None:
+                start = transitions.balance_pose()
+                rec["start"] = "assumed balance pose"
+            skew = transitions.skew_for(c)
+            secs = transitions.ramp_seconds(start, end, skew=skew)
+            rec["delta"] = round(max(abs(a - b) for a, b in zip(start, end)), 1)
+            if secs <= 0:
+                rec["why"] = "under the minimum move or ramps off"
+                return rec
+            self._ramping = True
+            try:
+                if transitions.kind(c) != "gait":
+                    self._write_pose("gb")
+                transitions.play(transitions.ramp_poses(start, end, secs, transitions.STEPS_PER_S, skew), lambda pose: self._write_pose(transitions.leg_cmd(pose)), sleep=time.sleep)
+            finally:
+                self._ramping = False
+            rec.update(ran=True, secs=round(secs, 2))
+            self._ease_done = c
+            self.last_motion_command, self._last_motion_t = transitions.leg_cmd(end), time.monotonic()
+        except Exception as e:  # noqa: BLE001
+            rec["why"] = f"failed: {e}"
+            log.warning("ease_into skipped (%s)", e)
+        return rec
+
     def _ease_transition(self, command: str) -> None:
         """Every move into a firmware skill is eased (user, 2026-10-18; link/transitions.py has the rules). Two steps, each a short ramp of `i` commands:
         1. the stand-up (standing rule, user, 2026-10-10): a skill that raises him, sent while he lies or sits, is preceded by the ~0.8 s ramp to the balance pose (gait/standup.py);
         2. the transition: from the pose the link knows to the skill's first frame. `kbalance` / `kup` only ever get step 1, so a stop / freeze out of a stride stays immediate."""
         c = command.strip()
+        if self._ease_done == c:
+            self._ease_done = None                             # ease_into() has just done this one
+            return
+        self._ease_done = None
         if not c.startswith("k") or self._ramping or transitions.is_plain(c):
             return                                             # the picture poses play as the firmware does (user, 2026-10-18: eased they were too slow)
         self._ramping = True
+        rec = self.last_ease = {"cmd": c, "ran": False, "why": "", "start": None, "secs": 0.0, "delta": 0.0}
         try:
             start = None
             # Any firmware skill that is not itself a lying or sitting one stands him up by itself, un-eased, when it starts from lying or sitting (user, 2026-10-10: a gait or turn;
@@ -249,25 +295,33 @@ class SerialLink:
             if c not in STAY_DOWN_SKILLS and self.last_motion_command in LYING_OR_SITTING:
                 start = self._stand_up()
             if c in transitions.STOP_SKILLS:
+                rec["why"] = "stop skill: immediate"
                 return
             end = transitions.target(c)
             if end is None:
+                rec["why"] = "no first frame / never eased"
                 return
             if start is None:
                 if transitions.is_stream(self.last_motion_command, self._last_motion_t):
+                    rec["why"] = "a stream is running"
                     return                                     # a walk or another streamed motion is running: the caller owns it
                 start = transitions.pose_after(self.last_motion_command)
+                rec["start"] = "known pose" if start is not None else None
             if start is None and transitions.read_pose_enabled() and transitions.may_read_before(self.last_motion_command, c):
                 start = self.read_leg_pose()                   # stage 2: after a firmware gait or a trick, ask the servos where the legs are
             if start is None:
+                rec["why"] = "pose unknown to the link: the firmware's own jump"
                 return                                         # unknown pose: the firmware's own start
             skew = transitions.skew_for(c)
             secs = transitions.ramp_seconds(start, end, skew=skew)
+            rec["delta"] = round(max(abs(a - b) for a, b in zip(start, end)), 1)
             if secs <= 0:
+                rec["why"] = "under the minimum move or ramps off"
                 return
             if transitions.kind(c) != "gait" and c not in transitions.STOP_SKILLS:
                 self._write_pose("gb")        # firmware gyro balance off while the Pi eases (2026-10-18: with it on, the 5 Hz balance loop fought every ramp, the legs slipped and G2 "caught his balance"; the voice actuator sends gb after each posture, other callers do not)
             transitions.play(transitions.ramp_poses(start, end, secs, transitions.STEPS_PER_S, skew), lambda pose: self._write_pose(transitions.leg_cmd(pose)), sleep=time.sleep)
+            rec.update(ran=True, secs=round(secs, 2))
         except Exception as e:  # noqa: BLE001  -- the ramp must never stop the command that follows
             log.warning("transition ramp skipped (%s)", e)
         finally:
