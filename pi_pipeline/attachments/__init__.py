@@ -342,7 +342,7 @@ def _voice_module_stamp() -> str:
 def _voice_module_recent() -> bool:
     """True if the English setting was sent less than VOICE_MODULE_MIN_GAP_S ago (a timestamp file): a crash loop must not send it on every restart. Never raises."""
     try:
-        return 0 <= time.time() - float(open(_voice_module_stamp()).read().strip()) < VOICE_MODULE_MIN_GAP_S
+        return -5.0 <= time.time() - float(open(_voice_module_stamp()).read().strip()) < VOICE_MODULE_MIN_GAP_S      # (a little slack for a clock set back by the time sync)
     except (OSError, ValueError):
         return False
 
@@ -352,7 +352,7 @@ def _voice_module_note() -> None:
         p = _voice_module_stamp()
         os.makedirs(os.path.dirname(p), exist_ok=True)
         with open(p, "w") as f:
-            f.write(f"{time.time():.0f}\n")
+            f.write(f"{time.time():.3f}\n")
     except OSError:
         pass
 
