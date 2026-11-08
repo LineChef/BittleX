@@ -1195,3 +1195,63 @@ def test_a_turns_only_round_stands_once_and_never_poses_or_looks():
     assert res["cycles"] == 3 and not res["fell"]
     assert log[0] == "stand" and log.count("stand") == 1 and "relax" not in log and "look" not in log and "up" not in log
     assert [x for x in log if isinstance(x, tuple)] == [("turn", td.TURN_S)] * 6 and td.TURN_S >= 1.4      # the turn is long enough for the cycle stop to have a boundary to reach
+
+
+def test_a_yaw_spike_at_the_start_of_a_turn_does_not_stop_it(monkeypatch):
+    """2026-11-08, a ball goal: `asked 6.0 deg, got 22.4 deg in 0.02 s` ended a line-up turn before it began (a 22 deg jump in 0.02 s is a sensor spike, turns run at about 30 deg/s)."""
+    t = {"now": 0.0, "since": None}
+
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0):
+            self.sent.append((c, round(t["now"], 2)))
+            if c in ("kwkL", "kwkR"): t["since"] = t["now"]
+            return ""
+        def poll_imu(self):
+            yaw = 100.0
+            if t["since"] is not None:
+                el = t["now"] - t["since"]
+                yaw += 22.4 + max(0.0, el - 0.1) * 28.0                                      # a jump of 22 deg right at the start (the reading stays offset), then a real 28 deg/s turn
+            return [f"ICM:{0.0:6.2f}{0.0:6.2f}{1.0:6.2f}{yaw:7.1f}{0.0:7.1f}{0.0:7.1f}"]
+
+    def sleep(s): t["now"] += s
+    lk = Link()
+    r = bc.SerialRobot(lk, sleep=sleep, clock=lambda: t["now"])
+    r.stand_up = lambda: "ok"
+    assert r.turn(30.0, 1.0, stop_deg=6.0) == "ok"
+    at = {c: when for c, when in lk.sent}
+    ran = at["kbalance"] - at["kwkR"]
+    assert 0.15 < ran < 0.6                                                                      # it kept going past the spike until the real turn reached about 6 deg (a stop on the spike would be at 0.0 s)
+
+
+def test_with_the_yaw_stop_off_a_line_up_turn_is_the_timed_turn(monkeypatch):
+    monkeypatch.setattr(bc, "ALIGN_YAW_STOP", False)
+    sent = []
+
+    class Link:
+        def send(self, c, read_reply=False, settle=0.0): sent.append(c); return ""
+        def poll_imu(self): return []
+    t = {"now": 0.0}
+    r = bc.SerialRobot(Link(), sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])
+    r.stand_up = lambda: "ok"
+    r.turn(30.0, 1.0, stop_deg=6.0)
+    assert r.last_turn_deg is None and 0.95 <= t["now"] <= 3.0                                  # timed: no yaw was counted
+
+
+def test_a_stand_only_round_rests_stands_and_stops_at_the_first_fall():
+    from pi_pipeline.behavior import transition_drill as td
+    sent = []
+
+    class Link:
+        def send(self, c, read_reply=False, settle=0.0): sent.append(c); return ""
+
+    class R:
+        def __init__(self, swings): self._lk, self.swings, self._pitch, self._roll, self.t = Link(), list(swings), [], [], 0.0
+        def _clock(self): self.t += 0.5; return self.t
+        def _fell(self): return False
+        def swing_deg(self): return self.swings.pop(0)
+    ok = td.run_stand_only(R([3.0, 4.0, 5.0]), 3, say=lambda *a: None, sleep=lambda s: None)
+    assert ok["cycles"] == 3 and not ok["fell"] and sent.count("kbalance") == 3 and sent.count("krest") == 3 and ok["swings"] == [3.0, 4.0, 5.0]
+    sent.clear()
+    bad = td.run_stand_only(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
+    assert bad["fell"] and bad["cycles"] == 1 and sent.count("kbalance") == 2                  # it stopped at the second stand-up: nothing more was sent

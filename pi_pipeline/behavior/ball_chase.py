@@ -210,6 +210,9 @@ ALIGN_MAX_DEG = 6.0            # (user, 2026-11-03: still turning too much) one 
 ALIGN_MIN_DEG = 3.0            # the smallest line-up turn asked for (gyro-stopped turns, 2026-11-05)
 ALIGN_STOP_LEAD_DEG = 1.5      # the gyro stop sends `kbalance` this many degrees early: the body keeps turning a moment after it
 ALIGN_CAP_S = 2.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
+ALIGN_YAW_STOP = os.environ.get("G2_ALIGN_YAW_STOP", "1").strip().lower() not in ("0", "off", "false", "no")      # `0`: the line-up turns are timed (from the learned turn pace) instead of stopped on the yaw (owner's idea, 2026-11-08)
+YAW_SPIKE_RATE_DEG_S = 120.0   # a yaw change faster than this (plus the margin) cannot be a real turn (they run at about 30 deg/s): it is a sensor spike and is ignored. 2026-11-08: "asked 6.0 deg, got 22.4 deg in 0.02 s"
+YAW_SPIKE_MARGIN_DEG = 6.0
 ALIGN_CLOSE_IN = 5.0           # closer than this (camera to ball) the pulse is smaller still
 ALIGN_CLOSE_GAIN = 0.7         # ... times this
 ALIGN_TRIES = 4
@@ -830,12 +833,19 @@ class SerialRobot:
         limit = seconds
         if yaw0 is not None:
             limit = max(ALIGN_CAP_S, 2.0 * seconds)
+        spikes = 0
         while self._clock() - t0 < limit:
             if self._fell():
                 state = "fell"
                 break
-            if yaw0 is not None and self._yaw is not None and abs(self._yaw - yaw0) >= max(0.0, stop_yaw_deg - ALIGN_STOP_LEAD_DEG):
-                break
+            if yaw0 is not None and self._yaw is not None:
+                dyaw = abs(self._yaw - yaw0)
+                if dyaw > YAW_SPIKE_RATE_DEG_S * (self._clock() - t0) + YAW_SPIKE_MARGIN_DEG:
+                    spikes += 1
+                    log.warning("yaw spike: %.1f deg in %.2f s is faster than a turn can be: ignored (counting from here)", dyaw, self._clock() - t0)
+                    yaw0 = self._yaw
+                elif dyaw >= max(0.0, stop_yaw_deg - ALIGN_STOP_LEAD_DEG):
+                    break
             self._sleep(0.02 if yaw0 is not None else 0.05)
         ran = self._clock() - t0
         n_imu = min(len(self._imu_t), len(self._roll))
@@ -1198,7 +1208,7 @@ class SerialRobot:
         or after ALIGN_CAP_S; with no yaw reading the timed `seconds` apply. `last_turn_deg` / `last_turn_s` say what he did."""
         if self.stand_up() == "fell":
             return "fell"
-        return self._skill("kwkR" if degrees > 0 else "kwkL", seconds, stop_yaw_deg=stop_deg if stop_deg > 0 else None)
+        return self._skill("kwkR" if degrees > 0 else "kwkL", seconds, stop_yaw_deg=stop_deg if stop_deg > 0 and ALIGN_YAW_STOP else None)
 
     def back(self, seconds: float) -> str:
         if self.stand_up() == "fell":

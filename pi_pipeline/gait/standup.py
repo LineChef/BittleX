@@ -145,6 +145,15 @@ def _ease_out(u: float) -> float:
     return 1 - (1 - u) ** 2                  # fast at the start: no dead time before the front legs get going
 
 
+def stand_via(p) -> str | None:
+    """How the arm stands up from rest: `G2_STAND_VIA=sequenced|kbalance` for one run, else the profile's `stand_via`. (2026-11-08: the plain firmware `kbalance` moves all eight joints at once and
+    tipped him over toward the side whose legs rose later; `sequenced` is the Pi's own rear-then-front rise with both sides together.)"""
+    v = os.environ.get("G2_STAND_VIA", "").strip().lower()
+    if v in ("sequenced", "kbalance"):
+        return v
+    return p.get("stand_via") if p else None
+
+
 def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The arm build's stand-up in order (profile "poses": {"stand_via": "sequenced"}; 2026-10-25: the firmware kbalance moves all eight leg joints at once and G2 fell front right
     when the nose rose with the claw out ahead). From rest: the rear legs ease to the balance pose with the front paws and the claw on the floor; the front legs follow, starting when the
@@ -152,7 +161,7 @@ def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     Returns True if it ran."""
     p = _poses()
     c = (last_motion_command or "").strip()
-    if not p or p.get("stand_via") != "sequenced" or c not in ("", "d", "krest", "kzz"):
+    if not p or stand_via(p) != "sequenced" or c not in ("", "d", "krest", "kzz"):
         return False
     start, goal = rest_pose(), balance_pose()
     end_s = max(SEQ_FRONT_START_S + SEQ_FRONT_S, SEQ_LIFT_TO_S)
@@ -262,7 +271,7 @@ def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool
     (the caller's stand command then follows, from the balance pose)."""
     p = _poses()
     c = (last_motion_command or "").strip()
-    if not p or p.get("stand_via") != "kbalance" or c not in ("", "d", "krest", "kzz"):
+    if not p or stand_via(p) != "kbalance" or c not in ("", "d", "krest", "kzz"):
         return False
     send("kbalance")
     sleep(2.0)

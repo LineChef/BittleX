@@ -106,6 +106,42 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = T
     return {"cycles": done, "fell": fell, "fell_at": fell_at, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off)}
 
 
+def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: float = 2.5, watch_s: float = 1.5) -> dict:
+    """Stand up from rest `cycles` times (rest, then the stand-up under test, then the tilt for `watch_s` seconds), nothing else: the stand-up on its own (2026-11-08: it tipped him over toward the side whose
+    legs rose later; is it the firmware stand-up, the gyro balance being off, or the Pi's sequenced rise?). The stand-up is whatever the switches say (`G2_STAND_VIA`, `G2_GYRO_BALANCE`). Stops at the first fall
+    (nothing is sent to a fallen G2). Returns {"cycles", "fell", "fell_at", "worst_swing_deg", "near_falls", "swings"}."""
+    lk = robot._lk
+    worst, near, swings, fell = 0.0, 0, [], False
+    done = 0
+    for i in range(cycles):
+        lk.send("krest", read_reply=False, settle=0.0)
+        sleep(rest_s)
+        lk.send("gP", read_reply=False, settle=0.0)
+        sleep(0.3)
+        robot._pitch, robot._roll = [], []
+        lk.send("kbalance", read_reply=False, settle=0.0)            # the stand-up under test
+        t_end = robot._clock() + watch_s
+        while robot._clock() < t_end and not fell:
+            fell = robot._fell()
+            sleep(0.05)
+        sw = robot.swing_deg()
+        swings.append(round(sw, 1))
+        worst = max(worst, sw)
+        if sw >= NEAR_FALL_DEG:
+            near += 1
+        lk.send("gp", read_reply=False, settle=0.0)
+        say(f"stand-up {i + 1}/{cycles}: swing {sw:.0f} deg" + (" FELL" if fell else ""))
+        trace_p, trace_r = list(robot._pitch), list(robot._roll)
+        if trace_p and trace_r:
+            say(f"   tilt: pitch {min(trace_p):+.0f}..{max(trace_p):+.0f}, roll {min(trace_r):+.0f}..{max(trace_r):+.0f}")
+        if sw >= STANDUP_FELL_SWING_DEG:
+            fell = True
+        if fell:
+            break
+        done += 1
+    return {"cycles": done, "fell": fell, "fell_at": "stand-up from rest" if fell else "", "worst_swing_deg": round(worst, 1), "near_falls": near, "swings": swings}
+
+
 MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF")
 MEASURE_S = 4.0
 
@@ -144,6 +180,7 @@ def main() -> None:
     ap.add_argument("--measure", action="store_true", help="measure each gait's cycle time from the IMU (no variant; writes ~/.local/share/g2/gait_cycles.json)")
     ap.add_argument("--cycles", type=int, default=10)
     ap.add_argument("--turns-only", action="store_true", help="stand once, then only turn and turn back (no attention pose, claw look or stand-up from it): tests the turn and stop levers where they act")
+    ap.add_argument("--stand-only", action="store_true", help="only stand up from rest, --cycles times (the stand-up on its own; G2_STAND_VIA and G2_GYRO_BALANCE choose what is under test)")
     ap.add_argument("--turn-s", type=float, default=TURN_S, help=f"each turn's length in seconds (default {TURN_S})")
     args = ap.parse_args()
     if not args.measure and not args.variant:
@@ -179,6 +216,11 @@ def main() -> None:
     robot = chase.SerialRobot(link, fall_deg=30.0)          # 30 deg off level is not standing (the stand-ups that fell on 2026-11-07 stayed under the old 45 deg limit)
     fell = False
     try:
+        if args.stand_only:
+            res = run_stand_only(robot, args.cycles)
+            fell = bool(res.get("fell"))
+            print("RESULT", args.variant + "+stand_only", res)
+            return
         chase._stand_if_lying(link, "kbalance")
         if args.measure:
             measure(robot)
