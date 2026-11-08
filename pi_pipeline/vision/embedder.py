@@ -137,6 +137,9 @@ class LazyOnnxEmbedder:
         self._inner = None
         self._timer = None
         self.loads = 0
+        self._last_used = 0.0
+        from ..util import mem_budget
+        mem_budget.register("embedder", self.release, self.idle_for)      # a big model loading elsewhere may release this one while it is idle (util/mem_budget.py)
         self.name = "onnx:" + self._path.rsplit("/", 1)[-1]
         self.key = self._path.rsplit("/", 1)[-1] + (f"#{pool}" if pool != "auto" else "")
         self.dim = 0
@@ -145,7 +148,24 @@ class LazyOnnxEmbedder:
     def loaded(self) -> bool:
         return self._inner is not None
 
+    def idle_for(self, seconds: float) -> bool:
+        import time as _t
+        return _t.monotonic() - self._last_used >= seconds
+
+    def release(self) -> bool:
+        """Unload now if loaded; True if it did."""
+        with self._lock:
+            if self._inner is None:
+                return False
+        self.unload()
+        return True
+
     def embed(self, img):
+        import time as _t
+        self._last_used = _t.monotonic()
+        if self._inner is None:
+            from ..util import mem_budget
+            mem_budget.make_room(130.0, keep="embedder")                 # outside our own lock (util/mem_budget.py)
         with self._lock:
             if self._inner is None:
                 self._inner = self._factory()

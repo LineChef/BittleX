@@ -84,7 +84,10 @@ class PiperTTS:
         self._path = str(p)
         self._lock = threading.RLock()
         self._voice = None
+        self._last_used = 0.0
         self._load()
+        from ..util import mem_budget
+        mem_budget.register("speech", self.release, self.idle_for)       # a big model loading elsewhere may release this one while it is idle (util/mem_budget.py)
         self._sd = sd
         self._rate = self._voice.config.sample_rate
         self._style = style or ("current" if robot_effect else "plain")   # a name from effects.VOICES
@@ -94,6 +97,9 @@ class PiperTTS:
         """Load the voice if it is not in memory (about 10 s on the Pi Zero 2 W)."""
         from piper.voice import PiperVoice
         from ..util.ort_memory import lean_sessions
+        if self._voice is None and self._last_used:                      # a reload (not the first load): make room first, outside our own lock (util/mem_budget.py)
+            from ..util import mem_budget
+            mem_budget.make_room(90.0, keep="speech")
         with self._lock:
             if self._voice is None:
                 with lean_sessions():                           # (arena off: about 20 MB less once it has spoken, same speed; docs/plan-detail/voice-service-memory-2026-11-07.md)
@@ -103,6 +109,15 @@ class PiperTTS:
     @property
     def loaded(self) -> bool:
         return self._voice is not None
+
+    def idle_for(self, seconds: float) -> bool:
+        """True if nothing has been synthesised or played for `seconds`."""
+        import time as _t
+        return _t.monotonic() - self._last_used >= seconds
+
+    def _touch(self) -> None:
+        import time as _t
+        self._last_used = _t.monotonic()
 
     def release(self) -> bool:
         """Free the voice's memory (about 155 MB on the Pi) while no uncached sentence is expected (a goal session, an exploration roam: user, 2026-11-07). Lines already in the speech cache
@@ -130,6 +145,7 @@ class PiperTTS:
 
     def _synth(self, text: str):
         import numpy as np
+        self._touch()
         self._load()                                                      # a released voice comes back first
         chunks = list(self._voice.synthesize(pronounce(text)))
         if not chunks:
