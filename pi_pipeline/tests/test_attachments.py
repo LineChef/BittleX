@@ -680,3 +680,37 @@ def test_the_voice_module_english_setting_is_not_sent_again_within_ten_minutes(m
     p = A._voice_module_stamp()
     open(p, "w").write(f"{_t.time() - A.VOICE_MODULE_MIN_GAP_S - 5:.0f}\n")                      # long ago: sent again
     assert A.apply_voice_module_language(Link(), "arm") is True and sent == ["XAc", "XAa", "XAc", "XAa"]
+
+
+def test_gyro_gaits_switches_the_gyro_on_just_before_a_gait_and_never_around_postures(monkeypatch):
+    """G2_GYRO_GAITS=1 (2026-11-08 experiment): `gB` goes out right before a scripted gait; postures and the stop are untouched (the board's own rc / up flipped him when the gyro was on in the attention pose)."""
+    from pi_pipeline.link import serial_link
+    from pi_pipeline.link.serial_link import SerialLink
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+        def write(self, b):
+            self.out.append(b.decode().strip())
+        def flush(self):
+            pass
+
+    def run(env):
+        monkeypatch.setenv("G2_GYRO_GAITS", env)
+        lk = SerialLink("/dev/null")
+        lk._ser = FakeSerial()
+        lk._ease_transition = lambda c: None
+        for c in ("kwkR", "kbalance", "kcalib", "kwkF"):
+            lk.send(c, read_reply=False, settle=0.0)
+        return [x for x in lk._ser.out if x]
+    off = run("0")
+    assert "gB" not in off and off[0] == "kwkR"
+    on = run("1")
+    assert on[:2] == ["gB", "kwkR"]                                   # on, then the gait
+    assert on.count("gB") == 2 and on[on.index("kwkF") - 1] == "gB"   # before each of the two gaits, nowhere else
+    assert on[on.index("kbalance") - 1] == "kwkR" and "gB" not in on[on.index("kbalance"):on.index("kwkF") - 1]      # not before the stop or the attention pose

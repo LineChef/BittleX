@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import collections
 import logging
+import os
 import threading
 import time
 
@@ -44,6 +45,14 @@ def feedback_row(line: str):
 LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit", "kcalib")      # kcalib: the attention pose (legs straight); a move out of it stands him up back legs first (user, 2026-11-02)
 # Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
 STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd", "kcalib"})
+
+
+GYRO_GAIT_GAP_S = float(os.environ.get("G2_GYRO_GAIT_GAP_S", "0.3") or 0.3)
+
+
+def gyro_gaits_on() -> bool:
+    """`G2_GYRO_GAITS=1`: the firmware gyro balance is switched on just before a scripted gait and stays off otherwise (default off; an experiment, 2026-11-08)."""
+    return os.environ.get("G2_GYRO_GAITS", "").strip().lower() in ("1", "on", "true", "yes")
 
 
 class SerialLink:
@@ -184,6 +193,10 @@ class SerialLink:
                     threading.Thread(target=lambda: (audio_gate.wait_idle(2.0), self.send(command, read_reply=False, settle=settle, _deferred=True)), name="beep-wait", daemon=True).start()
                     return ""
                 audio_gate.note_beep(audio_gate.beep_seconds(command))
+            if gyro_gaits_on() and command[:1] == "k" and command.strip() not in transitions.STOP_SKILLS and transitions.kind(command.strip()) == "gait":
+                self._ser.write(b"gB\n")                 # the gyro balance on for a gait only (G2_GYRO_GAITS=1; user, 2026-11-08). The stop `kbalance` is followed by `gb` as before, so it is never on in the attention / sit poses,
+                self._ser.flush()                         # where the board took a pose for a fall and started its own rc / up (the flip of 2026-11-08)
+                time.sleep(GYRO_GAIT_GAP_S)               # a toggle right next to a gait token stopped the walk once (2026-10-25): leave a gap
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             if read_reply or settle:
                 self._ser.flush()                  # wait until it is on the wire (a reply or a settle follows)
