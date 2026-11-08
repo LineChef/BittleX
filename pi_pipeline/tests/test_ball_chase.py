@@ -1011,8 +1011,9 @@ def test_the_transition_drill_counts_cycles_near_falls_and_stops_at_the_first_fa
         def turn(self, deg, s): self.n += 1; return "fell" if self.n == self.fell_on else "ok"
         def swing_deg(self): return self.swing
     kw = dict(look=lambda r: None, say=lambda *a: None, sleep=lambda s: None)
-    assert td.run_variant(R(0), 4, **kw) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "near_falls": 0, "reseats": 0, "stand_ups_with_legs_off": 0}
-    assert td.run_variant(R(3), 10, **kw)["cycles"] == 1                                # two turns a cycle: the third turn is in cycle 2
+    assert td.run_variant(R(0), 4, **kw) == {"cycles": 4, "fell": False, "fell_at": "", "worst_swing_deg": 3.0, "near_falls": 0, "reseats": 0, "stand_ups_with_legs_off": 0}
+    third = td.run_variant(R(3), 10, **kw)
+    assert third["cycles"] == 1 and third["fell_at"] == "turn left"                    # two turns a cycle: the third turn is in cycle 2
     big = td.run_variant(R(0, swing=25.0), 2, **kw)
     assert big["near_falls"] == 6 and big["worst_swing_deg"] == 25.0                    # stand-up and two turns, twice
 
@@ -1160,3 +1161,37 @@ def test_with_the_scripted_default_gait_a_chase_walk_is_the_firmware_walk(monkey
     monkeypatch.setattr(bc, "STOP_CALM", False)
     assert r.walk(1.0) == "ok"
     assert "kwkF" in sent and r._walker is None and r.bumped is False
+
+
+def test_a_stand_up_that_swings_30_degrees_is_a_fall_and_nothing_more_is_sent():
+    """2026-11-07: a stand-up with a leg out stayed under the 45 deg limit and the drill kept driving him."""
+    from pi_pipeline.behavior import transition_drill as td
+    turned = []
+
+    class R:
+        gate_reseats = 0
+        def relax(self): return "ok"
+        def fallen(self): return False
+        def stand_up_from_attention(self): return "ok"
+        def turn(self, deg, s): turned.append(deg); return "ok"
+        def swing_deg(self): return 37.0
+    res = td.run_variant(R(), 5, look=lambda r: None, say=lambda *a: None, sleep=lambda s: None)
+    assert res["fell"] and res["fell_at"] == "stand-up from attention (swing)" and turned == []
+
+
+def test_a_turns_only_round_stands_once_and_never_poses_or_looks():
+    from pi_pipeline.behavior import transition_drill as td
+    log = []
+
+    class R:
+        gate_reseats = 0
+        def stand_up(self): log.append("stand"); return "ok"
+        def relax(self): log.append("relax"); return "ok"
+        def fallen(self): return False
+        def stand_up_from_attention(self): log.append("up"); return "ok"
+        def turn(self, deg, s): log.append(("turn", s)); return "ok"
+        def swing_deg(self): return 4.0
+    res = td.run_variant(R(), 3, look=lambda r: log.append("look"), say=lambda *a: None, sleep=lambda s: None, turns_only=True)
+    assert res["cycles"] == 3 and not res["fell"]
+    assert log[0] == "stand" and log.count("stand") == 1 and "relax" not in log and "look" not in log and "up" not in log
+    assert [x for x in log if isinstance(x, tuple)] == [("turn", td.TURN_S)] * 6 and td.TURN_S >= 1.4      # the turn is long enough for the cycle stop to have a boundary to reach

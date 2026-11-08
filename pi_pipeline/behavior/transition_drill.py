@@ -20,14 +20,20 @@ VARIANTS = {"baseline": (False, False, False, False, False), "calm": (True, Fals
 NEAR_FALL_DEG = 20.0      # a tilt swing this big in one phase counts as a near fall (most falls are never recorded, so variants are compared on swings too)
 
 
-def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1.0, look=None, say=print, sleep=time.sleep) -> dict:
+STANDUP_FELL_SWING_DEG = 30.0   # a stand-up whose tilt swung this much is a fall even if the tilt never reached the fall limit (2026-11-07: a leg-out stand-up was not seen and the drill kept driving him)
+TURN_S = 1.5                    # a turn's length: with the measured gait periods (1.00 s left, 1.04 s right) a 1.0 s turn was already one whole cycle, so the whole-cycle stop had nothing to do
+
+
+def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = TURN_S, look=None, say=print, sleep=time.sleep, turns_only: bool = False) -> dict:
     """`cycles` of the pattern the logged falls follow, with no rest between cycles: attention pose, a full claw look (arm up, left, right, centre, down), the back-legs-first stand-up, a turn, and at
     once a turn back the other way. Stops at the first fall. `look(robot)` makes the claw look (default: claw_survey.run_claw_look without pictures). Returns
-    {"cycles", "fell", "worst_swing_deg", "near_falls", "reseats"}."""
+    {"cycles", "fell", "fell_at", "worst_swing_deg", "near_falls", "reseats"}. `turns_only` skips the attention pose, the claw look and the stand-up from it: he stands once and then only turns and turns
+    back, so the turn and stop levers are tested where they act (2026-11-07: most rounds ended at the stand-up before a lever could matter)."""
     if look is None:
         from . import claw_survey
         look = lambda r: claw_survey.run_claw_look(r._lk, None, "drill", stopped=r.fallen)      # noqa: E731
     worst, near, done, fell = 0.0, 0, 0, False
+    fell_at = ""
 
     legs_off: list = []
 
@@ -53,27 +59,34 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
     if hasattr(robot, "imu_alive") and not robot.imu_alive():
         say("NO IMU FRAMES: the board is silent, the guards would do nothing. Check the Pi-to-BiBoard plug and the board's power. Round not run.")
         return {"cycles": 0, "fell": False, "worst_swing_deg": 0.0, "near_falls": 0, "reseats": 0, "stand_ups_with_legs_off": 0, "void": "no IMU frames"}
+    if turns_only and robot.stand_up() == "fell":
+        return {"cycles": 0, "fell": True, "fell_at": "first stand-up", "worst_swing_deg": 0.0, "near_falls": 0, "reseats": 0, "stand_ups_with_legs_off": 0}
     for i in range(cycles):
         side = 1 if i % 2 == 0 else -1
-        r_state = robot.relax()
-        trace("attention pose")
-        if r_state != "ok" or robot.fallen():                         # a fall anywhere ends the round at once: nothing more is sent to a fallen G2
-            trace("fall in the attention pose")
-            fell = True
-            break
-        look(robot)
-        trace("claw look")
-        if hasattr(robot, "imu_alive") and i > 0 and not getattr(robot, "_pitch", None):
-            say("NO IMU FRAMES during the round: void.")
-            return {"cycles": done, "fell": False, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off), "void": "IMU went silent"}
-        if robot.fallen():
-            trace("fall")
-            fell = True
-            break
-        if robot.stand_up_from_attention() == "fell":
-            fell = True
-            break
-        note("stand-up from attention")
+        if not turns_only:
+            r_state = robot.relax()
+            trace("attention pose")
+            if r_state != "ok" or robot.fallen():                         # a fall anywhere ends the round at once: nothing more is sent to a fallen G2
+                trace("fall in the attention pose")
+                fell, fell_at = True, "attention pose"
+                break
+            look(robot)
+            trace("claw look")
+            if hasattr(robot, "imu_alive") and i > 0 and not getattr(robot, "_pitch", None):
+                say("NO IMU FRAMES during the round: void.")
+                return {"cycles": done, "fell": False, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off), "void": "IMU went silent"}
+            if robot.fallen():
+                trace("fall")
+                fell, fell_at = True, "claw look"
+                break
+            if robot.stand_up_from_attention() == "fell":
+                fell, fell_at = True, "stand-up from attention"
+                break
+            note("stand-up from attention")
+            if robot.swing_deg() >= STANDUP_FELL_SWING_DEG:
+                say(f"   the stand-up swung {robot.swing_deg():.0f} deg: counted as a fall, nothing more is sent")
+                fell, fell_at = True, "stand-up from attention (swing)"
+                break
         for k, deg in enumerate((side * turn_deg, -side * turn_deg)):
             state = robot.turn(deg, turn_s)
             note(f"turn {'right' if deg > 0 else 'left'}")
@@ -84,13 +97,13 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
             if le:
                 say(f"   link transition: {le}")
             if state == "fell":
-                fell = True
+                fell, fell_at = True, f"turn {'right' if deg > 0 else 'left'}"
                 break
         say(f"cycle {i + 1}/{cycles}: {'FELL' if fell else 'ok'}, re-seats so far {robot.gate_reseats}")
         if fell:
             break
         done += 1
-    return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off)}
+    return {"cycles": done, "fell": fell, "fell_at": fell_at, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off)}
 
 
 MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF")
@@ -130,10 +143,21 @@ def main() -> None:
     ap.add_argument("--variant", choices=sorted(VARIANTS))
     ap.add_argument("--measure", action="store_true", help="measure each gait's cycle time from the IMU (no variant; writes ~/.local/share/g2/gait_cycles.json)")
     ap.add_argument("--cycles", type=int, default=10)
+    ap.add_argument("--turns-only", action="store_true", help="stand once, then only turn and turn back (no attention pose, claw look or stand-up from it): tests the turn and stop levers where they act")
+    ap.add_argument("--turn-s", type=float, default=TURN_S, help=f"each turn's length in seconds (default {TURN_S})")
     args = ap.parse_args()
     if not args.measure and not args.variant:
         ap.error("--variant or --measure is required")
-    chase.STOP_CALM, chase.POSE_GATE, chase.CYCLE_STOP, chase.PREPOSITION, chase.EASED_STOP = VARIANTS[args.variant]
+    # (--measure takes no variant: it runs with every lever off, which is the baseline)
+    chase.STOP_CALM, chase.POSE_GATE, chase.CYCLE_STOP, chase.PREPOSITION, chase.EASED_STOP = VARIANTS[args.variant or "baseline"]
+    import subprocess
+    try:                                                        # 2026-11-07: the voice service was running beside the drill for 25 minutes and shared the serial port; refuse to start with it up
+        up = subprocess.run(["systemctl", "is-active", "g2-voice"], capture_output=True, text=True, timeout=5).stdout.strip() == "active"
+    except Exception:  # noqa: BLE001
+        up = False
+    if up:
+        print("the g2-voice service is RUNNING: it shares the BiBoard's serial port with this drill. Stop it first (sudo systemctl stop g2-voice). Round not run.")
+        return
     from ..link.serial_link import SerialLink
     from ..power import battery
     link = SerialLink("/dev/serial0")
@@ -147,27 +171,31 @@ def main() -> None:
 
     class _Watch(logging.Handler):                      # the BiBoard's own voice module starting a move (a spoken word, a TV): that round is void, not a fall caused by the transitions
         def emit(self, record):
-            if "started a move the Pi did not send" in record.getMessage():
-                board_moves.append(record.getMessage()[-60:])
+            msg = record.getMessage()
+            if "started a move the Pi did not send" in msg and "'balance'" not in msg:       # (a late echo of the Pi's own kbalance, about 3 s after it, was flagged on every round of 2026-11-07)
+                board_moves.append(msg[-60:])
     logging.getLogger("g2.command_log").addHandler(_Watch())
     logging.getLogger().addHandler(_Watch())
-    robot = chase.SerialRobot(link)
+    robot = chase.SerialRobot(link, fall_deg=30.0)          # 30 deg off level is not standing (the stand-ups that fell on 2026-11-07 stayed under the old 45 deg limit)
+    fell = False
     try:
         chase._stand_if_lying(link, "kbalance")
         if args.measure:
             measure(robot)
             return
-        res = run_variant(robot, args.cycles)
+        res = run_variant(robot, args.cycles, turn_s=args.turn_s, turns_only=args.turns_only)
+        fell = bool(res.get("fell"))
         if board_moves:
             res["void"] = f"the board started a move on its own during the round: {board_moves[-1]}"
-        print("RESULT", args.variant, res)
+        print("RESULT", args.variant + ("+turns_only" if args.turns_only else ""), res)
     except KeyboardInterrupt:
         print("ended")
     finally:
-        try:
-            link.send("krest", read_reply=False, settle=0.0)
-        except Exception:  # noqa: BLE001
-            pass
+        if not fell:                                    # nothing is sent to a G2 that fell: a rest command to one lying with a leg out dropped him again (2026-11-07)
+            try:
+                link.send("krest", read_reply=False, settle=0.0)
+            except Exception:  # noqa: BLE001
+                pass
 
 
 if __name__ == "__main__":

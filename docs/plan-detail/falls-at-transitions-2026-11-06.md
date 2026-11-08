@@ -1,5 +1,7 @@
 # Falls at pose and gait transitions (HIGH PRIORITY, opened 2026-11-06)
 
+**Next hardware session tools (2026-11-08): `pi_pipeline/behavior/drill_block.sh VARIANT [LAST] [FIRST] [-- --turns-only]` runs a block back to back (refuses while g2-voice is running; `stop` kills it and sends nothing to G2); the drill now counts a stand-up that swings 30 deg as a fall, stops at 30 deg off level, runs 1.5 s turns, has `--turns-only` (stand once, then only turns and stops, so the levers are tested where they act), no longer flags the late `balance` echo, `--measure` needs no variant, and sends no `krest` to a G2 that fell.**
+
 **Next hardware session: A/B the gyro balance (owner, 2026-11-08: "I'm hoping having gyro balance on might help reduce falls"): the arm now runs with it on by default; run the same drill block with `G2_GYRO_BALANCE=0` and `=1` (all of tonight's 2026-11-07 rounds ran with it effectively off, so there is no data on it).**
 
 **Results of the first hardware run (2026-11-07): [`hardware-run-2026-11-07.md`](hardware-run-2026-11-07.md). Main finding: 8 of 9 falls were at the attention pose or the stand-up from it, not at turns or stops; no lever showed a benefit.**
