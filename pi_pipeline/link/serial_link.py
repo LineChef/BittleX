@@ -375,6 +375,9 @@ class SerialLink:
             _spec = _ilu.spec_from_file_location("g2_standup", _p)
             standup = _ilu.module_from_spec(_spec)
             _spec.loader.exec_module(standup)
+        if self._stand_up_kskill(standup):                          # from rest: the whole stand-up as one `K` skill the board plays itself (G2_STAND_VIA=kskill; link/kskill.py)
+            self._skip_firmware_stand = True
+            return transitions.balance_pose()
         if standup.stand_from_attention(self._write_pose, time.sleep, self.last_motion_command):  # from the attention pose (kcalib): the back legs first, then the front legs (user, 2026-11-02)
             self._skip_firmware_stand = True
             return transitions.balance_pose()
@@ -395,6 +398,25 @@ class SerialLink:
             start = standup.rest_pose()
         transitions.play(standup.ramp_poses(start, standup.balance_pose(), secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
         return transitions.balance_pose()
+
+    def _stand_up_kskill(self, standup) -> bool:
+        """Stand up from rest with a `K` skill (link/kskill.py) when `G2_STAND_VIA=kskill`. True if it ran."""
+        try:
+            p = standup._poses()
+            if not p or standup.stand_via(p) != "kskill" or (self.last_motion_command or "").strip() not in ("", "d", "krest", "kzz"):
+                return False
+            from . import kskill
+            secs, steps = 1.8, 18
+            data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), seconds=secs, steps=steps))
+            self._ser.write(data)
+            self._ser.flush()
+            time.sleep(kskill.play_seconds(secs, steps))
+            self.last_motion_command, self._last_motion_t = "kbalance", time.monotonic()
+            log.info("stand-up played as a K skill (%d bytes)", len(data))
+            return True
+        except Exception as e:  # noqa: BLE001  -- fall back to the usual stand-up
+            log.warning("K-skill stand-up failed (%s): the usual stand-up follows", e)
+            return False
 
     def read_leg_pose(self, *, rows: int = 2, timeout_s: float = 0.6, agree_deg: float = 5.0):
         """Measured leg angles (servos 8..15, Petoi order) from the firmware's `f` feedback stream, or None.

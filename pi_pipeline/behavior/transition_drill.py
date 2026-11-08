@@ -112,7 +112,12 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
     (nothing is sent to a fallen G2). Returns {"cycles", "fell", "fell_at", "worst_swing_deg", "near_falls", "swings"}."""
     lk = robot._lk
     worst, near, swings, fell = 0.0, 0, [], False
-    done = 0
+    done, vmins = 0, []
+    try:
+        from ..power import battery
+        volt_read = lambda link: battery.read_voltage(link, attempts=1, drain_s=0.0)      # noqa: E731
+    except Exception:  # noqa: BLE001
+        volt_read = None
     for i in range(cycles):
         lk.send("krest", read_reply=False, settle=0.0)
         sleep(rest_s)
@@ -121,8 +126,17 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
         robot._pitch, robot._roll = [], []
         lk.send("kbalance", read_reply=False, settle=0.0)            # the stand-up under test
         t_end = robot._clock() + watch_s
+        volts, next_v = [], robot._clock()
         while robot._clock() < t_end and not fell:
             fell = robot._fell()
+            if robot._clock() >= next_v and callable(volt_read):
+                next_v = robot._clock() + 0.3                         # the pack during the rise: a servo that sags may be a voltage dip (best effort: a read can fail while the IMU streams)
+                try:
+                    v = volt_read(lk)
+                    if v is not None:
+                        volts.append(v)
+                except Exception:  # noqa: BLE001
+                    pass
             sleep(0.05)
         sw = robot.swing_deg()
         swings.append(round(sw, 1))
@@ -130,7 +144,8 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
         if sw >= NEAR_FALL_DEG:
             near += 1
         lk.send("gp", read_reply=False, settle=0.0)
-        say(f"stand-up {i + 1}/{cycles}: swing {sw:.0f} deg" + (" FELL" if fell else ""))
+        vmins.append(round(min(volts), 2) if volts else None)
+        say(f"stand-up {i + 1}/{cycles}: swing {sw:.0f} deg" + (" FELL" if fell else "") + (f", pack during the rise: min {min(volts):.2f} V of {len(volts)} reads" if volts else ", pack during the rise: no reading"))
         trace_p, trace_r = list(robot._pitch), list(robot._roll)
         if trace_p and trace_r:
             say(f"   tilt: pitch {min(trace_p):+.0f}..{max(trace_p):+.0f}, roll {min(trace_r):+.0f}..{max(trace_r):+.0f}")
@@ -139,7 +154,7 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
         if fell:
             break
         done += 1
-    return {"cycles": done, "fell": fell, "fell_at": "stand-up from rest" if fell else "", "worst_swing_deg": round(worst, 1), "near_falls": near, "swings": swings}
+    return {"cycles": done, "fell": fell, "fell_at": "stand-up from rest" if fell else "", "worst_swing_deg": round(worst, 1), "near_falls": near, "swings": swings, "min_volts": vmins}
 
 
 MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF")

@@ -149,7 +149,7 @@ def stand_via(p) -> str | None:
     """How the arm stands up from rest: `G2_STAND_VIA=sequenced|kbalance` for one run, else the profile's `stand_via`. (2026-11-08: the plain firmware `kbalance` moves all eight joints at once and
     tipped him over toward the side whose legs rose later; `sequenced` is the Pi's own rear-then-front rise with both sides together.)"""
     v = os.environ.get("G2_STAND_VIA", "").strip().lower()
-    if v in ("sequenced", "kbalance"):
+    if v in ("sequenced", "kbalance", "kskill"):
         return v
     return p.get("stand_via") if p else None
 
