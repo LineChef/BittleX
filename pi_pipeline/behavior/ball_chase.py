@@ -537,6 +537,18 @@ POSE_TOL_DEG = 12.0            # a leg pose read with `j` names a known pose whe
 POSE_WAIT_S = {"stand": 6.0, "attention": 3.0}      # the longest wait for a pose to read as reached after asking for it (the firmware stand-up from rest takes about 2 to 3 s)
 
 
+def default_gait() -> str:
+    """The default gait: "scripted" (Petoi's arm gait, `kwkF`) or "policy" (the learned walk). `G2_DEFAULT_GAIT` decides, read now (user, 2026-11-08: scripted is the default)."""
+    v = os.environ.get("G2_DEFAULT_GAIT", "").strip().lower()
+    if v:
+        return v
+    try:
+        from ..config import settings
+        return settings.default_gait
+    except Exception:  # noqa: BLE001
+        return "scripted"
+
+
 def _known_poses() -> dict:
     """The leg poses G2 is ever left in, servo index -> commanded degrees: the stand (the attachment's balance pose), attention (`kcalib`, every leg joint 0), rest and sit."""
     from ..gait import standup
@@ -1115,7 +1127,10 @@ class SerialRobot:
         if self.stand_up() == "fell":
             return "fell"
         self.posture = "stand"
-        return self._policy_walk(seconds)                 # always the default gait policy (user, 2026-10-31)
+        if default_gait() == "scripted":                                      # the default gait is Petoi's scripted arm gait (user, 2026-11-08; G2_DEFAULT_GAIT=policy brings the learned walk back)
+            self.bumped = False
+            return self._skill("kwkF", seconds)
+        return self._policy_walk(seconds)                 # the default gait policy (user, 2026-10-31)
 
     def walk_scripted(self, seconds: float) -> str:
         """Petoi's scripted forward walk (`kwkF`) for `seconds`, then the balance pose. The dialing-in steps use it (user, 2026-11-04): much steadier than the learned policy, so the distance to the

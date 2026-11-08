@@ -933,6 +933,7 @@ def test_practise_by_voice_starts_the_goal_or_a_walls_roam(monkeypatch):
 
 
 def test_a_bump_while_chasing_stops_the_walk_and_is_recorded_for_the_walls_goal(monkeypatch):
+    monkeypatch.setenv("G2_DEFAULT_GAIT", "policy")          # (the contact signal is the learned walk's; the scripted default has none)
     from pi_pipeline.gait import policy_walker
     from pi_pipeline.goals.walls import events_from_trace
 

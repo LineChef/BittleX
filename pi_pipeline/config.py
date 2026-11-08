@@ -177,7 +177,7 @@ class Settings:
     battery_load_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_LOW_V", 7.3))     # the same 30% as read under load (sags ~0.2 V)
     battery_load_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_CRITICAL_V", 7.2))   # 20% under load
     # G2's forward gait: "policy" = the deployed learned walk (default), "firmware" = the stock scripted wkF. Turning and the other gaits stay firmware.
-    default_gait: str = field(default_factory=lambda: _env("G2_DEFAULT_GAIT", "policy").strip().lower())
+    default_gait: str = field(default_factory=lambda: _env("G2_DEFAULT_GAIT", "scripted").strip().lower())
     # "go ahead and look around" by voice hands over to an exploration session (explore_launch.py); it ends and the voice service returns
     explore_handover: bool = field(default_factory=lambda: _env("G2_EXPLORE_HANDOVER", "1") not in ("0", "false", "no"))
     explore_roam_s: float = field(default_factory=lambda: _env_float("G2_EXPLORE_ROAM_S", 600.0))

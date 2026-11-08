@@ -216,7 +216,7 @@ class SerialLink:
         """Send `gb` when the fitted attachment has the gyro balance off or fall recovery off (the arm). Never raises."""
         try:
             from . import opencat
-            if self._ser is not None and (not self._gyro_allowed() or opencat.recovery_off()):
+            if self._ser is not None and not self._gyro_allowed():          # (user, 2026-11-08: the arm runs with the gyro balance ON; fall recovery off no longer forces it off after a skill)
                 self._ser.write(b"gb\n")
         except Exception:  # noqa: BLE001
             pass

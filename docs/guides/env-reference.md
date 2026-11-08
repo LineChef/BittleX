@@ -98,7 +98,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_CYCLE_STOP` | `"0"` | `ball_chase.py` | [`settings-switches.md`](settings-switches.md), [`falls-at-transitions-2026-11-06.md`](../plan-detail/falls-at-transitions-2026-11-06.md) |
 | `G2_DATA_DIR` | `"~/g2_data"` | `g2_calibrate.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_DECISION_LOG` | `DECISION_LOG` | `ball_chase.py` | [`punt.md`](punt.md) |
-| `G2_DEFAULT_GAIT` | `"policy"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_DEFAULT_GAIT` | `""` | `ball_chase.py`, `config.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_DETECTION_LOG` | `"on"` | `detection_filter.py` | [`.env.example`](../../.env.example) |
 | `G2_DETECTION_LOG_DIR` | `"~/g2_runs/detections"` | `detection_filter.py`, `wall_stats.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_DISK_WARN_PCT` | `85.0` | `config.py` | [`.env.example`](../../.env.example), [`diagnostics.md`](../hardware/diagnostics.md) |

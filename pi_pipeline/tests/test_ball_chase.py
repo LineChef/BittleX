@@ -195,6 +195,7 @@ def test_a_fall_during_a_firmware_move_still_stops_the_move():
 
 def test_walks_are_always_the_default_gait_policy(monkeypatch):
     from pi_pipeline.gait import policy_walker
+    monkeypatch.setenv("G2_DEFAULT_GAIT", "policy")          # (the default is Petoi's scripted arm gait since 2026-11-08; G2_DEFAULT_GAIT=policy brings the learned walk back)
     made = []
 
     class FakeWalker:
@@ -1141,3 +1142,21 @@ def test_eased_stop_does_nothing_without_a_period_or_a_writer(monkeypatch, tmp_p
     r._lk._write_pose = lambda c: None
     r.turn(25.0, 1.0)
     assert not r.last_eased_stop["ran"] and "period" in r.last_eased_stop["why"]
+
+
+def test_with_the_scripted_default_gait_a_chase_walk_is_the_firmware_walk(monkeypatch):
+    """User, 2026-11-08: the default gait is Petoi's scripted arm gait (`kwkF`, played as `wkArmF` on the arm); no learned walker is made."""
+    monkeypatch.setenv("G2_DEFAULT_GAIT", "scripted")
+    sent = []
+
+    class L:
+        def send(self, c, read_reply=False, settle=0.0): sent.append(c); return ""
+        def poll_imu(self): return []
+    t = {"now": 0.0}
+    r = bc.SerialRobot(L(), sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])
+    r.stand_up = lambda: "ok"
+    r._fell = lambda: False
+    monkeypatch.setattr(bc, "POSE_GATE", False)
+    monkeypatch.setattr(bc, "STOP_CALM", False)
+    assert r.walk(1.0) == "ok"
+    assert "kwkF" in sent and r._walker is None and r.bumped is False

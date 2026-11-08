@@ -51,7 +51,7 @@
     ],
     "voice_module_language": "english",
     "easing": false,
-    "gyro_balance": false,
+    "gyro_balance": true,
     "gait_switching": false,
     "skills": true,
     "fall_recovery": false,

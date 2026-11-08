@@ -192,10 +192,11 @@ def test_switches_are_on_unless_a_profile_says_false():
     assert A.flag("easing", "arm", {"arm": {}}) is True
 
 
-def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_fall_recovery():
+def test_the_shipped_arm_profile_runs_without_easing_gait_switching_or_fall_recovery_but_with_the_gyro_balance_on():
     data = A.load_profiles()["arm"]
     assert data["payload_profile"] == "arm"
-    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "fall_recovery"))
+    assert not any(A.flag(k, "arm") for k in ("easing", "gait_switching", "fall_recovery"))
+    assert A.flag("gyro_balance", "arm")                 # (user, 2026-11-08: the arm runs with the firmware gyro balance on)
     assert A.flag("skills", "arm")                                              # the claw's voice skills are on (user, 2026-11-02)
 
 
@@ -222,7 +223,19 @@ def test_no_easing_with_the_arm(monkeypatch):
     assert standup.blend_to_balance(sent.append, sleep=lambda s: None, last_motion_command="i8 40 9 40") is False and not sent
 
 
+def _arm_gyro_off(monkeypatch):
+    """The arm profile as it shipped until 2026-11-08 (gyro balance off, so every `gB` becomes `gb` and each skill is followed by `gb`): these tests pin that mechanism."""
+    import copy
+    real = A.load_profiles
+    def patched(*a, **k):
+        d = copy.deepcopy(real(*a, **k))
+        d["arm"]["gyro_balance"] = False
+        return d
+    monkeypatch.setattr(A, "load_profiles", patched)
+
+
 def test_the_arm_turns_every_gB_into_gb(monkeypatch):
+    _arm_gyro_off(monkeypatch)
     from pi_pipeline.link.serial_link import SerialLink
 
     class FakeSerial:
@@ -244,6 +257,7 @@ def test_the_arm_turns_every_gB_into_gb(monkeypatch):
 
 
 def test_startup_turns_the_gyro_off_for_the_arm(monkeypatch):
+    _arm_gyro_off(monkeypatch)
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     sent = []
 
@@ -436,6 +450,7 @@ def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kba
 def test_with_fall_recovery_off_every_skill_and_every_connect_is_followed_by_gb(monkeypatch):
     """User, 2026-10-25: the firmware turns its gyro assist on with a skill (and on a restart), and with it on it keeps trying its own self-right after a fall, which shakes the Pi plug
     loose. The arm's link sends `gb` right after each skill and after connecting; the other attachments send nothing extra."""
+    _arm_gyro_off(monkeypatch)
     from pi_pipeline.link.serial_link import SerialLink
 
     class FakeSerial:
@@ -498,6 +513,7 @@ def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_u
 def test_a_gait_has_no_gb_next_to_it_but_a_posture_still_gets_one_after(monkeypatch):
     """2026-10-25, hardware: a `gb` right behind `kwkF` stopped the walk (0.2 in in 3 s, against about 20 in without it) and a `gb` right before it did the same in the chase (the distance to the ball never changed). The gyro
     is already off from the connect and the last posture; gaits get nothing; postures and tricks still get `gb` after."""
+    _arm_gyro_off(monkeypatch)
     from pi_pipeline.link.serial_link import SerialLink
 
     class FakeSerial:
@@ -587,3 +603,32 @@ def test_startup_asks_again_when_the_first_reply_is_a_leftover(monkeypatch):
         def send(self, cmd, **kw):
             return next(replies) if cmd == "?" else ""
     assert A.startup_check(Arm()) is True
+
+
+def test_the_shipped_arm_runs_with_the_gyro_balance_on(monkeypatch):
+    """User, 2026-11-08: the arm runs with the firmware gyro balance on: `gB` goes out as `gB`, start-up sends no `gb`, and a skill is not followed by `gb`."""
+    from pi_pipeline.link.serial_link import SerialLink
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    sent = []
+
+    class Arm:
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return "Bittle X+Arm\nB10_260101" if cmd == "?" else ""
+    assert A.startup_check(Arm()) is True
+    assert "gb" not in sent
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+        def write(self, b):
+            self.out.append(b.decode().strip())
+        def flush(self):
+            pass
+    lk = SerialLink("/dev/null")
+    lk._ser = FakeSerial()
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    lk.send("gB", read_reply=False, settle=0.0)
+    lk._gyro_off_if_needed()
+    assert lk._ser.out == ["gB"]
