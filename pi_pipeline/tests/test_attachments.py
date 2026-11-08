@@ -192,11 +192,11 @@ def test_switches_are_on_unless_a_profile_says_false():
     assert A.flag("easing", "arm", {"arm": {}}) is True
 
 
-def test_the_shipped_arm_profile_runs_without_easing_gait_switching_or_fall_recovery_but_with_the_gyro_balance_on():
+def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_fall_recovery():
     data = A.load_profiles()["arm"]
     assert data["payload_profile"] == "arm"
-    assert not any(A.flag(k, "arm") for k in ("easing", "gait_switching", "fall_recovery"))
-    assert A.flag("gyro_balance", "arm")                 # (user, 2026-11-08: the arm runs with the firmware gyro balance on)
+    # (2026-11-08: the gyro balance was on for a few hours and the board started its own `rc` / `up` self-right during a claw look and flipped him: it is off again; G2_GYRO_BALANCE=1 turns it on for one run)
+    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "fall_recovery"))
     assert A.flag("skills", "arm")                                              # the claw's voice skills are on (user, 2026-11-02)
 
 
@@ -605,10 +605,11 @@ def test_startup_asks_again_when_the_first_reply_is_a_leftover(monkeypatch):
     assert A.startup_check(Arm()) is True
 
 
-def test_the_shipped_arm_runs_with_the_gyro_balance_on(monkeypatch):
-    """User, 2026-11-08: the arm runs with the firmware gyro balance on: `gB` goes out as `gB`, start-up sends no `gb`, and a skill is not followed by `gb`."""
+def test_the_arm_runs_with_the_gyro_balance_on_when_asked_for_one_run(monkeypatch):
+    """`G2_GYRO_BALANCE=1` (the A/B): `gB` goes out as `gB`, start-up sends no `gb`, and a skill is not followed by `gb`. Not the default: the board's own self-right flipped him with it on (2026-11-08)."""
     from pi_pipeline.link.serial_link import SerialLink
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.setenv("G2_GYRO_BALANCE", "1")
     sent = []
 
     class Arm:
@@ -637,11 +638,11 @@ def test_the_shipped_arm_runs_with_the_gyro_balance_on(monkeypatch):
 def test_an_env_switch_overrides_the_profile_flag_for_one_run(monkeypatch):
     """User, 2026-11-08: G2_GYRO_BALANCE=0 / 1 (any profile flag: G2_<KEY>) decides for a run, so the gyro balance can be A/B tested without editing the profile."""
     monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
-    assert A.flag("gyro_balance", "arm") is True                       # the shipped arm profile
-    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
-    assert A.flag("gyro_balance", "arm") is False and A.flag_safe("gyro_balance") in (True, False)
+    assert A.flag("gyro_balance", "arm") is False                      # the shipped arm profile
     monkeypatch.setenv("G2_GYRO_BALANCE", "1")
-    assert A.flag("gyro_balance", "arm") is True
+    assert A.flag("gyro_balance", "arm") is True and A.flag_safe("gyro_balance") in (True, False)
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    assert A.flag("gyro_balance", "arm") is False
     assert A.flag("easing", "arm") is False                            # other flags untouched
 
 
@@ -650,7 +651,7 @@ def test_the_stand_up_ramp_runs_with_the_gyro_balance_off_and_turns_it_on_after(
     from pi_pipeline.gait import standup
     from pi_pipeline.link.serial_link import SerialLink
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    monkeypatch.setenv("G2_GYRO_BALANCE", "1")                          # on for this run (it is off by default)
     out = []
     lk = SerialLink("/dev/null")
     lk._write_pose = out.append
@@ -659,7 +660,7 @@ def test_the_stand_up_ramp_runs_with_the_gyro_balance_off_and_turns_it_on_after(
     assert lk._stand_up() is not None
     assert out == ["gb", "i8 40", "gB"]
     out.clear()
-    monkeypatch.setenv("G2_GYRO_BALANCE", "0")                          # gyro off for the run: nothing extra is sent
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")                          # gyro off (the default): nothing extra is sent
     lk.last_motion_command = "kcalib"
     assert lk._stand_up() is not None and out == ["i8 40"]
 
