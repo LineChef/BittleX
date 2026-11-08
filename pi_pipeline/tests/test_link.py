@@ -479,13 +479,18 @@ def test_a_move_out_of_the_attention_pose_stands_him_up_back_legs_first_then_fro
         pose.update(dict(zip(nums[0::2], nums[1::2])))
         poses.append(dict(pose))
     first_front = next(i for i, p in enumerate(poses) if any(p[j] for j in front))
-    assert all(abs(poses[first_front - 1][j]) >= 0.75 * abs(poses[-1][j]) for j in rear)       # the back legs are at least three quarters of the way up before the front legs start (a little overlap, user 2026-11-03)
+    assert any(poses[first_front - 1][j] for j in rear)                                            # the back legs have started before the front legs do (one motion, user 2026-11-08) ...
+    assert any(abs(poses[first_front - 1][j]) < 0.5 * abs(poses[-1][j]) for j in rear)            # ... and are less than half way up when the front legs start (they follow right behind)
+    refreshes = [c for c in sent[:-standup.ATT_FINAL_REPEATS] if len(set(int(x) for x in c[1:].split()[0::2])) == 8]
+    assert len(refreshes) >= 3                                                                     # the whole pose is sent again every few steps during the ramp (a dropped joint is corrected within about 0.3 s)
     goal = standup.balance_pose()
     servo_goal = {standup._URDF_TO_SERVO[k]: int(round(goal[k])) for k in range(8)}
     assert poses[-1] == servo_goal                                                      # ends at the balance pose
     assert sent[-1] == sent[-2] == standup.move_cmd(goal) and standup.ATT_FINAL_REPEATS == 2      # the whole pose twice at the end (a garbled last command once left a leg folded)
     ramp = sent[:-standup.ATT_FINAL_REPEATS]
-    assert len(ramp) <= standup.ATT_STEPS_PER_S * 2.8 and max(len(c) for c in ramp) <= 44          # only the moving legs; in the 0.3 s overlap all eight (42 characters, about 0.6 KB/s: under the 1 KB/s that dropped a byte on 2026-11-02)
+    dur = max(standup.ATT_REAR_S, standup.ATT_FRONT_START_S + standup.ATT_FRONT_S)
+    assert len(ramp) <= standup.ATT_STEPS_PER_S * 2.8 and max(len(c) for c in ramp) <= 50      # only the moving legs, plus the whole pose every few steps
+    assert sum(len(c) + 1 for c in ramp) / dur < 800                                        # under 0.8 KB/s: the 1 KB/s of full commands at 20 a second is what dropped a byte (2026-11-02)
     step = max(abs(a[j] - b[j]) for a, b in zip(poses, poses[1:]) for j in a)
     assert step * standup.ATT_STEPS_PER_S <= 80 + 1e-6                                  # no joint faster than the 80 deg/s cap
 

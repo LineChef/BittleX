@@ -202,8 +202,14 @@ def stand_from_sit(send, sleep=time.sleep, last_motion_command=None) -> bool:
 
 
 ATTENTION_URDF_DEG = [0.0] * 8               # the firmware `calib` pose ("attention", legs straight): every leg joint at 0 (InstinctBittleESP.h `calib`)
-ATT_REAR_S, ATT_FRONT_S = 1.2, 1.5           # the stand-up from the attention pose: the back legs rise over ATT_REAR_S, THEN the front legs over ATT_FRONT_S (user, 2026-11-02: the all-at-once
-ATT_FRONT_START_S = ATT_REAR_S - 0.3           # firmware kbalance out of the attention pose flipped him over); the biggest joint move (a knee, about 56 deg) peaks near 70 deg/s
+ATT_SMOOTH = os.environ.get("G2_ATT_STAND", "smooth").strip().lower() != "legacy"      # (user, 2026-11-08) one smooth motion; G2_ATT_STAND=legacy keeps the two-stage stand-up
+ATT_REAR_S, ATT_FRONT_S = (1.2, 1.4) if ATT_SMOOTH else (1.2, 1.5)    # the stand-up from the attention pose: the back legs rise over ATT_REAR_S, the front legs over ATT_FRONT_S (user, 2026-11-02: the all-at-once
+ATT_FRONT_START_S = 0.35 if ATT_SMOOTH else ATT_REAR_S - 0.3           # firmware kbalance out of the attention pose flipped him over); the biggest joint move (a knee, about 56 deg) peaks near 70 deg/s
+# (user, 2026-11-08: "the front legs should start standing up right after the back legs so the getup is one smooth motion with the front legs slightly after the back legs": the front legs now start 0.35 s
+# in, when the back legs are about a fifth of the way up, and both groups finish near 1.2 and 1.75 s; the biggest knee move peaks near 60 deg/s over 1.4 s, under the 80 deg/s cap. The old timing started them
+# 0.9 s in, when the back legs were 85% up, which looked like two motions.)
+ATT_REFRESH_EVERY = 4 if ATT_SMOOTH else 0   # steps: every this many steps the whole leg pose (what each joint should be by now) is sent again, so a joint whose command was dropped or garbled is corrected within about
+                                             # 0.3 s, not at the end (the stand-ups that fell on 2026-11-07 had a leg left folded or out backwards); about 0.2 KB/s more, still well under the 1 KB/s that dropped a byte
 # (user, 2026-11-03: a little less time between the back legs and the front legs: the front legs start 0.3 s before the back legs finish, when the back legs are about 85% up)
 ATT_STEPS_PER_S = 14                         # (2026-11-02: one stand-up in 13 folded the front-right leg up instead of down. Likely cause: full 8-joint `i` commands at 20 a second, about 1 KB/s,
                                              # while the board is still moving; a dropped byte turns a command into a wrong angle.) So: 10 a second, only the joints that changed, and
@@ -239,6 +245,8 @@ def stand_from_attention(send, sleep=time.sleep, last_motion_command=None) -> bo
                     changed.append((_URDF_TO_SERVO[k], d))
         if changed:
             send(_pairs_cmd(changed))
+        if ATT_REFRESH_EVERY and i % ATT_REFRESH_EVERY == 0 and i < n:
+            send(move_cmd(last))                                 # the whole pose as it should be now (see ATT_REFRESH_EVERY)
         sleep(1.0 / ATT_STEPS_PER_S)
     for _ in range(ATT_FINAL_REPEATS):
         sleep(0.25)                                              # let the board catch up first: these arrive whole
