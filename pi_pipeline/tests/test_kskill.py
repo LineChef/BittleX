@@ -29,7 +29,7 @@ def test_both_sides_move_together_and_the_rear_legs_lead():
 
 
 def test_message_is_k_payload_tilde_and_never_holds_the_terminator():
-    msg = kskill.message(kskill.stand_payload([64, -50, 64, -50, 74, -56, 74, -56], [15, 56, 15, 56, 20, 50, 20, 50], 59, 0))
+    msg = kskill.message(kskill.stand_payload([64, -50, 64, -50, 74, -56, 74, -56], [15, 56, 15, 56, 20, 50, 20, 50], 59, 0, steps=18, speed_raw=12, delay_raw=2))
     assert msg[:1] == b"K" and msg[-1:] == b"~" and b"~" not in msg[1:-1]
     assert len(msg) <= kskill.BUFF_LEN
     with pytest.raises(ValueError):
@@ -60,3 +60,14 @@ def test_the_link_plays_the_stand_up_as_a_k_skill_only_when_asked(monkeypatch):
     lk.last_motion_command = "kwkF"
     wrote.clear()
     assert lk._stand_up_kskill(standup) is False and wrote == []              # only from rest
+
+
+def test_the_timing_comes_from_the_environment(monkeypatch):
+    for k in ("G2_KSKILL_STEPS", "G2_KSKILL_SPEED", "G2_KSKILL_DELAY", "G2_KSKILL_WAIT_S"):
+        monkeypatch.delenv(k, raising=False)
+    assert kskill.tuning() == {"steps": 8, "speed": 24, "delay": 0, "wait_s": 2.2}
+    monkeypatch.setenv("G2_KSKILL_STEPS", "12")
+    monkeypatch.setenv("G2_KSKILL_DELAY", "1")
+    monkeypatch.setenv("G2_KSKILL_SPEED", "junk")
+    t = kskill.tuning()
+    assert t["steps"] == 12 and t["delay"] == 1 and t["speed"] == 24            # a bad value falls back to the default

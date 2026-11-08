@@ -406,11 +406,11 @@ class SerialLink:
             if not p or standup.stand_via(p) != "kskill" or (self.last_motion_command or "").strip() not in ("", "d", "krest", "kzz"):
                 return False
             from . import kskill
-            secs, steps = 1.8, 18
-            data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), seconds=secs, steps=steps))
+            t = kskill.tuning()
+            data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"]))
             self._ser.write(data)
             self._ser.flush()
-            time.sleep(kskill.play_seconds(secs, steps))
+            time.sleep(t["wait_s"])
             self.last_motion_command, self._last_motion_t = "kbalance", time.monotonic()
             log.info("stand-up played as a K skill (%d bytes)", len(data))
             return True

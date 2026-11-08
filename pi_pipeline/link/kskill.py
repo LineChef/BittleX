@@ -65,10 +65,23 @@ def stand_frames(start_urdf, goal_urdf, lift0=None, lift1=None, steps: int = 18,
     return frames
 
 
-def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, seconds: float = 1.8, steps: int = 18, speed_raw: int = 12) -> bytes:
-    """The stand-up skill: `steps` frames spread over about `seconds`; each frame waits `seconds / steps` (in 50 ms units, at least 1) after a quick move to it."""
+def tuning() -> dict:
+    """The stand-up's timing, from the environment so it can be tuned on the robot without a deploy: G2_KSKILL_STEPS (frames, default 8), G2_KSKILL_SPEED (raw speed, firmware speed = raw / 8, default 24),
+    G2_KSKILL_DELAY (raw pause after each frame in 50 ms units, default 0), G2_KSKILL_WAIT_S (how long the Pi waits for it to finish, default 2.2). 2026-11-08, first try on the board (18 frames, speed 12, pause 2 each):
+    symmetric (roll -2..+2) but "way too slow and jerky": a pause after every frame and the firmware easing each frame from a standstill."""
+    import os
+
+    def num(key, default):
+        try:
+            return float(os.environ.get(key, "").strip() or default)
+        except ValueError:
+            return float(default)
+    return {"steps": max(2, int(num("G2_KSKILL_STEPS", 8))), "speed": max(1, int(num("G2_KSKILL_SPEED", 24))), "delay": max(0, int(num("G2_KSKILL_DELAY", 0))), "wait_s": max(0.5, num("G2_KSKILL_WAIT_S", 2.2))}
+
+
+def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0) -> bytes:
+    """The stand-up skill: `steps` frames, each a move at `speed_raw` / 8 followed by a pause of `delay_raw` x 50 ms."""
     frames = stand_frames(start_urdf, goal_urdf, lift0, lift1, steps)
-    delay_raw = max(1, int(round(seconds / steps / 0.05)))
     return behavior_payload(frames, [speed_raw] * len(frames), [delay_raw] * len(frames))
 
 
@@ -80,5 +93,5 @@ def message(payload: bytes) -> bytes:
 
 
 def play_seconds(seconds: float, steps: int) -> float:
-    """How long to wait for the skill to finish: its delays plus a margin for the moves."""
+    """How long to wait for the skill to finish (kept for callers that know the nominal time)."""
     return seconds + 0.6 + 0.05 * steps
