@@ -167,6 +167,8 @@ class LazyOnnxEmbedder:
             self._timer = None
             import gc
             gc.collect()
+            from ..util.ort_memory import trim_heap
+            trim_heap()
             _mem_note("embedder released")
 
 

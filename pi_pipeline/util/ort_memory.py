@@ -38,3 +38,17 @@ def lean_sessions():
         yield
     finally:
         ort.InferenceSession = orig
+
+
+def trim_heap() -> bool:
+    """Hand freed heap memory back to the OS (glibc `malloc_trim(0)`). Freeing a model leaves its memory in the process's heap; on the Pi (2026-11-07 probe) releasing Piper changed the
+    resident size by nothing until the heap was trimmed. Returns True if it ran (Linux with glibc only; never raises)."""
+    try:
+        import ctypes
+        import sys
+        if not sys.platform.startswith("linux"):
+            return False
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+        return True
+    except Exception:  # noqa: BLE001
+        return False

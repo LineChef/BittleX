@@ -113,6 +113,8 @@ class PiperTTS:
                 return False
             self._voice = None
         gc.collect()
+        from ..util.ort_memory import trim_heap
+        trim_heap()                                             # (without it the freed model stays in the process: probe on the Pi, 2026-11-07)
         _mem_note("speech engine released")
         return True
 
