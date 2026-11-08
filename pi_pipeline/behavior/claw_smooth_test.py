@@ -1,7 +1,7 @@
 """Try the claw raise at several speeds and step rates so the smoothest can be picked by eye (owner, 2026-11-08: "I see that same jerkiness when we raise the claw in the claw look").
 
 Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped. G2 goes to the attention pose (`kcalib`, where the claw look raises it), then for each setting raises the claw to the look height,
-holds a moment, lowers it, and says which setting it was; then he stands up and rests. Stops at the first fall (nothing more is sent).
+holds a moment, lowers it, and says which setting it was; then he stands up and rests. Stops at the first fall (then lays him in the rest position).
 
     python -m pi_pipeline.behavior.claw_smooth_test            # the default set of settings
     python -m pi_pipeline.behavior.claw_smooth_test --set 40:40 --set 60:20     # speed deg/s : steps a second
@@ -68,8 +68,7 @@ def main() -> None:
     except KeyboardInterrupt:
         print("ended")
     finally:
-        if not fell:
-            link.send("krest", read_reply=False, settle=0.0)
+        link.send("krest", read_reply=False, settle=0.0)          # always, a fall included (owner, 2026-11-08)
 
 
 if __name__ == "__main__":

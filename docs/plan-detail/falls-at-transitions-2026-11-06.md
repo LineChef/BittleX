@@ -1,6 +1,6 @@
 # Falls at pose and gait transitions (HIGH PRIORITY, opened 2026-11-06)
 
-**Standing rule (owner, 2026-11-08): never leave G2 standing when the voice service is offline: use `pi_pipeline/behavior/service_off.sh` (rests him first, only if he reads upright) instead of a bare `systemctl stop g2-voice`.**
+**Standing rules (owner, 2026-11-08): after any detected fall, lay G2 in the rest position (the drill, `claw_smooth_test`, `drill_block.sh stop` and `service_off.sh` all do); and never leave G2 standing when the voice service is offline: use `pi_pipeline/behavior/service_off.sh` (rests him first, only if he reads upright) instead of a bare `systemctl stop g2-voice`.**
 
 **Next hardware session tools (2026-11-08): `pi_pipeline/behavior/drill_block.sh VARIANT [LAST] [FIRST] [-- --turns-only]` runs a block back to back (refuses while g2-voice is running; `stop` kills it and sends nothing to G2); the drill now counts a stand-up that swings 30 deg as a fall, stops at 30 deg off level, runs 1.5 s turns, has `--turns-only` (stand once, then only turns and stops, so the levers are tested where they act), no longer flags the late `balance` echo, `--measure` needs no variant, and sends no `krest` to a G2 that fell.**
 

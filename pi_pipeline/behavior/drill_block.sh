@@ -2,17 +2,17 @@
 # Run on the Pi: a block of transition-drill rounds back to back, one go for the block (owner, 2026-11-07). Stops at the first fall or a real void round; writes one file per round and a status file.
 #   pi_pipeline/behavior/drill_block.sh VARIANT [LAST_ROUND] [FIRST_ROUND] [-- extra drill args, e.g. --turns-only]
 #   G2_GYRO_BALANCE=0 pi_pipeline/behavior/drill_block.sh baseline 3        # the gyro-balance A/B: the same block with the env set to 0 and to 1
-#   pi_pipeline/behavior/drill_block.sh stop                                # kill a running block; sends NOTHING to G2 (add "rest" to send krest, only when he is standing)
+#   pi_pipeline/behavior/drill_block.sh stop                                # kill a running block and lay G2 in the rest position (owner, 2026-11-08: always rest him after a fall; add "norest" to send nothing)
 # Refuses to start while the g2-voice service is running (it shares the serial port: it ran beside the drill for 25 minutes on 2026-11-07).
 D=${G2_HW_DIR:-$HOME/g2_runs/hw_$(date +%Y%m%d)}; mkdir -p "$D"; cd "$(dirname "$0")/../.." || exit 1
 if [ "$1" = "stop" ]; then
   kill -TERM "$(cat "$D/runner.pid" 2>/dev/null)" 2>/dev/null
   for p in $(pgrep -f "behavior.transition_drill"); do kill -KILL "$p" 2>/dev/null; done
   echo "$(date +%T) STOPPED BY HAND" >> "$D/status_stop.txt"
-  if [ "$2" = "rest" ]; then pi_pipeline/.venv/bin/python -c "
+  if [ "$2" = "norest" ]; then echo "drill killed; nothing sent to G2"
+  else pi_pipeline/.venv/bin/python -c "
 from pi_pipeline.link.serial_link import SerialLink
-lk = SerialLink('/dev/serial0'); lk.connect(); lk.send('krest', read_reply=False, settle=0.0); print('krest sent')" 2>&1 | grep -v '^LOG' | tail -1
-  else echo "drill killed; nothing sent to G2"; fi
+lk = SerialLink('/dev/serial0'); lk.connect(); lk.send('krest', read_reply=False, settle=0.0); print('drill killed; krest sent')" 2>&1 | grep -v '^LOG' | tail -1; fi
   exit 0
 fi
 V=$1; N=${2:-3}; S=${3:-1}; shift 3 2>/dev/null; [ "$1" = "--" ] && shift

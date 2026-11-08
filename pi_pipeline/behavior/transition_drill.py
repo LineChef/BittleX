@@ -109,7 +109,7 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = T
 def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: float = 2.5, watch_s: float = 1.5) -> dict:
     """Stand up from rest `cycles` times (rest, then the stand-up under test, then the tilt for `watch_s` seconds), nothing else: the stand-up on its own (2026-11-08: it tipped him over toward the side whose
     legs rose later; is it the firmware stand-up, the gyro balance being off, or the Pi's sequenced rise?). The stand-up is whatever the switches say (`G2_STAND_VIA`, `G2_GYRO_BALANCE`). Stops at the first fall
-    (nothing is sent to a fallen G2). Returns {"cycles", "fell", "fell_at", "worst_swing_deg", "near_falls", "swings"}."""
+    (the caller then lays him in the rest position). Returns {"cycles", "fell", "fell_at", "worst_swing_deg", "near_falls", "swings"}."""
     lk = robot._lk
     worst, near, swings, fell = 0.0, 0, [], False
     done, vmins, poses = 0, [], []
@@ -259,11 +259,10 @@ def main() -> None:
     except KeyboardInterrupt:
         print("ended")
     finally:
-        if not fell:                                    # nothing is sent to a G2 that fell: a rest command to one lying with a leg out dropped him again (2026-11-07)
-            try:
-                link.send("krest", read_reply=False, settle=0.0)
-            except Exception:  # noqa: BLE001
-                pass
+        try:                                            # always laid in the rest position at the end, a fall included (owner, 2026-11-08: "make sure we always put g2 in rest position after a fall is detected"; he cannot do it by hand)
+            link.send("krest", read_reply=False, settle=0.0)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 if __name__ == "__main__":
