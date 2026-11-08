@@ -408,6 +408,13 @@ class SerialLink:
             from . import kskill
             t = kskill.tuning()
             data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"]))
+            try:
+                from pi_pipeline.attachments import flag_explicit_on
+                if flag_explicit_on("gyro_balance"):             # G2_GYRO_BALANCE=1 (owner, 2026-11-08: "turn the gyro on for the standup"): the gyro balance is ON while the board plays the rise
+                    self._write_pose("gB")                       # (the stand-up wrapper above turns it off for the Pi's own streamed ramps, which the balance loop fights; the K skill is the board's own motion)
+                    time.sleep(0.2)
+            except ImportError:
+                pass
             self._ser.write(data)
             self._ser.flush()
             time.sleep(t["wait_s"])

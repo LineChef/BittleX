@@ -155,7 +155,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_GOAL_STATE` | `STATE` | `journal.py` | [`goals.md`](goals.md) |
 | `G2_GOAL_SUGGEST` | `"1"` | `suggestions.py` | [`goals.md`](goals.md) |
 | `G2_GRUNT` | `"1"` | `loop.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
-| `G2_GYRO_BALANCE` | — | `__init__.py`, `drill_block.sh`, `transition_drill.py` | [`settings-switches.md`](settings-switches.md), [`falls-at-transitions-2026-11-06.md`](../plan-detail/falls-at-transitions-2026-11-06.md), [`hardware-run-2026-11-07.md`](../plan-detail/hardware-run-2026-11-07.md) |
+| `G2_GYRO_BALANCE` | — | `__init__.py`, `drill_block.sh`, `transition_drill.py` +1 | [`settings-switches.md`](settings-switches.md), [`falls-at-transitions-2026-11-06.md`](../plan-detail/falls-at-transitions-2026-11-06.md), [`hardware-run-2026-11-07.md`](../plan-detail/hardware-run-2026-11-07.md) |
 | `G2_GYRO_GAITS` | `""` | `serial_link.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GYRO_GAIT_GAP_S` | `"0.3"` | `serial_link.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_HEAD` | `"0"` | `sinks.py`, `gestures.py` | [`capabilities.md`](../capabilities.md) |

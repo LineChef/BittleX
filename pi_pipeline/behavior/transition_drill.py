@@ -152,6 +152,7 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
         except Exception:  # noqa: BLE001
             pass
         poses.append(pose)
+        lk.send("gb", read_reply=False, settle=0.0)                  # the gyro balance back off after each stand-up (it may have been switched on for it): never left on at rest or in the attention pose, where the board took the pose for a fall
         if pose not in ("stand", "?"):
             say(f"   NOT STANDING: the board reads the pose as {pose!r} (a stand-up the board ignored or did not finish)")
         vmins.append(round(min(volts), 2) if volts else None)

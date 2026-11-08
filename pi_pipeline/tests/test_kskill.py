@@ -77,3 +77,29 @@ def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environ
     monkeypatch.setenv("G2_STAND_SPEED", "junk")
     ov.write_text("not json")
     assert kskill.tuning()["speed"] == 20 and mf.get("CLAW_DEG_S") == 60.0                       # junk falls through to the file's number
+
+
+def test_the_k_stand_up_plays_with_the_gyro_on_when_asked(monkeypatch):
+    """Owner, 2026-11-08: "turn the gyro on for the standup": G2_GYRO_BALANCE=1 sends gB before the K skill (and nothing turns it off during the rise)."""
+    from pi_pipeline.link import serial_link
+    from pi_pipeline.link.serial_link import SerialLink
+    prof = {"stand_via": "kskill", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
+    monkeypatch.setattr(standup, "_poses", lambda: prof)
+    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    out = []
+
+    class Ser:
+        is_open = True
+        def write(self, b): out.append(bytes(b))
+        def flush(self): pass
+    lk = SerialLink("/dev/null")
+    lk._ser = Ser()
+    lk.last_motion_command = "krest"
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    assert lk._stand_up_kskill(standup) and out[0][:1] == b"K"                      # gyro off: just the skill
+    out.clear()
+    lk.last_motion_command = "krest"
+    monkeypatch.setenv("G2_GYRO_BALANCE", "1")
+    assert lk._stand_up_kskill(standup)
+    assert out[0].strip() == b"gB" and out[1][:1] == b"K"                           # gyro on first, then the skill
