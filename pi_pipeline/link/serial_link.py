@@ -332,7 +332,27 @@ class SerialLink:
         self._ser.flush()
 
     def _stand_up(self):
-        """The eased stand-up from lying or sitting to the balance pose. Returns the balance pose (Petoi leg order) if it ran, else None."""
+        """The eased stand-up from lying or sitting to the balance pose. Returns the balance pose (Petoi leg order) if it ran, else None.
+        With the gyro balance allowed (the arm since 2026-11-08) it is turned off for the ramp, which the firmware's 5 Hz balance loop fights (2026-10-18: the legs slipped), and on again once he is up."""
+        try:
+            from pi_pipeline.attachments import flag_explicit_on
+            gyro = flag_explicit_on("gyro_balance")      # only where the gyro balance is switched on by name (the arm); the stock robot's stand-up is unchanged
+        except ImportError:
+            gyro = False
+        if gyro:
+            try:
+                self._write_pose("gb")
+            except Exception:  # noqa: BLE001
+                gyro = False
+        done = self._stand_up_ramp()
+        if gyro:
+            try:
+                self._write_pose("gB")
+            except Exception:  # noqa: BLE001
+                pass
+        return done
+
+    def _stand_up_ramp(self):
         try:
             from pi_pipeline.gait import standup
         except ImportError:                       # scripts run by path (fw_skill_log.py, run_gait.py) have pi_pipeline/ itself on sys.path, not the repo root

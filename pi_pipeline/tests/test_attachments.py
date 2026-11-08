@@ -632,3 +632,33 @@ def test_the_shipped_arm_runs_with_the_gyro_balance_on(monkeypatch):
     lk.send("gB", read_reply=False, settle=0.0)
     lk._gyro_off_if_needed()
     assert lk._ser.out == ["gB"]
+
+
+def test_an_env_switch_overrides_the_profile_flag_for_one_run(monkeypatch):
+    """User, 2026-11-08: G2_GYRO_BALANCE=0 / 1 (any profile flag: G2_<KEY>) decides for a run, so the gyro balance can be A/B tested without editing the profile."""
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    assert A.flag("gyro_balance", "arm") is True                       # the shipped arm profile
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    assert A.flag("gyro_balance", "arm") is False and A.flag_safe("gyro_balance") in (True, False)
+    monkeypatch.setenv("G2_GYRO_BALANCE", "1")
+    assert A.flag("gyro_balance", "arm") is True
+    assert A.flag("easing", "arm") is False                            # other flags untouched
+
+
+def test_the_stand_up_ramp_runs_with_the_gyro_balance_off_and_turns_it_on_after(monkeypatch):
+    """User, 2026-11-08: the arm runs with the gyro balance on; the firmware's balance loop fights an eased stand-up (2026-10-18), so the ramp is bracketed gb ... gB."""
+    from pi_pipeline.gait import standup
+    from pi_pipeline.link.serial_link import SerialLink
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    out = []
+    lk = SerialLink("/dev/null")
+    lk._write_pose = out.append
+    lk.last_motion_command = "kcalib"
+    monkeypatch.setattr(standup, "stand_from_attention", lambda send, sleep, last: (send("i8 40"), True)[1])
+    assert lk._stand_up() is not None
+    assert out == ["gb", "i8 40", "gB"]
+    out.clear()
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")                          # gyro off for the run: nothing extra is sent
+    lk.last_motion_command = "kcalib"
+    assert lk._stand_up() is not None and out == ["i8 40"]

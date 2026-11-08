@@ -265,10 +265,29 @@ def register(attachment: str, policy: str, *, trim: str | None = None, payload_p
 
 
 def flag(key: str, attachment: str | None = None, profiles: dict | None = None) -> bool:
-    """A behaviour switch from the fitted attachment's profile (easing, gyro_balance, gait_switching, skills): on unless the profile says false."""
+    """A behaviour switch from the fitted attachment's profile (easing, gyro_balance, gait_switching, skills): on unless the profile says false.
+    `G2_<KEY>=0|1` (for example `G2_GYRO_BALANCE=0`) overrides the profile for one run, so a hardware A/B needs no profile edit and no deploy (user, 2026-11-08)."""
+    ov = os.environ.get("G2_" + key.upper(), "").strip().lower()
+    if ov in ("1", "on", "true", "yes"):
+        return True
+    if ov in ("0", "off", "false", "no"):
+        return False
     att = attachment or current()
     v = ((profiles if profiles is not None else load_profiles()).get(att) or {}).get(key)
     return True if v is None else bool(v)
+
+
+def flag_explicit_on(key: str) -> bool:
+    """True only when the switch is turned on by name: `G2_<KEY>=1`, or the fitted attachment's profile says true (a missing key is "on" for `flag` but not here). Never raises."""
+    try:
+        ov = os.environ.get("G2_" + key.upper(), "").strip().lower()
+        if ov in ("1", "on", "true", "yes"):
+            return True
+        if ov in ("0", "off", "false", "no"):
+            return False
+        return ((load_profiles().get(current()) or {}).get(key)) is True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def flag_safe(key: str) -> bool:

@@ -1,5 +1,7 @@
 # Falls at pose and gait transitions (HIGH PRIORITY, opened 2026-11-06)
 
+**Next hardware session: A/B the gyro balance (owner, 2026-11-08: "I'm hoping having gyro balance on might help reduce falls"): the arm now runs with it on by default; run the same drill block with `G2_GYRO_BALANCE=0` and `=1` (all of tonight's 2026-11-07 rounds ran with it effectively off, so there is no data on it).**
+
 **Results of the first hardware run (2026-11-07): [`hardware-run-2026-11-07.md`](hardware-run-2026-11-07.md). Main finding: 8 of 9 falls were at the attention pose or the stand-up from it, not at turns or stops; no lever showed a benefit.**
 
 **State at the end of the first hardware session: nothing is proven.** The guards below are built, tested in code and deployed, but no A/B round has valid evidence yet. Do not write the approach into the project-wide guidelines until one variant clearly beats the baseline (owner's rule); this page is where it gets written up from.
