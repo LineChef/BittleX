@@ -37,6 +37,11 @@ def main() -> None:
     ap.add_argument("--no-memory", action="store_true", help="run without persistent memory")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+    try:
+        from ..util.ort_memory import single_arena
+        single_arena()                                                # (one malloc arena: a model reloaded on a background thread no longer ends up bigger; docs/plan-detail/voice-service-memory-2026-11-07.md)
+    except Exception:  # noqa: BLE001
+        pass
     try:                                                              # the memory log (diag/memlog.py): one reading a minute, kept for debugging after runs
         from ..diag import memlog
         memlog.start("voice service start")

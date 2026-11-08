@@ -52,3 +52,18 @@ def trim_heap() -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+def single_arena() -> bool:
+    """Use ONE malloc arena for the whole process (`mallopt(M_ARENA_MAX, 1)`; `G2_MALLOC_ARENAS=many` leaves glibc's default). A model loaded on a background thread (Piper's reload after a release)
+    otherwise goes into that thread's own arena and the main thread's freed memory is not reused: on the Pi a background reload ended 37 MB larger than the first load (probe 2026-11-07).
+    Call it once, early, before the worker threads start. Returns True if it was set."""
+    try:
+        import ctypes
+        import os
+        import sys
+        if not sys.platform.startswith("linux") or os.environ.get("G2_MALLOC_ARENAS", "").strip().lower() == "many":
+            return False
+        return ctypes.CDLL("libc.so.6").mallopt(-8, 1) == 1              # M_ARENA_MAX = -8
+    except Exception:  # noqa: BLE001
+        return False

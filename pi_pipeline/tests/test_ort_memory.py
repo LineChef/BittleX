@@ -64,3 +64,8 @@ def test_piper_tts_release_and_reload(monkeypatch, tmp_path):
         time.sleep(0.02)
     assert t.loaded and len(loads) == 3
     assert T.release_speech(object()) is False                             # an engine that cannot release is left alone
+
+
+def test_heap_helpers_never_raise():
+    assert ort_memory.trim_heap() in (True, False)
+    assert ort_memory.single_arena() in (True, False)
