@@ -43,7 +43,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_API_WARMUP` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_ATTACHMENT` | `""` | `__init__.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](attachments.md) |
 | `G2_ATTACHMENT_FILE` | `"~/.local/share/g2/attachment.json"` | `__init__.py` | [`attachments.md`](attachments.md) |
-| `G2_ATT_STAND` | `"smooth"` | `standup.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_ATT_STAND` | `"smooth"` | `standup.py` | [`settings-switches.md`](settings-switches.md), [`hardware-run-2026-11-07.md`](../plan-detail/hardware-run-2026-11-07.md) |
 | `G2_AUDIO_GATE` | `"1"` | `audio_gate.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_AUTOLOG` | `"on"` | `autolog.py` | [`capabilities.md`](../capabilities.md), [`real-data-pipeline.md`](../rl/real-data-pipeline.md) |
 | `G2_AUTOLOG_DIR` | `"~/g2_runs/auto"` | `autolog.py` | [`settings-switches.md`](settings-switches.md) |
@@ -100,7 +100,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_CYCLE_STOP` | `"0"` | `ball_chase.py` | [`settings-switches.md`](settings-switches.md), [`falls-at-transitions-2026-11-06.md`](../plan-detail/falls-at-transitions-2026-11-06.md) |
 | `G2_DATA_DIR` | `"~/g2_data"` | `g2_calibrate.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_DECISION_LOG` | `DECISION_LOG` | `ball_chase.py` | [`punt.md`](punt.md) |
-| `G2_DEFAULT_GAIT` | `""` | `ball_chase.py`, `config.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_DEFAULT_GAIT` | `""` | `ball_chase.py`, `config.py` | [`settings-switches.md`](settings-switches.md), [`hardware-run-2026-11-07.md`](../plan-detail/hardware-run-2026-11-07.md) |
 | `G2_DETECTION_LOG` | `"on"` | `detection_filter.py` | [`.env.example`](../../.env.example) |
 | `G2_DETECTION_LOG_DIR` | `"~/g2_runs/detections"` | `detection_filter.py`, `wall_stats.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_DISK_WARN_PCT` | `85.0` | `config.py` | [`.env.example`](../../.env.example), [`diagnostics.md`](../hardware/diagnostics.md) |
@@ -151,7 +151,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_GOAL_STATE` | `STATE` | `journal.py` | [`goals.md`](goals.md) |
 | `G2_GOAL_SUGGEST` | `"1"` | `suggestions.py` | [`goals.md`](goals.md) |
 | `G2_GRUNT` | `"1"` | `loop.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
-| `G2_GYRO_BALANCE` | — | `__init__.py`, `drill_block.sh` | [`settings-switches.md`](settings-switches.md), [`falls-at-transitions-2026-11-06.md`](../plan-detail/falls-at-transitions-2026-11-06.md) |
+| `G2_GYRO_BALANCE` | — | `__init__.py`, `drill_block.sh` | [`settings-switches.md`](settings-switches.md), [`falls-at-transitions-2026-11-06.md`](../plan-detail/falls-at-transitions-2026-11-06.md), [`hardware-run-2026-11-07.md`](../plan-detail/hardware-run-2026-11-07.md) |
 | `G2_HEAD` | `"0"` | `sinks.py`, `gestures.py` | [`capabilities.md`](../capabilities.md) |
 | `G2_HEAD_RECALL` | `""` | `recall.py` | [`STATUS.md`](../STATUS.md), [`ai-head-implementation.md`](../planned/ai-head/ai-head-implementation.md), [`head-role-prompts.md`](../planned/ai-head/head-role-prompts.md) |
 | `G2_HISTORY_TURNS` | `12` | `config.py` | [`.env.example`](../../.env.example) |

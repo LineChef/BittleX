@@ -169,3 +169,20 @@ def test_load_voltage_check_asks_periodically_and_alerts_on_a_sagging_pack():
     assert chk.tick(9.0) is None
     assert chk.tick(10.0) == (BatteryLevel.CRITICAL, 6.6)
     assert seen[0] == 7.5 and 6.6 in seen
+
+
+def test_a_sagged_low_reading_is_re_read_and_the_best_one_decides(monkeypatch):
+    """2026-11-07: a goal read 8% (7.33 V) one attempt after 64% (7.81 V) and ended the session; the pack had only sagged."""
+    from pi_pipeline.power import battery as B
+    reads = iter([(False, 8, 7.33), (False, 12, 7.40), (True, 64, 7.81)])
+    monkeypatch.setattr(B, "motion_gate", lambda link, **kw: next(reads))
+    waits = []
+    assert B.settled_gate(object(), sleep=waits.append) == (True, 64, 7.81) and waits == [4.0, 4.0]
+    low = iter([(False, 8, 7.33), (False, 9, 7.35), (False, 7, 7.30)])
+    monkeypatch.setattr(B, "motion_gate", lambda link, **kw: next(low))
+    ok, pct, v = B.settled_gate(object(), sleep=lambda s: None)
+    assert ok is False and pct == 9                                       # still low after resting: the best reading is reported
+    monkeypatch.setattr(B, "motion_gate", lambda link, **kw: (True, 70, 7.9))
+    assert B.settled_gate(object(), sleep=lambda s: (_ for _ in ()).throw(AssertionError("no wait for a normal reading"))) == (True, 70, 7.9)
+    monkeypatch.setattr(B, "motion_gate", lambda link, **kw: (True, None, None))
+    assert B.settled_gate(object(), sleep=lambda s: (_ for _ in ()).throw(AssertionError("no wait for an unreadable pack"))) == (True, None, None)

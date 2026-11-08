@@ -1720,3 +1720,20 @@ def test_a_sidestep_ends_facing_the_ball_again_so_it_stays_in_the_cameras_view()
     facing = a.degrees + a.degrees2                                                          # the heading after both turns, from straight ahead
     toward = math.degrees(math.atan2(0.0 - px, 10.0 - py))                                   # the ball is straight ahead at 10 in
     assert abs(facing - toward) < 1.0
+
+
+def test_a_claw_look_is_metered_in_the_background_and_its_time_is_in_the_trace(monkeypatch):
+    """User, 2026-11-08: the claw look is slow in the chase. The light is metered while the claw is still moving, and the trace says where the time went."""
+    class Cam(FakeCamera):
+        def __init__(self, frames):
+            super().__init__(frames); self.events = []
+        def refresh_exposure(self): self.events.append("fresh")
+        def premeter(self, force=False): self.events.append(("premeter", force))
+    cam = Cam([picture(), picture()])
+    bc.LOST_LOOKS, bc.CLAW_PAN_SIGN = 1, "right"
+    trace, said = [], []
+    bc.claw_scan(ClawRobot(), cam, bc.ChasePlanner(), sleep=lambda s: None, say=said.append, trace=trace)
+    assert cam.events[:2] == ["fresh", ("premeter", True)]                                   # metering is started before the claw moves
+    look = next(e for e in trace if e["kind"] == "claw_look")
+    assert {"raise", "pan", "settle", "camera", "find", "lower"} <= set(look["phases_s"])
+    assert any("claw look time" in m for m in said)

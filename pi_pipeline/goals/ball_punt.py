@@ -222,7 +222,7 @@ class BallPunt:
             ok = self.robot.battery_ok() if self.robot is not None else True
             return ok, "battery ok" if ok else "battery low"
         from ..power import battery
-        ok, pct, volts = battery.motion_gate(self._link)
+        ok, pct, volts = battery.settled_gate(self._link, min_percent=min_pct)       # a low reading is re-read before it ends a session (sag)
         self.last_pack_pct = pct
         if pct is None:
             return ok, ("battery unreadable: continuing (testing)" if ok else "battery unreadable")

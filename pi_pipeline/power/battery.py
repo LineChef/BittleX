@@ -99,6 +99,27 @@ def motion_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, attempts: int = 
     return pct >= min_percent, pct, v
 
 
+def settled_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, rest_reads: int = 2, rest_s: float = 4.0, sleep=None) -> tuple[bool, int | None, float | None]:
+    """`motion_gate`, but a LOW reading is not believed at once: the pack sags under load (a goal's battery gate read 8% / 7.33 V one attempt after 64% / 7.81 V and ended the session, 2026-11-07), so the
+    low reading is re-read `rest_reads` times, `rest_s` apart (nothing moves meanwhile), and the best of them decides. A normal reading, and an unreadable one, are returned as `motion_gate` gives them."""
+    import time as _time
+    sleep = sleep or _time.sleep
+    ok, pct, v = motion_gate(link, min_percent=min_percent)
+    if ok or pct is None:
+        return ok, pct, v
+    best = (pct, v)
+    for _ in range(max(0, rest_reads)):
+        sleep(rest_s)
+        ok2, pct2, v2 = motion_gate(link, min_percent=min_percent)
+        if pct2 is not None and pct2 > best[0]:
+            best = (pct2, v2)
+        if ok2:
+            log.info("battery read low (%s%%), then %s%% after resting: sag, going on", pct, pct2)
+            return True, pct2, v2
+    log.warning("battery still low after %d re-reads (best %s%%, %.2f V)", rest_reads, best[0], best[1])
+    return False, best[0], best[1]
+
+
 class BatteryLevel(IntEnum):
     OK = 0
     LOW = 1

@@ -137,7 +137,7 @@ class DiscoverObjects:
         if link is None:
             return True, "battery not checked (no link)"
         from ..power import battery
-        ok, pct, volts = battery.motion_gate(link)
+        ok, pct, volts = battery.settled_gate(link, min_percent=min_pct)
         self.last_pack_pct = pct
         if pct is None:
             return ok, "battery unreadable: continuing" if ok else "battery unreadable"
