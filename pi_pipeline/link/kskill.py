@@ -69,13 +69,20 @@ def tuning() -> dict:
     """The stand-up's timing, from pi_pipeline/motion_feel.py (STAND_STEPS, STAND_SPEED, STAND_PAUSE, STAND_WAIT_S: that file, the owner's override file on the Pi, or G2_<NAME> for one run).
     2026-11-08 on the board: 18 frames, speed 12, a pause after each was symmetric (roll -2..+2) but "way too slow and jerky"; 8 frames, speed 24, no pause "looked good", a bit snappy."""
     from .. import motion_feel as mf
-    return {"steps": max(2, int(mf.get("STAND_STEPS"))), "speed": max(1, int(mf.get("STAND_SPEED"))), "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, mf.get("STAND_WAIT_S"))}
+    steps, speed = max(2, int(mf.get("STAND_STEPS"))), max(1, int(mf.get("STAND_SPEED")))
+    mid, slow_n = int(mf.get("STAND_SPEED_MID")), max(0, int(mf.get("STAND_SLOW_STAGES")))
+    speeds = [speed] * steps
+    if mid > 0:                                           # slow at the start and the end, fast through the middle (owner, 2026-11-08: the half-up pose is where he tips)
+        for k in range(slow_n, steps - slow_n):
+            speeds[k] = max(1, mid)
+    return {"steps": steps, "speed": speed, "speeds": speeds, "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, mf.get("STAND_WAIT_S"))}
 
 
-def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0) -> bytes:
-    """The stand-up skill: `steps` frames, each a move at `speed_raw` / 8 followed by a pause of `delay_raw` x 50 ms."""
+def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0, speeds: list | None = None) -> bytes:
+    """The stand-up skill: `steps` frames, each a move at `speed_raw` / 8 (or its own entry of `speeds`) followed by a pause of `delay_raw` x 50 ms."""
     frames = stand_frames(start_urdf, goal_urdf, lift0, lift1, steps)
-    return behavior_payload(frames, [speed_raw] * len(frames), [delay_raw] * len(frames))
+    sp = list(speeds) if speeds is not None and len(speeds) == len(frames) else [speed_raw] * len(frames)
+    return behavior_payload(frames, sp, [delay_raw] * len(frames))
 
 
 def message(payload: bytes) -> bytes:

@@ -407,7 +407,7 @@ class SerialLink:
                 return False
             from . import kskill
             t = kskill.tuning()
-            data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"]))
+            data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
             try:
                 from pi_pipeline.attachments import flag_explicit_on
                 if flag_explicit_on("gyro_balance"):             # G2_GYRO_BALANCE=1 (owner, 2026-11-08: "turn the gyro on for the standup"): the gyro balance is ON while the board plays the rise

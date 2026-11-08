@@ -68,7 +68,7 @@ def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environ
     monkeypatch.setenv("G2_MOTION_FEEL", str(ov))
     for k in ("G2_STAND_STEPS", "G2_STAND_SPEED", "G2_STAND_PAUSE", "G2_STAND_WAIT_S"):
         monkeypatch.delenv(k, raising=False)
-    assert kskill.tuning() == {"steps": 8, "speed": 20, "delay": 0, "wait_s": 2.6}              # the numbers in the file
+    assert kskill.tuning() == {"steps": 8, "speed": 20, "speeds": [20] * 8, "delay": 0, "wait_s": 2.6}      # the numbers in the file
     ov.write_text('{"STAND_SPEED": 16, "STAND_WAIT_S": 3.0}')
     t = kskill.tuning()
     assert t["speed"] == 16 and t["wait_s"] == 3.0 and t["steps"] == 8                           # the override file wins, only for what it names
@@ -103,3 +103,16 @@ def test_the_k_stand_up_plays_with_the_gyro_on_when_asked(monkeypatch):
     monkeypatch.setenv("G2_GYRO_BALANCE", "1")
     assert lk._stand_up_kskill(standup)
     assert out[0].strip() == b"gB" and out[1][:1] == b"K"                           # gyro on first, then the skill
+
+
+def test_unequal_speed_is_slow_at_the_ends_and_fast_in_the_middle(monkeypatch, tmp_path):
+    ov = tmp_path / "feel.json"
+    ov.write_text('{"STAND_SPEED": 12, "STAND_SPEED_MID": 28, "STAND_SLOW_STAGES": 2}')
+    monkeypatch.setenv("G2_MOTION_FEEL", str(ov))
+    for k in ("G2_STAND_STEPS", "G2_STAND_SPEED", "G2_STAND_SPEED_MID", "G2_STAND_SLOW_STAGES"):
+        monkeypatch.delenv(k, raising=False)
+    t = kskill.tuning()
+    assert t["speeds"] == [12, 12, 28, 28, 28, 28, 12, 12]
+    data = kskill.stand_payload([64, -50, 64, -50, 74, -56, 74, -56], [15, 56, 15, 56, 20, 50, 20, 50], 59, 0, steps=8, speed_raw=12, speeds=t["speeds"])
+    got = [data[7 + k * kskill.FRAME_LEN + 16] for k in range(8)]
+    assert got == [12, 12, 28, 28, 28, 28, 12, 12]                                  # the speed byte of each frame
