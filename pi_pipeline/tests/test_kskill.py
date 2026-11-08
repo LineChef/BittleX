@@ -62,12 +62,18 @@ def test_the_link_plays_the_stand_up_as_a_k_skill_only_when_asked(monkeypatch):
     assert lk._stand_up_kskill(standup) is False and wrote == []              # only from rest
 
 
-def test_the_timing_comes_from_the_environment(monkeypatch):
-    for k in ("G2_KSKILL_STEPS", "G2_KSKILL_SPEED", "G2_KSKILL_DELAY", "G2_KSKILL_WAIT_S"):
+def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environment(monkeypatch, tmp_path):
+    from pi_pipeline import motion_feel as mf
+    ov = tmp_path / "feel.json"
+    monkeypatch.setenv("G2_MOTION_FEEL", str(ov))
+    for k in ("G2_STAND_STEPS", "G2_STAND_SPEED", "G2_STAND_PAUSE", "G2_STAND_WAIT_S"):
         monkeypatch.delenv(k, raising=False)
-    assert kskill.tuning() == {"steps": 8, "speed": 24, "delay": 0, "wait_s": 2.2}
-    monkeypatch.setenv("G2_KSKILL_STEPS", "12")
-    monkeypatch.setenv("G2_KSKILL_DELAY", "1")
-    monkeypatch.setenv("G2_KSKILL_SPEED", "junk")
+    assert kskill.tuning() == {"steps": 8, "speed": 20, "delay": 0, "wait_s": 2.6}              # the numbers in the file
+    ov.write_text('{"STAND_SPEED": 16, "STAND_WAIT_S": 3.0}')
     t = kskill.tuning()
-    assert t["steps"] == 12 and t["delay"] == 1 and t["speed"] == 24            # a bad value falls back to the default
+    assert t["speed"] == 16 and t["wait_s"] == 3.0 and t["steps"] == 8                           # the override file wins, only for what it names
+    monkeypatch.setenv("G2_STAND_SPEED", "12")
+    assert kskill.tuning()["speed"] == 12                                                         # the environment wins over both
+    monkeypatch.setenv("G2_STAND_SPEED", "junk")
+    ov.write_text("not json")
+    assert kskill.tuning()["speed"] == 20 and mf.get("CLAW_DEG_S") == 60.0                       # junk falls through to the file's number

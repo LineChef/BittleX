@@ -66,17 +66,10 @@ def stand_frames(start_urdf, goal_urdf, lift0=None, lift1=None, steps: int = 18,
 
 
 def tuning() -> dict:
-    """The stand-up's timing, from the environment so it can be tuned on the robot without a deploy: G2_KSKILL_STEPS (frames, default 8), G2_KSKILL_SPEED (raw speed, firmware speed = raw / 8, default 24),
-    G2_KSKILL_DELAY (raw pause after each frame in 50 ms units, default 0), G2_KSKILL_WAIT_S (how long the Pi waits for it to finish, default 2.2). 2026-11-08, first try on the board (18 frames, speed 12, pause 2 each):
-    symmetric (roll -2..+2) but "way too slow and jerky": a pause after every frame and the firmware easing each frame from a standstill."""
-    import os
-
-    def num(key, default):
-        try:
-            return float(os.environ.get(key, "").strip() or default)
-        except ValueError:
-            return float(default)
-    return {"steps": max(2, int(num("G2_KSKILL_STEPS", 8))), "speed": max(1, int(num("G2_KSKILL_SPEED", 24))), "delay": max(0, int(num("G2_KSKILL_DELAY", 0))), "wait_s": max(0.5, num("G2_KSKILL_WAIT_S", 2.2))}
+    """The stand-up's timing, from pi_pipeline/motion_feel.py (STAND_STEPS, STAND_SPEED, STAND_PAUSE, STAND_WAIT_S: that file, the owner's override file on the Pi, or G2_<NAME> for one run).
+    2026-11-08 on the board: 18 frames, speed 12, a pause after each was symmetric (roll -2..+2) but "way too slow and jerky"; 8 frames, speed 24, no pause "looked good", a bit snappy."""
+    from .. import motion_feel as mf
+    return {"steps": max(2, int(mf.get("STAND_STEPS"))), "speed": max(1, int(mf.get("STAND_SPEED"))), "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, mf.get("STAND_WAIT_S"))}
 
 
 def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0) -> bytes:

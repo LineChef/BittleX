@@ -100,8 +100,10 @@ CLAW_RAISE_FIRST = True        # (user, 2026-11-02) from the attention pose the 
                                # pan left, picture, pan right, picture, back to the centre still raised, and lower it last
 CLAW_LIFT_MAX_DEG = 120.0     # the most claw_pose will ask of the lift servo (the Pi's own limit for joint angles; the firmware takes up to 127)
 CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: LEFT on G2 (2026-11-01, pictures taken 1.3 s after each move: pan +35 put the ball 73 px to the right = camera 35 deg left, pan -35 about 39 deg right; the user saw the claw swing left); claw_look --calibrate can re-measure it
-CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
-CLAW_STEPS_PER_S = 40
+from .. import motion_feel as _feel  # noqa: E402
+
+CLAW_DEG_S = _feel.get("CLAW_DEG_S")              # how fast the arm moves for a look, deg/s (below the 80 deg/s cap on eased moves): the number is in pi_pipeline/motion_feel.py
+CLAW_STEPS_PER_S = int(_feel.get("CLAW_STEPS_PER_S"))      # position commands a second while the arm moves (also motion_feel.py). 2026-11-08: the raise looks jerky
 CLAW_LOOK_POSE = "kcalib"      # the pose he holds for the claw look (user, 2026-11-01): the BiBoard's "attention" pose, the one the legs are calibrated in; "ksit" is the sit it replaced. He stands up normally afterwards (`kbalance`)
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
 CLAW_POSE_S = 2.0              # to settle into the attention pose
