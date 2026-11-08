@@ -89,7 +89,6 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_PREPOSITION` | off (unproven) | before a firmware turn or walk the Pi eases the legs to the skill's first frame itself, even where the link does not know the pose |
 | `G2_EASED_STOP` | off (test) | the normal end of a timed turn or back-up freezes the legs at the gait's estimated pose and eases to balance (0.8 s at most) before `kbalance`; never for an emergency stop; needs a gait period |
 | `G2_ORT_ARENA` | off | `1` puts back onnxruntime's memory arena for Piper and the embedder (the default frees about 20 MB once Piper has spoken, same speed) |
-| `G2_DEFAULT_GAIT` | scripted (since 2026-11-08) | `scripted`: walks are Petoi's firmware gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, the chase and the exploration walk with the firmware gait (no bump signal from the walk); `policy` brings the learned walk back |
 | `G2_MALLOC_ARENAS` | unset (one arena) | `many` leaves glibc's default of several malloc arenas in the voice service; the single arena keeps a model reloaded on a background thread from ending up bigger |
 | `G2_RELEASE_VOICE` | on | an in-process goal session or exploration roam frees Piper's memory (about 155 MB) at its start and loads it again in the background at its end; a line that needs synthesis during the session loads it first (about 10 s); `0` keeps it loaded |
 | `G2_GAIT_CYCLE_S` | unset | one gait period in seconds (0.25-2.0) for every gait: overrides the measured file |
@@ -136,7 +135,7 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 | `G2_NOISE_LOG` | `~/.local/share/g2/noise.jsonl` | the log of BiBoard commands that make a noise; `off` turns the file off |
 | `G2_GAIT_MODE_FILE`, `G2_GALLERY_PENDING` | `~/.local/share/g2/gait_mode.json`, `.../gallery_pending.json` | the shared gait mode and the pictures queued for the object gallery |
 | `G2_STATE_DIR` | `~/.local/share/g2` | where `bringup` keeps its progress file |
-| `G2_DEFAULT_GAIT` | `policy` | `firmware` goes back to the stock scripted `wkF` for forward walking |
+| `G2_DEFAULT_GAIT` | `firmware` (since 2026-11-08; was `policy`) | `firmware`: walks are Petoi's scripted gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, and the chase and the exploration walk with it (no bump signal from the walk); `policy` brings the learned walk back |
 | `G2_CONVERSATION_WINDOW_S`, `G2_CONVERSATION_MAX_S` | 20, 600 | conversation mode ("let's talk"): how long G2 waits for you to start each turn, and the session limit; 0 for the window turns the mode off |
 | `G2_CONVERSATION_MAX_WORDS`, `G2_SIDE_MAX_WORDS` | 30, 14 | a turn heard without the wake word that runs longer than this is dropped before Claude (the first number applies in conversation mode); 0 means no limit |
 | `G2_VOLUME` | 65 | the one volume, percent of max, for every sound G2 plays (his voice, the tones, the alarms, the camera sounds) and the buzzer (65 -> `b6`); held to 75. No sound has a level of its own |

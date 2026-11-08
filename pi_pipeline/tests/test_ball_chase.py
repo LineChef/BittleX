@@ -1146,7 +1146,7 @@ def test_eased_stop_does_nothing_without_a_period_or_a_writer(monkeypatch, tmp_p
 
 def test_with_the_scripted_default_gait_a_chase_walk_is_the_firmware_walk(monkeypatch):
     """User, 2026-11-08: the default gait is Petoi's scripted arm gait (`kwkF`, played as `wkArmF` on the arm); no learned walker is made."""
-    monkeypatch.setenv("G2_DEFAULT_GAIT", "scripted")
+    monkeypatch.setenv("G2_DEFAULT_GAIT", "firmware")
     sent = []
 
     class L:
