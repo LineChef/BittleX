@@ -128,3 +128,26 @@ def test_the_default_confidence_floor_is_0_6_and_the_env_can_turn_it_off(monkeyp
     assert min_confidence() == 0.6
     monkeypatch.setenv("G2_WAKE_MIN_CONF", "0")
     assert min_confidence() == 0.0
+
+
+def test_a_missing_microphone_keeps_the_service_up_and_still_takes_a_poked_command(monkeypatch):
+    """2026-11-08: `PortAudioError: Error querying device -1` killed the service and systemd restarted it 27 times. Now the wake word waits and retries."""
+    from pi_pipeline.voice import wake_word as W
+    w = object.__new__(W.VoskWakeWord)
+    w._poked, w._pending, w._handover = None, None, False
+    tries = []
+
+    def ensure():
+        tries.append(1)
+        if len(tries) < 3:
+            raise RuntimeError("Error querying device -1")
+    w._ensure_stream = ensure
+    clock = {"t": 0.0}
+    monkeypatch.setattr(W.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(W.time, "sleep", lambda s: clock.__setitem__("t", clock["t"] + s))
+    assert w._open_or_wait() is True and len(tries) == 3                          # it retried until the microphone came back
+    tries.clear()
+    w2 = object.__new__(W.VoskWakeWord)
+    w2._poked, w2._pending, w2._handover = "ball goal", None, False
+    w2._ensure_stream = lambda: (_ for _ in ()).throw(RuntimeError("Error querying device -1"))
+    assert w2._open_or_wait() is False and w2._pending == "ball goal" and w2._handover is True      # no microphone, but the command handed in from outside still arrives

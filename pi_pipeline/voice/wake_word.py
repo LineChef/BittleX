@@ -310,8 +310,39 @@ class VoskWakeWord:
             pass
         return rec
 
+    MIC_RETRY_FIRST_S, MIC_RETRY_MAX_S, MIC_LOG_EVERY_S = 2.0, 30.0, 60.0
+
+    def _open_or_wait(self) -> bool:
+        """Open the microphone stream, and when there is no audio device (2026-11-08: the service died with `PortAudioError: Error querying device -1` and systemd restarted it 27 times in 20
+        minutes, each restart re-sending the voice-module commands and reloading the speech model) stay up instead: retry with a backoff (2 s growing to 30 s), say so once a minute, and
+        still take a command handed in from outside (`g2goal run`, the stop file). True once the stream is open; False if a command arrived meanwhile (it is in `_pending`)."""
+        delay, last_log, down_since = self.MIC_RETRY_FIRST_S, 0.0, None
+        while True:
+            try:
+                self._ensure_stream()
+                if down_since is not None:
+                    log.warning("the microphone is back after %.0f s", time.monotonic() - down_since)
+                return True
+            except Exception as e:  # noqa: BLE001  -- PortAudioError and friends
+                now = time.monotonic()
+                if down_since is None:
+                    down_since = now
+                if now - last_log >= self.MIC_LOG_EVERY_S:
+                    last_log = now
+                    log.warning("no microphone (%s): the wake word cannot run; the service stays up and retries (every %.0f s now)", e, delay)
+                end = now + delay
+                while time.monotonic() < end:
+                    if self._poked is not None:
+                        self._pending, self._poked = self._poked, None
+                        self._handover = True
+                        log.info("command handed in from outside while there is no microphone: %r", self._pending)
+                        return False
+                    time.sleep(0.25)
+                delay = min(self.MIC_RETRY_MAX_S, delay * 1.5)
+
     def wait(self) -> None:
-        self._ensure_stream()
+        if not self._open_or_wait():
+            return
         self._handover = False
         q = self._q
         try:

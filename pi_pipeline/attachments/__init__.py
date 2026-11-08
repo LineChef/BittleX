@@ -332,6 +332,31 @@ def voice_module_language(attachment: str | None = None, profiles: dict | None =
     return None if value == "off" else value
 
 
+VOICE_MODULE_MIN_GAP_S = 600.0
+
+
+def _voice_module_stamp() -> str:
+    return os.path.expanduser(os.environ.get("G2_VOICE_MODULE_STAMP", "~/.local/share/g2/voice_module_applied"))
+
+
+def _voice_module_recent() -> bool:
+    """True if the English setting was sent less than VOICE_MODULE_MIN_GAP_S ago (a timestamp file): a crash loop must not send it on every restart. Never raises."""
+    try:
+        return 0 <= time.time() - float(open(_voice_module_stamp()).read().strip()) < VOICE_MODULE_MIN_GAP_S
+    except (OSError, ValueError):
+        return False
+
+
+def _voice_module_note() -> None:
+    try:
+        p = _voice_module_stamp()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w") as f:
+            f.write(f"{time.time():.0f}\n")
+    except OSError:
+        pass
+
+
 def apply_voice_module_language(link, attachment: str | None = None) -> bool:
     """Send the profile's voice-module language to the BiBoard: `XAc` (enable), a pause, then `XAa` (English). Only English is supported; any other value is logged and ignored.
     Returns whether the commands were sent. Never raises."""
@@ -342,6 +367,9 @@ def apply_voice_module_language(link, attachment: str | None = None) -> bool:
     if want != "english":
         log.warning("attachment %s: voice_module_language %r is not supported (only 'english'); nothing sent", att, want)
         return False
+    if _voice_module_recent():
+        log.info("attachment %s: the voice module was set to English less than %.0f s ago: not sent again (a restart loop would send it every 50 s)", att, VOICE_MODULE_MIN_GAP_S)
+        return False
     try:
         from ..link import opencat
         link.send(opencat.VOICE_MODULE_ENABLE, read_reply=True)         # the board answers every X command with a stray 'X': read it so the later `?` reads the real banner
@@ -350,6 +378,7 @@ def apply_voice_module_language(link, attachment: str | None = None) -> bool:
     except Exception as e:  # noqa: BLE001 -- must never stop the service
         log.warning("attachment %s: could not set the voice module to English (%s)", att, e)
         return False
+    _voice_module_note()
     log.info("attachment %s: BiBoard voice module set to English (profile)", att)
     return True
 

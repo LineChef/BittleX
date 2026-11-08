@@ -662,3 +662,20 @@ def test_the_stand_up_ramp_runs_with_the_gyro_balance_off_and_turns_it_on_after(
     monkeypatch.setenv("G2_GYRO_BALANCE", "0")                          # gyro off for the run: nothing extra is sent
     lk.last_motion_command = "kcalib"
     assert lk._stand_up() is not None and out == ["i8 40"]
+
+
+def test_the_voice_module_english_setting_is_not_sent_again_within_ten_minutes(monkeypatch, tmp_path):
+    """2026-11-08: the service crash-looped 27 times in 20 minutes and sent XAc/XAa to the BiBoard on every restart."""
+    import time as _t
+    sent = []
+
+    class Link:
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return ""
+    monkeypatch.setattr(A.time, "sleep", lambda s: None)
+    assert A.apply_voice_module_language(Link(), "arm") is True and sent == ["XAc", "XAa"]
+    assert A.apply_voice_module_language(Link(), "arm") is False and sent == ["XAc", "XAa"]       # a moment later: skipped
+    p = A._voice_module_stamp()
+    open(p, "w").write(f"{_t.time() - A.VOICE_MODULE_MIN_GAP_S - 5:.0f}\n")                      # long ago: sent again
+    assert A.apply_voice_module_language(Link(), "arm") is True and sent == ["XAc", "XAa", "XAc", "XAa"]
