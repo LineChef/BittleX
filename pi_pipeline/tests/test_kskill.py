@@ -127,3 +127,31 @@ def test_unequal_speed_is_slow_at_the_ends_and_fast_in_the_middle(monkeypatch, t
     data = kskill.stand_payload([64, -50, 64, -50, 74, -56, 74, -56], [15, 56, 15, 56, 20, 50, 20, 50], 59, 0, steps=8, speed_raw=12, speeds=t["speeds"])
     got = [data[7 + k * kskill.FRAME_LEN + 16] for k in range(8)]
     assert got == [12, 12, 28, 28, 28, 28, 12, 12]                                  # the speed byte of each frame
+
+
+def test_the_k_stand_up_from_the_attention_pose_is_on_unless_switched_off(monkeypatch):
+    """The attention-pose stand-up (where most of the 2026-11-07 falls were) uses the K skill (STAND_ATT_KSKILL, on since 2026-11-08); the legs start straight and the lift servo is not eased."""
+    from pi_pipeline.link import serial_link
+    from pi_pipeline.link.serial_link import SerialLink
+    prof = {"stand_via": "kbalance", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
+    monkeypatch.setattr(standup, "_poses", lambda: prof)
+    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    monkeypatch.delenv("G2_STAND_VIA", raising=False)
+    wrote = []
+
+    class Ser:
+        is_open = True
+        def write(self, b): wrote.append(bytes(b))
+        def flush(self): pass
+    lk = SerialLink("/dev/null")
+    lk._ser = Ser()
+    lk.last_motion_command = "kcalib"
+    monkeypatch.setenv("G2_STAND_ATT_KSKILL", "0")
+    assert lk._stand_up_kskill(standup) is False and wrote == []              # switched off for the run
+    monkeypatch.delenv("G2_STAND_ATT_KSKILL", raising=False)
+    assert lk._stand_up_kskill(standup) is True                               # the default
+    k = next(w for w in wrote if w[:1] == b"K")
+    first = [b - 256 if b > 127 else b for b in k[8:8 + 20]]                  # frame 0
+    assert first[1] == 0 and first[10] > 0                                    # the lift servo stays at 0 (not eased from 59); the rear legs have begun to rise from straight

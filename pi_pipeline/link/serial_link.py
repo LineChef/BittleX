@@ -400,14 +400,19 @@ class SerialLink:
         return transitions.balance_pose()
 
     def _stand_up_kskill(self, standup) -> bool:
-        """Stand up from rest with a `K` skill (link/kskill.py) when `G2_STAND_VIA=kskill`. True if it ran."""
+        """Stand up with a `K` skill (link/kskill.py): from rest by default, from the attention pose when motion_feel.STAND_ATT_KSKILL is on. True if it ran."""
         try:
             p = standup._poses()
-            if not p or not standup.use_kskill(p) or (self.last_motion_command or "").strip() not in ("", "d", "krest", "kzz"):
+            last = (self.last_motion_command or "").strip()
+            from .. import motion_feel
+            from_att = last == "kcalib" and bool(p) and motion_feel.get("STAND_ATT_KSKILL") >= 1       # from the attention pose (legs straight), once tested
+            if not p or not standup.use_kskill(p) or (last not in ("", "d", "krest", "kzz") and not from_att):
                 return False
             from . import kskill
             t = kskill.tuning()
-            data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
+            start = list(standup.ATTENTION_URDF_DEG) if from_att else standup.rest_pose()
+            lift0, lift1 = (None, None) if from_att else (p.get("arm_rest"), p.get("arm_walk"))         # from the attention pose the claw is already down: only the legs rise
+            data = kskill.message(kskill.stand_payload(start, standup.balance_pose(), lift0, lift1, steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
             from .. import motion_feel
             from pi_pipeline.attachments import flag_explicit_on
             keep_on = flag_explicit_on("gyro_balance")             # the gyro balance is on for the whole run (G2_GYRO_BALANCE=1): leave it

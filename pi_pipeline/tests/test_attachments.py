@@ -652,6 +652,7 @@ def test_the_stand_up_ramp_runs_with_the_gyro_balance_off_and_turns_it_on_after(
     from pi_pipeline.link.serial_link import SerialLink
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     monkeypatch.setenv("G2_GYRO_BALANCE", "1")                          # on for this run (it is off by default)
+    monkeypatch.setenv("G2_STAND_ATT_KSKILL", "0")                      # (the attention-pose stand-up is the board-played K skill by default since 2026-11-08: this tests the Pi-streamed one)
     out = []
     lk = SerialLink("/dev/null")
     lk._write_pose = out.append
