@@ -621,6 +621,23 @@ Key docs (in docs/):
 EOF
 }
 
+# g2rest  -- lay G2 in the rest position and stop the voice service (the Pi's behavior/service_off.sh: rest first, then service off). The service stays off until `g2voiceon` or the next reboot.
+g2rest() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && bash pi_pipeline/behavior/service_off.sh"; }
+# g2voiceon  -- start the Pi's voice service again (only with G2 at rest: it can move him).
+g2voiceon() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting"; }
+# g2standup [N]  -- N (default 1) eased K stand-ups from rest (service stopped first, hands near), swing and pack printed, then G2 is laid in rest again. Uses the Pi's deployed code and motion_feel numbers.
+g2standup() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2rest || return 1
+  ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.transition_drill --stand-only --cycles ${1:-1}"
+}
+# g2deploy  -- ship the last COMMIT of pi_pipeline/ and the deployed policy to the Pi (rsync) and restart the voice service. Commit first; the Pi must be idle (no walk, no ball goal).
+g2deploy() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  ( cd "$G2_ROOT" && git status --short -- pi_pipeline | grep -v '^??' | sed 's/^/not committed (not deployed): /' )
+  bash "$G2_ROOT/tools/g2_deploy_when_online.sh" --once
+}
+
 # g2help  -- print the bare list of helpers with their one-line comments.
 g2help() { grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | grep -v '^g2help' | sed 's/() *{.*# */\t/; s/() *{.*//'; }
 

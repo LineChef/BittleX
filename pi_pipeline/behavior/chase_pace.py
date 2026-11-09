@@ -20,8 +20,8 @@ WALL_PACE_START_S = WALK_START_S
 SHORT_TURN_S = 1.6             # a turn this short or shorter is an alignment pulse
 
 DEFAULTS = {"walk_in_s": 4.2,                     # the policy walk with the arm: ARM1R 4 ft 5 in in 12.5 s on hardwood (2026-10-25)
-            "turn_deg_s": 6.0,                    # Petoi's arm turn: 30 deg in 4.8 s (2026-10-25)
-            "pulse_deg_s": 4.0}                   # a guess: a short pulse turns less per second than a long turn
+            "turn_deg_s": 28.0,                   # Petoi's firmware turn (kwkL / kwkR, the default gait since 11-03): about 28 deg/s measured; the old 6.0 was the arm-build policy turn (2026-10-25) and made every plain turn overshoot about four times
+            "pulse_deg_s": 24.0}                  # a short pulse turns a little less per second than a long turn (line-up pulses also stop on the gyro)
 LIMITS = {"walk_in_s": (0.5, 15.0), "turn_deg_s": (0.5, 40.0), "pulse_deg_s": (0.3, 40.0)}
 
 

@@ -151,5 +151,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | Command | What it does |
 |---|---|
 | `g2docs` | print the list of key docs (the full index is docs/README.md) |
+| `g2voiceon` | start the Pi's voice service again (only with G2 at rest: it can move him). |
+| `g2standup [N]` | N (default 1) eased K stand-ups from rest (service stopped first, hands near), swing and pack printed, then G2 is laid in rest again. Uses the Pi's deployed code and motion_feel numbers. |
 | `g2help` | print the bare list of helpers with their one-line comments. |
 | `g2oddleg [note]` | flag an odd leg the moment you see one after a stand-up (a different leg ~2% of the time): writes the time, your note and the last leg checks (angles the board held, pack volts, tilt) to ~/.local/share/g2/odd_leg.jsonl on the Pi, so the logs can be lined up with what you saw. Sends nothing to G2. |

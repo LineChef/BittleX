@@ -329,7 +329,7 @@ def test_walks_and_turns_are_timed_from_the_measured_pace(tmp_path):
     assert book.record_walk(reading(10, 0), reading(12, 0), 2.0) is None           # pushed (farther after the walk): not a pace
     for _ in range(2):
         book.record_turn(reading(12, 20), reading(12, 8), 20.0, 1.0)              # a right pulse swung the ball 12 deg left: 12 deg/s
-    assert book.turn_deg_s(1, True) > 8 and book.turn_deg_s(-1, True) == 4.0        # per side: left is still the default
+    assert book.turn_deg_s(1, True) < 24.0 and book.turn_deg_s(-1, True) == 24.0       # per side: left is still the default
     assert json.load(open(tmp_path / "pace.json"))["k"]["walk_in_s"]["n"] == 3      # kept on disk
 
 

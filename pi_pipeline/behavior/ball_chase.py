@@ -499,7 +499,7 @@ class ChasePlanner:
             deg = max(-MAX_TURN_DEG, min(MAX_TURN_DEG, ball.bearing_deg))
             side = 1 if deg > 0 else -1
             self.turn_before = float(ball.bearing_deg)
-            return Action("turn", max(MIN_MOVE_S, abs(deg) / self._turn_rate(side, False)), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
+            return Action("turn", max(MIN_MOVE_S, abs(deg) / self._turn_rate(side, False)), deg, stop_deg=abs(deg), why=f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
         if near and self.after_punt and ball.distance_in > CLOSE_IN_IN:
             self.after_punt = False
             return Action("walk", 0.9, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer", scripted=NUDGE_GAIT == "scripted")
@@ -1642,7 +1642,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 planner.last_bearing, planner.last_edge = float(b), False
                 if abs(b) > 8.0:
                     side = 1 if b > 0 else -1
-                    state = robot.turn(b, max(MIN_MOVE_S, abs(min(abs(b), MAX_TURN_DEG)) / planner._turn_rate(side, False)))
+                    state = robot.turn(b, max(MIN_MOVE_S, abs(min(abs(b), MAX_TURN_DEG)) / planner._turn_rate(side, False)), stop_deg=abs(min(abs(b), MAX_TURN_DEG)))
                     note(kind="act", act="turn", why=f"the ball was {b:+.0f} deg off in the claw look from the sit: turn toward it", state=state, degrees=round(b, 1))
                     if state == "fell":
                         say("G2 fell: stopping (fall recovery is off)")
