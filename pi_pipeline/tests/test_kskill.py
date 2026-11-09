@@ -207,3 +207,52 @@ def test_when_the_eased_stand_up_cannot_run_the_command_is_dropped_not_sent_as_a
     lk._ease_transition = SerialLink._ease_transition.__get__(lk)
     assert lk.send("kbalance", read_reply=False, settle=0.0) == ""
     assert not any(w.strip() == b"kbalance" for w in wrote)                              # no firmware stand-up reached the wire
+
+
+def test_the_attention_stand_up_has_its_own_slower_numbers(monkeypatch, tmp_path):
+    monkeypatch.setenv("G2_MOTION_FEEL", str(tmp_path / "none.json"))
+    for k in ("G2_STAND_SPEED", "G2_STAND_ATT_SPEED", "G2_STAND_SPEED_MID", "G2_STAND_ATT_SPEED_MID", "G2_STAND_WAIT_S", "G2_STAND_ATT_WAIT_S"):
+        monkeypatch.delenv(k, raising=False)
+    rest, att = kskill.tuning(), kskill.tuning(from_attention=True)
+    assert rest["speeds"] == [12, 12, 28, 28, 28, 28, 12, 12] and rest["wait_s"] == 3.4          # the rest stand-up is unchanged
+    assert att["speeds"] == [10, 10, 22, 22, 22, 22, 10, 10] and att["wait_s"] == 4.0            # the attention-pose stand-up is a little slower
+    assert all(a < r for a, r in zip(att["speeds"], rest["speeds"]))
+
+
+def test_the_move_into_the_attention_pose_is_an_eased_k_skill_and_kcalib_is_not_sent(monkeypatch):
+    """Owner, 2026-11-08: he sat hard into the attention position. The Pi plays the move as an eased K skill (untested on G2 until the next session)."""
+    from pi_pipeline.link.serial_link import SerialLink
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    prof = standup._poses()
+    att_legs = [0] * 16
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: [0] * 16)                    # the legs read as straight: the attention pose reached
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    lk.last_motion_command = "kbalance"
+    assert lk.send("kcalib", read_reply=False, settle=0.0) == ""
+    assert not any(w.strip() == b"kcalib" for w in wrote)                                         # the firmware kcalib never reached the wire
+    k = _k_message(wrote)
+    assert k[:1] == b"K" and k[-1:] == b"~" and lk.last_motion_command == "kcalib"
+    n = [b - 256 if b > 127 else b for b in k[1:8]]
+    assert n[0] == -6                                                                            # six stages
+    last = [b - 256 if b > 127 else b for b in k[1 + 7 + 5 * 20:1 + 7 + 6 * 20]]
+    assert last[8:16] == [0] * 8 and last[0:8] == [0] * 8                                        # the last stage is the attention pose (legs straight), the arm joints at 0
+    wrote.clear()
+    assert lk._attention_entry_eased() is True and wrote == []                                   # already there: nothing is sent
+    lk.last_motion_command = "kwkF"
+    assert lk._attention_entry_eased() is False and wrote == []                                  # an unknown pose: the caller sends the firmware kcalib as before
+    monkeypatch.setenv("G2_ATT_ENTRY_EASED", "0")
+    lk.last_motion_command = "kbalance"
+    assert lk._attention_entry_eased() is False                                                  # switched off in motion_feel
+    del att_legs, prof
+
+
+def test_the_eased_entry_forces_the_attention_pose_when_the_board_does_not_report_it(monkeypatch):
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: [30] * 16)                    # still standing
+    monkeypatch.delenv("G2_ATT_ENTRY_EASED", raising=False)
+    lk.last_motion_command = "kbalance"
+    assert lk._attention_entry_eased() is True
+    forced = [w for w in wrote if w.startswith(b"i8 ")]
+    assert len(forced) == 2 and forced[0].strip() == standup.move_cmd([0.0] * 8).encode()       # forced to legs straight, twice

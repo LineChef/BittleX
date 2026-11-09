@@ -14,6 +14,17 @@ THE STAND-UP (the ONLY stand-up on the arm build, from rest, sit, the attention 
   STAND_PAUSE   a pause after each stage, in 50 ms units. 0 = none. Any pause makes it stop-and-go.        (0)
   STAND_WAIT_S  how long the Pi waits for the rise to finish before the next command. Lower the speed, raise this.   (3.4)
 
+THE STAND-UP OUT OF THE ATTENTION POSE has its own, slightly slower numbers (owner, 2026-11-08: "standups out of the attention position were getting close to falling"); the rest stand-up above is unchanged.
+  STAND_ATT_SPEED       slow speed at the first and last stages (the same idea as STAND_SPEED).                      (10; the rest stand-up uses 12)
+  STAND_ATT_SPEED_MID   the faster middle stages.                                                                   (22; the rest stand-up uses 28)
+  STAND_ATT_WAIT_S      the longest the Pi waits for the board to finish (it stops waiting as soon as the legs read as up).   (4.0)
+
+EASING INTO THE ATTENTION POSE (owner, 2026-11-08: he "sits hard into the attention position"; the firmware `kcalib` moves every joint at once at full speed). UNTESTED on G2 until the next session.
+  ATT_ENTRY_EASED   1 = the Pi plays the move into the attention pose as an eased K skill (and the firmware `kcalib` is not sent); 0 = the firmware `kcalib` as before.   (1)
+  ATT_ENTRY_STEPS   stages of the move.                                                                              (6)
+  ATT_ENTRY_SPEED   speed of each stage (the firmware speed is this / 8: bigger = faster, harder).                    (10)
+  ATT_ENTRY_WAIT_S  the longest the Pi waits for the legs to read as in the attention pose.                           (3.0)
+
 THE CLAW RAISE / SWING IN A LOOK (the arm's two servos are sent a new position this many times a second)
   CLAW_DEG_S         how fast the arm moves, in degrees a second. SMALLER = SLOWER.                        (60)
   CLAW_STEPS_PER_S   position commands a second while it moves. More = finer steps.   (100: of 60/40, 40/40, 60/100 and 30/60 the owner picked 60 deg/s at 100 a second as smoothest, 2026-11-08)
@@ -30,6 +41,13 @@ STAND_SPEED_MID = 28
 STAND_SLOW_STAGES = 2
 STAND_PAUSE = 0
 STAND_WAIT_S = 3.4
+STAND_ATT_SPEED = 10
+STAND_ATT_SPEED_MID = 22
+STAND_ATT_WAIT_S = 4.0
+ATT_ENTRY_EASED = 1
+ATT_ENTRY_STEPS = 6
+ATT_ENTRY_SPEED = 10
+ATT_ENTRY_WAIT_S = 3.0
 
 CLAW_DEG_S = 60.0
 CLAW_STEPS_PER_S = 100

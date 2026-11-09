@@ -65,17 +65,22 @@ def stand_frames(start_urdf, goal_urdf, lift0=None, lift1=None, steps: int = 18,
     return frames
 
 
-def tuning() -> dict:
-    """The stand-up's timing, from pi_pipeline/motion_feel.py (STAND_STEPS, STAND_SPEED, STAND_PAUSE, STAND_WAIT_S: that file, the owner's override file on the Pi, or G2_<NAME> for one run).
-    2026-11-08 on the board: 18 frames, speed 12, a pause after each was symmetric (roll -2..+2) but "way too slow and jerky"; 8 frames, speed 24, no pause "looked good", a bit snappy."""
+def tuning(from_attention: bool = False) -> dict:
+    """The stand-up's timing, from pi_pipeline/motion_feel.py (that file, the owner's override file on the Pi, or G2_<NAME> for one run). `from_attention` uses the attention pose's own, slightly slower
+    numbers (STAND_ATT_*). 2026-11-08 on the board: 18 frames, speed 12, a pause after each was symmetric (roll -2..+2) but "way too slow and jerky"; 8 frames, speed 24, no pause "looked good", a bit snappy;
+    the stand-up out of the attention pose was then "getting close to falling" and is a little slower."""
     from .. import motion_feel as mf
-    steps, speed = max(2, int(mf.get("STAND_STEPS"))), max(1, int(mf.get("STAND_SPEED")))
-    mid, slow_n = int(mf.get("STAND_SPEED_MID")), max(0, int(mf.get("STAND_SLOW_STAGES")))
+    steps = max(2, int(mf.get("STAND_STEPS")))
+    if from_attention:
+        speed, mid, wait = max(1, int(mf.get("STAND_ATT_SPEED"))), int(mf.get("STAND_ATT_SPEED_MID")), mf.get("STAND_ATT_WAIT_S")
+    else:
+        speed, mid, wait = max(1, int(mf.get("STAND_SPEED"))), int(mf.get("STAND_SPEED_MID")), mf.get("STAND_WAIT_S")
+    slow_n = max(0, int(mf.get("STAND_SLOW_STAGES")))
     speeds = [speed] * steps
     if mid > 0:                                           # slow at the start and the end, fast through the middle (owner, 2026-11-08: the half-up pose is where he tips)
         for k in range(slow_n, steps - slow_n):
             speeds[k] = max(1, mid)
-    return {"steps": steps, "speed": speed, "speeds": speeds, "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, mf.get("STAND_WAIT_S"))}
+    return {"steps": steps, "speed": speed, "speeds": speeds, "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, wait)}
 
 
 def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0, speeds: list | None = None) -> bytes:
@@ -143,3 +148,21 @@ def legs_reached(joints, goal_urdf, tol: float = REACHED_TOL_DEG) -> bool:
     if not joints or len(joints) < 16:
         return False
     return all(abs(joints[URDF_TO_SERVO[k]] - goal_urdf[k]) <= tol for k in range(8))
+
+
+def entry_frames(start_urdf, goal_urdf, steps: int = 6) -> list:
+    """The frames of an eased move between two leg poses (8 angles each, URDF order), all four legs together along one smooth curve. The arm joints (0-7) stay at 0: the claw is down."""
+    frames = []
+    for k in range(1, steps + 1):
+        w = _smooth(k / steps)
+        f = [0.0] * DOF
+        for idx in range(8):
+            f[URDF_TO_SERVO[idx]] = start_urdf[idx] + (goal_urdf[idx] - start_urdf[idx]) * w
+        frames.append(f)
+    return frames
+
+
+def entry_payload(start_urdf, goal_urdf, *, steps: int = 6, speed_raw: int = 10) -> bytes:
+    """The `K` payload for an eased move into the attention pose (or any leg pose): `steps` frames at one speed, no pauses."""
+    frames = entry_frames(start_urdf, goal_urdf, steps)
+    return behavior_payload(frames, [speed_raw] * len(frames), [0] * len(frames))

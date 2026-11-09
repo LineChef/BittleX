@@ -177,6 +177,8 @@ class SerialLink:
         if command.strip() == "gB" and not self._gyro_allowed():
             command = "gb"                        # the fitted attachment runs with the firmware gyro balance off (attachments.flag "gyro_balance")
         try:
+            if command.strip() == "kcalib" and self._attention_entry_eased():     # the move into the attention pose is eased (owner, 2026-11-08: it sat hard into it): the firmware kcalib is not sent
+                return ""
             self._ease_transition(command)
             if self._stand_refused:                          # the eased stand-up could not run: nothing else is sent in its place (a horn tells the owner), he stays as he is
                 self._stand_refused = False
@@ -408,6 +410,50 @@ class SerialLink:
         transitions.play(standup.ramp_poses(start, standup.balance_pose(), secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
         return transitions.balance_pose()
 
+    def _attention_entry_eased(self) -> bool:
+        """Move into the attention pose (legs straight) as an eased `K` skill instead of the firmware `kcalib` (which drives every joint at once at full speed). UNTESTED on G2 until the next session
+        (motion_feel.ATT_ENTRY_EASED turns it off). True if it handled the command (including "already there"); False means the caller sends `kcalib` as before."""
+        try:
+            from pi_pipeline.gait import standup
+            from .. import motion_feel
+            p = standup._poses()
+            if not p or motion_feel.get("ATT_ENTRY_EASED") < 1:
+                return False
+            last = (self.last_motion_command or "").strip()
+            if last == "kcalib":
+                return True                                                # already in the attention pose: nothing to do
+            if last in ("kbalance", "kup"):
+                start = list(standup.balance_pose())
+            elif last in ("d", "krest", "kzz"):
+                start = list(standup.rest_pose())
+            elif last == "ksit":
+                start = list(standup.SIT_URDF_DEG)
+            else:
+                return False                                               # unknown pose: the firmware kcalib as before
+            from . import kskill
+            goal = list(standup.ATTENTION_URDF_DEG)
+            data = kskill.message(kskill.entry_payload(start, goal, steps=int(motion_feel.get("ATT_ENTRY_STEPS")), speed_raw=int(motion_feel.get("ATT_ENTRY_SPEED"))))
+            kskill.write_chunked(self._ser.write, data, time.sleep)
+            self._ser.flush()
+            waited, reached = 0.0, False
+            while waited < motion_feel.get("ATT_ENTRY_WAIT_S"):
+                time.sleep(kskill.POLL_S)
+                waited += kskill.POLL_S + 0.25
+                if waited >= kskill.MIN_WAIT_S and kskill.legs_reached(kskill.read_joints(self), goal):
+                    reached = True
+                    break
+            if not reached:
+                log.warning("eased move into the attention pose: the board did not report it after %.1f s: forcing it", waited)
+                for _ in range(2):
+                    self._write_pose(standup.move_cmd(goal))
+                    time.sleep(0.3)
+            self.last_motion_command, self._last_motion_t = "kcalib", time.monotonic()
+            log.info("moved into the attention pose as an eased K skill (%d bytes)", len(data))
+            return True
+        except Exception as e:  # noqa: BLE001  -- fall back to the firmware kcalib
+            log.warning("eased move into the attention pose failed (%s): the firmware kcalib follows", e)
+            return False
+
     def _stand_up_kskill(self, standup) -> bool:
         """THE stand-up (link/kskill.py): the whole rise as one `K` skill the board plays itself, from rest, a sit, the attention pose, or (when the pose is not known) the leg angles the board reports.
         Waits until the board reports the stand pose, forces it if it does not get there, gyro on during the rise and off right after. True if it ran; False means NOTHING was done (never a firmware stand-up)."""
@@ -431,7 +477,7 @@ class SerialLink:
                     return False
                 start = [float(j[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
                 lift0, lift1 = float(j[1]), p.get("arm_walk")
-            t = kskill.tuning()
+            t = kskill.tuning(from_attention=(last == "kcalib"))
             data = kskill.message(kskill.stand_payload(start, standup.balance_pose(), lift0, lift1, steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
             from pi_pipeline.attachments import flag_explicit_on
             keep_on = flag_explicit_on("gyro_balance")             # the gyro balance is on for the whole run (G2_GYRO_BALANCE=1): leave it
