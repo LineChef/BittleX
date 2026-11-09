@@ -217,7 +217,7 @@ YAW_SPIKE_RATE_DEG_S = 120.0   # a yaw change faster than this (plus the margin)
 YAW_SPIKE_MARGIN_DEG = 6.0
 ALIGN_CLOSE_IN = 5.0           # closer than this (camera to ball) the pulse is smaller still
 ALIGN_CLOSE_GAIN = 0.7         # ... times this
-ALIGN_TRIES = 4
+ALIGN_TRIES = 6                # (owner, 2026-11-09: "he tried to punt from really far away", the line-up ran out of tries: 3 -> 6; the goal's align_tries setting and a pin carry the same number on the Pi)
 WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch" anyway or "back_up" and line up again
 
 
