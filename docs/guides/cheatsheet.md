@@ -9,6 +9,7 @@ Commands you run, one example per row: copy it and change the value. Every optio
 | Command | Does |
 |---|---|
 | `g2rest` | rest G2 now |
+| `g2standup` | one eased stand-up from rest, then rest again (`g2standup 5` for five) |
 | `g2stop voice` | stop the voice service safely |
 | `g2reset` | restart the voice loop |
 | `g2floor hardwood` | set the floor before any walk |
@@ -18,7 +19,7 @@ Commands you run, one example per row: copy it and change the value. Every optio
 | `g2pics` | open the review page |
 | `g2sync run --force all` | copy everything from the Pi |
 | `g2mic off 30` | wake word off for 30 minutes |
-| `g2deploy` | push the last commit to the Pi |
+| `g2deploy --once` | deploy the last commit to the Pi now (no flag: waits for the Pi to come online) |
 | `g2ssh` | open a shell on the Pi |
 
 ## Stop and safety
@@ -242,6 +243,7 @@ Every command on this page and in [`cheatsheet-advanced.md`](cheatsheet-advanced
 | `g2send` | [Claw and camera](#claw-and-camera) |
 | `g2serial` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
 | `g2ssh` | [Most used](#most-used), [Setup](cheatsheet-advanced.md#setup) |
+| `g2standup` | [Most used](#most-used) |
 | `g2stop` | [Most used](#most-used), [Stop and safety](#stop-and-safety) |
 | `g2sync` | [Most used](#most-used), [Data and review](#data-and-review) |
 | `g2tb` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
