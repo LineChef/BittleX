@@ -403,21 +403,23 @@ class SerialLink:
         """Stand up from rest with a `K` skill (link/kskill.py) when `G2_STAND_VIA=kskill`. True if it ran."""
         try:
             p = standup._poses()
-            if not p or standup.stand_via(p) != "kskill" or (self.last_motion_command or "").strip() not in ("", "d", "krest", "kzz"):
+            if not p or not standup.use_kskill(p) or (self.last_motion_command or "").strip() not in ("", "d", "krest", "kzz"):
                 return False
             from . import kskill
             t = kskill.tuning()
             data = kskill.message(kskill.stand_payload(standup.rest_pose(), standup.balance_pose(), p.get("arm_rest"), p.get("arm_walk"), steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
-            try:
-                from pi_pipeline.attachments import flag_explicit_on
-                if flag_explicit_on("gyro_balance"):             # G2_GYRO_BALANCE=1 (owner, 2026-11-08: "turn the gyro on for the standup"): the gyro balance is ON while the board plays the rise
-                    self._write_pose("gB")                       # (the stand-up wrapper above turns it off for the Pi's own streamed ramps, which the balance loop fights; the K skill is the board's own motion)
-                    time.sleep(0.2)
-            except ImportError:
-                pass
+            from .. import motion_feel
+            from pi_pipeline.attachments import flag_explicit_on
+            keep_on = flag_explicit_on("gyro_balance")             # the gyro balance is on for the whole run (G2_GYRO_BALANCE=1): leave it
+            gyro = keep_on or motion_feel.get("STAND_GYRO") >= 1     # on while the board plays the rise (owner, 2026-11-08: the gyro-on stand-up was 10 of 10)
+            if gyro:
+                self._write_pose("gB")
+                time.sleep(0.2)
             self._ser.write(data)
             self._ser.flush()
             time.sleep(t["wait_s"])
+            if gyro and not keep_on:
+                self._write_pose("gb")                             # off again right after the rise: never left on in the attention / sit poses (the board's own rc / up flipped him there)
             self.last_motion_command, self._last_motion_t = "kbalance", time.monotonic()
             log.info("stand-up played as a K skill (%d bytes)", len(data))
             return True

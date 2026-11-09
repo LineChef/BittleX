@@ -154,6 +154,21 @@ def stand_via(p) -> str | None:
     return p.get("stand_via") if p else None
 
 
+def use_kskill(p) -> bool:
+    """Whether the stand-up from rest is the board-played `K` skill (link/kskill.py): the default since 2026-11-08 (owner: "the new eased standup looks good, lets keep it"; 10 of 10 stood, roll within 2 deg).
+    `G2_STAND_VIA` (kskill | kbalance | sequenced) decides for one run, else `motion_feel.STAND_KSKILL` (1). Only where there are arm poses (the stock robot keeps its own stand-up)."""
+    if not p:
+        return False
+    v = os.environ.get("G2_STAND_VIA", "").strip().lower()
+    if v in ("sequenced", "kbalance", "kskill"):
+        return v == "kskill"
+    try:
+        from .. import motion_feel
+        return motion_feel.get("STAND_KSKILL") >= 1
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The arm build's stand-up in order (profile "poses": {"stand_via": "sequenced"}; 2026-10-25: the firmware kbalance moves all eight leg joints at once and G2 fell front right
     when the nose rose with the claw out ahead). From rest: the rear legs ease to the balance pose with the front paws and the claw on the floor; the front legs follow, starting when the

@@ -38,28 +38,38 @@ def test_message_is_k_payload_tilde_and_never_holds_the_terminator():
         kskill.behavior_payload([[0] * 16] * 200, [1] * 200, [1] * 200)         # too big for the buffer
 
 
-def test_the_link_plays_the_stand_up_as_a_k_skill_only_when_asked(monkeypatch):
+def test_the_link_plays_the_stand_up_as_a_k_skill_by_default_and_not_when_switched_off(monkeypatch):
     from pi_pipeline.link import serial_link
     from pi_pipeline.link.serial_link import SerialLink
     prof = {"stand_via": "kbalance", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
     monkeypatch.setattr(standup, "_poses", lambda: prof)
     monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
     wrote = []
 
     class Ser:
         is_open = True
-        def write(self, b): wrote.append(bytes(b))
+        def write(self, b): wrote.append(bytes(b).strip())
         def flush(self): pass
     lk = SerialLink("/dev/null")
     lk._ser = Ser()
     lk.last_motion_command = "krest"
-    monkeypatch.delenv("G2_STAND_VIA", raising=False)
-    assert lk._stand_up_kskill(standup) is False and wrote == []              # the profile says kbalance
-    monkeypatch.setenv("G2_STAND_VIA", "kskill")
-    assert lk._stand_up_kskill(standup) is True and wrote[0][:1] == b"K" and wrote[0][-1:] == b"~"
+    monkeypatch.setenv("G2_STAND_VIA", "kbalance")
+    assert lk._stand_up_kskill(standup) is False and wrote == []              # switched off for the run: the plain firmware stand-up
+    monkeypatch.delenv("G2_STAND_VIA")
+    monkeypatch.delenv("G2_STAND_GYRO", raising=False)
+    assert lk._stand_up_kskill(standup) is True                               # the default
+    assert wrote[0] == b"gB" and wrote[1][:1] == b"K" and wrote[1][-1:] == b"~" and wrote[2] == b"gb"      # the gyro on for the rise, the skill, the gyro off right after
     lk.last_motion_command = "kwkF"
     wrote.clear()
     assert lk._stand_up_kskill(standup) is False and wrote == []              # only from rest
+    lk.last_motion_command = "krest"
+    monkeypatch.setenv("G2_STAND_GYRO", "0")
+    assert lk._stand_up_kskill(standup) is True and wrote[0][:1] == b"K" and b"gB" not in wrote and b"gb" not in wrote      # the gyro setting off: just the skill
+    monkeypatch.setattr(standup, "_poses", lambda: None)
+    lk.last_motion_command = "krest"
+    assert lk._stand_up_kskill(standup) is False                              # the stock robot (no arm poses) keeps its own stand-up
 
 
 def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environment(monkeypatch, tmp_path):
@@ -68,7 +78,7 @@ def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environ
     monkeypatch.setenv("G2_MOTION_FEEL", str(ov))
     for k in ("G2_STAND_STEPS", "G2_STAND_SPEED", "G2_STAND_PAUSE", "G2_STAND_WAIT_S"):
         monkeypatch.delenv(k, raising=False)
-    assert kskill.tuning() == {"steps": 8, "speed": 20, "speeds": [20] * 8, "delay": 0, "wait_s": 2.6}      # the numbers in the file
+    assert kskill.tuning() == {"steps": 8, "speed": 12, "speeds": [12, 12, 28, 28, 28, 28, 12, 12], "delay": 0, "wait_s": 3.4}      # the numbers in the file (slow at the ends, fast in the middle)
     ov.write_text('{"STAND_SPEED": 16, "STAND_WAIT_S": 3.0}')
     t = kskill.tuning()
     assert t["speed"] == 16 and t["wait_s"] == 3.0 and t["steps"] == 8                           # the override file wins, only for what it names
@@ -76,7 +86,7 @@ def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environ
     assert kskill.tuning()["speed"] == 12                                                         # the environment wins over both
     monkeypatch.setenv("G2_STAND_SPEED", "junk")
     ov.write_text("not json")
-    assert kskill.tuning()["speed"] == 20 and mf.get("CLAW_DEG_S") == 60.0                       # junk falls through to the file's number
+    assert kskill.tuning()["speed"] == 12 and mf.get("CLAW_DEG_S") == 60.0                       # junk falls through to the file's number
 
 
 def test_the_k_stand_up_plays_with_the_gyro_on_when_asked(monkeypatch):
@@ -97,6 +107,7 @@ def test_the_k_stand_up_plays_with_the_gyro_on_when_asked(monkeypatch):
     lk._ser = Ser()
     lk.last_motion_command = "krest"
     monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    monkeypatch.setenv("G2_STAND_GYRO", "0")
     assert lk._stand_up_kskill(standup) and out[0][:1] == b"K"                      # gyro off: just the skill
     out.clear()
     lk.last_motion_command = "krest"
