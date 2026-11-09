@@ -39,7 +39,12 @@ def test_the_look_takes_left_right_centre_and_ends_with_the_arm_down():
     state = claw_survey.run_claw_look(link, shots.append, "after_bow", sleep=lambda s: None)
     assert state == "ok" and shots == ["look_left", "look_right", "after_bow"]
     assert link.sent[0] == "gP" and link.sent[-1] == "gp"
-    assert link.sent[-2] == "i0 0 1 0"                                              # arm centred and lowered
+    arm = {}
+    for c in link.sent:
+        if c.startswith("i"):
+            nums = [int(x) for x in c[1:].split()]
+            arm.update(dict(zip(nums[0::2], nums[1::2])))
+    assert arm == {0: 0, 1: 0}                                                      # arm centred and lowered (each command names only the joint that changed)
 
 
 def test_a_stop_during_the_look_halts_the_arm_at_once_and_a_stop_between_moves_lowers_it():

@@ -18,7 +18,7 @@ THE STAND-UP FROM REST (the default since 2026-11-08: played by the board as one
 
 THE CLAW RAISE / SWING IN A LOOK (the arm's two servos are sent a new position this many times a second)
   CLAW_DEG_S         how fast the arm moves, in degrees a second. SMALLER = SLOWER.                        (60)
-  CLAW_STEPS_PER_S   position commands a second while it moves. More = finer steps.                        (40)
+  CLAW_STEPS_PER_S   position commands a second while it moves. More = finer steps.   (100: of 60/40, 40/40, 60/100 and 30/60 the owner picked 60 deg/s at 100 a second as smoothest, 2026-11-08)
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ STAND_PAUSE = 0
 STAND_WAIT_S = 3.4
 
 CLAW_DEG_S = 60.0
-CLAW_STEPS_PER_S = 40
+CLAW_STEPS_PER_S = 100
 
 _OVERRIDE = "~/.local/share/g2/motion_feel.json"
 

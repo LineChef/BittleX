@@ -390,7 +390,12 @@ def test_the_serial_robot_moves_only_the_arm_for_a_claw_look_within_its_limits()
     r = bc.SerialRobot(Link(), sleep=lambda s: None)
     assert r.claw_pose(90, 200) == "ok"
     moves = [c for c in sent if c.startswith("i")]
-    assert moves[-1] == f"i0 45 1 {int(bc.CLAW_LIFT_MAX_DEG)}" and all(c.split()[0] == "i0" and len(c.split()) == 4 for c in moves)    # pan clamped to 45, lift to CLAW_LIFT_MAX_DEG, no leg joints
+    state = {}
+    for c in moves:
+        nums = [int(x) for x in c[1:].split()]
+        assert nums[0::2] and set(nums[0::2]) <= {0, 1}                       # only the arm's two joints, never a leg (each command names only the joint that changed)
+        state.update(dict(zip(nums[0::2], nums[1::2])))
+    assert state == {0: 45, 1: int(bc.CLAW_LIFT_MAX_DEG)}                      # pan clamped to 45, lift to CLAW_LIFT_MAX_DEG
     assert len(moves) >= int(45 / bc.CLAW_DEG_S * bc.CLAW_STEPS_PER_S)                                       # at most CLAW_DEG_S
 
 

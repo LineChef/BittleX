@@ -1193,10 +1193,15 @@ class SerialRobot:
         self._pitch, self._roll = [], []
         self._tx("gP")
         state = "ok"
+        sent_p = sent_l = None
         for i in range(1, steps + 1):
             u = i / steps
             k = u * u * (3 - 2 * u)
-            self._tx(f"i0 {int(round(p0 + (pan - p0) * k))} 1 {int(round(l0 + (lift - l0) * k))}")
+            pi_, li_ = int(round(p0 + (pan - p0) * k)), int(round(l0 + (lift - l0) * k))
+            parts = ([f"0 {pi_}"] if pi_ != sent_p else []) + ([f"1 {li_}"] if li_ != sent_l else [])      # only the joint that changed: at 100 commands a second a two-joint command every tick would be over the 1 KB/s that dropped a byte
+            if parts:
+                self._tx("i" + " ".join(parts))
+                sent_p, sent_l = pi_, li_
             self._sleep(1.0 / CLAW_STEPS_PER_S)
             if i % 5 == 0 and self._fell():
                 state = "fell"

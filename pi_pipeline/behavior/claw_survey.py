@@ -43,10 +43,15 @@ def _smooth(link, a: tuple[float, float], b: tuple[float, float], sleep, stopped
     from .ball_chase import CLAW_DEG_S, CLAW_STEPS_PER_S
     span = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
     steps = max(1, int(math.ceil(span / CLAW_DEG_S * CLAW_STEPS_PER_S)))
+    sent_p = sent_l = None
     for i in range(1, steps + 1):
         u = i / steps
         k = u * u * (3 - 2 * u)
-        link.send(f"i0 {int(round(a[0] + (b[0] - a[0]) * k))} 1 {int(round(a[1] + (b[1] - a[1]) * k))}", read_reply=False, settle=0.0)
+        pi_, li_ = int(round(a[0] + (b[0] - a[0]) * k)), int(round(a[1] + (b[1] - a[1]) * k))
+        parts = ([f"0 {pi_}"] if pi_ != sent_p else []) + ([f"1 {li_}"] if li_ != sent_l else [])          # only the joint that changed (see ball_chase.claw_pose)
+        if parts:
+            link.send("i" + " ".join(parts), read_reply=False, settle=0.0)
+            sent_p, sent_l = pi_, li_
         sleep(1.0 / CLAW_STEPS_PER_S)
         if stopped is not None and i % 10 == 0 and stopped():
             raise _Halt()
