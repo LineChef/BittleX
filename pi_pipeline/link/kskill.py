@@ -143,6 +143,22 @@ def read_joints(link, timeout_s: float = 0.8, sleep=time.sleep, clock=time.monot
     return None
 
 
+POSE_TOL_DEG = 12.0            # a leg pose read with `j` names a known pose when every leg joint is within this of it (the same number as behavior/ball_chase.py)
+
+
+def classify_start(joints, standup) -> str:
+    """"rest", "sit", "attention", "stand" or "unknown" from the 16 joint angles `j` reports (what the firmware last commanded). The poses a stand-up may start from; anything else is "unknown"."""
+    if not joints or len(joints) < 16:
+        return "unknown"
+    poses = {"rest": standup.rest_pose(), "sit": standup.SIT_URDF_DEG, "attention": standup.ATTENTION_URDF_DEG, "stand": standup.balance_pose()}
+    best, err = "unknown", 1e9
+    for name, pose in poses.items():
+        e = max(abs(joints[URDF_TO_SERVO[k]] - float(pose[k])) for k in range(8))
+        if e < err:
+            best, err = name, e
+    return best if err <= POSE_TOL_DEG else "unknown"
+
+
 def legs_reached(joints, goal_urdf, tol: float = REACHED_TOL_DEG) -> bool:
     """True when every leg joint the board reports is within `tol` degrees of the goal pose (URDF order)."""
     if not joints or len(joints) < 16:

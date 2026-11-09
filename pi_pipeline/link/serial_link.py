@@ -42,6 +42,8 @@ def feedback_row(line: str):
 
 
 # What the legs were last told to do, as far as the stand-up ramp is concerned. "" is a fresh process (assumed lying).
+POSE_READ_TRIES = 3             # reads of the board's pose before a stand-up (the first one after the service stops is often garbled)
+REST_FIRST_S = 3.0              # after the rest command that comes first when the pose is unknown: the time the board takes to lie down
 LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit", "kcalib")      # kcalib: the attention pose (legs straight); a move out of it stands him up back legs first (user, 2026-11-02)
 # Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
 STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd", "kcalib"})
@@ -455,6 +457,22 @@ class SerialLink:
             return False
 
     def _stand_up_kskill(self, standup) -> bool:
+        """The eased K stand-up, and one line in the motion events log (link/motion_events.py) for it, whatever happens."""
+        from . import motion_events
+        ev: dict = {"outcome": "refused"}
+        t0 = time.monotonic()
+        try:
+            ok = self._stand_up_kskill_run(standup, ev)
+        except Exception as e:  # noqa: BLE001
+            ev["error"] = str(e)[:120]
+            ok = False
+        ev["seconds"] = round(time.monotonic() - t0, 1)
+        if not ok:
+            ev["outcome"] = "refused"
+        motion_events.write("stand_up", **ev)
+        return ok
+
+    def _stand_up_kskill_run(self, standup, ev: dict) -> bool:
         """THE stand-up (link/kskill.py): the whole rise as one `K` skill the board plays itself, from rest, a sit, the attention pose, or (when the pose is not known) the leg angles the board reports.
         Waits until the board reports the stand pose, forces it if it does not get there, gyro on during the rise and off right after. True if it ran; False means NOTHING was done (never a firmware stand-up)."""
         try:
@@ -464,6 +482,35 @@ class SerialLink:
             from .. import motion_feel
             from . import kskill
             last = (self.last_motion_command or "").strip()
+            ev["last_command"] = last
+            # The pose is read before EVERY stand-up (owner, 2026-11-09): a pose the board reports as rest, a sit or the attention pose is the start (it wins over what the Pi last sent); a pose it
+            # does not know, or no readable pose at all (the first read after the service stops often comes back garbled), and he is laid in rest first, then stood up from rest.
+            j0 = None
+            for _ in range(POSE_READ_TRIES):
+                j0 = kskill.read_joints(self)
+                if j0 and len(j0) >= 16:
+                    break
+                j0 = None
+                time.sleep(0.25)
+            pose = kskill.classify_start(j0, standup)
+            ev["pose_read"] = pose
+            if j0:
+                ev["legs"] = [int(j0[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
+            ev["rested_first"] = False
+            if pose == "unknown":
+                log.warning("stand-up: the pose is %s: laying him in rest first", "unreadable" if j0 is None else "not a known one")
+                self._write_pose("krest")
+                time.sleep(REST_FIRST_S)
+                self._write_pose("gb")
+                self.last_motion_command, self._last_motion_t = "krest", time.monotonic()
+                last, ev["rested_first"] = "krest", True
+                j1 = kskill.read_joints(self)
+                after = kskill.classify_start(j1, standup)
+                ev["pose_after_rest"] = after
+                pose = after if after in ("rest", "sit", "attention") else "rest"          # still unreadable or odd after the rest command: he was just told to lie down
+            if pose in ("rest", "sit", "attention"):
+                last = {"rest": "krest", "sit": "ksit", "attention": "kcalib"}[pose]
+            ev["start"] = last
             lift0, lift1 = None, None
             if last in ("d", "krest", "kzz"):
                 start, lift0, lift1 = standup.rest_pose(), p.get("arm_rest"), p.get("arm_walk")            # the claw is on the floor at rest: its lift eases up with the legs
@@ -497,6 +544,8 @@ class SerialLink:
                 if kskill.legs_reached(kskill.read_joints(self), goal):
                     reached = True
                     break
+            ev["outcome"], ev["waited_s"] = ("reached" if reached else "forced"), round(waited, 1)
+            ev["speeds"], ev["wait_s"], ev["gyro"] = t["speeds"], t["wait_s"], bool(gyro)
             if not reached:                                                  # did not get there: force the legs to the stand angles before anything else moves
                 log.warning("K-skill stand-up: the board did not report the stand pose after %.1f s: forcing it", waited)
                 for _ in range(2):

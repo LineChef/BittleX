@@ -14,7 +14,7 @@ import os
 STAND_GYRO = 1             # 1 = the gyro balance is ON while the board plays the rise and off right after (never left on in the attention / sit poses). 0 = off throughout.
 STAND_STEPS = 8            # how many stages the rise is cut into. More = smoother but each stage takes time.
 STAND_SPEED = 12           # how fast each stage moves, at the first and last stages. The firmware's speed is this number / 8, so BIGGER = FASTER (24 uniform was "a bit snappy", 20 "still too fast", 14 uniform leaned more).
-STAND_SPEED_MID = 25       # a faster speed for the stages in the MIDDLE of the rise (0 = no, every stage at STAND_SPEED). The half-up pose is where he tips, so: slow at the start and end, fast through the middle.
+STAND_SPEED_MID = 20       # a faster speed for the stages in the MIDDLE of the rise (0 = no, every stage at STAND_SPEED). The half-up pose is where he tips, so: slow at the start and end, fast through the middle.
 STAND_SLOW_STAGES = 2      # how many stages at the start and at the end stay at the slow STAND_SPEED when STAND_SPEED_MID is set.
 STAND_PAUSE = 0            # a pause after each stage, in 50 ms units. 0 = none. Any pause makes it stop-and-go.
 STAND_WAIT_S = 3.4         # how long the Pi waits for the rise to finish before the next command. Lower the speed, raise this.

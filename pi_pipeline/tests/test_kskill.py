@@ -198,10 +198,11 @@ def test_no_switch_turns_it_off_and_other_starts_read_the_board(monkeypatch):
     wrote.clear()
     lk.last_motion_command = ""                                                          # a fresh process: the legs the board reports are the start
     assert lk._stand_up_kskill(standup) is True and _k_message(wrote)[:1] == b"K"
-    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: None)                   # unknown start and the board does not answer: it does NOTHING (never a firmware stand-up)
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: None)                   # the pose is unreadable (owner, 2026-11-09): he is laid in rest first, then stood up from rest
     wrote.clear()
     lk.last_motion_command = ""
-    assert lk._stand_up_kskill(standup) is False and wrote == []
+    assert lk._stand_up_kskill(standup) is True
+    assert wrote[0].strip() == b"krest" and wrote[1].strip() == b"gb" and _k_message(wrote)[:1] == b"K"          # the rest comes before the K stand-up, never a firmware stand-up
 
 
 def test_when_the_eased_stand_up_cannot_run_the_command_is_dropped_not_sent_as_a_firmware_stand_up(monkeypatch):
@@ -223,7 +224,7 @@ def test_the_attention_stand_up_has_its_own_slower_numbers(monkeypatch, tmp_path
     rest, att = kskill.tuning(), kskill.tuning(from_attention=True)
     assert rest["speeds"] == _speeds(motion_feel.STAND_SPEED, motion_feel.STAND_SPEED_MID) and rest["wait_s"] == 3.4          # the rest stand-up is unchanged
     assert att["speeds"] == [10, 10, 22, 22, 22, 22, 10, 10] and att["wait_s"] == 4.0            # the attention-pose stand-up is a little slower
-    assert all(a < r for a, r in zip(att["speeds"], rest["speeds"]))
+    assert att["speed"] < rest["speed"]                                                       # slower at the first and last stages (the middle stages are the owner's to tune either way)
 
 
 def test_the_move_into_the_attention_pose_is_an_eased_k_skill_and_kcalib_is_not_sent(monkeypatch):
@@ -263,3 +264,43 @@ def test_the_eased_entry_forces_the_attention_pose_when_the_board_does_not_repor
     assert lk._attention_entry_eased() is True
     forced = [w for w in wrote if w.startswith(b"i8 ")]
     assert len(forced) == 2 and forced[0].strip() == standup.move_cmd([0.0] * 8).encode()       # forced to legs straight, twice
+
+
+def _legs_joints(urdf_legs):
+    j = [0] * 16
+    for k in range(8):
+        j[kskill.URDF_TO_SERVO[k]] = urdf_legs[k]
+    return j
+
+
+def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first(monkeypatch, tmp_path):
+    """Owner, 2026-11-09: read the pose before every stand-up; if it is unknown or unexpected, send the rest command first, then stand up. And every stand-up is logged."""
+    import json
+    monkeypatch.setenv("G2_MOTION_EVENTS", str(tmp_path / "ev.jsonl"))
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    prof = standup._poses()
+    goal = prof["balance_urdf_deg"]
+    # 1. the board reports a sit while the Pi last sent krest: the read pose wins (a sit start), no rest first
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: _legs_joints(standup.SIT_URDF_DEG))
+    lk.last_motion_command = "krest"
+    assert lk._stand_up_kskill(standup) is True
+    assert not any(w.strip() == b"krest" for w in wrote)
+    # 2. legs in a pose that is none of the known ones: rest first (krest, then gb), then the K stand-up
+    wrote.clear()
+    odd = [a + 40 for a in goal]
+    reads = iter([_legs_joints(odd), _legs_joints(prof["rest_urdf_deg"])] + [_legs_joints(goal)] * 50)
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: next(reads))
+    lk.last_motion_command = "kbalance"
+    assert lk._stand_up_kskill(standup) is True
+    assert wrote[0].strip() == b"krest" and wrote[1].strip() == b"gb" and _k_message(wrote)[:1] == b"K"
+    # 3. unreadable on every try: three reads, then the rest first as well
+    wrote.clear()
+    n = []
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: n.append(1) or None)
+    lk.last_motion_command = ""
+    assert lk._stand_up_kskill(standup) is True and wrote[0].strip() == b"krest" and len(n) >= 3
+    ev = [json.loads(line) for line in open(tmp_path / "ev.jsonl")]
+    assert [e["event"] for e in ev] == ["stand_up"] * 3
+    assert [e["pose_read"] for e in ev] == ["sit", "unknown", "unknown"] and [e["rested_first"] for e in ev] == [False, True, True]
+    assert ev[0]["start"] == "ksit" and ev[1]["start"] == "krest" and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
