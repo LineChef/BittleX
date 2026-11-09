@@ -1,6 +1,6 @@
 """Try the claw raise at several speeds and step rates so the smoothest can be picked by eye (owner, 2026-11-08: "I see that same jerkiness when we raise the claw in the claw look").
 
-Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped. G2 goes to the attention pose (`kcalib`, where the claw look raises it), then for each setting raises the claw to the look height,
+The claw is centered before anything else so that nothing pans it at the start. Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped. G2 goes to the attention pose (`kcalib`, where the claw look raises it), then for each setting raises the claw to the look height,
 holds a moment, lowers it, and says which setting it was; then he stands up and rests. Stops at the first fall (then lays him in the rest position).
 
     python -m pi_pipeline.behavior.claw_smooth_test            # the default set of settings
@@ -49,6 +49,8 @@ def main() -> None:
     robot = chase.SerialRobot(link, fall_deg=30.0)
     fell = False
     try:
+        link.send("i0 0", read_reply=False, settle=0.0)              # the claw centered first, at rest: nothing in this test pans it (owner, 2026-11-08: "don't pan the claw right before you start the raise test"). The attention pose
+        time.sleep(1.0)                                                # (`kcalib`) sets every arm joint to its zero, so a claw left panned would swing to centre right before the raise rounds
         chase._stand_if_lying(link, "kbalance")
         if robot.relax() != "ok" or robot.fallen():
             fell = True
