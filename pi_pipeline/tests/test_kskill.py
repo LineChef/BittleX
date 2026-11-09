@@ -1,6 +1,7 @@
 """The `K`-skill stand-up (link/kskill.py): the message format and the link's use of it."""
 import pytest
 
+from pi_pipeline import motion_feel
 from pi_pipeline.gait import standup
 from pi_pipeline.link import kskill
 
@@ -59,13 +60,19 @@ def test_message_is_k_payload_tilde_and_never_holds_the_terminator():
         kskill.behavior_payload([[0] * 16] * 200, [1] * 200, [1] * 200)         # too big for the buffer
 
 
+def _speeds(slow, mid):
+    """The per-stage speeds the file's numbers give: STAND_SLOW_STAGES slow ones at each end, the middle ones fast."""
+    n, k = int(motion_feel.STAND_STEPS), int(motion_feel.STAND_SLOW_STAGES)
+    return [int(slow) if (i < k or i >= n - k) else int(mid) for i in range(n)]
+
+
 def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environment(monkeypatch, tmp_path):
     from pi_pipeline import motion_feel as mf
     ov = tmp_path / "feel.json"
     monkeypatch.setenv("G2_MOTION_FEEL", str(ov))
     for k in ("G2_STAND_STEPS", "G2_STAND_SPEED", "G2_STAND_PAUSE", "G2_STAND_WAIT_S"):
         monkeypatch.delenv(k, raising=False)
-    assert kskill.tuning() == {"steps": 8, "speed": 12, "speeds": [12, 12, 28, 28, 28, 28, 12, 12], "delay": 0, "wait_s": 3.4}      # the numbers in the file (slow at the ends, fast in the middle)
+    assert kskill.tuning() == {"steps": 8, "speed": 12, "speeds": _speeds(motion_feel.STAND_SPEED, motion_feel.STAND_SPEED_MID), "delay": 0, "wait_s": 3.4}      # the numbers in the file (slow at the ends, fast in the middle)
     ov.write_text('{"STAND_SPEED": 16, "STAND_WAIT_S": 3.0}')
     t = kskill.tuning()
     assert t["speed"] == 16 and t["wait_s"] == 3.0 and t["steps"] == 8                           # the override file wins, only for what it names
@@ -214,7 +221,7 @@ def test_the_attention_stand_up_has_its_own_slower_numbers(monkeypatch, tmp_path
     for k in ("G2_STAND_SPEED", "G2_STAND_ATT_SPEED", "G2_STAND_SPEED_MID", "G2_STAND_ATT_SPEED_MID", "G2_STAND_WAIT_S", "G2_STAND_ATT_WAIT_S"):
         monkeypatch.delenv(k, raising=False)
     rest, att = kskill.tuning(), kskill.tuning(from_attention=True)
-    assert rest["speeds"] == [12, 12, 28, 28, 28, 28, 12, 12] and rest["wait_s"] == 3.4          # the rest stand-up is unchanged
+    assert rest["speeds"] == _speeds(motion_feel.STAND_SPEED, motion_feel.STAND_SPEED_MID) and rest["wait_s"] == 3.4          # the rest stand-up is unchanged
     assert att["speeds"] == [10, 10, 22, 22, 22, 22, 10, 10] and att["wait_s"] == 4.0            # the attention-pose stand-up is a little slower
     assert all(a < r for a, r in zip(att["speeds"], rest["speeds"]))
 

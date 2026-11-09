@@ -625,7 +625,7 @@ EOF
 g2standup() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
-  ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.transition_drill --stand-only --cycles ${1:-1}"
+  ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.transition_drill --variant baseline --stand-only --cycles ${1:-1}"
 }
 
 # g2help  -- print the bare list of helpers with their one-line comments.
