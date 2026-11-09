@@ -4,9 +4,7 @@ Edit the numbers below and have them deployed (`g2deploy`, or ask), or, to try a
 `~/.local/share/g2/motion_feel.json` on the Pi, for example {"STAND_SPEED": 18, "CLAW_DEG_S": 45}. That file wins over this one and survives deploys. The stand-up numbers are read at every stand-up; the claw numbers when the program starts (the voice service or a goal run), so restart it after changing those.
 An environment variable of the same name with G2_ in front (G2_STAND_SPEED=18) wins over both, for one run.
 
-THE STAND-UP FROM REST (the default since 2026-11-08: played by the board as one `K` skill, pi_pipeline/link/kskill.py; owner: "the new eased standup looks good, lets keep it". 10 of 10 stood, roll within 2 deg)
-  STAND_KSKILL  1 = this stand-up from rest, 0 = the plain firmware stand-up (`G2_STAND_VIA=kbalance` does the same for one run).                       (1)
-  STAND_ATT_KSKILL  1 = the same board-played stand-up from the ATTENTION pose (`kcalib`, legs straight), replacing the Pi-streamed one that most of the 2026-11-07 falls were in. ON since 2026-11-08 at the owner's go, tested in real time; 0 turns it off.   (1)
+THE STAND-UP (the ONLY stand-up on the arm build, from rest, sit, the attention pose or any pose the board reports: owner, 2026-11-08, a hard rule; played by the board as one `K` skill, pi_pipeline/link/kskill.py; 10 of 10 stood, roll within 2 deg). There is no switch to turn it off
   STAND_GYRO    1 = the gyro balance is ON while the board plays the rise and off right after (never left on in the attention / sit poses). 0 = off throughout.   (1)
   STAND_STEPS   how many stages the rise is cut into. More = smoother but each stage takes time.        (8)
   STAND_SPEED   how fast each stage moves. The firmware's speed is this number / 8, so BIGGER = FASTER.   (12 at the first and last stages; 24 uniform was "a bit snappy", 20 "still too fast", 14 uniform leaned more)
@@ -25,8 +23,6 @@ from __future__ import annotations
 import json
 import os
 
-STAND_KSKILL = 1
-STAND_ATT_KSKILL = 1
 STAND_GYRO = 1
 STAND_STEPS = 8
 STAND_SPEED = 12

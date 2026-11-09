@@ -859,8 +859,12 @@ class SerialRobot:
             state = self._eased_stop(token, self._clock() - t0)
         if state != "fell" and yaw0 is None and self._calm_before_stop() == "fell":          # (a gyro-stopped line-up turn is ended on its yaw at once: waiting would turn it further)
             state = "fell"
-        self.posture = "stand"
-        self._tx("kbalance")                              # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
+        if state == "fell":
+            self.posture = "rest"
+            self._tx("krest")                             # after a fall he is laid in the rest position, never sent a stand (owner, 2026-11-08: always rest after a fall; no stand-up but the eased one)
+        else:
+            self.posture = "stand"
+            self._tx("kbalance")                          # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
         self._sleep(1.0)                                  # for over a minute: the firmware runs a gait until it is told something else)
         if yaw0 is not None:
             self._fell()                                  # the last frames: where the yaw ended once the body had stopped

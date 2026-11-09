@@ -95,3 +95,51 @@ def message(payload: bytes) -> bytes:
 def play_seconds(seconds: float, steps: int) -> float:
     """How long to wait for the skill to finish (kept for callers that know the nominal time)."""
     return seconds + 0.6 + 0.05 * steps
+
+
+# ---------------------------------------------------------------------------------------------------- knowing when the board has finished the skill (2026-11-08: the Pi moved on after a fixed wait while the board was still rising)
+CHUNK_BYTES = 24            # the K message goes out in short pieces: the board's serial input holds about 128 bytes and a long burst can overflow it while it is busy (a lost byte shifts every later angle)
+CHUNK_GAP_S = 0.006
+REACHED_TOL_DEG = 6.0
+POLL_S = 0.4
+MIN_WAIT_S = 1.5
+
+
+def write_chunked(write, data: bytes, sleep=time.sleep) -> None:
+    """Send `data` in CHUNK_BYTES pieces with a short gap."""
+    for i in range(0, len(data), CHUNK_BYTES):
+        write(data[i:i + CHUNK_BYTES])
+        sleep(CHUNK_GAP_S)
+
+
+def read_joints(link, timeout_s: float = 0.8, sleep=time.sleep, clock=time.monotonic):
+    """The 16 joint angles the board reports (`j`), or None. Stops the IMU stream first, as behavior/ball_chase.read_joints does (the read often failed while it ran)."""
+    import re
+    poll, other = getattr(link, "poll_imu", None), getattr(link, "pop_other", None)
+    if not callable(poll) or not callable(other):
+        return None
+    try:
+        link.send("gp", read_reply=False, settle=0.0)
+        sleep(0.1)
+        poll()
+        other()
+        link.send("j", read_reply=False, settle=0.0)
+        end = clock() + timeout_s
+        while clock() < end:
+            poll()
+            for ln in other():
+                if ln.count(",") >= 15:
+                    nums = [int(x) for x in re.findall(r"-?\d+", ln)]
+                    if len(nums) >= 16 and nums[:16] != list(range(16)):
+                        return nums[:16]
+            sleep(0.05)
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def legs_reached(joints, goal_urdf, tol: float = REACHED_TOL_DEG) -> bool:
+    """True when every leg joint the board reports is within `tol` degrees of the goal pose (URDF order)."""
+    if not joints or len(joints) < 16:
+        return False
+    return all(abs(joints[URDF_TO_SERVO[k]] - goal_urdf[k]) <= tol for k in range(8))

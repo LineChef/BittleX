@@ -496,6 +496,7 @@ def test_a_move_out_of_the_attention_pose_stands_him_up_back_legs_first_then_fro
 
 
 def test_the_link_stands_him_up_from_the_attention_pose_itself_and_skips_the_firmware_stand(monkeypatch):
+    monkeypatch.setattr(__import__("pi_pipeline.gait.standup", fromlist=["x"]), "use_kskill", lambda p: False)       # this tests the older stand-up routine, which no longer runs on the arm (owner, 2026-11-08: the eased K stand-up is the only one)
     import time as _time
     from pi_pipeline.link.serial_link import SerialLink
 
@@ -519,16 +520,15 @@ def test_the_link_stands_him_up_from_the_attention_pose_itself_and_skips_the_fir
     assert len(legs) >= 15 and "kbalance" not in out[out.index(legs[0]):]            # the link's own back-legs-first stand-up, and no firmware stand-up after it
 
 
-def test_g2_stand_via_overrides_the_profile_for_one_run(monkeypatch):
-    """2026-11-08: the firmware kbalance stand-up from rest tipped him toward the side that rose later; G2_STAND_VIA=sequenced uses the Pi's rear-then-front rise instead."""
+def test_no_switch_turns_the_eased_stand_up_off_on_the_arm(monkeypatch):
+    """Owner, 2026-11-08, a hard rule: G2 never stands up any way but the eased one. G2_STAND_VIA, the profile's stand_via and motion_feel cannot bring back the firmware or the sequenced stand-up on the arm."""
     from pi_pipeline.gait import standup
     prof = {"stand_via": "kbalance", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50]}
     monkeypatch.setattr(standup, "_poses", lambda: prof)
-    monkeypatch.delenv("G2_STAND_VIA", raising=False)
-    sent = []
-    assert not standup.stand_sequenced(sent.append, lambda s: None, "krest") and sent == []              # the profile says kbalance
-    monkeypatch.setenv("G2_STAND_VIA", "sequenced")
-    assert standup.stand_sequenced(sent.append, lambda s: None, "krest") and len(sent) > 10              # the override: the Pi's own rise
-    assert not standup.stand_via_firmware(sent.append, lambda s: None, "krest")
-    monkeypatch.setenv("G2_STAND_VIA", "kbalance")
-    assert standup.stand_via_firmware(lambda c: None, lambda s: None, "krest")
+    for v in ("", "kbalance", "sequenced", "kskill"):
+        monkeypatch.setenv("G2_STAND_VIA", v)
+        assert standup.use_kskill(prof) is True
+        sent = []
+        assert standup.stand_sequenced(sent.append, lambda s: None, "krest") is False and sent == []
+        assert standup.stand_via_firmware(sent.append, lambda s: None, "krest") is False and sent == []
+    assert standup.use_kskill(None) is False                                # a robot without arm poses (the stock Bittle) keeps its own

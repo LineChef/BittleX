@@ -5,6 +5,27 @@ from pi_pipeline.gait import standup
 from pi_pipeline.link import kskill
 
 
+def _legs_reported(monkeypatch, prof, *, reached=True):
+    """The board's `j` reply for the tests: the legs at the stand pose (reached) or still at rest (not yet)."""
+    goal = prof["balance_urdf_deg"] if reached else prof["rest_urdf_deg"]
+    j = [0] * 16
+    for k in range(8):
+        j[kskill.URDF_TO_SERVO[k]] = goal[k]
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: list(j))
+    return j
+
+
+def _k_message(wrote):
+    """The K message the link sent: the chunks from the one starting with 'K' to the one ending with '~', joined."""
+    start = next(i for i, w in enumerate(wrote) if w[:1] == b"K")
+    out = b""
+    for w in wrote[start:]:
+        out += w
+        if out.endswith(b"~"):
+            return out
+    return out
+
+
 def test_payload_layout_matches_a_behavior_skill():
     frames = kskill.stand_frames([64, -50, 64, -50, 74, -56, 74, -56], [15, 56, 15, 56, 20, 50, 20, 50], 59, 0, steps=6)
     data = kskill.behavior_payload(frames, [12] * 6, [2] * 6)
@@ -38,40 +59,6 @@ def test_message_is_k_payload_tilde_and_never_holds_the_terminator():
         kskill.behavior_payload([[0] * 16] * 200, [1] * 200, [1] * 200)         # too big for the buffer
 
 
-def test_the_link_plays_the_stand_up_as_a_k_skill_by_default_and_not_when_switched_off(monkeypatch):
-    from pi_pipeline.link import serial_link
-    from pi_pipeline.link.serial_link import SerialLink
-    prof = {"stand_via": "kbalance", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
-    monkeypatch.setattr(standup, "_poses", lambda: prof)
-    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
-    monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
-    wrote = []
-
-    class Ser:
-        is_open = True
-        def write(self, b): wrote.append(bytes(b).strip())
-        def flush(self): pass
-    lk = SerialLink("/dev/null")
-    lk._ser = Ser()
-    lk.last_motion_command = "krest"
-    monkeypatch.setenv("G2_STAND_VIA", "kbalance")
-    assert lk._stand_up_kskill(standup) is False and wrote == []              # switched off for the run: the plain firmware stand-up
-    monkeypatch.delenv("G2_STAND_VIA")
-    monkeypatch.delenv("G2_STAND_GYRO", raising=False)
-    assert lk._stand_up_kskill(standup) is True                               # the default
-    assert wrote[0] == b"gB" and wrote[1][:1] == b"K" and wrote[1][-1:] == b"~" and wrote[2] == b"gb"      # the gyro on for the rise, the skill, the gyro off right after
-    lk.last_motion_command = "kwkF"
-    wrote.clear()
-    assert lk._stand_up_kskill(standup) is False and wrote == []              # only from rest
-    lk.last_motion_command = "krest"
-    monkeypatch.setenv("G2_STAND_GYRO", "0")
-    assert lk._stand_up_kskill(standup) is True and wrote[0][:1] == b"K" and b"gB" not in wrote and b"gb" not in wrote      # the gyro setting off: just the skill
-    monkeypatch.setattr(standup, "_poses", lambda: None)
-    lk.last_motion_command = "krest"
-    assert lk._stand_up_kskill(standup) is False                              # the stock robot (no arm poses) keeps its own stand-up
-
-
 def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environment(monkeypatch, tmp_path):
     from pi_pipeline import motion_feel as mf
     ov = tmp_path / "feel.json"
@@ -89,33 +76,6 @@ def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environ
     assert kskill.tuning()["speed"] == 12 and mf.get("CLAW_DEG_S") == 60.0                       # junk falls through to the file's number
 
 
-def test_the_k_stand_up_plays_with_the_gyro_on_when_asked(monkeypatch):
-    """Owner, 2026-11-08: "turn the gyro on for the standup": G2_GYRO_BALANCE=1 sends gB before the K skill (and nothing turns it off during the rise)."""
-    from pi_pipeline.link import serial_link
-    from pi_pipeline.link.serial_link import SerialLink
-    prof = {"stand_via": "kskill", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
-    monkeypatch.setattr(standup, "_poses", lambda: prof)
-    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
-    monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    out = []
-
-    class Ser:
-        is_open = True
-        def write(self, b): out.append(bytes(b))
-        def flush(self): pass
-    lk = SerialLink("/dev/null")
-    lk._ser = Ser()
-    lk.last_motion_command = "krest"
-    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
-    monkeypatch.setenv("G2_STAND_GYRO", "0")
-    assert lk._stand_up_kskill(standup) and out[0][:1] == b"K"                      # gyro off: just the skill
-    out.clear()
-    lk.last_motion_command = "krest"
-    monkeypatch.setenv("G2_GYRO_BALANCE", "1")
-    assert lk._stand_up_kskill(standup)
-    assert out[0].strip() == b"gB" and out[1][:1] == b"K"                           # gyro on first, then the skill
-
-
 def test_unequal_speed_is_slow_at_the_ends_and_fast_in_the_middle(monkeypatch, tmp_path):
     ov = tmp_path / "feel.json"
     ov.write_text('{"STAND_SPEED": 12, "STAND_SPEED_MID": 28, "STAND_SLOW_STAGES": 2}')
@@ -129,16 +89,16 @@ def test_unequal_speed_is_slow_at_the_ends_and_fast_in_the_middle(monkeypatch, t
     assert got == [12, 12, 28, 28, 28, 28, 12, 12]                                  # the speed byte of each frame
 
 
-def test_the_k_stand_up_from_the_attention_pose_is_on_unless_switched_off(monkeypatch):
-    """The attention-pose stand-up (where most of the 2026-11-07 falls were) uses the K skill (STAND_ATT_KSKILL, on since 2026-11-08); the legs start straight and the lift servo is not eased."""
+def test_the_stand_up_waits_for_the_board_and_forces_the_pose_if_it_never_gets_there(monkeypatch):
+    """2026-11-08: the Pi moved on after a fixed wait while the board was still rising. Now it polls the board's joint reading until the legs reach the stand pose; if they never do, it forces them there."""
     from pi_pipeline.link import serial_link
     from pi_pipeline.link.serial_link import SerialLink
     prof = {"stand_via": "kbalance", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
     monkeypatch.setattr(standup, "_poses", lambda: prof)
     monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
-    monkeypatch.delenv("G2_STAND_VIA", raising=False)
+    for k in ("G2_GYRO_BALANCE", "G2_STAND_VIA", "G2_STAND_GYRO"):
+        monkeypatch.delenv(k, raising=False)
     wrote = []
 
     class Ser:
@@ -147,11 +107,103 @@ def test_the_k_stand_up_from_the_attention_pose_is_on_unless_switched_off(monkey
         def flush(self): pass
     lk = SerialLink("/dev/null")
     lk._ser = Ser()
-    lk.last_motion_command = "kcalib"
-    monkeypatch.setenv("G2_STAND_ATT_KSKILL", "0")
-    assert lk._stand_up_kskill(standup) is False and wrote == []              # switched off for the run
-    monkeypatch.delenv("G2_STAND_ATT_KSKILL", raising=False)
-    assert lk._stand_up_kskill(standup) is True                               # the default
-    k = next(w for w in wrote if w[:1] == b"K")
-    first = [b - 256 if b > 127 else b for b in k[8:8 + 20]]                  # frame 0
-    assert first[1] == 0 and first[10] > 0                                    # the lift servo stays at 0 (not eased from 59); the rear legs have begun to rise from straight
+    # still at rest on every poll: it keeps waiting, then forces the stand pose with two full leg commands
+    _legs_reported(monkeypatch, prof, reached=False)
+    lk.last_motion_command = "krest"
+    assert lk._stand_up_kskill(standup) is True
+    forced = [w for w in wrote if w.startswith(b"i8 ")]
+    assert len(forced) == 2 and forced[0].strip() == standup.move_cmd(standup.balance_pose()).encode()
+    # the legs arrive on the third poll: no forcing
+    wrote.clear()
+    seq = iter([False, False, True])
+    goal = prof["balance_urdf_deg"]
+    rest = prof["rest_urdf_deg"]
+
+    def reading(link, **kw):
+        legs = goal if next(seq) else rest
+        j = [0] * 16
+        for k in range(8):
+            j[kskill.URDF_TO_SERVO[k]] = legs[k]
+        return j
+    monkeypatch.setattr(kskill, "read_joints", reading)
+    lk.last_motion_command = "krest"
+    assert lk._stand_up_kskill(standup) is True
+    assert not [w for w in wrote if w.startswith(b"i8 ")]
+
+
+def test_the_k_message_goes_out_in_short_pieces_and_the_legs_check_is_tolerant():
+    sent = []
+    kskill.write_chunked(sent.append, bytes(range(100)), sleep=lambda s: None)
+    assert all(len(c) <= kskill.CHUNK_BYTES for c in sent) and b"".join(sent) == bytes(range(100))
+    goal = [15, 56, 15, 56, 20, 50, 20, 50]
+    j = [0] * 16
+    for k in range(8):
+        j[kskill.URDF_TO_SERVO[k]] = goal[k] + 4
+    assert kskill.legs_reached(j, goal) is True                      # within 6 deg
+    j[kskill.URDF_TO_SERVO[3]] = goal[3] + 12
+    assert kskill.legs_reached(j, goal) is False and kskill.legs_reached(None, goal) is False
+
+
+def _arm_link(monkeypatch, wrote, *, reached=True):
+    from pi_pipeline.link import serial_link
+    from pi_pipeline.link.serial_link import SerialLink
+    prof = {"stand_via": "kbalance", "rest_urdf_deg": [64, -50, 64, -50, 74, -56, 74, -56], "balance_urdf_deg": [15, 56, 15, 56, 20, 50, 20, 50], "arm_rest": 59, "arm_walk": 0}
+    monkeypatch.setattr(standup, "_poses", lambda: prof)
+    _legs_reported(monkeypatch, prof, reached=reached)
+    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    for k in ("G2_GYRO_BALANCE", "G2_STAND_VIA", "G2_STAND_GYRO"):
+        monkeypatch.delenv(k, raising=False)
+
+    class Ser:
+        is_open = True
+        def write(self, b): wrote.append(bytes(b))
+        def flush(self): pass
+    lk = SerialLink("/dev/null")
+    lk._ser = Ser()
+    return lk
+
+
+def test_the_eased_stand_up_runs_from_rest_sit_and_the_attention_pose(monkeypatch):
+    """Owner, 2026-11-08, a hard rule: every stand-up is the eased K stand-up. From rest, a sit and the attention pose; the gyro on for the rise and off right after."""
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    for last, lift_in_first in (("krest", True), ("ksit", False), ("kcalib", False)):
+        wrote.clear()
+        lk.last_motion_command = last
+        assert lk._stand_up_kskill(standup) is True
+        assert wrote[0].strip() == b"gB" and wrote[-1].strip() == b"gb"                  # gyro on for the rise, off right after
+        k = _k_message(wrote)
+        assert k[:1] == b"K" and k[-1:] == b"~" and b"~" not in k[1:-1]
+        first = [b - 256 if b > 127 else b for b in k[8:8 + 20]]
+        assert (first[1] > 0) == lift_in_first                                           # the lift servo eases only from rest (the claw is already down from a sit or the attention pose)
+
+
+def test_no_switch_turns_it_off_and_other_starts_read_the_board(monkeypatch):
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    for v in ("kbalance", "sequenced", "kskill"):
+        monkeypatch.setenv("G2_STAND_VIA", v)
+        wrote.clear()
+        lk.last_motion_command = "krest"
+        assert lk._stand_up_kskill(standup) is True and _k_message(wrote)[:1] == b"K"     # the environment cannot bring back another stand-up
+    monkeypatch.delenv("G2_STAND_VIA")
+    wrote.clear()
+    lk.last_motion_command = ""                                                          # a fresh process: the legs the board reports are the start
+    assert lk._stand_up_kskill(standup) is True and _k_message(wrote)[:1] == b"K"
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: None)                   # unknown start and the board does not answer: it does NOTHING (never a firmware stand-up)
+    wrote.clear()
+    lk.last_motion_command = ""
+    assert lk._stand_up_kskill(standup) is False and wrote == []
+
+
+def test_when_the_eased_stand_up_cannot_run_the_command_is_dropped_not_sent_as_a_firmware_stand_up(monkeypatch):
+    from pi_pipeline.link.serial_link import SerialLink
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: None)
+    lk.last_motion_command = ""                                                          # unknown start, no answer from the board
+    lk._ease_transition = SerialLink._ease_transition.__get__(lk)
+    assert lk.send("kbalance", read_reply=False, settle=0.0) == ""
+    assert not any(w.strip() == b"kbalance" for w in wrote)                              # no firmware stand-up reached the wire

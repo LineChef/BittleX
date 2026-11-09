@@ -178,6 +178,11 @@ class SerialLink:
             command = "gb"                        # the fitted attachment runs with the firmware gyro balance off (attachments.flag "gyro_balance")
         try:
             self._ease_transition(command)
+            if self._stand_refused:                          # the eased stand-up could not run: nothing else is sent in its place (a horn tells the owner), he stays as he is
+                self._stand_refused = False
+                self._skip_firmware_stand = False
+                self._failed(command, "no eased stand-up")
+                return ""
             if self._skip_firmware_stand and command.strip() in ("kbalance", "kup"):
                 self._skip_firmware_stand = False       # the arm's own stand-up just ran (_stand_up): this stand-up command would make the firmware stand up a second time from the posture it believes he is in
                 self.last_motion_command = command.strip()
@@ -243,6 +248,7 @@ class SerialLink:
         return flag_safe("gyro_balance")
 
     _ramping = False
+    _stand_refused = False                        # set when the eased stand-up could not run: send() then drops the command that asked for it
     _skip_firmware_stand = False                  # set by _stand_up when the arm's own stand-up ran: the kbalance / kup that asked for it is not sent
     _last_motion_t: float | None = None          # when last_motion_command went out (monotonic)
     last_pose_read: dict | None = None           # the outcome of the last read_leg_pose() (ok, rows, ms, spread, pose)
@@ -375,8 +381,11 @@ class SerialLink:
             _spec = _ilu.spec_from_file_location("g2_standup", _p)
             standup = _ilu.module_from_spec(_spec)
             _spec.loader.exec_module(standup)
-        if self._stand_up_kskill(standup):                          # from rest: the whole stand-up as one `K` skill the board plays itself (G2_STAND_VIA=kskill; link/kskill.py)
-            self._skip_firmware_stand = True
+        if standup._poses() and standup.use_kskill(standup._poses()):      # the arm build (G2): the eased K-skill stand-up is the ONLY stand-up (owner, 2026-11-08, a hard rule)
+            self._skip_firmware_stand = True                          # whatever happens, the firmware's own stand-up (the kbalance / kup that asked for this) is never sent
+            if not self._stand_up_kskill(standup):
+                log.error("the eased stand-up could not run (start pose unknown and unreadable, or an error): G2 does NOT stand up, and the command that asked for it is dropped")
+                self._stand_refused = True
             return transitions.balance_pose()
         if standup.stand_from_attention(self._write_pose, time.sleep, self.last_motion_command):  # from the attention pose (kcalib): the back legs first, then the front legs (user, 2026-11-02)
             self._skip_firmware_stand = True
@@ -400,36 +409,60 @@ class SerialLink:
         return transitions.balance_pose()
 
     def _stand_up_kskill(self, standup) -> bool:
-        """Stand up with a `K` skill (link/kskill.py): from rest by default, from the attention pose when motion_feel.STAND_ATT_KSKILL is on. True if it ran."""
+        """THE stand-up (link/kskill.py): the whole rise as one `K` skill the board plays itself, from rest, a sit, the attention pose, or (when the pose is not known) the leg angles the board reports.
+        Waits until the board reports the stand pose, forces it if it does not get there, gyro on during the rise and off right after. True if it ran; False means NOTHING was done (never a firmware stand-up)."""
         try:
             p = standup._poses()
-            last = (self.last_motion_command or "").strip()
-            from .. import motion_feel
-            from_att = last == "kcalib" and bool(p) and motion_feel.get("STAND_ATT_KSKILL") >= 1       # from the attention pose (legs straight), once tested
-            if not p or not standup.use_kskill(p) or (last not in ("", "d", "krest", "kzz") and not from_att):
+            if not p or not standup.use_kskill(p):
                 return False
-            from . import kskill
-            t = kskill.tuning()
-            start = list(standup.ATTENTION_URDF_DEG) if from_att else standup.rest_pose()
-            lift0, lift1 = (None, None) if from_att else (p.get("arm_rest"), p.get("arm_walk"))         # from the attention pose the claw is already down: only the legs rise
-            data = kskill.message(kskill.stand_payload(start, standup.balance_pose(), lift0, lift1, steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
             from .. import motion_feel
+            from . import kskill
+            last = (self.last_motion_command or "").strip()
+            lift0, lift1 = None, None
+            if last in ("d", "krest", "kzz"):
+                start, lift0, lift1 = standup.rest_pose(), p.get("arm_rest"), p.get("arm_walk")            # the claw is on the floor at rest: its lift eases up with the legs
+            elif last == "kcalib":
+                start = list(standup.ATTENTION_URDF_DEG)                                                   # the claw is already down: only the legs rise
+            elif last == "ksit":
+                start = list(standup.SIT_URDF_DEG)
+            else:                                                                                          # unknown (a fresh process, after a trick): the angles the board reports
+                j = kskill.read_joints(self)
+                if not j or len(j) < 16:
+                    return False
+                start = [float(j[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
+                lift0, lift1 = float(j[1]), p.get("arm_walk")
+            t = kskill.tuning()
+            data = kskill.message(kskill.stand_payload(start, standup.balance_pose(), lift0, lift1, steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"]))
             from pi_pipeline.attachments import flag_explicit_on
             keep_on = flag_explicit_on("gyro_balance")             # the gyro balance is on for the whole run (G2_GYRO_BALANCE=1): leave it
-            gyro = keep_on or motion_feel.get("STAND_GYRO") >= 1     # on while the board plays the rise (owner, 2026-11-08: the gyro-on stand-up was 10 of 10)
+            gyro = keep_on or motion_feel.get("STAND_GYRO") >= 1     # on while the board plays the rise (the gyro-on stand-up was 10 of 10)
             if gyro:
                 self._write_pose("gB")
                 time.sleep(0.2)
-            self._ser.write(data)
+            kskill.write_chunked(self._ser.write, data, time.sleep)          # in short pieces: a long burst can overflow the board's input while it is busy
             self._ser.flush()
-            time.sleep(t["wait_s"])
+            goal = standup.balance_pose()
+            waited, reached = 0.0, False
+            while waited < max(t["wait_s"] * 2.0, 6.0):                      # until the board reports the stand pose (not a fixed time: the Pi once moved on while the board was still rising, 2026-11-08)
+                time.sleep(kskill.POLL_S)
+                waited += kskill.POLL_S + 0.25
+                if waited < kskill.MIN_WAIT_S:
+                    continue
+                if kskill.legs_reached(kskill.read_joints(self), goal):
+                    reached = True
+                    break
+            if not reached:                                                  # did not get there: force the legs to the stand angles before anything else moves
+                log.warning("K-skill stand-up: the board did not report the stand pose after %.1f s: forcing it", waited)
+                for _ in range(2):
+                    self._write_pose(standup.move_cmd(goal))
+                    time.sleep(0.3)
             if gyro and not keep_on:
                 self._write_pose("gb")                             # off again right after the rise: never left on in the attention / sit poses (the board's own rc / up flipped him there)
             self.last_motion_command, self._last_motion_t = "kbalance", time.monotonic()
             log.info("stand-up played as a K skill (%d bytes)", len(data))
             return True
-        except Exception as e:  # noqa: BLE001  -- fall back to the usual stand-up
-            log.warning("K-skill stand-up failed (%s): the usual stand-up follows", e)
+        except Exception as e:  # noqa: BLE001
+            log.error("K-skill stand-up failed (%s)", e)
             return False
 
     def read_leg_pose(self, *, rows: int = 2, timeout_s: float = 0.6, agree_deg: float = 5.0):

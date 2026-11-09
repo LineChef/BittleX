@@ -399,6 +399,7 @@ def test_fall_recovery_is_off_for_the_arm_and_on_everywhere_else(monkeypatch):
 def test_the_arm_stand_up_helpers_do_nothing_for_other_builds_and_the_plain_one_still_works(monkeypatch):
     """2026-10-25: the Pi never set the lift servo, so a walk from rest walked with the claw forward; a Pi-side lift ramp ended in a silent board. The arm build's stand-up ends on the
     firmware kbalance (which puts the lift at 0); the stock build and the head send nothing extra."""
+    monkeypatch.setattr(__import__("pi_pipeline.gait.standup", fromlist=["x"]), "use_kskill", lambda p: False)       # this tests the older stand-up routine, which no longer runs on the arm (owner, 2026-11-08: the eased K stand-up is the only one)
     from pi_pipeline.gait import standup
     monkeypatch.delenv("G2_STAND_RAMP_S", raising=False)
     sent = []
@@ -418,6 +419,7 @@ def test_the_arm_stand_up_helpers_do_nothing_for_other_builds_and_the_plain_one_
 def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kbalance_before_the_end(monkeypatch, tmp_path):
     """2026-10-25: the firmware stand-up lifts all eight leg joints at once and G2 fell front right with the claw out ahead; the arm build raises the rear first and the front
     right behind it (no pause between), and the firmware kbalance (the lift servo's swing) goes out while the front legs finish."""
+    monkeypatch.setattr(__import__("pi_pipeline.gait.standup", fromlist=["x"]), "use_kskill", lambda p: False)       # this tests the older stand-up routine, which no longer runs on the arm (owner, 2026-11-08: the eased K stand-up is the only one)
     from pi_pipeline.gait import standup
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     prof = A.load_profiles()
@@ -479,6 +481,7 @@ def test_with_fall_recovery_off_every_skill_and_every_connect_is_followed_by_gb(
 
 def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_up(monkeypatch, tmp_path):
     """2026-10-25, hardware: G2 stood up, then again (the firmware plays kbalance from the rest posture it believes he is in) and the arm drew back: the kbalance that asked for the arm's own stand-up is not sent."""
+    monkeypatch.setattr(__import__("pi_pipeline.gait.standup", fromlist=["x"]), "use_kskill", lambda p: False)       # this tests the older stand-up routine, which no longer runs on the arm (owner, 2026-11-08: the eased K stand-up is the only one)
     from pi_pipeline.link.serial_link import SerialLink
 
     class FakeSerial:
@@ -648,6 +651,7 @@ def test_an_env_switch_overrides_the_profile_flag_for_one_run(monkeypatch):
 
 def test_the_stand_up_ramp_runs_with_the_gyro_balance_off_and_turns_it_on_after(monkeypatch):
     """User, 2026-11-08: the arm runs with the gyro balance on; the firmware's balance loop fights an eased stand-up (2026-10-18), so the ramp is bracketed gb ... gB."""
+    monkeypatch.setattr(__import__("pi_pipeline.gait.standup", fromlist=["x"]), "use_kskill", lambda p: False)       # this tests the older stand-up routine, which no longer runs on the arm (owner, 2026-11-08: the eased K stand-up is the only one)
     from pi_pipeline.gait import standup
     from pi_pipeline.link.serial_link import SerialLink
     monkeypatch.setenv("G2_ATTACHMENT", "arm")

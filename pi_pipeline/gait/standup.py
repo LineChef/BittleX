@@ -155,18 +155,9 @@ def stand_via(p) -> str | None:
 
 
 def use_kskill(p) -> bool:
-    """Whether the stand-up from rest is the board-played `K` skill (link/kskill.py): the default since 2026-11-08 (owner: "the new eased standup looks good, lets keep it"; 10 of 10 stood, roll within 2 deg).
-    `G2_STAND_VIA` (kskill | kbalance | sequenced) decides for one run, else `motion_feel.STAND_KSKILL` (1). Only where there are arm poses (the stock robot keeps its own stand-up)."""
-    if not p:
-        return False
-    v = os.environ.get("G2_STAND_VIA", "").strip().lower()
-    if v in ("sequenced", "kbalance", "kskill"):
-        return v == "kskill"
-    try:
-        from .. import motion_feel
-        return motion_feel.get("STAND_KSKILL") >= 1
-    except Exception:  # noqa: BLE001
-        return False
+    """The eased `K`-skill stand-up is the ONLY stand-up on the arm build (owner, 2026-11-08, a hard rule: "G2 should NEVER stand up in any way other than the eased stand-up I approved"). There is no switch, no
+    environment variable and no profile entry that turns it off: where there are arm poses it is always used; a robot without them (the stock Bittle, no arm profile) keeps its own stand-up."""
+    return bool(p)
 
 
 def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
@@ -176,8 +167,8 @@ def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     Returns True if it ran."""
     p = _poses()
     c = (last_motion_command or "").strip()
-    if not p or stand_via(p) != "sequenced" or c not in ("", "d", "krest", "kzz"):
-        return False
+    if not p or use_kskill(p) or stand_via(p) != "sequenced" or c not in ("", "d", "krest", "kzz"):
+        return False                                                  # (never on the arm: the eased K stand-up is the only stand-up there)
     start, goal = rest_pose(), balance_pose()
     end_s = max(SEQ_FRONT_START_S + SEQ_FRONT_S, SEQ_LIFT_TO_S)
     n = int(round(end_s * STEPS_PER_S))
@@ -286,7 +277,7 @@ def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool
     (the caller's stand command then follows, from the balance pose)."""
     p = _poses()
     c = (last_motion_command or "").strip()
-    if not p or stand_via(p) != "kbalance" or c not in ("", "d", "krest", "kzz"):
+    if not p or use_kskill(p) or stand_via(p) != "kbalance" or c not in ("", "d", "krest", "kzz"):
         return False
     send("kbalance")
     sleep(2.0)
