@@ -53,15 +53,14 @@ confirmed good.
 
 This is the same pose used earlier (2026-09-28, pre-reflash) to rule out
 a per-leg zero-point offset while chasing the `vtF` stumble; see
-[`../docs/plan-detail/phase4-hardware-assembly.md`](../docs/plan-detail/phase4-hardware-assembly.md)
-for that investigation.
+Petoi's assembly guide.
 
 ## After the front-left shoulder servo was replaced (2026-10-06)
 
 The front-left shoulder servo (servo 8) was replaced on 2026-10-06 and the
 joint calibration was redone afterwards; the date of the second calibration was
 not recorded. The walking evidence for the swap (drift fell from about 140 to
-about 40 degrees per 12.5 s) is in [`../docs/rl/real-walk-log.md`](../docs/rl/real-walk-log.md).
+about 40 degrees per 12.5 s). The walk logs record it.
 Re-run the procedure above and the `kbalance` check after any servo
 replacement.
 

@@ -26,7 +26,7 @@ The **sidecar** (`<name>.onnx.json`) travels with every policy and is read by bo
 | `checkpoint`, `exported`, `levers` | Provenance |
 | `modes` | Optional. The gaits the policy was trained for; without it, `normal` only |
 
-Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and check parity with `verify_onnx.py` (ONNX versus the torch policy) and `validate_deploy.py` (drives the Pi-side `residual_policy.py` in lockstep with the sim: observation, action and rounded joint targets must match). Score a policy through G2's real control path with `benchmark_decathlon.py --hw i`. Training and promotion rules: [`../rl/training-upgrade-2026-10.md`](../rl/training-upgrade-2026-10.md).
+Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and check parity with `verify_onnx.py` (ONNX versus the torch policy) and `validate_deploy.py` (drives the Pi-side `residual_policy.py` in lockstep with the sim: observation, action and rounded joint targets must match). Score a policy through G2's real control path with `benchmark_decathlon.py --hw i`.
 
 ## 2. Promote and deploy
 
@@ -87,7 +87,7 @@ The mapping and signs were verified on G2, but repeat these steps after a servo 
 | Symptom | Look at |
 |---|---|
 | The walk never starts or no IMU frames | The raw IMU lines; the yaw field once overflowed and made every line unparseable (fixed in `imu_parse.py`). [`operating-lessons.md`](operating-lessons.md) |
-| Heading drifts | The foot trim for this policy and floor; [`../rl/real-walk-log.md`](../rl/real-walk-log.md) |
+| Heading drifts | The foot trim for this policy and floor |
 | A leg moves the wrong way | `deploy_map.SERVO_SIGN` and step 3 above |
 | The loop overruns or lags | Whether something else is using the Pi (exploration, speech); [`../hardware/diagnostics.md`](../hardware/diagnostics.md) |
 | The Mac cannot reach the Pi ("No route to host", `EHOSTUNREACH`) but another machine can | Check in this order. (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on. A Deny answer to the "find devices on your local network" prompt blocks that app's connections to every LAN device while the router may still answer, and a program that was already running keeps the old answer until it is quit and reopened (`claude --continue` resumes a Claude Code session). Cause on 2026-11-04. (2) **An MDM or endpoint-security agent** blocking the local subnet (Jamf, 2026-09-22; turning it off fixed it at once; `profiles status` saying "no MDM" does not rule it out). (3) The router: client isolation, guest network. First confirm the Pi is on at all: it also looks unreachable when it was shut down. `ping` the Pi's raw IP, then `ssh -vvv` |

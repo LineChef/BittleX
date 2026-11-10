@@ -55,7 +55,7 @@ Each attachment names the BiBoard firmware it needs: the first line of the BiBoa
 | `head` | `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head) |
 | `arm` | `Bittle X+Arm` |
 
-The arm's skills (15, enabled for voice 2026-11-02: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page, [`../planned/robot-arm.md`](../planned/robot-arm.md)) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet (the user switched them on anyway, 2026-11-02: hands near; `hunt` and `showOff` are names the arm build is only inferred to redefine).
+The arm's skills (15, enabled for voice 2026-11-02: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet (the user switched them on anyway, 2026-11-02: hands near; `hunt` and `showOff` are names the arm build is only inferred to redefine).
 
 ## Behaviour switches
 
@@ -72,16 +72,16 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 
 The arm's `poses` entry holds the arm firmware's rest and balance poses (measured on G2, 2026-10-25), the lift servo's rest 59 and walking 0, and `stand_via`: `kbalance` (the default since the night of 2026-10-25: the plain firmware stand-up, `kbalance` from rest also sets the lift to 0) or `sequenced` (`gait/standup.py` `stand_sequenced`: rear legs, then front legs, the lift servo easing from 60 to 0; kept in the code, tried and put back by the user: easing is off). The Pi never sets the lift servo itself, so a stand-up has to come through one of these. The link sends `gb` after every posture skill and after connecting (fall recovery is off: the firmware's own self-right runs while its gyro assist is on) and never next to a gait (a `gb` before or behind `kwkF` stopped the walk).
 
-The arm has `easing`, `gait_switching` and `fall_recovery` off, `blending` on and (since 2026-11-08) `gyro_balance` on; for its first hardware round it had `easing`, `gyro_balance`, `gait_switching`, `skills` and `fall_recovery` off and `blending` on (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
+The arm has `easing`, `gait_switching` and `fall_recovery` off, `blending` on and (since 2026-11-08) `gyro_balance` on; for its first hardware round it had `easing`, `gyro_balance`, `gait_switching`, `skills` and `fall_recovery` off and `blending` on. Turning one back on is a one-line profile edit and a deploy.
 
 ## Open with the arm fitted (2026-10-24)
 
 1. Done: the calibration was backed up before the reflash and survived it ([`../../blueprints/calibration.md`](../../blueprints/calibration.md)).
 2. Decided: the head does not accept the Bittle X+Arm firmware (it shifts every posture and swaps the gaits), so going back to the AI head is a reflash to plain Bittle X with the calibration checked.
 3. A no-attachment policy: the sim has no payload profile yet for the pod without the head (185 g); add one, train it with the same recipe and save it for `none` (until then `none` runs the legacy `DEFAULT_POLICY`).
-4. Weigh the arm and the camera (the sim's `arm` profile uses Petoi's spec-page estimate, 63 g, and 15 g); ARM1 trained on it: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md).
+4. Weigh the arm and the camera (the sim's `arm` profile uses Petoi's spec-page estimate, 63 g, and 15 g); the first arm walking policy was trained on those figures.
 5. Run the arm's skill tokens on the bench before they are trusted.
 
 ## What a setting cannot switch
 
-The flag controls software. The attachment's own hardware is physical: a powered AI head runs its own firmware whatever the Pi does, a reflash changes the BiBoard until the next reflash, and removing the Pi's own microphone and speaker (a later AI-head step) cannot be undone by a setting. Keep the head's transmit line unconnected and the BiBoard's voice module connected unless a decision says otherwise. Head plan: [`../planned/ai-head/README.md`](../planned/ai-head/README.md).
+The flag controls software. The attachment's own hardware is physical: a powered AI head runs its own firmware whatever the Pi does, a reflash changes the BiBoard until the next reflash, and removing the Pi's own microphone and speaker (a later AI-head step) cannot be undone by a setting. Keep the head's transmit line unconnected and the BiBoard's voice module connected unless a decision says otherwise.

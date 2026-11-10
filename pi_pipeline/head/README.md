@@ -1,6 +1,6 @@
 # Petoi AI Head tools (not in the build)
 
-**Not part of the running build.** An MCP tool server for the Petoi AI Head's agent (an exploration of 2026-10-11). The plan, findings and what adopting the head would take: [`../../docs/planned/ai-head/README.md`](../../docs/planned/ai-head/README.md).
+**Not part of the running build.** An MCP tool server for the Petoi AI Head's agent (an exploration of 2026-10-11).
 
 `mcp_tools.py` connects *out* to the head agent's MCP access point (a secret websocket address read from `XIAOZHI_MCP_ENDPOINT` in `.env`) and answers the cloud model's `initialize`, `tools/list` and `tools/call` requests, so the model can call tools while someone talks to the head.
 

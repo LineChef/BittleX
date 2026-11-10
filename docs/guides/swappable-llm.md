@@ -48,5 +48,4 @@ off the device).
 - `pi_pipeline/tests/test_llm_routing.py` covers routing, translation, fallback and fast-only mode with a fake transport; no network is used.
 - Not yet run against a real provider or on G2. Unknowns: how well a given free model handles G2's three tools, latency on the Pi, and its limits.
 - History is stored in Anthropic's block shape for every backend, so a conversation can switch backends mid-session.
-- Intended use with the Petoi AI Head: the head's voice pipeline sends speech to a project-hosted backend, which calls `Conversation`. See
-  [`../research/xiaozhi-esp32-review.md`](../research/xiaozhi-esp32-review.md).
+- Intended use with the Petoi AI Head: the head's voice pipeline sends speech to a project-hosted backend, which calls `Conversation`.

@@ -15,7 +15,6 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
 
 ### Importance, core facts, sightings, consolidation (2026-10-05)
 
-Design notes: [`docs/research/robot-memory-patterns.md`](../../docs/research/robot-memory-patterns.md).
 
 * **Importance.** The `remember` tool takes an `importance` (1-5; 5 = names, who lives here, pets, how G2 looks). Injected facts are
   ranked by importance plus a recency bonus that halves every two weeks, so a name outranks a passing remark when the 30-slot cap bites.

@@ -41,8 +41,8 @@ Commands in this folder use `../../.venv/bin/python`. Tests: `../../.venv/bin/py
 
 ## `trained/`
 
-Gitignored, except the small result files that back decisions (benchmark JSON, reports, the exported release policies) which are force-added: [`../docs/rl/results-index.md`](../docs/rl/results-index.md). Final policies are `trained/<tag>_ppo.zip`; the released ones are `Release_Candidate<name>_ppo.onnx` with their sidecars. Never put a wildcard delete over this folder: the code reads switches from it (for example `v3_world2`).
+Gitignored, except the small result files that back decisions (benchmark JSON, reports, the exported release policies) which are force-added. Final policies are `trained/<tag>_ppo.zip`; the released ones are `Release_Candidate<name>_ppo.onnx` with their sidecars. Never put a wildcard delete over this folder: the code reads switches from it (for example `v3_world2`).
 
 ## Removed campaign scripts
 
-Scripts for closed campaigns (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, and the old hardware-IMU retrain chains) were removed from the working tree on 2026-10-17. Their results are in [`../docs/archive/`](../docs/archive/README.md). To recover one: `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.
+Scripts for closed campaigns (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, and the old hardware-IMU retrain chains) were removed from the working tree on 2026-10-17. To recover one: `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.

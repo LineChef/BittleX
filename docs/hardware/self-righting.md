@@ -19,7 +19,7 @@ More detail on the firmware path: [`petoi-firmware-reference.md`](petoi-firmware
 - **Speed:** self-righting is disabled for fast gaits such as trot, because the robot no longer knows it is flipped, so a fall at speed may not trigger it.
 - **The push reflex only fires while standing**, not during a walking gait. A stumble mid-walk is not covered by the firmware; the learned mid-gait catch is complementary.
 - **With the Pi in the loop:** `pi_pipeline`'s `RecoveryFSM` (`link/recovery.py`) has flags marked hardware-gated for a possible conflict with the firmware's own flip-triggered `rc`. It is built and tested but not wired in, so today the firmware handles recovery on its own. Retest self-righting with the Pi connected before wiring the FSM in.
-- **The simulation cannot show it.** Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model): [`../rl/getup-sim-replay.md`](../rl/getup-sim-replay.md). Judge self-righting on the robot, not in the sim.
+- **The simulation cannot show it.** Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model). Judge self-righting on the robot, not in the sim.
 
 ## Testing the get-up moves on the pod payload
 

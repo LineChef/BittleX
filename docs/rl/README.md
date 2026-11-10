@@ -1,41 +1,21 @@
-# Walking and training (RL)
+# Walking and training
 
-Reinforcement-learning gait work that is part of the current build: how the deployed gait is trained, scored and logged on the real robot. Which policy is deployed
-and what has been tested on G2: [`../STATUS.md`](../STATUS.md). Roadmap: [`../project-plan.md`](../project-plan.md) Phase 3.
+This section explains how G2's walking gait is trained in simulation, scored, exported and deployed to the robot. The gait is a small neural network that adds corrections to Petoi's scripted walk. Which policy is deployed and how it has done on G2 is on the [Current status](../STATUS.md) page.
 
-| | |
+## Start here
+
+| Page | What it covers |
 |---|---|
-| [`walking-policy.md`](walking-policy.md) | What the learned gait does and its limits. |
+| [Walking policy](walking-policy.md) | What the learned gait does, what it cannot do and how it is built. |
+| [Training pipeline](training-pipeline.md) | The whole path from an idea to a file on G2: choose settings, train, score, export, promote and feed real data back. |
 
-### How it is trained
+## Training and testing details
 
-| | |
+| Page | What it covers |
 |---|---|
-| [`training-pipeline.md`](training-pipeline.md) | **Start here for training.** The pipeline end to end: profile and levers, chains, train, score, export, promote, feed real data back. |
-| [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) | The trainer behind the V4 to V6 chains: frontier curriculum, levers, bugs fixed, measurements, pitfalls. |
-| [`results-index.md`](results-index.md) | Every tracked result file under `trained/` with the docs that cite it (generated). |
+| [Passability audit](passability-audit.md) | The rule that simulated difficulty never rises above what a capable policy can pass, and how each hazard's limit is measured. |
+| [Skill learning method](skill-learning-method.md) | The recipe for teaching G2 a new motor skill. |
+| [Hardware logging](hardware-logging.md) | What a real-robot walk log contains and what is useful as training evidence. |
+| [Real-data pipeline](real-data-pipeline.md) | How walks on the robot are logged, checked and turned into simulation calibration. |
 
-### On the real robot
-
-| | |
-|---|---|
-| [`real-walk-log.md`](real-walk-log.md) | Real-robot walks and servo troubleshooting (10/01 on), with the end-of-session state list. Raw data: [`real-walk-data/`](real-walk-data/). What each hardware log carries: [`hardware-logging.md`](hardware-logging.md). |
-| [`hardware-logging.md`](hardware-logging.md) | What rungait.py --log writes, what the firmware can and cannot provide, and what is worth using as training evidence. Written 2026-10-07. |
-| [`carpet-findings-2026-10-20.md`](carpet-findings-2026-10-20.md) | The carpet work of 2026-10-20: the failure, the sim carpet model, every probe and real walk, what helped, what did not, and what to try next. Read before touching carpet again. |
-| [`real-data-pipeline.md`](real-data-pipeline.md) | Always-on capture, ingest gates and sim calibration snapshots. |
-| [`sysid-capture-plan.md`](sysid-capture-plan.md) | The system-identification capture sessions. |
-
-### History and method
-
-| | |
-|---|---|
-| [`hw1-log.md`](hw1-log.md) | Training under the real control path (5 Hz IMU, command timing); the policy lineage and benchmark fixes. |
-| [`skill-learning-method.md`](skill-learning-method.md) | The agreed recipe for teaching G2 a new motor skill. |
-| [`passability-audit.md`](passability-audit.md) | Standing rule: difficulty never ramps above what a capable policy can pass; the audit that measures each hazard's top threshold. |
-| [`getup-sim-replay.md`](getup-sim-replay.md) | Replaying firmware `rc`/`rl` get-up in PyBullet (the sim cannot validate it). |
-| [`h1-rubric.md`](h1-rubric.md) | The learned-vs-scripted real-robot comparison method. |
-
-Training plans for the V5 and V6 chains: [`../plan-detail/v5-training-plan.md`](../plan-detail/v5-training-plan.md), [`../plan-detail/v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md).
-Deferred RL work and backlogs: [`../planned/`](../planned/README.md). Closed campaigns and old sim logs: [`../archive/`](../archive/README.md).
-
-Scripts for closed campaigns (vision goal, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree on 2026-10-17; recover one with `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.
+Deployment on the Pi is covered in [Gait deployment](../guides/gait-deployment.md). The code index for the trainer is in the [training code README](../../rl_training/README.md).

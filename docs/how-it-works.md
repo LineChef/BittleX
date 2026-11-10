@@ -23,7 +23,7 @@ The guiding design choice: these are **independent systems**, not one "brain." V
 
 **What it can and cannot do.** It makes constant small corrections: good balance, straight tracking, small obstacles and light shoves. It cannot make dramatic saves or get up after tipping over; the robot physically lacks the joints. The sensors are also coarse (a 5 Hz IMU, no fast joint feedback), so the policy cannot anticipate hazards, only react to them.
 
-**Vision and walking stay separate.** Putting vision inside the walking policy was tried across several campaigns and closed: a policy that could see ahead learned to plow through obstacles instead of bracing. Vision instead acts above the gait, choosing a scripted skill or slowing the speed command. Details: [`archive/rl/vision-in-gait.md`](archive/rl/vision-in-gait.md), [`rl/walking-policy.md`](rl/walking-policy.md), [`guides/gait-deployment.md`](guides/gait-deployment.md).
+**Vision and walking stay separate.** Putting vision inside the walking policy was tried across several campaigns and closed: a policy that could see ahead learned to plow through obstacles instead of bracing. Vision instead acts above the gait, choosing a scripted skill or slowing the speed command. Details: [`rl/walking-policy.md`](rl/walking-policy.md), [`guides/gait-deployment.md`](guides/gait-deployment.md).
 
 ---
 

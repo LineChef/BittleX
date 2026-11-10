@@ -1,7 +1,4 @@
-> **Reference, moved verbatim from the README on 2026-10-02.** It describes the original frozen base `run20m_ppo`
-> (the first 20 M-step policy; ±22° residual, ~200 M steps across 88 runs). The policies that followed (±30° residual,
-> training under the real control path, and the one deployed now) are in [`hw1-log.md`](hw1-log.md); which one is
-> deployed is in [`../STATUS.md`](../STATUS.md); real-robot results are in [`real-walk-log.md`](real-walk-log.md).
+> This page describes the original frozen base policy, `run20m_ppo` (the first 20 M-step policy; ±22° residual, about 200 M steps across 88 runs). The policies that followed use a ±30° residual and train under the real control path. Which one is deployed, and how it has done on the robot, is on the [status page](../STATUS.md).
 
 # Walking policy — what the learned gait does
 
@@ -45,7 +42,7 @@ the changes that measurably helped were kept.
   *forward* at ~0.06 m/s, walks down steep descents, and holds a straight line
   across a cross-slope, at 0 % falls. (A 2026-09-23 re-measure with corrected
   slope labels found its limits are side-hills past ~8° and climbs past ~20°;
-  see `docs/rl/hw1-log.md`.)
+  see the training notes in the repo.)
 - **Scattered obstacles.** Every episode drops 4–10 small boxes (to ~45 mm,
   short along-path, never spanning the lane) in the walking path. The policy
   never sees them coming, so what it learned is to *clear or deflect over* them
@@ -123,8 +120,7 @@ was tried and closed (Phase D, the `smoke_vfix3` retry) — it just plows throug
 or stalls; the accepted fix is a *discrete* reaction layered outside the walk
 policy (vision picks a scripted response, not a learned one), built and
 sim-validated but waiting on a real forward sensor. It also does not self-right
-or jump (a jump is planned as a separate on-command skill,
-[`docs/planned/behavior-ideas.md`](../planned/behavior-ideas.md) B14), and does not climb —
+or jump (a jump is planned as a separate on-command skill), and does not climb —
 though unlike the others, climbing a single ledge is now a **confirmed,
 scheduled** goal (B13) once the body arrives, not a maybe: Phase F's sim
 attempt hit a contact-physics wall, not proof the real robot can't do it.
@@ -132,4 +128,4 @@ attempt hit a contact-physics wall, not proof the real robot can't do it.
 
 ## V4 (2026-10-09)
 
-The newest policy, trained with a hazard curriculum that advances, long hazard episodes, a doubled mirror-symmetry loss, a lower learning rate and a low-rate cool-down. It is a learned residual on the scripted walk like the others, with the same 278 inputs; a training-only critic saw extra true-state values. Against V3 it is about even overall, smoother and faster on flat ground and better on ledges and shoves, and a little weaker on the 10 deg cross-slope and small rubble. Details, numbers and the first-walk plan: [`hw1-log.md`](hw1-log.md) (V4 entry) and [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) section 6.
+The newest policy, trained with a hazard curriculum that advances, long hazard episodes, a doubled mirror-symmetry loss, a lower learning rate and a low-rate cool-down. It is a learned residual on the scripted walk like the others, with the same 278 inputs; a training-only critic saw extra true-state values. Against V3 it is about even overall, smoother and faster on flat ground and better on ledges and shoves, and a little weaker on the 10 deg cross-slope and small rubble.

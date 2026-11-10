@@ -10,7 +10,7 @@ limit under sustained load. Researched 2026-09-05.
 |---|---|---|
 | 0 | `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed | In place |
 | 1 | `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop | **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos |
-| 2 | `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED | Built and tested, **not wired in** (backlog [B26](../planned/behavior-ideas.md)) |
+| 2 | `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED | Built and tested, **not wired in** (planned) |
 | 3 | A thermal-aware residual policy (the literature blueprint) | Designed, not built; needs training |
 
 **The estimator is unvalidated.** G2's servos report no temperature or current, so heat is estimated from commanded motion. Until it is checked against the real servos, treat the thresholds as guesses that err toward safety.

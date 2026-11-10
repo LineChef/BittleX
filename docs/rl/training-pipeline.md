@@ -1,6 +1,6 @@
 # The training pipeline, end to end
 
-How a walking policy goes from an idea to a file on G2, and the rules that govern each step. Code index: [`../../rl_training/README.md`](../../rl_training/README.md). The design of the trainer: [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md). Deploying: [`../guides/gait-deployment.md`](../guides/gait-deployment.md). The results that back decisions: [`results-index.md`](results-index.md).
+How a walking policy goes from an idea to a file on G2, and the rules that govern each step. Code index: [`../../rl_training/README.md`](../../rl_training/README.md). Deploying: [`../guides/gait-deployment.md`](../guides/gait-deployment.md).
 
 ## 1. Define what the sim models
 
@@ -10,15 +10,15 @@ Every new mechanic in `opencat_gym_env.py` defaults off, so older checkpoints an
 
 ## 2. Plan a chain
 
-A chain is a plan document plus a runner that carries it out unattended and stops only for a judgement call:
+A chain is a plan plus a runner that carries it out unattended and stops only for a judgement call:
 
-| Chain | Plan | Runner | State |
-|---|---|---|---|
-| V3 | [`../archive/rl/v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) | `phase_v3.py` (also the scoring code the others reuse) | done |
-| V4 (screens, then a 20M) | [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) | `phase_v4.py` | done, deployed 2026-10-09 |
-| V5 | [`../plan-detail/v5-training-plan.md`](../plan-detail/v5-training-plan.md) | `phase_v5.py` | done, not promoted |
-| V6 (staged skills, then a 20M) | [`../plan-detail/v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md) | `phase_v6.py` | done, deployed |
-| High-step creep | [`../archive/plan-detail/high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) | `phase_hs.py` | stopped, goal not met |
+| Chain | Runner | State |
+|---|---|---|
+| V3 | `phase_v3.py` (also the scoring code the others reuse) | done |
+| V4 (screens, then a 20M) | `phase_v4.py` | done, deployed 2026-10-09 |
+| V5 | `phase_v5.py` | done, not promoted |
+| V6 (staged skills, then a 20M) | `phase_v6.py` | done, deployed |
+| High-step creep | `phase_hs.py` | stopped, goal not met |
 
 The rules every plan follows: a fresh candidate each time; screens of at most 3M steps with two seeds per lever, judged on learnability and no flat-ground regression; a 20M only after `preflight.py` prints ALL PASS and only on the user's go; difficulty capped by what a capable policy can pass (`passability_audit.py`); nothing trains on a consolidated 20M.
 

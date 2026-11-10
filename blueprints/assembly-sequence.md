@@ -5,7 +5,7 @@ The order G2 was built in, with the record for each step. Follow it top to botto
 | # | Step | Done | Record |
 |---|---|---|---|
 | 1 | Mount the PiSugar S under the Pi Zero 2 W (pogo-pin contact, header stays free) | 2026-09-18 | [`build-logs/pi-biboard-build-notes.md`](../docs/hardware/build-logs/pi-biboard-build-notes.md) Step 1 |
-| 2 | Assemble the Bittle X V2 frame, servos and BiBoard from Petoi's kit | 2026-09-28 | Petoi's assembly guide; notes in [`../docs/plan-detail/phase4-hardware-assembly.md`](../docs/plan-detail/phase4-hardware-assembly.md) |
+| 2 | Assemble the Bittle X V2 frame, servos and BiBoard from Petoi's kit | 2026-09-28 | Petoi's assembly guide |
 | 3 | Erase and reflash the BiBoard with the current official OpenCat firmware | 2026-09-29 | [`../docs/hardware/petoi-firmware-reference.md`](../docs/hardware/petoi-firmware-reference.md), [`../docs/hardware/calibration-and-bringup-research.md`](../docs/hardware/calibration-and-bringup-research.md) |
 | 4 | Calibrate the eight leg servos with the bracket and verify with `kbalance` | 2026-09-29 | [`calibration.md`](calibration.md) |
 | 5 | Prepare the BiBoard's 5-pin Pi socket (solder the header) | about 2026-09-30 | [`build-logs/pi-biboard-build-notes.md`](../docs/hardware/build-logs/pi-biboard-build-notes.md) Step 2 |
@@ -18,4 +18,4 @@ The order G2 was built in, with the record for each step. Follow it top to botto
 
 After the hardware is together: [`../docs/guides/bring-up-sequence.md`](../docs/guides/bring-up-sequence.md) is the ordered software and first-movement bring-up (run it with `python -m pi_pipeline.bringup`).
 
-Not part of the build: the Petoi AI Head ([`../docs/planned/ai-head/`](../docs/planned/ai-head/README.md)) and the arm module ([`../docs/planned/robot-arm.md`](../docs/planned/robot-arm.md)). Its wiring, if it is ever added, is Part 2 of the wiring guide.
+Not part of the build: the Petoi AI Head and the arm module. Its wiring, if it is ever added, is Part 2 of the wiring guide.

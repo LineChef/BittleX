@@ -8,9 +8,9 @@ Where each part of the code is documented. Each package has its own README next 
 |---|---|---|---|
 | `voice/` | Wake word, speech to text, Claude, text to speech; local commands; sounds | [`voice/README.md`](../pi_pipeline/voice/README.md) | [`guides/voice-commands.md`](guides/voice-commands.md), [`guides/settings-switches.md`](guides/settings-switches.md), [`guides/swappable-llm.md`](guides/swappable-llm.md), [`guides/models.md`](guides/models.md) |
 | `personality/` | Traits that shape the prompt, behavior and cues | [`personality/README.md`](../pi_pipeline/personality/README.md) | [`how-it-works.md`](how-it-works.md) |
-| `memory/` | Exchange log, facts, consolidation, review UI | [`memory/README.md`](../pi_pipeline/memory/README.md) | [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md) |
-| `reflection/` | Session recaps and reflection notes | [`reflection/README.md`](../pi_pipeline/reflection/README.md) | [`planned/reflection-plan.md`](planned/reflection-plan.md) |
-| `goals/` | Goal sessions: attempts judged on the Pi to change the next, journal, spoken suggestions, report | [`goals/README.md`](../pi_pipeline/goals/README.md) | [`planned/goals-plan.md`](planned/goals-plan.md), [`guides/goals.md`](guides/goals.md) |
+| `memory/` | Exchange log, facts, consolidation, review UI | [`memory/README.md`](../pi_pipeline/memory/README.md) | [`how-it-works.md`](how-it-works.md) |
+| `reflection/` | Session recaps and reflection notes | [`reflection/README.md`](../pi_pipeline/reflection/README.md) | |
+| `goals/` | Goal sessions: attempts judged on the Pi to change the next, journal, spoken suggestions, report | [`goals/README.md`](../pi_pipeline/goals/README.md) | [`guides/goals.md`](guides/goals.md) |
 | `behavior/` | The driver, exploration, idle, sleep, wall avoidance | [`behavior/README.md`](../pi_pipeline/behavior/README.md) | [`guides/exploration-mode.md`](guides/exploration-mode.md) |
 | `vision/` | Camera, detections, pictures, wall distance, recognition | [`vision/README.md`](../pi_pipeline/vision/README.md) | [`vision/README.md`](vision/README.md), [`vision/picture-library.md`](vision/picture-library.md) |
 | `gait/` | The 80 Hz loop, steering, stand-up, guards, tools | [`gait/README.md`](../pi_pipeline/gait/README.md) | [`guides/gait-deployment.md`](guides/gait-deployment.md), [`rl/walking-policy.md`](rl/walking-policy.md) |
@@ -19,7 +19,7 @@ Where each part of the code is documented. Each package has its own README next 
 | `diag/` | Event log, ring buffer, watchdog, crash reports | [`diag/README.md`](../pi_pipeline/diag/README.md) | [`hardware/diagnostics.md`](hardware/diagnostics.md) |
 | `power/` | Pi power levers, battery watch, runtime, sleep | [`power/README.md`](../pi_pipeline/power/README.md) | [`hardware/pi-power.md`](hardware/pi-power.md) |
 | `telemetry/` | Automatic walk logs, floors, epochs, labels | [`telemetry/README.md`](../pi_pipeline/telemetry/README.md) | [`rl/real-data-pipeline.md`](rl/real-data-pipeline.md) |
-| `head/` | MCP tool server for the AI Head (not in the build) | [`head/README.md`](../pi_pipeline/head/README.md) | [`planned/ai-head/`](planned/ai-head/README.md) |
+| `head/` | MCP tool server for the AI Head (not in the build) | [`head/README.md`](../pi_pipeline/head/README.md) | [`guides/attachments.md`](guides/attachments.md) |
 | `util/` | Disk warning, log tidy, worker supervisor | [`util/README.md`](../pi_pipeline/util/README.md) | |
 
 Package-level overview, setup and the list of modules built but not yet wired in: [`../pi_pipeline/README.md`](../pi_pipeline/README.md).
@@ -28,6 +28,6 @@ Package-level overview, setup and the list of modules built but not yet wired in
 
 | Folder | Does | Docs |
 |---|---|---|
-| `rl_training/opencat-gym/` | Simulation training, benchmarks and export of the walking policy | [`rl/README.md`](rl/README.md), [`rl/training-upgrade-2026-10.md`](rl/training-upgrade-2026-10.md) |
+| `rl_training/opencat-gym/` | Simulation training, benchmarks and export of the walking policy | [`rl/README.md`](rl/README.md) |
 | `tools/` | Docs checks, Mac-to-Pi operations, real-data pipeline, vision dataset tools, git hooks | [`../tools/README.md`](../tools/README.md), [`guides/shell-helpers.md`](guides/shell-helpers.md) |
 | `blueprints/` | The physical build: assembly order, wiring, mounting, calibration | [`../blueprints/README.md`](../blueprints/README.md) |

@@ -14,7 +14,7 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 | [`gen_results_index.py`](gen_results_index.py) | Regenerates `docs/rl/results-index.md`: every tracked result file under `rl_training/opencat-gym/trained/` with the docs that cite it. |
 | [`gen_helpers_doc.py`](gen_helpers_doc.py) | Regenerates `docs/guides/shell-helpers.md` from the comments in `g2_aliases.sh`. |
 | [`md_to_html.py`](md_to_html.py) | Turns one Markdown doc into a single self-contained HTML page. |
-| [`make_petoi_edition.py`](make_petoi_edition.py) | Builds the English edition of the XiaoZhi and Petoi head documentation for sending to Petoi (reads [`docs/research/xiaozhi-vendor-docs.md`](../docs/research/xiaozhi-vendor-docs.md), writes outside the repo). |
+| [`make_petoi_edition.py`](make_petoi_edition.py) | Builds the English edition of the XiaoZhi and Petoi head documentation for sending to Petoi (writes outside the repo). |
 
 ## Running G2 from the Mac
 
@@ -25,8 +25,8 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 | [`g2_promote_policy.sh`](g2_promote_policy.sh) | Promotes a trained policy to the default and queues its deploy. | [`gait-deployment.md`](../docs/guides/gait-deployment.md) |
 | [`g2_explore.sh`](g2_explore.sh) | Starts, stops and inspects a supervised exploration session on the Pi (the voice service always comes back). | [`exploration-mode.md`](../docs/guides/exploration-mode.md) |
 | [`g2_safe_stop.sh`](g2_safe_stop.sh) | Rests G2, then stops whatever controls him. Never stop a controller any other way. | [`operating-g2.md`](../docs/guides/operating-g2.md) |
-| [`g2_baseline.sh`](g2_baseline.sh), [`g2_turns.sh`](g2_turns.sh) | Logged baseline walks and firmware turn runs on the Pi. | [`rl/real-walk-log.md`](../docs/rl/real-walk-log.md) |
-| [`g2_memory_backup.sh`](g2_memory_backup.sh) | Copies the Pi's memory database to this machine. | [`phase9-memory.md`](../docs/plan-detail/phase9-memory.md) |
+| [`g2_baseline.sh`](g2_baseline.sh), [`g2_turns.sh`](g2_turns.sh) | Logged baseline walks and firmware turn runs on the Pi. | |
+| [`g2_memory_backup.sh`](g2_memory_backup.sh) | Copies the Pi's memory database to this machine. | |
 | [`g2_wifi.sh`](g2_wifi.sh) | Manages the Wi-Fi networks the Pi joins. | [`pi-bring-up.md`](../docs/guides/pi-bring-up.md) |
 | [`walk_log_summary.py`](walk_log_summary.py) | Summarizes walk logs from `run_gait.py` and the firmware-skill logger. | [`cheatsheet.md`](../docs/guides/cheatsheet.md) |
 | [`servo_static_test.py`](servo_static_test.py), [`servo_response_test.py`](servo_response_test.py), [`servo_step_test.py`](servo_step_test.py) | Bench servo tests over the BiBoard's USB serial, using the firmware's position feedback. | [`servo-thermal.md`](../docs/hardware/servo-thermal.md) |

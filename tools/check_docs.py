@@ -11,12 +11,14 @@ ERRORS (exit 1, block the commit):
   * the currently deployed policy's name (read from DEFAULT_POLICY in the code) in a page that must not name it
   * docs/backlog.md out of date with the item headings it is generated from (tools/gen_backlog.py)
 WARNINGS (printed, never fail):
+  * readability of a page published on the docs site: a table cell over 40 words, a line over 700 characters, an attribution tag such as
+    "(user, 2026-10-21)", or no opening paragraph (the site uses it as the page summary)
   * a link whose #anchor matches no heading in the target page
   * a docs page that no other page links to (an orphan)
 
 The rule behind the volatile-fact checks: a fact that changes belongs in ONE place (docs/STATUS.md for what is deployed and
 what is true now; the code for the policy name; `pytest` for test results). Dated logs (docs/rl, docs/plan-detail, docs/archive/history.md,
-docs/research, blueprints) record what was true then and are exempt. See docs/README.md, "Where to update what".
+docs/research, blueprints) record what was true then and are exempt. See docs/maintaining-docs.md, "Where to update what".
 Bypass a genuine false positive with `git commit --no-verify`.
 """
 import argparse
@@ -32,6 +34,48 @@ VOLATILE_FREE = ("README.md", "docs/README.md", "docs/STATUS.md", "docs/capabili
 COUNT_RE = re.compile(r"\b\d{2,4}\s+(?:passing\s+)?tests\b|\b\d{2,4}\s+passing\b", re.I)
 LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
+
+
+GENERATED_PAGES = ("docs/guides/env-reference.md", "docs/guides/shell-helpers.md", "docs/guides/cheatsheet.md", "docs/guides/cheatsheet-advanced.md")
+ATTRIBUTION_RE = re.compile(r"\((?:user|owner)[,:] ?20\d\d-\d\d-\d\d")
+CELL_WORDS, LONG_LINE = 40, 700
+
+
+def published(path):
+    """True for a page the docs bundle publishes (needs tools/build_docs_bundle.py next to this file)."""
+    try:
+        import build_docs_bundle as B
+    except ImportError:
+        return False
+    return B.is_page(path) and not B.is_excluded(path)
+
+
+def readability_warnings(path, text):
+    """Warnings about a published page that reads like a working note rather than documentation."""
+    out, infence, has_intro = [], False, False
+    body = re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.S)
+    generated = path in GENERATED_PAGES
+    for i, line in enumerate(body.splitlines(), 1):
+        if FENCE_RE.match(line):
+            infence = not infence
+            continue
+        if infence:
+            continue
+        st = line.strip()
+        if not has_intro and st and not st.startswith(("#", "|", ">", "-", "*", "!", "<")):
+            has_intro = True
+        if len(line) > LONG_LINE and not generated:
+            out.append(f"{path}:{i}: line of {len(line)} characters; split it up or move detail into a list")
+        if st.startswith("|") and not generated:
+            for cell in st.strip("|").split("|"):
+                if len(re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", cell).split()) > CELL_WORDS:
+                    out.append(f"{path}:{i}: table cell over {CELL_WORDS} words; use a heading and a short paragraph or list")
+                    break
+        if ATTRIBUTION_RE.search(line):
+            out.append(f"{path}:{i}: attribution tag in a published page; keep who decided what in the working notes")
+    if not has_intro:
+        out.append(f"{path}: no opening paragraph; the site uses it as the page summary")
+    return out
 
 
 def md_files(root, staged=False):
@@ -152,6 +196,8 @@ def check(root, files):
                     errors.append(f"{f}:{i}: hard-coded test count '{m.group(0)}' -- don't quote counts, run pytest")
                 if policy and policy in line and f != "docs/STATUS.md":
                     errors.append(f"{f}:{i}: names the deployed policy '{policy}' -- say 'the deployed policy' and link docs/STATUS.md")
+        if published(f):
+            warnings += readability_warnings(f, text)
         if f.startswith("docs/") and not f.startswith(("docs/plan-detail/", "docs/rl/", "docs/archive/", "docs/planned/", "docs/guides/", "docs/hardware/", "docs/research/")) and f != "docs/README.md" \
                 and inbound.get(f, 0) == 0:
             warnings.append(f"{f}: orphan page -- no other page links to it (add it to docs/README.md)")

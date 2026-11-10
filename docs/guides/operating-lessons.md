@@ -26,7 +26,7 @@ Things that bit during the hardware sessions of 2026-10-07 to 2026-10-10 and the
 
 - Ask which floor G2 is on and set it first (`g2floor <label>`); the label has a 72 h age limit in the ingest gates.
 - All tests start on his feet with hands near; the user says "go" before each run and measures with a tape in inches. Abort a block if the G2 pack passes 30% (resting) or the Pi's low alarm sounds (the Pi lasts about 3.3 h on a full charge: low alarm at 2.29 h, critical 2.62 h; record in `~/.local/share/g2/pi_runtime.json`, `python -m pi_pipeline.power runtime list`).
-- Capture walks for system identification need `--foot-hold off`, since the front-left hold changes the legs' motion ([`../rl/sysid-capture-plan.md`](../rl/sysid-capture-plan.md)). Stall and collision runs are labelled `collision` and excluded so they never feed a calibration fit.
+- Capture walks for system identification need `--foot-hold off`, since the front-left hold changes the legs' motion. Stall and collision runs are labelled `collision` and excluded so they never feed a calibration fit.
 - A decision rule that worked for new sensing: build a detector only if its runs separate from normal runs by a margin that holds on every repeat (the IMU contact signal separated on heading jitter, 10-13 against 1.4-1.6 deg per update).
 
 ### Processing the data after a session
@@ -55,4 +55,3 @@ Not automatic: the Pi's autolog skips any walk started with `--log`, and the Mac
 - The privacy hook flags the user's first name in docs and docstrings; use placeholders in tracked files.
 - Commit locally as often as you like, but `git push origin development` is a deliberate step: the repo is public.
 - Before deleting capture folders, `trained/` files or the memory database, look at what is there: they are not all reproducible.
-- Training-run pitfalls: [`../rl/training-upgrade-2026-10.md`](../rl/training-upgrade-2026-10.md) section 7.

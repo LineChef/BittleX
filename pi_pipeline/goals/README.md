@@ -1,7 +1,6 @@
 # Goals
 
 G2 works toward a goal the user sets and learns from his attempts, all on the Pi with no API call. How to use it: [`../../docs/guides/goals.md`](../../docs/guides/goals.md).
-Design and decisions: [`../../docs/planned/goals-plan.md`](../../docs/planned/goals-plan.md).
 
 | Module | What it does |
 |---|---|

@@ -125,7 +125,7 @@ mechanically," not a guess.
    mounts somewhere distinct, it needs its own sim body). Balance each piece on
    an edge for height + fore/aft CoM. Then set `PAYLOAD_MASS_*` / `HEAD_MASS_*` /
    positions in `opencat_gym_env.py` and retrain (or `--finetune-lr`) if the
-   delta from ~76 g is real — [`planned/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md) **H2**.
+   delta from ~76 g is real.
 5. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover still fits.
 
@@ -181,7 +181,7 @@ mechanically," not a guess.
     the floor). Do not proceed to 13b until this is clean.
 13b. **Now the floor, for the first time:** `--cmd` (the learned gait) →
     **the H1 head-to-head** vs firmware `kwkF`. Methodology + decision rule:
-    [`rl/h1-rubric.md`](../rl/h1-rubric.md); `h1_score.py` produces the verdict.
+    `h1_score.py` produces the verdict.
     Emergency stop (`--halt` / "emergency stop") within reach the whole time.
 
 **Vision on the robot (Phase 8)**

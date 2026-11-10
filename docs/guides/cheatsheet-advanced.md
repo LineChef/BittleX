@@ -121,7 +121,6 @@ Build the detection model: capture, filter, add to the library, upload to SenseC
 
 ## Docs and repo
 
-Where each kind of change is written down: [`../README.md`](../README.md#where-to-update-what).
 
 | Command | Does |
 |---|---|

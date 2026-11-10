@@ -12,4 +12,4 @@ The physical build record for G2: how the hardware was assembled and wired, with
 
 The dated build logs (the Pi, PiSugar and BiBoard connection; the microphone and speaker) are in [`../docs/hardware/build-logs/`](../docs/hardware/README.md#build-logs).
 
-Bittle X, the camera module and the Pi + PiSugar stack are assembled and in use. What works and what is open: [`../docs/STATUS.md`](../docs/STATUS.md). The first mounting research (an abandoned clip design) is archived in [`../docs/archive/mounting-research-2026-09.md`](../docs/archive/mounting-research-2026-09.md).
+Bittle X, the camera module and the Pi + PiSugar stack are assembled and in use. What works and what is open: [`../docs/STATUS.md`](../docs/STATUS.md).

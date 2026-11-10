@@ -1,6 +1,6 @@
 # G2 as built
 
-What G2 is made of, how it is connected, and what it weighs. This is the summary; each row links to the page that holds the detail and the evidence. The physical build record (wiring, soldering, mounting, calibration) is in [`../../blueprints/`](../../blueprints/README.md). What is working and what has been tested: [`../STATUS.md`](../STATUS.md). Parts that are bought or planned but not installed: [`../planned/`](../planned/README.md).
+What G2 is made of, how it is connected, and what it weighs. This is the summary; each row links to the page that holds the detail and the evidence. The physical build record (wiring, soldering, mounting, calibration) is in [`../../blueprints/`](../../blueprints/README.md). What is working and what has been tested: [`../STATUS.md`](../STATUS.md).
 
 ## Parts
 

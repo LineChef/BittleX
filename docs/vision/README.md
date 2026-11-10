@@ -20,12 +20,6 @@ capturing data for it.
 | [`downloaded-models.md`](downloaded-models.md) | **Models downloaded from the internet (outside the repo):** source, size, SHA-256, what each was checked against, who approved it, and what those checks do and do not show |
 | [`wall-check-plan.md`](wall-check-plan.md) | Goal (user): G2 looks often enough to notice a wall coming, not so often that constant pictures slow everything down. No Claude API call is involved; everything runs on the Pi. |
 
-### Related plans
-
-| | |
-|---|---|
-| [`exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md) | **The plan (2026-10-07):** exploration survey pictures, naming objects by voice, processing the pictures, recognition, "what am I looking at?" and "I see the ...". |
-
 The runtime code is `pi_pipeline/vision/` (feed / avoidance / cliff-guard /
 scene). The SenseCraft single-class flow is [`../guides/train-vision-model.md`](../guides/train-vision-model.md).
 

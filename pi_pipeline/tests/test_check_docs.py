@@ -23,8 +23,8 @@ def _run(root):
 def test_clean_tree_has_no_errors(tmp_path):
     root = _tree(tmp_path, {
         "README.md": "See [status](docs/STATUS.md) and [guide](docs/guides/g.md#setup).\n",
-        "docs/STATUS.md": "# Status\n",
-        "docs/README.md": "[g](guides/g.md)\n",
+        "docs/STATUS.md": "# Status\n\nCurrent state.\n",
+        "docs/README.md": "# Docs\n\n[g](guides/g.md)\n",
         "docs/guides/g.md": "# G\n\n## Setup\n\nHello\n",
     })
     errors, warnings = _run(root)
@@ -78,3 +78,12 @@ def test_the_real_repo_docs_pass(tmp_path):
     root = os.path.abspath(os.path.join(_TOOLS, ".."))
     errors, _ = cd.check(root, cd.md_files(root))
     assert errors == [] and cd.backlog_errors(root) == []
+
+
+def test_readability_warnings_for_published_pages():
+    long_cell = " ".join(["word"] * 45)
+    page = f"# T\n\n| a | b |\n|---|---|\n| x | {long_cell} |\n\nDecided (user, 2026-10-21) to do it.\n"
+    out = cd.readability_warnings("docs/guides/x.md", page)
+    assert any("table cell" in w for w in out) and any("attribution" in w for w in out)
+    assert cd.readability_warnings("docs/guides/x.md", "---\naudience: visitor\n---\n# T\n\nOne clear opening sentence.\n") == []
+    assert any("no opening paragraph" in w for w in cd.readability_warnings("docs/guides/x.md", "# T\n\n- only a list\n"))

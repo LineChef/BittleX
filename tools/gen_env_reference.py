@@ -13,6 +13,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_docs_bundle import is_excluded  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "docs", "guides", "env-reference.md")
@@ -45,8 +48,7 @@ def collect():
             mentions_code.setdefault(v, set()).add(f)
     docs = {}
     for f in files:
-        if (f.endswith(".md") and f.startswith("docs/") and not f.startswith("docs/archive/") and f != "docs/guides/env-reference.md"
-                and not f.startswith("docs/rl/results-index")) or f == ".env.example":
+        if (f.endswith(".md") and f.startswith("docs/") and not is_excluded(f) and f != "docs/guides/env-reference.md") or f == ".env.example":
             for v in set(MENTION.findall(open(os.path.join(ROOT, f), encoding="utf-8").read())):
                 docs.setdefault(v, set()).add(f)
     return reads, mentions_code, docs

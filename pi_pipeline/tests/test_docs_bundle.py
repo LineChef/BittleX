@@ -75,3 +75,35 @@ def test_title_summary_and_headings():
     assert B.title_of(md, "x") == "The title"
     assert B.summary_of(md) == "First paragraph with a link and code."
     assert [h["text"] for h in B.headings_of(md)] == ["Part one", "Sub"]
+
+
+@pytest.mark.parametrize("path,excluded", [
+    ("docs/plan-detail/phase7-voice.md", True), ("docs/planned/ai-head/README.md", True), ("docs/archive/history.md", True),
+    ("docs/research/community-projects.md", True), ("docs/rl/real-walk-log.md", True), ("docs/rl/real-walk-data/2026-10-10/README.md", True),
+    ("docs/backlog.md", True), ("docs/maintaining-docs.md", True),
+    ("docs/STATUS.md", False), ("docs/guides/cheatsheet.md", False), ("docs/rl/training-pipeline.md", False), ("blueprints/README.md", False),
+])
+def test_working_notes_are_excluded(path, excluded):
+    assert B.is_excluded(path) is excluded
+
+
+def test_excluded_files_are_not_assets():
+    assert not B.is_asset("docs/planned/ai-head/plan.html")
+    assert B.is_asset("docs/guides/operating-g2-quick-guide.pdf")
+
+
+def test_front_matter_is_split_from_the_page():
+    meta, body = B.parse_front("---\naudience: builder\nkind: guide\n---\n# Title\n\nText.\n")
+    assert meta == {"audience": "builder", "kind": "guide"} and body.startswith("# Title")
+    assert B.parse_front("# Title\n") == ({}, "# Title\n")
+
+
+def test_link_to_a_working_note_is_reported(monkeypatch):
+    out, w = rw("[log](real-walk-log.md)")
+    assert w and w[0].startswith(B.LEFT_OUT)
+
+
+def test_top_level_layout_groups_every_name_once():
+    names = [n for _, group in B.TOP_LAYOUT for n in group]
+    assert len(names) == len(set(names))
+    assert set(B.SECTION_DEFAULTS) <= set(B.SECTIONS)

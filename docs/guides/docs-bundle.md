@@ -1,6 +1,6 @@
 # The docs bundle: showing these docs on a website
 
-Every documentation page in the repo is packaged, on every push, as a **bundle** of plain files that a website can read and render as its own pages. There is no server or API to run: the bundle is static files on GitHub Pages. This page describes how it is built and published, the file format, and how the React site (Vite) loads it. Build code: [`../../tools/build_docs_bundle.py`](../../tools/build_docs_bundle.py); the workflow: `.github/workflows/docs-bundle.yml`.
+Every reader-facing documentation page in the repo is packaged, on every push, as a **bundle** of plain files that a website can read and render as its own pages. There is no server or API to run: the bundle is static files on GitHub Pages. This page describes how it is built and published, the file format, and how the React site (Vite) loads it. Build code: [`../../tools/build_docs_bundle.py`](../../tools/build_docs_bundle.py); the workflow: `.github/workflows/docs-bundle.yml`.
 
 ## How it is built and published
 
@@ -23,9 +23,15 @@ Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 | `pages/<route>.md` | Each page's Markdown with its links already rewritten. `pages/index.md` is the home page |
 | `assets/<repo path>` | Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan) |
 
-A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. `summary` is the first paragraph as plain text, at most 220 characters; a longer one is cut at a word boundary and ends with `…`. `search.json`'s `text` is the opposite, a raw cut-off at 4,000 characters.
+A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `audience`, `kind`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. `summary` is the first paragraph as plain text, at most 220 characters; a longer one is cut at a word boundary and ends with `…`. `search.json`'s `text` is the opposite, a raw cut-off at 4,000 characters.
 
-**Sections** are a closed set: `overview`, `guides`, `hardware`, `vision`, `rl`, `research`, `plan-detail`, `planned`, `archive`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
+**Sections** are a closed set: `overview`, `guides`, `hardware`, `vision`, `rl`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
+
+**Audience and kind.** `audience` is who a page is for (`visitor`, `builder` or `contributor`) and `kind` is what it is (`overview`, `guide`, `reference` or `concept`). A page sets them in optional front matter (a `---` block at the top with `audience:` and `kind:` lines, removed from the published Markdown); without it the section's default applies. A site can use them for badges and filters.
+
+**Left out of the bundle.** Working notes stay in the repo but are not published: `docs/plan-detail/`, `docs/planned/`, `docs/archive/`, `docs/research/`, the dated run logs in `docs/rl/`, `docs/backlog.md` and `docs/maintaining-docs.md`. The list is `EXCLUDED_DIRS` and `EXCLUDED_FILES` in the builder. The build fails if a published page links to one of them.
+
+**Top-level groups.** The top-level nav nodes carry a `group`: `Start here`, `Build and operate`, `Under the hood` or `About` (`TOP_LAYOUT` in the builder), so a sidebar can show them as headed groups.
 
 **Navigation nodes** (`nav`) have `route`, `title`, `section` and `order` always, and `children` (never an empty array) and `group` only when they apply. `order` is the node's position among its siblings, from 0, and the siblings are already listed in that order (it equals the page entry's `order`). A node with `folder: true` is a folder with no page of its own (`code`, `legal`, `hardware/build-logs` and similar): it has no `manifest.pages` entry and no `pages/<route>.md`, and its `section` is its first child's, so no node has an empty section. **`parent`** of a page entry is the route of its parent nav node, `null` at the top level; for a page inside a folder without a README it is that folder node's route. **Heading ids** are GitHub-style slugs, the same as `rehype-slug`: lower case, backticks and asterisks dropped, underscores kept inside names (`pi_pipeline/: runs on the Pi` is `pi_pipeline-runs-on-the-pi`; only an underscore at a word edge, as in `_emphasis_`, is dropped as Markdown emphasis), punctuation other than hyphens and underscores removed, each space a hyphen. Summaries keep underscores in code names the same way. Required and optional fields of every file are listed in the schema (`required`). The `nav` tree is ordered the way each folder's README lists its pages.
 
@@ -37,7 +43,7 @@ A **page** entry has `route`, `title`, `section`, `source` (the repo path), `upd
 
 The order of the pages in the site's sidebar is the order of the rows in each folder's `README.md`: change the order of the rows and rebuild. A page the README does not list goes to the end, alphabetically. A `###` heading in a folder README makes a **sidebar group**: the pages linked under it carry a `group` field in the manifest's `nav` (for example `Operate` and `Configure` under Guides). Use a `###` heading only for a group; `##` headings are ordinary sections. Pages above the first `###` have no group and come first.
 
-The order of the top-level overview pages is set in the builder (`TOP_ORDER` in `build_docs_bundle.py`), and the folders follow `FOLDER_ORDER`.
+The order of the top-level pages and folders is set in the builder (`TOP_LAYOUT` in `build_docs_bundle.py`).
 
 ### Controlling the order from the site
 

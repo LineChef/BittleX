@@ -6,7 +6,7 @@
   "$defs": {
     "section": {
       "description": "A closed set. Every page, and every navigation node (folder nodes included), carries exactly one. The build fails on a value outside this list.",
-      "enum": ["overview", "guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive", "blueprints", "code", "legal", "about"]
+      "enum": ["overview", "guides", "hardware", "vision", "rl", "blueprints", "code", "legal", "about"]
     },
     "Heading": {
       "type": "object",
@@ -20,13 +20,15 @@
     },
     "PageEntry": {
       "type": "object",
-      "required": ["route", "title", "section", "source", "updated", "summary", "headings", "parent", "order"],
+      "required": ["route", "title", "section", "source", "updated", "audience", "kind", "summary", "headings", "parent", "order"],
       "properties": {
         "route": {"type": "string", "description": "Site route without base; the home page is the empty string"},
         "title": {"type": "string"},
         "section": {"$ref": "#/$defs/section"},
         "source": {"type": "string", "description": "Repo path of the Markdown file"},
         "updated": {"type": "string", "format": "date", "description": "Date of the file's last commit"},
+        "audience": {"type": "string", "enum": ["visitor", "builder", "contributor"], "description": "Who the page is written for: a visitor (what G2 is and does), a builder (assembling or operating G2) or a contributor (code and training internals). From the page's front matter, else the section's default"},
+        "kind": {"type": "string", "enum": ["overview", "guide", "reference", "concept"], "description": "What the page is: an overview, a step-by-step guide, a reference to look things up in, or a concept explainer. From the page's front matter, else the section's default"},
         "summary": {"type": "string", "description": "First paragraph as plain text, at most 220 characters. When longer it is cut at a word boundary and ends with an ellipsis (U+2026)"},
         "headings": {"type": "array", "items": {"$ref": "#/$defs/Heading"}},
         "parent": {

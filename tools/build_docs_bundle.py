@@ -32,14 +32,28 @@ sys.path.insert(0, HERE)
 GIT_EXES = ("git", "/Library/Developer/CommandLineTools/usr/bin/git")
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".html"}
 CODE_READMES = ("pi_pipeline/README.md", "tools/README.md", "rl_training/README.md", "rl_training/opencat-gym/reference_gait/README.md")
-TOP_ORDER = ["STATUS", "how-it-works", "architecture", "capabilities", "project-plan", "code-map", "backlog"]
-FOLDER_TITLES = {"archive/plan-detail": "Archived plan write-ups", "archive/rl": "Archived training campaigns", "hardware/build-logs": "Build logs",
-                 "code": "Code READMEs", "legal": "Legal", "code/pi_pipeline": "Pi pipeline code"}
-FOLDER_ORDER = ["guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive"]
+FOLDER_TITLES = {"hardware/build-logs": "Build logs", "code": "Code READMEs", "legal": "Legal", "code/pi_pipeline": "Pi pipeline code"}
+# Top-level order and sidebar groups (a top-level node's `group`): what a newcomer reads first, then how to build and run G2, then the internals.
+TOP_LAYOUT = [("Start here", ["how-it-works", "capabilities", "STATUS", "project-plan"]),
+              ("Build and operate", ["guides", "hardware", "vision", "blueprints"]),
+              ("Under the hood", ["architecture", "code-map", "rl", "code"]),
+              ("About", ["about", "legal"])]
+# Working notes stay in the repo but never reach the site: plans, backlogs, history, outside-project reviews, run logs.
+EXCLUDED_DIRS = ("docs/plan-detail/", "docs/planned/", "docs/archive/", "docs/research/", "docs/rl/real-walk-data/")
+EXCLUDED_FILES = {"docs/backlog.md", "docs/maintaining-docs.md", "docs/rl/real-walk-log.md", "docs/rl/hw1-log.md", "docs/rl/results-index.md",
+                  "docs/rl/carpet-findings-2026-10-20.md", "docs/rl/getup-sim-replay.md", "docs/rl/h1-rubric.md", "docs/rl/sysid-capture-plan.md",
+                  "docs/rl/training-upgrade-2026-10.md"}
+# Who a page is for and what it is, by section; a page's front matter (`audience:` / `kind:`) overrides these.
+AUDIENCES = ["visitor", "builder", "contributor"]
+KINDS = ["overview", "guide", "reference", "concept"]
+SECTION_DEFAULTS = {"overview": ("visitor", "overview"), "guides": ("builder", "guide"), "hardware": ("builder", "reference"),
+                    "vision": ("builder", "reference"), "rl": ("contributor", "concept"), "blueprints": ("builder", "guide"),
+                    "code": ("contributor", "reference"), "legal": ("visitor", "reference"), "about": ("visitor", "overview")}
+LEFT_OUT = "left-out page: "
 LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
 FENCE = re.compile(r"^(```|~~~)")
 # The closed sets the schema (docs/guides/docs-bundle.schema.json, shipped as schema.json) promises; the build refuses a value outside them, so the schema cannot drift.
-SECTIONS = ["overview", "guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive", "blueprints", "code", "legal", "about"]
+SECTIONS = ["overview", "guides", "hardware", "vision", "rl", "blueprints", "code", "legal", "about"]
 ASSET_KINDS = ["png", "jpg", "jpeg", "gif", "svg", "pdf", "html"]      # one per ASSET_EXT; the files in the bundle today are html and pdf
 SUMMARY_MAX = 220
 
@@ -89,10 +103,6 @@ def route_for(path):
 def section_for(path, route):
     if route == "":
         return "overview"
-    if path.startswith("docs/archive/"):
-        return "archive"
-    if path.startswith("docs/planned/"):
-        return "planned"
     if path.startswith("docs/"):
         parts = path.split("/")
         return parts[1] if len(parts) > 2 else "overview"
@@ -113,8 +123,26 @@ def is_page(path):
     return route_for(path) is not None
 
 
+def is_excluded(path):
+    """True for working notes: kept in the repo, never published in the bundle."""
+    return path in EXCLUDED_FILES or path.startswith(EXCLUDED_DIRS)
+
+
+def parse_front(text):
+    """Split optional `---` front matter (flat `key: value` lines) from a page. Returns (meta, body)."""
+    m = re.match(r"^---\n(.*?)\n---\n?", text, re.S)
+    if not m:
+        return {}, text
+    meta = {}
+    for line in m.group(1).split("\n"):
+        k, _, v = line.partition(":")
+        if k.strip() and v.strip():
+            meta[k.strip()] = v.strip()
+    return meta, text[m.end():]
+
+
 def is_asset(path):
-    return path.startswith(("docs/", "blueprints/")) and os.path.splitext(path)[1].lower() in ASSET_EXT
+    return not is_excluded(path) and path.startswith(("docs/", "blueprints/")) and os.path.splitext(path)[1].lower() in ASSET_EXT
 
 
 def repo_url(arg):
@@ -143,6 +171,9 @@ def rewrite_links(text, src, pages, assets, base, assets_url, gh, warnings, bran
             return f"{pre}{base}{('/' + r) if r else ''}{frag}{post}"
         if res_clean in assets:
             return f"{pre}{assets_url}/{res_clean}{frag}{post}"
+        if is_excluded(res_clean) or is_excluded(res_clean + "/"):
+            warnings.append(f"{LEFT_OUT}{src}: links to a working note that is not published: {target}")
+            return m.group(0)
         if os.path.isdir(os.path.join(ROOT, res_clean)):
             for cand in (res_clean + "/README.md",):
                 if cand in pages:
@@ -304,12 +335,12 @@ def build_nav(entries, bodies, pages):
     ordered = []
     if home:
         ordered.append(home)
-    for name in TOP_ORDER:
-        if name in top:
-            ordered.append(top.pop(name))
-    for name in FOLDER_ORDER + ["blueprints", "code", "legal"]:
-        if name in top:
-            ordered.append(top.pop(name))
+    for label, names in TOP_LAYOUT:
+        for name in names:
+            if name in top:
+                n = top.pop(name)
+                n["group"] = label
+                ordered.append(n)
     ordered += [top[k] for k in sorted(top)]
     for n in ordered:
         finish(n)
@@ -323,7 +354,7 @@ def build(out, base, gh, branch, check=True):
             print(r.stdout + r.stderr)
             raise SystemExit("check_docs failed: not building a bundle from broken docs")
     tracked = [f for f in git("ls-files").splitlines() if f]
-    pages = {p: route_for(p) for p in tracked if is_page(p) and os.path.exists(os.path.join(ROOT, p))}
+    pages = {p: route_for(p) for p in tracked if is_page(p) and not is_excluded(p) and os.path.exists(os.path.join(ROOT, p))}
     assets = {p for p in tracked if is_asset(p) and os.path.exists(os.path.join(ROOT, p))}
     assets_url = f"{base}/_assets"
     warnings, entries, bodies, search = [], {}, {}, []
@@ -332,11 +363,16 @@ def build(out, base, gh, branch, check=True):
     os.makedirs(os.path.join(out, "pages"))
     digest = hashlib.sha256()
     for src, route in sorted(pages.items()):
-        raw = open(os.path.join(ROOT, src), encoding="utf-8").read()
+        meta, raw = parse_front(open(os.path.join(ROOT, src), encoding="utf-8").read())
         text = rewrite_links(raw, src, pages, assets, base, assets_url, gh, warnings, branch)
         title = title_of(raw, os.path.splitext(os.path.basename(src))[0])
         updated = git("log", "-1", "--format=%cs", "--", src).strip()
-        entries[route] = {"route": route, "title": title, "section": section_for(src, route), "source": src, "updated": updated,
+        section = section_for(src, route)
+        d_aud, d_kind = SECTION_DEFAULTS.get(section, ("contributor", "reference"))
+        audience, kind = meta.get("audience", d_aud), meta.get("kind", d_kind)
+        if audience not in AUDIENCES or kind not in KINDS:
+            raise SystemExit(f"{src}: front matter audience '{audience}' / kind '{kind}' must be one of {AUDIENCES} / {KINDS}")
+        entries[route] = {"route": route, "title": title, "section": section, "source": src, "updated": updated, "audience": audience, "kind": kind,
                           "summary": summary_of(raw), "headings": headings_of(raw)}
         bodies[route] = raw
         dest = os.path.join(out, "pages", (route or "index") + ".md")
@@ -345,6 +381,9 @@ def build(out, base, gh, branch, check=True):
         digest.update(src.encode() + text.encode())
         search.append({"route": route, "title": title, "section": entries[route]["section"],
                        "headings": [h["text"] for h in entries[route]["headings"]], "text": plain_text(raw)[:4000]})
+    leaks = [w for w in warnings if w.startswith(LEFT_OUT)]
+    if leaks:
+        raise SystemExit("published pages link to working notes that are not in the bundle:\n  " + "\n  ".join(w[len(LEFT_OUT):] for w in leaks))
     asset_list = []
     for a in sorted(assets):
         dest = os.path.join(out, "assets", a)

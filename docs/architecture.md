@@ -53,10 +53,10 @@ Each is an independent module; they reach each other only through small, deliber
 
 | Subsystem | Job | Seam to the rest | Detail |
 |---|---|---|---|
-| **Voice** (`voice/`) | Wake word, speech to text, Claude call, text to speech; local commands that never call the API (stop, floor, sleep, walk for N seconds) | `Memory.recall` before a Claude call, `Memory.record` after; `perform_skill` tool to the link | [`guides/voice-commands.md`](guides/voice-commands.md), [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md) |
-| **Memory** (`memory/`) | Persistent exchange log (BM25 search) plus short facts G2 saves itself with the `remember` tool; sleep-time consolidation | one function pair on the voice loop | [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md) |
+| **Voice** (`voice/`) | Wake word, speech to text, Claude call, text to speech; local commands that never call the API (stop, floor, sleep, walk for N seconds) | `Memory.recall` before a Claude call, `Memory.record` after; `perform_skill` tool to the link | [`guides/voice-commands.md`](guides/voice-commands.md) |
+| **Memory** (`memory/`) | Persistent exchange log (BM25 search) plus short facts G2 saves itself with the `remember` tool; sleep-time consolidation | one function pair on the voice loop | [`how-it-works.md`](how-it-works.md) |
 | **Behavior** (`behavior/`) | Autonomous behavior. `BehaviorDriver.tick()` reads inputs and returns an ordered list of `Effect`s; it never touches I/O. `bindings.py` maps effects to real sinks. Composes the mode controller, exploration (a stationary "attentive" tier and a voice-armed "roam" tier), idle posture, sleep, enrollment, thermal governor, chirps, emergency stop | `Effect` list out; sensors and detections in | [`guides/exploration-mode.md`](guides/exploration-mode.md) |
-| **Goals** (`goals/`) | Goal sessions the user starts: each attempt is scored from G2's own sensors and judged on the Pi (no API call) to change the next; journal, spoken suggestions, report. The first approach is the ball chase | runs as its own unit (the voice service steps aside, like exploration); lessons into memory as facts; suggestions said by the voice service when it starts | [`guides/goals.md`](guides/goals.md), [`planned/goals-plan.md`](planned/goals-plan.md) |
+| **Goals** (`goals/`) | Goal sessions the user starts: each attempt is scored from G2's own sensors and judged on the Pi (no API call) to change the next; journal, spoken suggestions, report. The first approach is the ball chase | runs as its own unit (the voice service steps aside, like exploration); lessons into memory as facts; suggestions said by the voice service when it starts | [`guides/goals.md`](guides/goals.md) |
 | **Personality** (`personality/`) | Composable traits (curiosity, mood, bonds …) that add to the Claude system prompt and to the behavior parameters | `Personality.system_prompt()`, `behavior_params()`, `cues()` | `personality/` code |
 | **Vision** (`vision/`) | Camera feed, detections, pictures, wall-distance reading, recognition by instance (`object_gallery`) | detections to the behavior layer; scene text to the voice layer | [`vision/README.md`](vision/README.md) |
 | **Gait** (`gait/`) | The 80 Hz loop (`run_gait.py`): a learned residual on the scripted `wkF` walk, exported to ONNX, plus heading hold, stand-up ramp, thermal and jam guards, carpet detection, fall guard | commands through the link; IMU in | [`guides/gait-deployment.md`](guides/gait-deployment.md), [`rl/walking-policy.md`](rl/walking-policy.md) |
@@ -76,11 +76,11 @@ Feature flags (`features.py`, set by `G2_FEATURES`) gate every major subsystem s
 
 ## How training reaches the robot
 
-Simulation training in PyBullet with Stable-Baselines3 (`rl_training/opencat-gym/`) produces a policy; `export_onnx.py` writes the `.onnx` and a `.onnx.json` sidecar (residual scale, command cadence). Only that pair and `pi_pipeline/` are deployed to the Pi, never `rl_training/`. Real-robot logs flow back: Pi autolog, then ingest gates on the Mac, then numbered calibration snapshots that the next sim runs can use. Pipeline details: [`rl/training-upgrade-2026-10.md`](rl/training-upgrade-2026-10.md), [`rl/real-data-pipeline.md`](rl/real-data-pipeline.md), [`guides/gait-deployment.md`](guides/gait-deployment.md).
+Simulation training in PyBullet with Stable-Baselines3 (`rl_training/opencat-gym/`) produces a policy; `export_onnx.py` writes the `.onnx` and a `.onnx.json` sidecar (residual scale, command cadence). Only that pair and `pi_pipeline/` are deployed to the Pi, never `rl_training/`. Real-robot logs flow back: Pi autolog, then ingest gates on the Mac, then numbered calibration snapshots that the next sim runs can use. Pipeline details: [`rl/training-pipeline.md`](rl/training-pipeline.md), [`rl/real-data-pipeline.md`](rl/real-data-pipeline.md), [`guides/gait-deployment.md`](guides/gait-deployment.md).
 
 ## What is deliberately not here
 
-- No learned vision inside the walking policy (tried and closed: [`archive/rl/vision-in-gait.md`](archive/rl/vision-in-gait.md)); vision picks a scripted skill or slows the speed command from above the frozen gait.
+- No learned vision inside the walking policy (tried and closed); vision picks a scripted skill or slows the speed command from above the frozen gait.
 - No fork of the OpenCat firmware.
 - Claude API calls are used sparingly; anything that can be a local rule, table or small model on the Pi is.
-- The Petoi AI Head and the robot-arm module are not part of the running build: [`planned/`](planned/README.md).
+- The Petoi AI Head and the robot-arm module are not part of the running build.

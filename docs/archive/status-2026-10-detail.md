@@ -8,7 +8,7 @@
 
 **The one place for "what is true right now."** Last verified 2026-10-07 (10:20 PM). Everything volatile — what is deployed, what has
 been exercised on the robot, open problems, next steps — lives here; the README, capabilities list and plan link to this
-file instead of restating it. History and data live in the dated logs, not here. Update rules: [`README.md`](../README.md#where-to-update-what).
+file instead of restating it. History and data live in the dated logs, not here. Update rules: [`README.md`](../maintaining-docs.md).
 
 ## The robot
 
