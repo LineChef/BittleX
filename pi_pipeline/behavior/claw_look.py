@@ -201,8 +201,8 @@ def main() -> None:
         finally:
             cam.close()
             if not (args.pictures or args.hold) or args.rest:
-                link.send("krest", read_reply=False, settle=0.0)
-                time.sleep(2.5)
+                from .ball_chase import ensure_rest
+                ensure_rest(link)                                      # rest confirmed with the board, as at the end of every session
             else:
                 print("no rest command sent: left as he is; arm home")
 

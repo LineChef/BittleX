@@ -168,6 +168,8 @@ class CameraSnapshotter:
         self._keep_days = keep_days
         self._exposure_check, self._max_exposure_retries = exposure_check, max_exposure_retries
         self._meter_every_s = meter_every_s
+        self.last_tilt = None                               # (roll deg, confidence) of the last picture, or None (picture_tilt.estimate)
+        self.last_tilt_at = float("-inf")
         self._metered_at = float("-inf")                   # when the light was last measured (by a look or by the wake-word metering)
         self._dark_pinned = False                          # a step up changed nothing: the sensor is at its limit in this light
         self._settled: ExposureStats | None = None         # the exposure result the camera is currently set up for
@@ -383,6 +385,11 @@ class CameraSnapshotter:
                     snap = self._balance_exposure(snap)
                     self._metered_at = self._clock()
                 log.info("camera snapshot: %dx%d, %d bytes, %d detections", snap.width, snap.height, len(snap.jpeg), len(snap.detections))
+                from . import picture_tilt                              # every picture in every mode says how far it is rolled: a tilted picture is a sag hint (owner, 2026-11-10)
+                self.last_tilt = picture_tilt.estimate(snap.jpeg)
+                self.last_tilt_at = self._clock()
+                if self.last_tilt is not None:
+                    log.info("picture tilt %+.1f deg (confidence %.2f)%s", self.last_tilt[0], self.last_tilt[1], " -- a sag hint" if picture_tilt.flagged(self.last_tilt) else "")
                 self._arm_idle_close()
                 from ..voice import shutter
                 shutter.click()                  # every picture taken makes the double click

@@ -537,6 +537,8 @@ class Camera(Protocol):
 
 
 SAG_TILT_DEG = 12.0            # standing, the body this far off the tilt measured right after his last good stand-up (or 20 deg off level before there is one): the legs have sagged
+PICTURE_SAG_HINT_S = 30.0       # how long a rolled picture keeps the body-tilt sag check stricter
+PICTURE_SAG_FACTOR = 0.6        # the body-tilt thresholds are this fraction of themselves while the hint is on (12 deg becomes 7)
 SAG_TILT_LEVEL_DEG = 20.0      # (2026-11-02: the board still read the stand while the back legs had let go and the body sat 33 deg nose-up; the next turn tipped him over)
 ATTENTION_TRIES = 3            # kcalib sent this many times at most until the board reads the attention pose (2026-11-02: one sent 1 s after the stop at the end of a turn was ignored)
 POSE_TOL_DEG = 12.0            # a leg pose read with `j` names a known pose when every leg joint is within this of it
@@ -578,6 +580,65 @@ def classify_pose(joints) -> str:
 def _yaw_diff(a: float, b: float) -> float:
     """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
     return (a - b + 180.0) % 360.0 - 180.0
+
+
+CLAW_CENTER_TOL_DEG = 4.0       # the arm counts as centred and lowered when the board reports both joints within this of 0
+
+
+def claw_path(a: tuple, b: tuple):
+    """The eased steps of an arm move from a to b (pan, lift) at CLAW_DEG_S: yields (pan, lift) in whole degrees. ONE stepping for every claw move in the project (claw_pose and the exploration's claw look)."""
+    span = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
+    steps = max(1, int(math.ceil(span / CLAW_DEG_S * CLAW_STEPS_PER_S)))
+    for i in range(1, steps + 1):
+        u = i / steps
+        k = u * u * (3 - 2 * u)
+        yield int(round(a[0] + (b[0] - a[0]) * k)), int(round(a[1] + (b[1] - a[1]) * k))
+
+
+def ensure_claw_centered(link, sleep=time.sleep, tries: int = 3) -> bool:
+    """After a claw look the arm must be centred and lowered, in EVERY mode (owner, 2026-11-10: it sometimes ended panned right while walking). Each move sends only the joint that changed, so one
+    dropped or garbled command left the pan where it was. This asks for the centre explicitly, reads the angles the board reports (`j`) and asks again while either joint is off; True once it reads centred.
+    A link that cannot read (a mock) gets the one explicit command and no loop."""
+    for n in range(tries):
+        try:
+            link.send("i0 0 1 0", read_reply=False, settle=0.0)
+        except Exception:  # noqa: BLE001
+            return False
+        sleep(0.3)
+        j = read_joints(link, timeout_s=0.8, sleep=sleep)
+        if j is None:
+            return False
+        if abs(j[0]) <= CLAW_CENTER_TOL_DEG and abs(j[1]) <= CLAW_CENTER_TOL_DEG:
+            if n:
+                log.warning("the claw was not centred after the look: centred on try %d", n + 1)
+            return True
+    log.warning("the claw still reads off centre after %d tries (pan %s, lift %s)", tries, j[0], j[1])
+    return False
+
+
+def ensure_rest(link, sleep=time.sleep, tries: int = 3) -> bool:
+    """Lay G2 in the rest position and CONFIRM it with the board's pose read, then relax the servos (`d`). The way every session ends (owner, 2026-11-10: an exploration ended with him in the survey bow; the rest command was
+    sent while the last survey stop was still playing and the board kept the skill). `krest` again up to `tries` times while the pose does not read as rest. True when it read rest."""
+    ok = False
+    for _ in range(tries):
+        try:
+            link.send("krest", read_reply=False, settle=0.0)
+        except Exception:  # noqa: BLE001
+            return False
+        sleep(3.0)
+        j = read_joints(link, timeout_s=1.0, sleep=sleep)
+        if j is None:
+            ok = False
+            break                                          # cannot read (a mock, a silent board): the one rest command is all there is
+        if classify_pose(j) == "rest":
+            ok = True
+            break
+        log.warning("rest was asked for but the pose reads %s: asking again", classify_pose(j))
+    try:
+        link.send("d", read_reply=False, settle=0.0)       # servos relaxed
+    except Exception:  # noqa: BLE001
+        pass
+    return ok
 
 
 def read_joints(link, timeout_s: float = 1.0, sleep=time.sleep, clock=time.monotonic) -> list[int] | None:
@@ -927,13 +988,28 @@ class SerialRobot:
         self._tx("gp")
         return (statistics.median(pitch), statistics.median(roll)) if pitch else None
 
+    def note_picture_tilt(self, reading) -> None:
+        """The last picture's roll (vision/picture_tilt.py): a picture that should be level but is rolled is a second sign of sagging legs (owner, 2026-11-10). While one was seen in the last
+        PICTURE_SAG_HINT_S, the body-tilt test below is stricter (PICTURE_SAG_FACTOR of the usual angle)."""
+        from ..vision import picture_tilt
+        if picture_tilt.flagged(reading):
+            self._picture_sag_at = self._clock()
+            log.info("picture rolled %+.0f deg: a sag hint (the body-tilt check is stricter for %.0f s)", reading[0], PICTURE_SAG_HINT_S)
+        else:
+            self._picture_sag_at = None
+
+    def _picture_hint(self) -> bool:
+        at = getattr(self, "_picture_sag_at", None)
+        return at is not None and self._clock() - at <= PICTURE_SAG_HINT_S
+
     def _sagged(self, tilt) -> bool:
-        """Standing, but tilted away from how he stood after his last good stand-up: the legs have let go (the pose read cannot see it, it reports the commanded angles)."""
+        """Standing, but tilted away from how he stood after his last good stand-up: the legs have let go (the pose read cannot see it, it reports the commanded angles). A rolled picture lowers the bar."""
         if tilt is None:
             return False
+        k = PICTURE_SAG_FACTOR if self._picture_hint() else 1.0
         if self._stand_tilt is None:
-            return max(abs(tilt[0]), abs(tilt[1])) > SAG_TILT_LEVEL_DEG
-        return max(abs(tilt[0] - self._stand_tilt[0]), abs(tilt[1] - self._stand_tilt[1])) > SAG_TILT_DEG
+            return max(abs(tilt[0]), abs(tilt[1])) > SAG_TILT_LEVEL_DEG * k
+        return max(abs(tilt[0] - self._stand_tilt[0]), abs(tilt[1] - self._stand_tilt[1])) > SAG_TILT_DEG * k
 
     def read_pose(self) -> str:
         """What the board says his legs are in: "stand", "attention", "rest", "sit" or "unknown" (`j`, the commanded angles)."""
@@ -1200,16 +1276,11 @@ class SerialRobot:
         pan = max(-45.0, min(45.0, float(pan)))
         lift = max(0.0, min(CLAW_LIFT_MAX_DEG, float(lift)))
         p0, l0 = self._claw
-        span = max(abs(pan - p0), abs(lift - l0))
-        steps = max(1, int(math.ceil(span / CLAW_DEG_S * CLAW_STEPS_PER_S)))
         self._pitch, self._roll = [], []
         self._tx("gP")
         state = "ok"
         sent_p = sent_l = None
-        for i in range(1, steps + 1):
-            u = i / steps
-            k = u * u * (3 - 2 * u)
-            pi_, li_ = int(round(p0 + (pan - p0) * k)), int(round(l0 + (lift - l0) * k))
+        for i, (pi_, li_) in enumerate(claw_path((p0, l0), (pan, lift)), 1):
             parts = ([f"0 {pi_}"] if pi_ != sent_p else []) + ([f"1 {li_}"] if li_ != sent_l else [])      # only the joint that changed: at 100 commands a second a two-joint command every tick would be over the 1 KB/s that dropped a byte
             if parts:
                 self._tx("i" + " ".join(parts))
@@ -1220,6 +1291,8 @@ class SerialRobot:
                 break
         self._claw = (pan, lift)
         self._tx("gp")
+        if state != "fell" and pan == 0.0 and lift == 0.0:
+            ensure_claw_centered(self._lk, self._sleep)           # the arm down and centred is confirmed with the board, not assumed
         return state
 
     def turn(self, degrees: float, seconds: float, stop_deg: float = 0.0) -> str:
@@ -1596,6 +1669,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             timed("settle", sleep, settle_s)                  # let the body stop swaying before the picture (in the attention pose, or standing while he dials in close to the ball)
             jpeg = timed("camera", camera.look)
             scene = _scene_signature(jpeg)
+            if not dry_run and hasattr(robot, "note_picture_tilt"):
+                robot.note_picture_tilt(getattr(camera, "last_tilt", None))             # a rolled picture is a second sign of sagging legs
             if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
                 say(f"[{steps}] no picture from the camera: looking again")
                 note(kind="no_picture")
@@ -1802,6 +1877,10 @@ class _SnapshotCamera:
         import threading
         self._pre_thread = threading.Thread(target=fn, kwargs={"force": force}, name="premeter", daemon=True)
         self._pre_thread.start()
+
+    @property
+    def last_tilt(self):
+        return getattr(self._cam, "last_tilt", None)
 
     def look(self) -> bytes | None:
         drop = getattr(self._cam, "discard_one", None)

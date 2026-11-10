@@ -584,6 +584,8 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                         th.join(timeout=12.0)
                     raise _FellExit()
                 rt.post(disarm_explore=True)
+                rt.stop()                                                      # the behaviour loop ends FIRST: a survey stop still playing (sit, bow, stretch) kept sending skills after the rest command and he ended in the bow (2026-11-10)
+                t.join(timeout=4.0)
                 time.sleep(1.0)
                 if policy_walker is not None:
                     policy_walker.stop(rest=False)                            # stop walking first, then settle into a balanced stand, and only then lie down:
@@ -593,7 +595,8 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 if os.environ.get("G2_COMPLETE_SOUND", "1") != "0" and not args.light:          # a goal's roam (--light) is one attempt: the goal session plays it once at its end
                     from .voice import prompt_tones
                     prompt_tones.play_complete(wait=True)
-                link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
+                from .behavior.ball_chase import ensure_rest
+                ensure_rest(link)                                              # lie down in the rest position, confirmed with the board's pose read, servos relaxed
             except _FellExit:
                 pass
             except Exception:  # noqa: BLE001

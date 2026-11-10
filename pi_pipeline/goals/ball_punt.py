@@ -203,8 +203,8 @@ class BallPunt:
             try:
                 if self._cam is not None:
                     self._cam.close()
-                self._link.send("krest", read_reply=False, settle=0.0)      # rest at the end of the session
-                time.sleep(2.5)
+                from ..behavior.ball_chase import ensure_rest
+                ensure_rest(self._link)                                     # rest at the end of the session, confirmed with the board's pose read (the same everywhere)
             finally:
                 self._release()
 

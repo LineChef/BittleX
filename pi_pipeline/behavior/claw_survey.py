@@ -40,14 +40,9 @@ class _Halt(Exception):
 
 def _smooth(link, a: tuple[float, float], b: tuple[float, float], sleep, stopped=None) -> None:
     """Move the arm (pan joint 0, lift joint 1) from a to b at CLAW_DEG_S, eased: the same stepping as `SerialRobot.claw_pose`."""
-    from .ball_chase import CLAW_DEG_S, CLAW_STEPS_PER_S
-    span = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
-    steps = max(1, int(math.ceil(span / CLAW_DEG_S * CLAW_STEPS_PER_S)))
+    from .ball_chase import CLAW_STEPS_PER_S, claw_path
     sent_p = sent_l = None
-    for i in range(1, steps + 1):
-        u = i / steps
-        k = u * u * (3 - 2 * u)
-        pi_, li_ = int(round(a[0] + (b[0] - a[0]) * k)), int(round(a[1] + (b[1] - a[1]) * k))
+    for i, (pi_, li_) in enumerate(claw_path(a, b), 1):
         parts = ([f"0 {pi_}"] if pi_ != sent_p else []) + ([f"1 {li_}"] if li_ != sent_l else [])          # only the joint that changed (see ball_chase.claw_pose)
         if parts:
             link.send("i" + " ".join(parts), read_reply=False, settle=0.0)
@@ -94,6 +89,8 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
         try:
             if not halted:                                                            # (halted mid-move = a fall: nothing more is sent to the arm)
                 _smooth(link, here, (0.0, 0.0), sleep)                               # arm down and centred whatever happened
+                from .ball_chase import ensure_claw_centered
+                ensure_claw_centered(link, sleep)                                    # confirmed with the board, the same as the chase's claw look
             link.send("gp", read_reply=False, settle=0.0)
         except Exception:  # noqa: BLE001
             log.exception("could not lower the claw")

@@ -216,8 +216,8 @@ def shot(args) -> int:
         except Exception:  # noqa: BLE001
             pass
         if not args.stay:
-            lk.send("d", read_reply=False, settle=0.0)               # lie down, servos relaxed
-            time.sleep(0.5)
+            from ..behavior.ball_chase import ensure_rest
+            ensure_rest(lk)                                          # lie down in the rest position, confirmed, servos relaxed
         lk.send("gp", read_reply=False, settle=0.0)
         lk.close()
 

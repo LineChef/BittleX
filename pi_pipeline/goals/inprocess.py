@@ -219,7 +219,8 @@ def run_goal_inprocess(shared, goal_id: str) -> dict:
         log_line(f"the goal session failed: {type(e).__name__}: {e}")
         summary = {"goal": goal_id, "why": f"error: {type(e).__name__}"}
         try:
-            shared.link.send("krest", read_reply=False, settle=0.0)       # never leave him up after a failure
+            from ..behavior.ball_chase import ensure_rest
+            ensure_rest(shared.link)                                      # never leave him up after a failure: rest, confirmed with the board
         except Exception:  # noqa: BLE001
             pass
     finally:
