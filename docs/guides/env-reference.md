@@ -143,7 +143,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_GALLERY_PENDING` | `"~/.local/share/g2/gallery_pending.json"` | `promoted_loader.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GOALS` | `GOALS_PATH` | `spec.py` | [`goals.md`](goals.md) |
 | `G2_GOALS_DIR` | `DEFAULT_DIR` | `g2_goal_edits.py`, `g2_goals_view.py` | not documented |
-| `G2_GOAL_INPROCESS` | `"1"` | `inprocess.py` | [`STATUS.md`](../STATUS.md), [`goals.md`](goals.md), [`settings-switches.md`](settings-switches.md) |
+| `G2_GOAL_INPROCESS` | `"1"` | `inprocess.py` | [`STATUS.md`](../STATUS.md), [`goals.md`](goals.md), [`settings-switches.md`](settings-switches.md) +1 |
 | `G2_GOAL_JOURNAL` | `JOURNAL` | `journal.py` | [`goals.md`](goals.md) |
 | `G2_GOAL_LESSONS` | `"0"` | `summary.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GOAL_OVERRIDES` | `PATH` | `overrides.py` | [`goals.md`](goals.md) |

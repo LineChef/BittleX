@@ -22,6 +22,7 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
 | Old way | `g2goal run ball_punt --standalone`, or `G2_GOAL_INPROCESS=0` in the Pi's `.env`: the voice service is stopped, the session runs in its own process, the service is started again. It is also the fallback when the service has no camera or serial link. After a stop and restart the BiBoard often went silent to the Pi (no answer to `P`, no IMU frames, the session ended `board_silent`, [`../STATUS.md`](../STATUS.md) open problems 15 and 18) |
 | Stop | **"emergency stop"** is not heard during a session (the voice loop is busy running it; the BiBoard's own voice module still hears you); use `g2ballstop` (or `g2goal stop`; he finishes the current move and rests) or `g2stop`. Ctrl-C in the `g2ball` terminal asks the session to stop |
 | It ends by itself | after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand) |
+| A fall after a good punt | the attempt keeps its data (owner, 2026-11-09): when the ball was punted and seen afterwards with a hit, it is scored as that hit, noted "then I fell", and counts for what he learns; the session still ends. A fall with no successful punt stays a fall (score 0) |
 
 He stands still for 5 s between attempts and rests at the end. Short cues: "target acquired", "searching", "punting", then "Got it." or "Missed."
 

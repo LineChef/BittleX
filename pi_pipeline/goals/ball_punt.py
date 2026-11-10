@@ -254,6 +254,9 @@ class BallPunt:
     def score(self, result: AttemptResult, settings: dict) -> Outcome:
         o = self._score(result, settings)
         if o.counted:
+            if result.ended == "fell":                       # a fall after a successful punt was scored as that punt: its stages are the punt's
+                import dataclasses
+                result = dataclasses.replace(result, ended="punted")
             o.stages = self.stages(result, settings, o)
         return o
 
@@ -311,6 +314,15 @@ class BallPunt:
                 "claw_looks": sum(1 for e in tr if e.get("kind") == "claw_look" and not e.get("after_punt")), "backed_up_s": result.extra.get("back_s", 0.0),
                 "walks": sum(1 for e in tr if e.get("kind") == "act" and e.get("act") == "walk"), **align_stats(tr)}
         if result.ended == "fell":
+            # A fall AFTER a successful punt keeps its data (owner, 2026-11-09: "keep data from runs that ended in a fall if it had at least 1 successful punt"): the attempt is scored as the
+            # punt it made, the fall is noted, and the session still ends (the runner stops on `result.ended == "fell"`). A fall with no successful punt stays a fall.
+            if any(e.get("kind") == "act" and e.get("act") == "punt" for e in tr) and any(e.get("kind") == "after_punt" for e in tr):
+                import dataclasses
+                o = self._score(dataclasses.replace(result, ended="punted"), settings)
+                if o.counted and o.success:
+                    o.numbers = {**o.numbers, "fell_after_punt": True}
+                    o.text += f"; then I fell ({_fmt_s(result.seconds)} in all)"
+                    return o
             return Outcome("fell", 0.0, False, f"I fell after {_fmt_s(result.seconds)}", nums)
         if result.ended == "ball_by_wall":
             return Outcome("ball_by_wall", None, False, "the ball was too close to a wall, so I left it (walls come first): not counted", nums)

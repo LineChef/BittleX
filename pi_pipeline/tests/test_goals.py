@@ -239,6 +239,17 @@ def test_a_ball_farther_away_after_the_punt_or_gone_is_a_punt():
     assert not ball_punt.BallPunt().score(_res("punted", tr), S).success      # still at the claw: a miss
 
 
+def test_a_fall_after_a_successful_punt_keeps_its_data_and_still_ends_the_session():
+    """Owner, 2026-11-09: keep the data from a run that ended in a fall if it had at least one successful punt."""
+    punt = {"kind": "act", "act": "punt", "at": (2.5, 0.0)}
+    good = [punt, {"kind": "after_punt", "ball": {"distance_in": 5.0, "bearing_deg": 0.0}}]
+    o = ball_punt.BallPunt().score(_res("fell", good), S)
+    assert o.code == "hit" and o.success and o.counted and o.numbers["fell_after_punt"] and "then I fell" in o.text and o.stages
+    missed = [punt, {"kind": "after_punt", "ball": {"distance_in": 3.0, "bearing_deg": 2.0}}]
+    assert ball_punt.BallPunt().score(_res("fell", missed), S).code == "fell"            # a punt that missed, then a fall: still a fall
+    assert ball_punt.BallPunt().score(_res("fell", [punt]), S).code == "fell"            # a punt whose result was never seen: still a fall
+
+
 def test_no_punt_is_scored_by_how_far_he_got():
     bp = ball_punt.BallPunt()
     assert bp.score(_res("time", [{"kind": "look", "ball": None}]), S).code == "never_found"

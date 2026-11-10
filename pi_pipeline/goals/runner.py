@@ -139,7 +139,7 @@ class GoalSession:
                     successes += int(outcome.success)
                 if outcome.counted:
                     self._speak("Got it." if outcome.success else "Missed.")
-                if outcome.fell:
+                if outcome.fell or result.ended == "fell":          # (a fall after a successful punt is scored as the punt, but the session still ends)
                     why = "fell"
                     break
                 if result.ended == "battery":
