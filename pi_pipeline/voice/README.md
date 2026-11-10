@@ -15,14 +15,18 @@ Every stage is an interface with a dev implementation and a robot implementation
 | `actuator.py` | `MockActuator` (logs) / `SerialActuator` (BiBoard over serial). |
 | `tts.py` | `MacTTS` (`say`) / `PiperTTS` (+ `synth_to_wav`) / `PrintTTS`. |
 | `stt.py` | `TextSTT` (stdin) / `VoskSTT` (mic; + `transcribe_wav`). |
-| `wake_word.py` | `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when no audio block arrives for 6 s (`G2_MIC_WATCHDOG`, backlog B27). Two optional gates: `G2_WAKE_MIN_CONF` (lowest word confidence) and `G2_WAKE_MAX_BEFORE` (words before the phrase in the same utterance). |
+| `wake_word.py` | `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when (see below) |
 | `wake_log.py` | every wake trigger and what followed it (`~/.local/share/g2/wake_triggers.jsonl`); `python -m pi_pipeline.voice.wake_log --days 7` counts the false ones and suggests a `G2_WAKE_MIN_CONF`. |
 | `speech_cache.py` | disk cache of synthesised lines (`~/.cache/g2/speech`, `G2_SPEECH_CACHE`), keyed by text, voice file, style and rate; `PiperTTS.prepare` reads and fills it, and the voice service pre-makes the exploration narration lines a minute after start-up (`G2_SPEECH_PREWARM`). |
-| `commands.py` | spoken commands the loop handles itself (no Claude call): "forget that", "go to sleep", "enable/disable gir mode", and **"dismissed"** (after a false wake: closes the window silently and logs the trigger as false; chosen because "go to sleep" already curls him up). Also parses the answer to the floor question he asks before a roam (`parse_floor_answer`, asked by `loop.py` `_ask_floor`; `G2_FLOOR_PROMPT_S`). |
+| `commands.py` | spoken commands the loop handles itself (no Claude call) |
 | `cues.py` | listening / thinking / speaking indicator (log now; buzzer/posture later). |
 | `loop.py` | the orchestrator. |
 | `livecheck.py` | real-API end-to-end check (`python -m pi_pipeline.voice.livecheck`; needs a key). |
 | `__main__.py` | CLI entrypoint. |
+
+- **wake_word.py:** `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when no audio block arrives for 6 s (`G2_MIC_WATCHDOG`, backlog B27). Two optional gates: `G2_WAKE_MIN_CONF` (lowest word confidence) and `G2_WAKE_MAX_BEFORE` (words before the phrase in the same utterance).
+- **commands.py:** "forget that", "go to sleep", "enable/disable gir mode", and **"dismissed"** (after a false wake: closes the window silently and logs the trigger as false; chosen because "go to sleep" already curls him up). Also parses the answer to the floor question he asks before a roam (`parse_floor_answer`, asked by `loop.py` `_ask_floor`; `G2_FLOOR_PROMPT_S`).
+
 
 ## Run it
 

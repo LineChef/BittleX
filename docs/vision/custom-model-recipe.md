@@ -100,9 +100,12 @@ notebook or a scratch dir any more.
 | 7 | **Train** on Colab — `g2_yolov8_828_3class.ipynb`, T4 GPU, upload the zip from step 6, run top-to-bottom, download `best.pt`. | notebook: `yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100` |
 | 8 | **Build a calibration set** — 300+ varied jpgs. Reuse `upload_vN` or a wider pull; a flat folder of `.jpg` is all the script needs. | (a folder path) |
 | 9 | **Export + vela locally** — makes the arm64 venv, patches onnx2tf, exports INT8 tflite, vela → 100% NPU. | `tools/gv2/export_yolov8_gv2.sh best.pt <calib_dir> 3 <you>,dog,cat` |
-| 10 | **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → Add Object again** per chip; plain Enter overwrites the one chip), Send. Or `python-sscma` serial (see "Also worth knowing"). | |
+| 10 | **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → (see below) | |
 | 11 | **Verify** on device: quiet on empty scene, one box per object. Headless: `python tools/vision_diag.py <port> --secs 40`. | |
 | 12 | **Cleanup** — delete the Colab runtime (wipes the uploaded photos). See the Cleanup section. | |
+
+- **10:** **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → Add Object again** per chip; plain Enter overwrites the one chip), Send. Or `python-sscma` serial (see "Also worth knowing").
+
 
 ### What `export_yolov8_gv2.sh` does (and why each piece is load-bearing)
 

@@ -119,7 +119,7 @@ step after any future full reflash, not a fault to re-diagnose.
 |---|---|---|
 | `k<skill>` | `T_SKILL` | run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF` |
 | `m<idx> <deg> …` | `T_INDEXED_SIMULTANEOUS_ASC` | move joint(s), chainable — `m0 30 8 -35` |
-| `b<note> <dur> …` | `T_BEEP` | buzzer melody: pairs of (note, duration). Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it |
+| `b<note> <dur> …` | `T_BEEP` | buzzer melody: pairs of (note, duration) |
 | `d` | `T_REST` | rest posture, servos off (ends a looping gait) |
 | `P` | `T_POWER` | **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack) |
 | `j` / `j <idx>` | `T_JOINTS` | **return all joint angles / one joint** |
@@ -133,6 +133,9 @@ step after any future full reflash, not a fault to re-diagnose.
 | `p` | `T_PAUSE` | pause |
 | `t` | `T_TILT` | tilt command |
 | `c` / `cd` | calibration / factory | **never send from the pipeline** |
+
+- **b<note> <dur> …:** Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it
+
 
 **CONFIRMED 2026-09-20, corrects the previous entry here:** `v`/`V` are still
 not a real token at all (grepped current `main` source directly — no match
@@ -510,4 +513,8 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 - Conclusion: the balance feedback loop, fed by an IMU that updates at 5 Hz (see the IMU rate notes above), is marginally stable and locks into a limit cycle once disturbed; some starts (a stand-up from rest) disturb it without any touch.
 - Side notes: the firmware's accumulated yaw counter can jump by exactly 360 degrees mid-episode (an unwrap artifact; the wrapped yaw is unchanged), and the front-left shoulder servo's faults (see `rl/real-walk-log.md`) may make it easier to excite but are not needed to explain it.
 
-**Fix (2026-10-04, `pi_pipeline/gait/stand_guard.py`):** (1) firmware gyro balance is kept off while G2 is idle: the voice service sends `gb` at start and every 60 s, and the serial actuator sends `gB` just before a firmware gait skill and `gb` just after it (and after rest or any posture); (2) a guard thread reads the 5 Hz IMU print and, if roll or pitch swings at least 0.8 degrees (standard deviation) with at least 4 mean-crossings per 4-second window for 4 s straight, sends `gb`. Replaying the five logs: it trips about 5 s after a wobble starts in every log that has one, and never on the balance-off log. It also catches stands started by the BiBoard's own voice module (those never pass through the Pi). Everything pauses while a gait runs, and for 8 s after any command the Pi sends. With `G2_BALANCE_OFF_IDLE=0` the guard re-enables balance (`gB`) after 5 minutes of quiet, doubling the wait if the wobble comes back within a minute. The service now opens ONE locked serial link shared by the actuator, the battery watch and the guard, and turns on the IMU print (`gP`) for the guard.
+**Fix (2026-10-04, `pi_pipeline/gait/stand_guard.py`):** (1) firmware gyro balance is kept off while G2 is idle: the voice service sends `gb` at start and every 60 s, and the serial actuator sends `gB` just before a firmware gait skill and `gb` just after it (and after rest or any posture); (2) a guard thread reads the 5 Hz IMU print and, if roll or pitch swings at least 0.8 degrees (standard deviation) with at least 4 mean-crossings per 4-second window for 4 s straight, sends `gb`.
+
+Replaying the five logs: it trips about 5 s after a wobble starts in every log that has one, and never on the balance-off log. It also catches stands started by the BiBoard's own voice module (those never pass through the Pi). Everything pauses while a gait runs, and for 8 s after any command the Pi sends.
+
+With `G2_BALANCE_OFF_IDLE=0` the guard re-enables balance (`gB`) after 5 minutes of quiet, doubling the wait if the wobble comes back within a minute. The service now opens ONE locked serial link shared by the actuator, the battery watch and the guard, and turns on the IMU print (`gP`) for the guard.

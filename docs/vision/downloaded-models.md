@@ -15,7 +15,11 @@ Used by `tools/eval_embedder.py --embedder onnx:~/g2_data/models/<file>` (DINOv2
 
 ## DINOv2-small as the gallery's embedder (2026-11-06, no new download)
 
-The user asked for the learned embedder to be set up. The file was already on the Mac and checked (table above), so nothing new was downloaded; `tools/g2_switch_embedder.sh push-model` copied it to the Pi's `~/.local/share/g2/models/dinov2_small.onnx` and checked the same SHA-256 there. On the 398 promoted pictures (20 objects), `tools/rebuild_gallery.py --dry`: same-object pairs 0.617 vs different-object pairs 0.345 (gap 0.272, the histogram's gap is 0.099); at thresholds chosen from that data (0.582 same-instance, 0.774 near-duplicate) 60% of same-object pairs are recognised against 4.3% of different-object pairs wrongly matched, where the histogram recognises 23% at 3.8% wrong. Leave-one-out 96% against 93%. On the Mac it takes 66 ms a picture and about 190 MB; the Pi has not been timed yet (it needs the voice service stopped).
+The user asked for the learned embedder to be set up. The file was already on the Mac and checked (table above), so nothing new was downloaded; `tools/g2_switch_embedder.sh push-model` copied it to the Pi's `~/.local/share/g2/models/dinov2_small.onnx` and checked the same SHA-256 there.
+
+On the 398 promoted pictures (20 objects), `tools/rebuild_gallery.py --dry`: same-object pairs 0.617 vs different-object pairs 0.345 (gap 0.272, the histogram's gap is 0.099); at thresholds chosen from that data (0.582 same-instance, 0.774 near-duplicate) 60% of same-object pairs are recognised against 4.3% of different-object pairs wrongly matched, where the histogram recognises 23% at 3.8% wrong.
+
+Leave-one-out 96% against 93%. On the Mac it takes 66 ms a picture and about 190 MB; the Pi has not been timed yet (it needs the voice service stopped).
 
 The gallery file now records its embedder and its thresholds, and every part of the Pi uses the gallery's own: switching is `g2embedder bench`, `g2embedder switch`, and `g2embedder revert` undoes it. The rebuilt gallery is at `~/g2_data/gallery_rebuilt/gallery.json` (19 entries; one pair of look-alike names could not both be kept).
 

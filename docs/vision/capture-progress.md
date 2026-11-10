@@ -201,12 +201,16 @@ already ahead, just don't let the gap widen further without a reason.
 
 | id | class | target | difficulty | pre-label base | notes |
 |---|---|---|---|---|---|
-| 0 | `<you>` | 150 (see mix above) | fine-grained (individual recognition) | Person Detection → auto boxes | close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed 2026-09-14: the standard pose set's "far (~5–6 ft)" pose still produced close/vclose-bucket boxes — genuinely far shots need more distance than that pose implies; verify with the bucket math above, not by eye. |
+| 0 | `<you>` | 150 (see mix above) | fine-grained (individual recognition) | Person Detection → auto boxes | close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed (see below) |
 | 1 | `<spouse>` | 150 (see mix above) | fine-grained | Person Detection → auto boxes | same routine, separate sessions. Not started as of 2026-09-14 (0 images) — capture from scratch targeting the mix above from session 1, rather than discovering the same close-up-only gap later. |
 | 2 | `dog` | 150 (see mix above) | coarse, poor cooperation | COCO-80 model → boxes on frames it catches; hand-label rest | burst-capture during normal activity, many short sessions, low yield each. As of 2026-09-14, 123 of 250 library files have no label at all (hand-labeling was never finished) — resolve that before counting toward the target. |
 | 3 | `cat` | 150 (see mix above) | coarse, poor cooperation | COCO-80 model → boxes; hand-label rest | same. |
-| 4 | `ledge` | ~200–250 | fine-grained | none — hand-box every frame (Roboflow faster for bulk) | **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered. **Do this after the G2 mount** — most POV-sensitive class. Apply the same distance-mix discipline once capture starts; "approach angle" variety maps to the same far→close spectrum. |
+| 4 | `ledge` | ~200–250 | fine-grained | none — hand-box every frame (Roboflow faster for bulk) | **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered |
 | — | negatives | ~40–50 | — | — | empty floor, plain walls, non-target edges (rug borders, grout) so `ledge` doesn't fire on any line; other people / portraits / coat racks so `<you>`/`<spouse>` don't fire on strangers. |
+
+- **0:** close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed 2026-09-14: the standard pose set's "far (~5–6 ft)" pose still produced close/vclose-bucket boxes — genuinely far shots need more distance than that pose implies; verify with the bucket math above, not by eye.
+- **4:** **Do this after the G2 mount** — most POV-sensitive class. Apply the same distance-mix discipline once capture starts; "approach angle" variety maps to the same far→close spectrum.
+
 
 **Individual recognition is coarse at 192 px** — two people who look similar
 (size, hair) will get confused. If that happens, the fix is the face-embedding
@@ -333,10 +337,24 @@ Read the counts off `~/Desktop/G2Memory/g2_vision_library/_MANIFEST.md` after ea
 | 2026-09-09 | `dog` | 1 | 120 | — | 120 | daylight session, subject-prominence `--limit 120` |
 | 2026-09-09 | `cat` | 1 | 120 | — | 120 | same |
 | 2026-09-09 | — | — | — | — | — | Built `custom_data.zip` (`<you>`/dog/cat, YOLO fmt) → trained YOLOv8n in `g2_yolov8_3class.ipynb` (mAP@50 **0.995**) → vela → flashed. **Dead on device** (thought Swift-YOLO required — wrong; see below). |
-| 2026-09-09 | — | — | — | — | — | Re-labelled dog/cat with `autobox_coco.py` (`<you>` 230, cat 218, dog 127), rebuilt `custom_data_yolo_v3.zip` (nc:3, 224px), retrained YOLOv8n (mAP@50 **0.907**). **Exported locally on arm64 py3.9** (`ultralytics==8.2.8` + onnx2tf 1.17.5, 3 workarounds) → vela 100% NPU → `g2_3class_yolov8_828_vela.tflite` (2.31 MB). **WORKS on device** — clean single boxes. Detects up close only (100-image INT8 calib; box frozen near training-avg position). |
-| 2026-09-14 | `<you>` | — | — | — | 238 (230 labeled) | **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) 0.67–0.90, with 14+ s stretches of zero raw detections during the mid/far part of the sweep. First two attempts came back with near-zero detections at any range; root cause was the camera module's physical **orientation**, not the model — re-checked with `python tools/camera_preview.py --info` (confirms port + loaded model without holding the port) and by eye once the module was rotated correctly. Checked *why* against the training labels: of 230 `<you>` images, **0% far (sz<0.30), 0.9% mid (0.30–0.50)** — 99% close/very-close. Count was never the issue (230 already exceeds the old 120 target); composition was. `dog`/`cat` show the same skew, less extreme (17–20% mid, but far is still only 0.5–4.7%). |
-| 2026-09-14 | — | — | — | — | — | **Decisions:** (1) target raised **120 → 150/class**, now with a mandatory distance-bucket mix (far 20% / mid 30% / close 30% / vclose 20% — see "Per-class targets" above) instead of a flat count, so this doesn't silently recur for `<spouse>`/`ledge`. (2) Keep class counts roughly in step going forward — a top-up for one class should be matched for the others in the same round, but nothing gets pruned from a class that's already ahead. (3) `<you>` gets an incremental **+40 images (20 far @ 8–12 ft, 20 mid @ 4–6 ft)** as a first step, added to the 230 (not replacing) — re-run the diagnostic after retraining/redeploying to check whether 40 closed the gap before capturing more. |
-| 2026-09-14 | — | — | — | — | — | **New tooling**, both reusing `curate_captures.py`'s tested hash/quality functions rather than reimplementing: `tools/optimize_library.py` — analyzes (`--report`) or materializes (`--out`) a quality-ranked (sharpness + exposure), deduped, distance-composition-capped subset per class against the 150 target; rerunnable any time the library grows, never touches the library itself. `tools/check_library_overlap.py` — before promoting a new session, flags (`--remove` to delete) any curated image that's a near-duplicate of one already promoted for that class, across *all* prior sessions, not just the current one. |
+| 2026-09-09 | — | — | — | — | — | Re-labelled dog/cat with `autobox_coco.py` (`<you>` 230, cat 218, dog 127), rebuilt `custom_data_yolo_v3.zip` (nc:3, 224px), retrained YOLOv8n (mAP@50 **0.907**) |
+| 2026-09-14 | `<you>` | — | — | — | 238 (230 labeled) | **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) (see below) |
+| 2026-09-14 | — | — | — | — | — | **Decisions:** (1) target raised **120 → 150/class**, now with a mandatory distance-bucket mix (far 20% / mid 30% / close 30% / (see below) |
+| 2026-09-14 | — | — | — | — | — | **New tooling**, both reusing `curate_captures.py`'s tested hash/quality functions rather than reimplementing |
+
+- **2026-09-09:** **Exported locally on arm64 py3.9** (`ultralytics==8.2.8` + onnx2tf 1.17.5, 3 workarounds) → vela 100% NPU → `g2_3class_yolov8_828_vela.tflite` (2.31 MB). **WORKS on device** — clean single boxes. Detects up close only (100-image INT8 calib; box frozen near training-avg position).
+- **2026-09-14:** **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) 0.67–0.90, with 14+ s stretches of zero raw detections during the mid/far part of the sweep.
+
+  First two attempts came back with near-zero detections at any range; root cause was the camera module's physical **orientation**, not the model — re-checked with `python tools/camera_preview.py --info` (confirms port + loaded model without holding the port) and by eye once the module was rotated correctly.
+
+  Checked *why* against the training labels: of 230 `<you>` images, **0% far (sz<0.30), 0.9% mid (0.30–0.50)** — 99% close/very-close. Count was never the issue (230 already exceeds the old 120 target); composition was. `dog`/`cat` show the same skew, less extreme (17–20% mid, but far is still only 0.5–4.7%).
+- **2026-09-14:** **Decisions:** (1) target raised **120 → 150/class**, now with a mandatory distance-bucket mix (far 20% / mid 30% / close 30% / vclose 20% — see "Per-class targets" above) instead of a flat count, so this doesn't silently recur for `<spouse>`/`ledge`.
+
+  (2) Keep class counts roughly in step going forward — a top-up for one class should be matched for the others in the same round, but nothing gets pruned from a class that's already ahead.
+
+  (3) `<you>` gets an incremental **+40 images (20 far @ 8–12 ft, 20 mid @ 4–6 ft)** as a first step, added to the 230 (not replacing) — re-run the diagnostic after retraining/redeploying to check whether 40 closed the gap before capturing more.
+- **2026-09-14:** `tools/optimize_library.py` — analyzes (`--report`) or materializes (`--out`) a quality-ranked (sharpness + exposure), deduped, distance-composition-capped subset per class against the 150 target; rerunnable any time the library grows, never touches the library itself. `tools/check_library_overlap.py` — before promoting a new session, flags (`--remove` to delete) any curated image that's a near-duplicate of one already promoted for that class, across *all* prior sessions, not just the current one.
+
 
 **Calibration checkpoint (`<you>`).** Runs as a **single-class** model (only one
 person captured so far). Subsets pre-built (jpg only — `--images-only`, so
@@ -362,11 +380,14 @@ up doesn't beat by ≥ 5 pts detection or ≥ 8 pts floor. If even `upload_all`
 
 | subset | det rate | conf mean | conf p10 (floor) | flicker /min | verdict |
 |---|---|---|---|---|---|
-| 40 | 0% | — | — | 0 | **FAIL** — 0/462 frames, incl. point-blank; camera_preview hit-rate 0% too. Same images trained a working single-class model earlier at ~161, so it's a convergence-floor thing: 40 is too few for the nano detector. (SenseCraft auto-label: 43 labelled / 9 unlabelled — 3 negatives got a spurious box for the class.) |
+| 40 | 0% | — | — | 0 | **FAIL** — 0/462 frames, incl. point-blank |
 | 80 (eff. ~75) | 0% (1/384) | 79 | 79 | 2.4 | **FAIL** — fired once at conf 79, then nothing. High precision, ~zero recall — underfit. |
 | 120 (eff. ~118) | **100%** (461/461) | 91 | 84 | 0 | **PASS** — maxed out: 100% detection, floor 84 (≈2× the bar), zero flicker. Tested in a non-training room. |
 | 160 | _not run_ | | | | can't beat 100% detection; floor 84 leaves no meaningful headroom |
 | 238 (all) | _not run_ | | | | ceiling already known; 120 settles it |
+
+- **40:** camera_preview hit-rate 0% too. Same images trained a working single-class model earlier at ~161, so it's a convergence-floor thing: 40 is too few for the nano detector. (SenseCraft auto-label: 43 labelled / 9 unlabelled — 3 negatives got a spurious box for the class.)
+
 
 ### Result: **~120 images per class**
 

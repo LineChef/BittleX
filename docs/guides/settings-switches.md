@@ -52,15 +52,15 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | Switch | Default | What it does |
 |---|---|---|
 | `G2_STAND_RAMP_S` | 0.8 | the eased stand-up (`off` / 0 = the old single jump; tests turn it off) |
-| `G2_TRANSITION_RAMP_S` | 2.0 | the longest eased move into a firmware skill's first frame (`link/transitions.py`); a move takes as long as its fastest joint needs to stay under 80 deg/s (at least 0.25 s; the bow, look up and check are not eased), sent 40 times a second; `off` / 0 = the firmware's own jump; tests turn it off |
+| `G2_TRANSITION_RAMP_S` | 2.0 | the longest eased move into a firmware skill's first frame (`link/transitions.py`) |
 | `G2_EASE_PICTURE_POSES` | off | `1` eases the bow, look up and check like every other skill (`link/transitions.py`); off by default since 2026-10-18 (user: eased they were too slow) |
-| `G2_POSE_BALANCE` | on | every pose (a firmware skill that is not a gait, the stand, lying down or calibration) plays with the firmware gyro balance on: `gB` just before it, after its ease; the stand guard sends `gb` once he has been still for its quiet window (`link/transitions.py`, `gait/stand_guard.py`). On since 2026-10-19 (user: the pod swinging tipped him in poses that ran with balance off); `0` goes back to balance off |
+| `G2_POSE_BALANCE` | on | every pose (a firmware skill that is not a gait, the stand, lying down or calibration) plays with the firmware gyro balance on |
 | `G2_WAKE_LOG` | `~/.local/share/g2/wake_triggers.jsonl` | every wake trigger and what followed it, for counting false triggers (`python -m pi_pipeline.voice.wake_log --days 7`); `off` turns it off |
-| `G2_WAKE_MIN_CONF` | 0.6 (was 0, off; 2026-11-06) | a wake phrase Kaldi is less sure of than this (0 to 1, lowest word confidence) is ignored; 0 = off. Every trigger logs its confidence (`journalctl -u g2-voice \| grep "wake word"`); pick the value once real calls and background talk separate | At 0.6 the two weeks of logged triggers would have dropped 4 of 48 real calls and 6 of 23 false ones (confidence is unknown for the rest). Raise it for fewer false triggers, lower it if he stops hearing you. The look-alikes “gg”, “gee gee” and similar never wake him.
-| `G2_EXPLORE_INPROCESS` | 0 | `1`: "go ahead and look around" runs the exploration inside the voice service (same link, walker, memory, speech engine and microphone; no stop and restart of `g2-voice`, no second Piper/Vosk load). Needs `explore`, `vision` and `vision_safety` on in the service's own `G2_FEATURES`; otherwise, or at `0`, the separate `g2-explore` session runs as before. Not yet tried on G2 |
+| `G2_WAKE_MIN_CONF` | 0.6 (was 0, off; 2026-11-06) | a wake phrase Kaldi is less sure of than this (0 to 1, lowest word confidence) is ignored | At 0.6 the two weeks of logged triggers would have dropped 4 of 48 real calls and 6 of 23 false ones (confidence is unknown for the rest) |
+| `G2_EXPLORE_INPROCESS` | 0 | `1`: "go ahead and look around" runs the exploration inside the voice service (same link, walker, memory, speech engine and microphone; no (see below) |
 | `G2_FLOOR_TRIM_MAX_AGE_H` | 12 | a floor label older than this is not used to pick a per-floor trim (`g2attach floor-trim`); the general trim applies |
 | `G2_BODY_STATE` | `~/.local/share/g2/body_state.json` | how the body has been doing (low battery, a recent fall, the last exploration), folded into each Claude turn's mood hint and the idle timing (`personality/body.py`); `off` turns it off |
-| `G2_FLOOR_PROMPT_S` | `10` | how long G2 listens for the answer when he asks "What surface will I be walking on?" before a voice-armed roam (0 turns the question off). Asked when the floor label is unknown or older than `G2_FLOOR_PROMPT_MAX_AGE_H` (default `1` hour); answer a floor ("tile") or "same"; no answer never blocks the roam |
+| `G2_FLOOR_PROMPT_S` | `10` | how long G2 listens for the answer when he asks "What surface will I be walking on?" before a voice-armed roam (0 turns the question off) |
 | `G2_FLOOR_MAX_AGE_H` / `G2_FLOOR_SKIP` | `1` / `0` | `tools/g2_explore.sh start` and `stationary` ask for the floor on a terminal when the label is unknown or older than this many hours; with no terminal the start is refused (set it with `g2floor tile`) unless `G2_FLOOR_SKIP=1` |
 | `G2_WAKE_MAX_BEFORE` | unset (off) | a wake phrase with more than this many other words before it in the same utterance is ignored (talk nearby, not a call); `wake_log` prints the words-before counts for real and false triggers and a suggested `G2_WAKE_MIN_CONF` |
 | `G2_MIC_WATCHDOG` | 1 | a supervised keeper reopens the microphone stream when no audio block has arrived for 6 s (backlog B27); `0` = off |
@@ -76,11 +76,19 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_FOOT_TRIM` | policy default | `off` disables the foot trim (V6 default `fl=-0.3`) |
 | `G2_ANNOUNCE_ONLINE` | on | `off` silences "G2 online." |
 
+- **G2_TRANSITION_RAMP_S:** a move takes as long as its fastest joint needs to stay under 80 deg/s (at least 0.25 s; the bow, look up and check are not eased), sent 40 times a second; `off` / 0 = the firmware's own jump; tests turn it off
+- **G2_POSE_BALANCE:** `gB` just before it, after its ease; the stand guard sends `gb` once he has been still for its quiet window (`link/transitions.py`, `gait/stand_guard.py`). On since 2026-10-19 (user: the pod swinging tipped him in poses that ran with balance off); `0` goes back to balance off
+- **G2_WAKE_MIN_CONF:** 0 = off. Every trigger logs its confidence (`journalctl -u g2-voice \| grep "wake word"`); pick the value once real calls and background talk separate
+- **G2_WAKE_MIN_CONF:** Raise it for fewer false triggers, lower it if he stops hearing you. The look-alikes “gg”, “gee gee” and similar never wake him.
+- **G2_EXPLORE_INPROCESS:** `1`: "go ahead and look around" runs the exploration inside the voice service (same link, walker, memory, speech engine and microphone; no stop and restart of `g2-voice`, no second Piper/Vosk load). Needs `explore`, `vision` and `vision_safety` on in the service's own `G2_FEATURES`; otherwise, or at `0`, the separate `g2-explore` session runs as before. Not yet tried on G2
+- **G2_FLOOR_PROMPT_S:** Asked when the floor label is unknown or older than `G2_FLOOR_PROMPT_MAX_AGE_H` (default `1` hour); answer a floor ("tile") or "same"; no answer never blocks the roam
+
+
 ## Exploration pictures, contact and one-sound-at-a-time (2026-10-10)
 
 | Switch | Default | What it does |
 |---|---|---|
-| `G2_SURVEY_CLAW` | auto | with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) instead of the bow, the sit and the check pose; `1` forces it, `0` brings the old looks back |
+| `G2_SURVEY_CLAW` | auto | with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) (see below) |
 | `G2_AVOID_CHIRP` | off | `1` brings back the soft chirp when he turns away from a wall (off since 2026-11-06) |
 | `G2_POSE_GATE` | on (unproven) | before a move that follows a pose change, and before a pose change shortly after a move, the body's real tilt is checked and lagging legs are re-seated; `0` turns it off (see `plan-detail/falls-at-transitions-2026-11-06.md`) |
 | `G2_STOP_CALM` | on (unproven) | a firmware move waits up to 0.4 s for a calm moment before its stop; `0` stops immediately as before |
@@ -90,7 +98,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_EASED_STOP` | off (test) | the normal end of a timed turn or back-up freezes the legs at the gait's estimated pose and eases to balance (0.8 s at most) before `kbalance`; never for an emergency stop; needs a gait period |
 | `G2_ORT_ARENA` | off | `1` puts back onnxruntime's memory arena for Piper and the embedder (the default frees about 20 MB once Piper has spoken, same speed) |
 | `G2_MALLOC_ARENAS` | unset (one arena) | `many` leaves glibc's default of several malloc arenas in the voice service; the single arena keeps a model reloaded on a background thread from ending up bigger |
-| `G2_RELEASE_VOICE` | on | an in-process goal session or exploration roam frees Piper's memory (about 155 MB) at its start and loads it again in the background at its end; a line that needs synthesis during the session loads it first (about 10 s); `0` keeps it loaded |
+| `G2_RELEASE_VOICE` | on | an in-process goal session or exploration roam frees Piper's memory (about 155 MB) at its start and loads it again in the background at its end |
 | `G2_GAIT_CYCLE_S` | unset | one gait period in seconds (0.25-2.0) for every gait: overrides the measured file |
 | `G2_LEG_CHECK` | on | after a stand-up from the attention pose or a sit the board's believed leg angles are compared with the stand pose and logged to `~/.local/share/g2/leg_check.jsonl` (report only); `0` turns it off |
 | `G2_SURVEY_CHECK` | on | a survey stop is look up, look down, stand, firmware `check` (`kck`, the body lean; G2 has no head to pan), stand, settle, one picture; `0` skips the check |
@@ -105,6 +113,10 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_NARRATE_START_QUIET_S` | 8 | no narration for the first seconds of an exploration |
 | `G2_WALL_STEER` | on | `0` turns the wall turn-away off (used to let him walk into a wall and test the hit sequence) |
 
+- **G2_SURVEY_CLAW:** with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) instead of the bow, the sit and the check pose; `1` forces it, `0` brings the old looks back
+- **G2_RELEASE_VOICE:** a line that needs synthesis during the session loads it first (about 10 s); `0` keeps it loaded
+
+
 ## Locations, logs and limits (added 2026-10-17)
 
 Where G2 keeps things, and the limits people occasionally change. Every variable the code reads, with its default, is listed in [`env-reference.md`](env-reference.md).
@@ -113,16 +125,16 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 |---|---|---|
 | `G2_API_LOG` | `~/.local/share/g2/api_calls.jsonl` | the log of every Claude API call (one JSON line each); `off` turns it off. Read with `g2api` |
 | `G2_API_PRICE` | `2,10` | input and output dollars per million tokens, used for the cost estimate (Sonnet 5.5's list price); set it to match the model in use |
-| `G2_STOP_MIN_CONF` | `0.5` | while the wake word is off (`g2mic off`), G2 listens only for the stop phrases. A stop phrase counts only when the recogniser has finished the sentence, the whole sentence is the phrase, and every word has at least this confidence (0 = no confidence check). A stop heard then while G2 lies at rest is ignored, not announced. Noise used to be taken for "abort" and "halt" and he said "Stopping." over and over (2026-11-04) |
-| `G2_GOAL_INPROCESS` | `1` | goal sessions (`g2ball`, "G2, ball goal") run inside the running voice service, borrowing its serial link, IMU stream and camera, so the port to the BiBoard is never closed. `0` = the old hand-over: the service is stopped, the session runs on its own, the service is started again (also `g2goal run GOAL --standalone`). Needs a serial link and a camera in the service, else it falls back by itself |
-| `G2_DROP_FRAGMENTS` | `1` | a turn of one or two filler words ("yeah", "ah", "the") right after the wake word is dropped with no reply and no saved record, and in the follow-up window (no question asked) a single word or filler pair is dropped too. `0` brings the old behaviour back. (2026-11-06: half of a week's wake triggers were false) |
-| `G2_PLACES` | `~/.local/share/g2/places.json` | the places memory: per room, counts only (no dates or times) of things seen, falls and bumps, sessions, pictures and the floor; short summaries reach the prompt when a room is mentioned or asked about. `python -m pi_pipeline.memory place list` shows it |
+| `G2_STOP_MIN_CONF` | `0.5` | while the wake word is off (`g2mic off`), G2 listens only for the stop phrases |
+| `G2_GOAL_INPROCESS` | `1` | goal sessions (`g2ball`, "G2, ball goal") run inside the running voice service, borrowing its serial link, IMU stream and camera, so the (see below) |
+| `G2_DROP_FRAGMENTS` | `1` | a turn of one or two filler words ("yeah", "ah", "the") right after the wake word is dropped with no reply and (see below) |
+| `G2_PLACES` | `~/.local/share/g2/places.json` | the places memory: per room, counts only (no dates or times) of things seen, falls and bumps, sessions, pictures and the floor |
 | `G2_CURRENT_PLACE` | `~/.local/share/g2/current_place` | the room G2 was told he is in ("you're in the kitchen", or `python -m pi_pipeline.memory place kitchen`); explorations, goal sessions and pictures are filed under it for 6 hours, then it lapses |
-| `G2_GOAL_LESSONS` | `0` | `1` saves each goal session's notes as memory facts again (they were a pile of near-repeats); by default the notes stay in the journal and ONE `goal_summary` fact per goal is kept, shown in chat only when the ball, a goal or practice comes up |
+| `G2_GOAL_LESSONS` | `0` | `1` saves each goal session's notes as memory facts again (they were a pile of near-repeats) |
 | `G2_LOG_DAYS` | `7` | the command, noise, power, memory and wall debug logs keep this many days (checked at service start and daily); `0` keeps everything |
-| `G2_PROMPT_CACHE` | `1h` | the part of every Claude request that never changes (tool list and system prompt, about 2,500 tokens) is cached and billed at a tenth of the input price on a hit: `1h`, `5m` or `off`. The mood, narration and gait hints sit after the cached part so changing one never resets it. `g2api` shows the tokens read from the cache |
-| `G2_RECALL_MAX_CHARS` | `2400` | the memory notes of ONE request, in characters (about 4 per token). Over it the lowest-ranked facts go first, then past moments; the core facts stay. `0` = no limit. Notes are sent with their own request only, never repeated in the history |
-| `G2_API_DAILY_USD` | `2.0` | a daily ceiling on Claude spend, worked out from the API call log. A warning in the log at 80%; at the ceiling G2 says he has used up his thinking budget and makes no more Claude calls until midnight (moves and stop words still work). `0` = no ceiling. The busiest day so far cost $0.44. `g2api` ends with today's figure |
+| `G2_PROMPT_CACHE` | `1h` | the part of every Claude request that never changes (tool list and system prompt, about 2,500 tokens) is cached and billed at (see below) |
+| `G2_RECALL_MAX_CHARS` | `2400` | the memory notes of ONE request, in characters (about 4 per token) |
+| `G2_API_DAILY_USD` | `2.0` | a daily ceiling on Claude spend, worked out from the API call log |
 | `G2_USAGE_FILE` | `~/.local/share/g2/api_usage.json` | per-day call and token counts, including retries (`python -m pi_pipeline.voice.usage`) |
 | `G2_BATTERY_WATCH` | on | the low-battery watch for G2's pack; `0` turns it off |
 | `G2_BATTERY_LOG`, `G2_BATTERY_LOG_EVERY_S` | `~/.local/share/g2/battery_voltage.csv`, 300 | the pack-voltage history, one line per interval (an empty path turns it off) |
@@ -135,19 +147,35 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 | `G2_NOISE_LOG` | `~/.local/share/g2/noise.jsonl` | the log of BiBoard commands that make a noise; `off` turns the file off |
 | `G2_GAIT_MODE_FILE`, `G2_GALLERY_PENDING` | `~/.local/share/g2/gait_mode.json`, `.../gallery_pending.json` | the shared gait mode and the pictures queued for the object gallery |
 | `G2_STATE_DIR` | `~/.local/share/g2` | where `bringup` keeps its progress file |
-| `G2_DEFAULT_GAIT` | `firmware` (since 2026-11-08; was `policy`) | `firmware`: walks are Petoi's scripted gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, and the chase and the exploration walk with it (no bump signal from the walk); `policy` brings the learned walk back |
-| `G2_GYRO_BALANCE` (and `G2_EASING`, `G2_BLENDING`, `G2_GAIT_SWITCHING`, `G2_SKILLS`, `G2_FALL_RECOVERY`) | unset (the fitted attachment's profile decides) | `0` / `1` overrides that attachment profile flag for one run, so a hardware A/B needs no profile edit or deploy. The arm's stand-up ramp turns the gyro balance off for the ramp and on again after it, where it is switched on by name |
-| `G2_GYRO_GAITS` | off (experiment, 2026-11-08) | `1`: the firmware gyro balance is switched on (`gB`, then a 0.3 s gap, `G2_GYRO_GAIT_GAP_S`) just before a scripted gait and stays off otherwise (the stop `kbalance` is followed by `gb` as before), so it is never on in the attention / sit poses, where the board took a pose for a fall and flipped him with its own `rc` / `up` |
-| (no switch) the stand-up | always the eased `K` skill on the arm build | **Hard rule:** every stand-up is the board-played eased `K` skill, from rest, a sit, the attention pose or the pose the board reports; `G2_STAND_VIA`, the profile's `stand_via` and `motion_feel` can no longer bring back the firmware or the Pi-streamed stand-ups. The numbers (stages, speeds, wait, gyro during the rise) are in `pi_pipeline/motion_feel.py`. If it cannot run, G2 does not stand and the command is dropped |
+| `G2_DEFAULT_GAIT` | `firmware` (since 2026-11-08; was `policy`) | `firmware`: walks are Petoi's scripted gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, and the (see below) |
+| `G2_GYRO_BALANCE` (and `G2_EASING`, `G2_BLENDING`, `G2_GAIT_SWITCHING`, `G2_SKILLS`, `G2_FALL_RECOVERY`) | unset (the fitted attachment's profile decides) | `0` / `1` overrides that attachment profile flag for one run, so a hardware A/B needs no profile edit or deploy |
+| `G2_GYRO_GAITS` | off (experiment, 2026-11-08) | `1`: the firmware gyro balance is switched on (`gB`, then a 0.3 s gap, `G2_GYRO_GAIT_GAP_S`) just before a scripted gait and stays (see below) |
+| (no switch) the stand-up | always the eased `K` skill on the arm build | **Hard rule:** every stand-up is the board-played eased `K` skill, from rest, a sit, the attention pose or the pose the board reports |
 | `pi_pipeline/motion_feel.py` (and `G2_STAND_STEPS`, `G2_STAND_SPEED`, `G2_STAND_PAUSE`, `G2_STAND_WAIT_S`, `G2_CLAW_DEG_S`, `G2_CLAW_STEPS_PER_S`; override file `~/.local/share/g2/motion_feel.json` on the Pi) | the numbers in that file | how slow moves feel: the `K`-skill stand-up's stages, speed, pause and wait, and the claw raise's speed and step rate. The file explains each number |
-| `G2_MOTION_EVENTS` | on (`~/.local/share/g2/motion_events.jsonl`) | one line per stand-up: the pose the board reported before it, whether he was laid in rest first (an unknown or unreadable pose gets `krest` then the stand-up), the numbers, the seconds and how it ended (`reached` / `forced` / `refused`). `off` disables it; another value is the file to use. Read by `python -m pi_pipeline.diag report` helpers (`diag/run_report.py`) |
-| `G2_ATT_STAND` | `smooth` (since 2026-11-08) | the stand-up from the attention pose is one motion: the front legs start 0.35 s after the back legs (when they are about a fifth up) instead of 0.9 s, the whole leg pose is re-sent every 4 steps so a dropped joint is corrected within about 0.3 s; `legacy` keeps the two-stage stand-up (back legs 85% up before the front legs start) |
+| `G2_MOTION_EVENTS` | on (`~/.local/share/g2/motion_events.jsonl`) | one line per stand-up: the pose the board reported before it, whether he was laid in rest first (an unknown or unreadable (see below) |
+| `G2_ATT_STAND` | `smooth` (since 2026-11-08) | the stand-up from the attention pose is one motion: the front legs start 0.35 s after the back legs (when they are (see below) |
 | `G2_CONVERSATION_WINDOW_S`, `G2_CONVERSATION_MAX_S` | 20, 600 | conversation mode ("let's talk"): how long G2 waits for you to start each turn, and the session limit; 0 for the window turns the mode off |
 | `G2_CONVERSATION_MAX_WORDS`, `G2_SIDE_MAX_WORDS` | 30, 14 | a turn heard without the wake word that runs longer than this is dropped before Claude (the first number applies in conversation mode); 0 means no limit |
 | `G2_VOLUME` | 65 | the one volume, percent of max, for every sound G2 plays (his voice, the tones, the alarms, the camera sounds) and the buzzer (65 -> `b6`); held to 75. No sound has a level of its own |
 | `G2_MEMLOG`, `G2_MEMLOG_S` | `~/.local/share/g2/memory_log.jsonl`, 10 | the memory log (`g2mem`): its file (`off` turns it off) and the seconds between readings |
 | `G2_TASK_SCOPE_STRICT` | off (on in the tests) | `1` makes a task that changes a setting it did not declare raise (util/task_scope.py) |
 | `G2_BATTERY_STRICT` | off | `1` stops a test when the pack cannot be read (default: warn and go on) |
+
+- **G2_STOP_MIN_CONF:** A stop phrase counts only when the recogniser has finished the sentence, the whole sentence is the phrase, and every word has at least this confidence (0 = no confidence check). A stop heard then while G2 lies at rest is ignored, not announced. Noise used to be taken for "abort" and "halt" and he said "Stopping." over and over (2026-11-04)
+- **G2_GOAL_INPROCESS:** goal sessions (`g2ball`, "G2, ball goal") run inside the running voice service, borrowing its serial link, IMU stream and camera, so the port to the BiBoard is never closed. `0` = the old hand-over: the service is stopped, the session runs on its own, the service is started again (also `g2goal run GOAL --standalone`). Needs a serial link and a camera in the service, else it falls back by itself
+- **G2_DROP_FRAGMENTS:** a turn of one or two filler words ("yeah", "ah", "the") right after the wake word is dropped with no reply and no saved record, and in the follow-up window (no question asked) a single word or filler pair is dropped too. `0` brings the old behaviour back. (2026-11-06: half of a week's wake triggers were false)
+- **G2_PLACES:** short summaries reach the prompt when a room is mentioned or asked about. `python -m pi_pipeline.memory place list` shows it
+- **G2_GOAL_LESSONS:** by default the notes stay in the journal and ONE `goal_summary` fact per goal is kept, shown in chat only when the ball, a goal or practice comes up
+- **G2_PROMPT_CACHE:** the part of every Claude request that never changes (tool list and system prompt, about 2,500 tokens) is cached and billed at a tenth of the input price on a hit: `1h`, `5m` or `off`. The mood, narration and gait hints sit after the cached part so changing one never resets it. `g2api` shows the tokens read from the cache
+- **G2_RECALL_MAX_CHARS:** Over it the lowest-ranked facts go first, then past moments; the core facts stay. `0` = no limit. Notes are sent with their own request only, never repeated in the history
+- **G2_API_DAILY_USD:** A warning in the log at 80%; at the ceiling G2 says he has used up his thinking budget and makes no more Claude calls until midnight (moves and stop words still work). `0` = no ceiling. The busiest day so far cost $0.44. `g2api` ends with today's figure
+- **G2_DEFAULT_GAIT:** `firmware`: walks are Petoi's scripted gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, and the chase and the exploration walk with it (no bump signal from the walk); `policy` brings the learned walk back
+- **G2_GYRO_BALANCE (and G2_EASING, G2_BLENDING, G2_GAIT_SWITCHING, G2_SKILLS, G2_FALL_RECOVERY):** The arm's stand-up ramp turns the gyro balance off for the ramp and on again after it, where it is switched on by name
+- **G2_GYRO_GAITS:** `1`: the firmware gyro balance is switched on (`gB`, then a 0.3 s gap, `G2_GYRO_GAIT_GAP_S`) just before a scripted gait and stays off otherwise (the stop `kbalance` is followed by `gb` as before), so it is never on in the attention / sit poses, where the board took a pose for a fall and flipped him with its own `rc` / `up`
+- **(no switch) the stand-up:** `G2_STAND_VIA`, the profile's `stand_via` and `motion_feel` can no longer bring back the firmware or the Pi-streamed stand-ups. The numbers (stages, speeds, wait, gyro during the rise) are in `pi_pipeline/motion_feel.py`. If it cannot run, G2 does not stand and the command is dropped
+- **G2_MOTION_EVENTS:** one line per stand-up: the pose the board reported before it, whether he was laid in rest first (an unknown or unreadable pose gets `krest` then the stand-up), the numbers, the seconds and how it ended (`reached` / `forced` / `refused`). `off` disables it; another value is the file to use. Read by `python -m pi_pipeline.diag report` helpers (`diag/run_report.py`)
+- **G2_ATT_STAND:** the stand-up from the attention pose is one motion: the front legs start 0.35 s after the back legs (when they are about a fifth up) instead of 0.9 s, the whole leg pose is re-sent every 4 steps so a dropped joint is corrected within about 0.3 s; `legacy` keeps the two-stage stand-up (back legs 85% up before the front legs start)
+
 
 **One volume for everything**: every sound G2 plays, his voice included, comes out at `G2_VOLUME` (default **65% of max**, `pi_pipeline/sound_levels.py`), and the buzzer is set to match (6 of 10). No sound has a level of its own; nothing is ever louder than 75% of max.
 | `G2_MEMORY_LOG_COMMANDS` | off | `1` logs the memory-related spoken commands |
