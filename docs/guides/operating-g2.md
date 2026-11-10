@@ -1,3 +1,8 @@
+---
+audience: builder
+kind: guide
+---
+
 # Operating G2: safety and day-to-day control
 
 What to know before G2 moves, how to stop him, and how to power things on and off. Commands in full: [`cheatsheet.md`](cheatsheet.md). Lessons from past sessions: [`operating-lessons.md`](operating-lessons.md). A printable two-page version of this page is [`operating-g2-quick-guide.pdf`](operating-g2-quick-guide.pdf).
@@ -5,12 +10,12 @@ What to know before G2 moves, how to stop him, and how to power things on and of
 ## Ground rules
 
 - **Never put G2 on his back.** The Pi and the BiBoard are exposed on top. If he falls or is flipped, right him by hand.
-- **Every test starts on his feet on the floor with your hands near.** No testing held in the air.
+- **Every test starts on his feet on the floor with a hand near.** No testing held in the air.
 - **Know which floor he is on** and set it before a walking run (`g2floor <label>`); walk logs are labelled by it.
 - **Rest or stand G2 before stopping anything that controls him** (`bash tools/g2_safe_stop.sh voice|explore`), never a plain service stop mid-stride.
 - **Never deploy new code to the Pi while he is walking, exploring, or being tested.** The deploy script refuses during an exploration or a walk.
 - **Never send `Xa` or `XAd` to the BiBoard.** They silently break its onboard voice commands.
-- **The AI head can move G2.** It is wired to the BiBoard's serial port (G1), and its model sends commands when you talk to it (press its button, or its wake word "Hi, Jason"). Use it only while G2 is idle or resting, never during a walk or an exploration; after a head session that moved him, power-cycle the BiBoard (or check the IMU stream) before the next walk, because the head can send `g` (the gyro toggle); tell Claude if Pi commands start failing (the wrong-answer horn).
+- **The AI head can move G2.** It is wired to the BiBoard's serial port (G1), and its model sends commands when it is spoken to (press its button, or its wake word "Hi, Jason"). Use it only while G2 is idle or resting, never during a walk or an exploration; after a head session that moved him, power-cycle the BiBoard (or check the IMU stream) before the next walk, because the head can send `g` (the gyro toggle); tell Claude if Pi commands start failing (the wrong-answer horn).
 
 ## Stopping G2
 
@@ -26,7 +31,7 @@ Emergency stop is a freeze, not a power-off. The voice loop listens for it befor
 
 ## Working on him safely: bench mode
 
-When G2 sits on the calibration stand, or you are running calibration, `check_serial` or an IMU probe, run the app with **`python -m pi_pipeline.app --bench`**. It suppresses autonomous movement and forces the voice actuator to a mock, so nothing else competes for the serial link. For pure diagnostics it is simpler not to run the app at all and use the individual tools, which each open the port themselves.
+When G2 sits on the calibration stand, or calibration is running, `check_serial` or an IMU probe, run the app with **`python -m pi_pipeline.app --bench`**. It suppresses autonomous movement and forces the voice actuator to a mock, so nothing else competes for the serial link. For pure diagnostics it is simpler not to run the app at all and use the individual tools, which each open the port themselves.
 
 ## Starting and stopping
 

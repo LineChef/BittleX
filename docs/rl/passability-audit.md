@@ -1,6 +1,6 @@
 # Passability audit: the hardest course must stay passable
 
-## Standing rule (user, 2026-10-08)
+## Standing rule
 
 **Difficulty never ramps above what a capable policy can pass.** Every hazard category (terrain, ledge, slope, fault, and any added later) has a top threshold, found by measurement: the largest magnitude that the best available policy passes at least half the time. The difficulty ramp is limited to that threshold, so no level, hard-scale factor or combination of hazards can produce an impossible episode. "Very hard but passable" is the target for the top of the ramp; "impossible" is a bug.
 Apply this to every new hazard, every change to a hazard's range, the level ceiling and the hard-scale factor: measure with `rl_training/opencat-gym/passability_audit.py` before the change goes into a run, and keep the limits in `g2_profile.py` (the `G2E_CAP_*` settings). A floor bug that puts a wall in front of G2, or a start pose inside the ground, is treated the same way as an over-hard setting: it is an impossible episode, and it is fixed before the next run.

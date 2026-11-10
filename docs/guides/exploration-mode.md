@@ -3,7 +3,7 @@
 Exploration is G2 walking around a cleared area by himself, looking at things, taking pictures and keeping away from walls. It is voice-armed only and never starts on its own.
 Code: `pi_pipeline/explore_session.py` (the session), `behavior/explore.py` (legs and headings), `behavior/driver.py` (the priority chain, wall steering, hit detection),
 `behavior/survey.py` (picture stops), `behavior/interest_watch.py` (the peeks), `vision/wall_distance.py` (the wall estimator). Settings: [`settings-switches.md`](settings-switches.md).
-Commands you can say: [`voice-commands.md`](voice-commands.md). Wall work and test history: [`../vision/wall-check-plan.md`](../vision/wall-check-plan.md).
+Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test history: [`../vision/wall-check-plan.md`](../vision/wall-check-plan.md).
 
 ## Starting it
 
@@ -36,13 +36,13 @@ Commands you can say: [`voice-commands.md`](voice-commands.md). Wall work and te
    Interest peeks pause while a picture is being taken, and exploration detects at the camera's picture capture option so a picture needs no capture-mode switch. Pictures: `~/.local/share/g2/explore_pictures/`, reviewed with `g2pics`; the scheduled ones are `after_bow_m25` to `after_bow_m99`.
 5. **Wall steering.** The estimator turns the picture's floor line into inches per column group (calibration in `~/.local/share/g2/wall_calibration.json`). A wall ahead means three of five groups at 24 in or
    closer on two of the newest three looks (about 50 degrees away, toward the side with more room), or any look at 12 in or closer, or a blocked picture. The turn replaces any turn already running, and a
-   two-note falling sound plays so you know why he turned.
+   two-note falling sound plays so the reason for the turn is audible.
 6. **Hit a wall.** A blocked look, a wall 6 in or closer on three groups, or two looks in a row at the same close wall with no turn between them: he says a long "ooooof", backs up for 2.4 s, stops, and
    turns around about 150 degrees toward the open side. Vision only for now; the IMU and servo-strain contact signals are still to build.
 7. **Always on underneath.** The fall guard (a tilt past 60 degrees for 0.3 s plays the losing horn and rests him), the thermal guard, the battery watch (G2 pack alarms at about 30% and 20%), the watchdog
    (a stalled control loop rests him), and the emergency stop.
 
-## Sounds you hear
+## Sounds
 
 | Moment | Sound |
 |---|---|
@@ -57,7 +57,7 @@ Commands you can say: [`voice-commands.md`](voice-commands.md). Wall work and te
 
 ## Ending it
 
-The roam time runs out (the end of the cap always ends the whole session), or you say "that's enough" / "end exploration mode" / "cancel exploration", or "emergency stop", or `g2_explore.sh stop`.
+The roam time runs out (the end of the cap always ends the whole session), or "that's enough" is said / "end exploration mode" / "cancel exploration", or "emergency stop", or `g2_explore.sh stop`.
 However it ends (even a crash) the unit sends rest (`d`) before the voice service starts again.
 
 ## Where to look afterwards
@@ -65,11 +65,11 @@ However it ends (even a crash) the unit sends rest (`d`) before the voice servic
 - `journalctl -u g2-explore` on the Pi (or `bash tools/g2_explore.sh logs`): turns, `g2.wall.steer`, `g2.wall.hit`, chirps, pictures.
 - `G2_PROFILE=1 bash tools/g2_explore.sh start 240` writes `profile.txt` in the session's diagnostics folder (`~/g2_logs/<session>/`): which threads use the CPU and where. Each walk's log sidecar (`~/g2_runs/auto/<date>/*.json`) records `late_ticks_pct` and `worst_tick_gap_ms`.
 - **Narration** is fixed text chosen from what he does and sees (new leg, a wall about N inches ahead and which way he turns, a bump, straight starts); a local voice speaks it, no API call. Lines come at least 5 s apart, the same kind after 25 s. Since 2026-10-18 the synthesised lines are cached on disk (`~/.cache/g2/speech`, `voice/speech_cache.py`) and the fixed ones are made a minute after the voice service starts, so a session says them without synthesising; a line not ready 8 s after it was decided is dropped; each line logs `narration timing:` (queue, synthesis, play).
-- **The report is written for you** when a roam ends (2026-10-18): `report.txt` and `report.html` in the session's folder on the Pi (for a roam run inside the voice service, `explore_HHMMSS.*` with just that roam's time window), and the log gets one line, *session report: N of 8 checks ok; CHECK: ...*. `g2explore report` prints the latest one; `g2explore report html` also saves the page on the Mac and opens it. The **checks** are the numbers the fixes are meant to move: no falls, late walk ticks under 5%, the camera answering every time, speech within 8 s with none dropped, walks stopping when told, no false wake triggers, no worker giving up, and every walk carrying a floor label. Read it after every roam.
+- **A report is written** when a roam ends (2026-10-18): `report.txt` and `report.html` in the session's folder on the Pi (for a roam run inside the voice service, `explore_HHMMSS.*` with just that roam's time window), and the log gets one line, *session report: N of 8 checks ok; CHECK: ...*. `g2explore report` prints the latest one; `g2explore report html` also saves the page on the Mac and opens it. The **checks** are the numbers the fixes are meant to move: no falls, late walk ticks under 5%, the camera answering every time, speech within 8 s with none dropped, walks stopping when told, no false wake triggers, no worker giving up, and every walk carrying a floor label. The report should be read after every roam.
 - `python -m pi_pipeline.diag report --html out.html` (on the Pi): the same report for any session (`--kind explore` picks the newest exploration).
 - **The floor is asked for before every roam** (2026-10-18). By voice, "look around" makes him ask "What surface will I be walking on?" when the label is unknown or over an hour old (answer "tile", "we are on carpet", or "same"). `g2explore start` asks the same on the terminal and refuses to start without a terminal until the label is set (`g2floor tile`, or `G2_FLOOR_SKIP=1`). A roam with no fresh label still happens, but its walks feed the loop-timing fits only, not the body fits (`docs/rl/real-data-pipeline.md`).
 - **The walls goal learns from every roam** (2026-10-31): each turn away and each bump is an encounter for the "turn away from walls" standing goal, which tunes the turn distance
-  (`TURN_IN`, 24 in to start), the other wall distances and the turn for the next roam: bumps push them out, turning with lots of room to spare pulls them in (`goals/walls.py`; your own values: `python -m pi_pipeline.behavior.wall_settings`). `g2goal report walls` shows what it learned.
+  (`TURN_IN`, 24 in to start), the other wall distances and the turn for the next roam: bumps push them out, turning with lots of room to spare pulls them in (`goals/walls.py`; the operator's own values: `python -m pi_pipeline.behavior.wall_settings`). `g2goal report walls` shows what it learned.
 - After the session, its recap is kept in `~/.local/share/g2/experiences.jsonl` ("how was your exploration?"), saved as a memory sighting ("where's the chair?") and noted in the body state (`personality/body.py`).
 - `~/.local/share/g2/wall_dryrun.jsonl` and `python -m pi_pipeline.vision.wall_stats`: every wall look in inches, the state, the turn it would make, the saved near-wall pictures.
 - `~/g2_runs/auto/<date>/`: the policy walk logs (CSV plus a JSON sidecar).

@@ -142,7 +142,7 @@ Also a manual CLI entry for bench testing.
 
 ### Curating a raw batch — `tools/curate_captures.py` (BUILT)
 
-Repeatable post-processing so you don't hand-sift hundreds of frames. Run it on
+Repeatable post-processing that avoids hand-sifting hundreds of frames. It runs on
 any capture folder:
 
 ```
@@ -161,16 +161,16 @@ picks a few clean negatives, rotates everything upright (`--rotate`, default
 a `<name>.json` sidecar with the module's boxes (`face_preview.py` writes these).
 `curate` then splits positives (box present) from negatives (none) automatically
 and writes a **YOLO `.txt` per positive** (`<class_id> cx cy w h` normalised,
-rotated to match) — upload-ready, you just assign the class name. Capture with
+rotated to match) — upload-ready; only the class name is left to assign. Capture with
 **Face Detection** loaded for tight face boxes; Person Detection boxes work but
-are larger (head+torso), so you'd tighten them at upload.
+are larger (head+torso), so they are tightened at upload.
 
 ### Handoff to training
 
 1. `python -m pi_pipeline ... sync-faces <dest>` (or scp) — pull
    `training_data/faces/<name>/` off the Pi.
-2. Upload to SenseCraft; the pre-label boxes mean you mostly just assign the
-   class name. Or import to Roboflow.
+2. Upload to SenseCraft; the pre-label boxes leave only the
+   class name to assign. Or import to Roboflow.
 3. Train (multi-class — add the new person to the existing `interaction`
    dataset), deploy the updated model.
 4. `.env`: add the name to `VISION_LABELS` (in class-id order) and

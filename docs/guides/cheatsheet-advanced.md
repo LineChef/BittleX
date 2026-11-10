@@ -1,3 +1,8 @@
+---
+audience: builder
+kind: reference
+---
+
 # Cheat sheet: setup, training, bring-up and repo
 
 The commands you run rarely. The everyday ones are on [`cheatsheet.md`](cheatsheet.md); every option of every alias is in [`shell-helpers.md`](shell-helpers.md).

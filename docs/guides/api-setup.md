@@ -1,82 +1,49 @@
-# Anthropic API setup checklist
+---
+audience: builder
+kind: guide
+---
 
-Two layers: account-side limits (the real hard stop — enforced by Anthropic, not
-by G2's own code, so a bug in G2 can't get around it) and G2-side limits (faster,
-local, and can warn *before* the hard stop is hit). Do both.
+# Setting up the Claude API key and spending limits
 
-## Account side (console.anthropic.com) — one-time, do this first
+G2 talks through the Claude API, which bills per use. This page covers two layers of protection: limits set in the Anthropic console, and limits inside G2's own software. The console limits are the hard stop, because Anthropic enforces them and a bug in G2 cannot get around them. G2's own limits are faster, and they warn before the hard stop is reached. Set up both.
 
-- [ ] **Create a dedicated API key for G2**, separate from any other project/key
-      you have. Isolates its spend and lets you revoke or re-cap just this key
-      without touching anything else.
-- [ ] **Set a monthly spend limit** on the key / workspace (Console → Billing or
-      Limits). This is the actual ceiling — once hit, calls fail instead of
-      racking up charges, regardless of anything G2's code does or doesn't do.
-- [ ] **Enable usage alert emails** at a threshold (e.g. 50% / 80%) so you hear
-      about rising spend before the limit bites.
-- [ ] If available on your plan, consider **prepaid credits instead of
-      auto-reload** — spend literally can't exceed what's loaded.
-- [ ] Put the key in the gitignored `.env` as `ANTHROPIC_API_KEY=` — **never** in
-      a tracked file (see the repo-privacy rules; the pre-commit hook doesn't
-      scan for API-key-shaped strings, so this one's on you).
-- [ ] **Bookmark the key's console page** so revoking a lost/compromised key is a
-      2-minute job, not a search (ties to the lost-device hardening item in
-      `pi-set-up.md` §9).
-- [ ] **If you set an expiry on the key**, also put that date in `.env` as
-      `ANTHROPIC_API_KEY_EXPIRES=YYYY-MM-DD`. G2 then logs a warning as it nears
-      (`G2_API_KEY_EXPIRY_WARN_DAYS`, default 30) and an error once it's past —
-      so an expired key is never a silent non-reply. **Built 2026-09-10**
-      (`config.api_key_expiry_status()`, surfaced at voice startup + in
-      `livecheck`). Reset both the console expiry and this date when you rotate.
+## In the Anthropic console
 
-## G2 side — local, faster, and can warn ahead of time — partly built (usage tracking yes; limiter and budget caps not yet)
+Do these once, before the key is first used.
 
-**The rule for every limit below, self-imposed or Anthropic's own: warn before
-it's hit, and clearly say/log when it IS hit — never a silent failure or a raw
-error, so it's never "why is G2 not responding and I have no idea why."**
+1. **Create a dedicated API key for G2.** Keep it separate from any other project's key. That isolates G2's spending and allows revoking or re-capping this key alone.
+2. **Set a monthly spend limit** on the key or workspace (Console, Billing or Limits). This is the real ceiling. Once it is reached, calls fail instead of running up charges.
+3. **Turn on usage alert emails** at a threshold such as 50% and 80%, so rising spend is noticed before the limit is reached.
+4. **Consider prepaid credits instead of auto-reload,** where the plan offers them. Spend then cannot exceed what is loaded.
+5. **Store the key in the gitignored `.env` file** as `ANTHROPIC_API_KEY=`. Never put it in a tracked file. The pre-commit hook does not scan for key-shaped strings.
+6. **Bookmark the key's console page,** so revoking a lost or exposed key takes minutes.
+7. **Record the expiry, if the key has one.** Add `ANTHROPIC_API_KEY_EXPIRES=YYYY-MM-DD` to `.env`. G2 logs a warning as the date approaches (`G2_API_KEY_EXPIRY_WARN_DAYS`, default 30) and an error once it has passed, so an expired key is never a silent non-reply. Update both the console expiry and this date when the key is rotated.
 
-Independent guardrails — they catch different things, one of them isn't
-even a G2 setting. The usage tracker and price config exist; the call-rate limiter
-and the budget caps are still to build:
+## Inside G2
 
-- [ ] **Call-rate limiter** — cap calls/minute (e.g. `G2_MAX_CALLS_PER_MIN`).
-      Catches a *bug* (wake-word false-trigger loop, a retry storm) in seconds,
-      before it's spent real money. Doesn't need to know cost at all.
-- [x] **Local usage tracker: BUILT.** Every API call is logged with its exact token usage (`voice/api_log.py`, a gitignored file under `~/.local/share/g2/`), and a per-day report counts each turn and retry (`python -m pi_pipeline.voice.usage`). Read it any time with `g2api [hours]`, which shows calls, tokens and approximate cost by source.
-- [x] **Price-per-token config: BUILT** as `G2_PRICE_IN_PER_MTOK` and `G2_PRICE_OUT_PER_MTOK`, filled in by hand from the current pricing page. Tokens are tracked for certain; dollars are estimated from those two numbers, not a hard-coded price that could go stale.
-- [ ] **The project's own budget caps** (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`).
-      Once crossed, G2 **refuses further API calls itself** and says/logs so
-      clearly — "I can't chat right now, I've hit today's budget" — fails safe,
-      locally, without waiting on Anthropic's own limit.
-- [ ] **Early warning on the project's own budget** — a configurable threshold *below* the
-      cap (`G2_BUDGET_WARN_PCT`, default ~0.8). The first time a period crosses
-      it, G2 says/logs a warning once — not every subsequent call, so it doesn't
-      nag — e.g. "heads up, I'm at 80% of today's chat budget."
-- [x] **Anthropic's OWN limit / auth errors — clear spoken responses. BUILT
-      2026-09-10.** `Conversation._create()` now classifies:
-      - **Auth** (`AuthenticationError` / `PermissionDeniedError`, HTTP 401/403
-        — revoked / expired / wrong key) → no retry, `ConversationError(kind=
-        "auth")`; G2 says `G2_SPEECH_API_AUTH` (default *"I can't reach my brain
-        right now -- my API key may be invalid or expired."*).
-      - **Rate limit** (`RateLimitError` / 429) → backs off and retries up to 3×;
-        if still failing, `kind="rate"`, G2 says `G2_SPEECH_API_RATE`.
-      - **Billing / quota** (a 400 mentioning credit / billing / balance / quota)
-        → no retry, `kind="billing"`, G2 says `G2_SPEECH_API_BILLING`.
-      - Anything else still falls through to the loop's generic "I glitched".
-      `voice/loop.py` catches `ConversationError` first, speaks `.spoken`, logs
-      the `.kind`, and keeps the loop alive. Phrases are `.env`-overridable.
-      Still deferred (unless you hit issues): the *proactive* local budget
-      tracker / caps / call-rate limiter above.
-- [ ] `python -m pi_pipeline.voice usage` (or similar) — check current spend /
-      remaining budget anytime, without opening the console.
-- [ ] **Verify all three end-to-end** before trusting them: temporarily set a
-      tiny local budget and confirm the warning + hard refusal fire and read
-      clearly; separately, confirm a simulated/forced rate-limit or billing
-      error also produces a clear message instead of silence or a crash. Then
-      restore the real budget.
+### Usage tracking
 
-## Status
+Every API call is logged with its exact token count in a gitignored file under `~/.local/share/g2/` (`voice/api_log.py`). `g2api [hours]` shows calls, tokens and an approximate cost by source. `python -m pi_pipeline.voice.usage` prints a per-day report that counts each turn and retry.
 
-Account-side: not yet done (do when the API key is first set up). G2-side:
-specified above, not yet implemented — say the word and it gets built into
-`pi_pipeline/voice/`.
+Dollars are estimated from two prices set in `.env`: `G2_PRICE_IN_PER_MTOK` and `G2_PRICE_OUT_PER_MTOK`. They are filled in by hand from the current pricing page, so a price change never leaves a stale figure in the code.
+
+### Clear spoken messages when the API refuses
+
+Every limit follows one rule: warn before it is hit, and say or log clearly when it is hit. A failure is never silent and never a raw error. G2 classifies what the API returns and speaks a plain line for each case:
+
+| Failure | What happens | Spoken line (setting that changes it) |
+|---|---|---|
+| Authentication error (revoked, expired or wrong key) | No retry. | `G2_SPEECH_API_AUTH`, by default "I can't reach my brain right now -- my API key may be invalid or expired." |
+| Rate limit | Backs off and retries up to three times. | `G2_SPEECH_API_RATE` |
+| Billing or quota error | No retry. | `G2_SPEECH_API_BILLING` |
+| Anything else | The voice loop stays alive. | A generic "I glitched." |
+
+The voice loop catches the error, speaks the line and logs the failure kind. The phrases can all be overridden in `.env`.
+
+### Not built yet
+
+- A **call-rate limiter** (for example `G2_MAX_CALLS_PER_MIN`) would catch a bug such as a wake-word false-trigger loop or a retry storm within seconds, without needing to know any cost.
+- **Local budget caps** (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`) would make G2 refuse further calls once crossed and say so, without waiting for Anthropic's own limit.
+- An **early warning** below the cap (`G2_BUDGET_WARN_PCT`, about 0.8) would speak once when a period crosses the threshold.
+
+Once these exist, they should be checked end to end: set a tiny budget temporarily, confirm the warning and the refusal both fire and read clearly, force a rate-limit and a billing error, confirm each gives a clear message, then restore the real budget.

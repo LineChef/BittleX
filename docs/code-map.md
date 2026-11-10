@@ -1,3 +1,8 @@
+---
+audience: contributor
+kind: reference
+---
+
 # Code map: the docs and the packages
 
 Where each part of the code is documented. Each package has its own README next to the code; the docs pages explain how to use and operate the part. How the pieces fit: [`architecture.md`](architecture.md).

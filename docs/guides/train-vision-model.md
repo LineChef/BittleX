@@ -1,7 +1,7 @@
 # Train a visual model for G2 — full walkthrough
 
 Every step and command to go from "nothing" to "a custom detection model running
-on the Grove Vision AI V2", so you can do it solo. Written for a face/person
+on the Grove Vision AI V2", doable by one person. Written for a face/person
 recognition model (`alex`), but the same flow trains any object model.
 
 Related: `vision/capture-checklist.md` (the capture routine),
@@ -20,7 +20,7 @@ Related: `vision/capture-checklist.md` (the capture routine),
 - Camera plugged into the Mac. Confirm: `ls /dev/cu.usbmodem*`.
 
 > **Port is single-owner.** SenseCraft's in-app "disconnect" does NOT release the
-> browser's serial port — you must **close the SenseCraft tab** before any local
+> browser's serial port — the **SenseCraft tab must be closed** before any local
 > script can open `/dev/cu.usbmodem*` (else "Resource busy"; `lsof` shows
 > Google Chrome).
 
@@ -28,8 +28,8 @@ Related: `vision/capture-checklist.md` (the capture routine),
 
 ## 1 · Put a base detection model on the module
 
-Used only to generate pre-label boxes during capture — you'll overwrite it with
-your trained model later.
+Used only to generate pre-label boxes during capture — it is replaced by the
+trained model later.
 
 1. SenseCraft → **Models** → **Model Library**.
 2. Filter: search `person`, Supported Devices = **Grove - Vision AI V2**.
@@ -56,16 +56,16 @@ PY
 The sensor outputs its native orientation — often **90° rotated**. That matters:
 
 - **Person Detection is trained on *upright* people.** On a sideways feed it
-  misses you in most frames → few pre-labels. (Session-1 test: 46 boxes / 342
+  misses the subject in most frames → few pre-labels. (Session-1 test: 46 boxes / 342
   frames sideways.)
 - **Rotating on the module is not possible** — no AT command, and camera sensors can't do
   a 90° transpose (only H/V flip).
 
 So **physically rotate the camera module 90°** until its raw feed is upright
 (check the preview *before* pressing "rotate view"). Note which way — that's the
-orientation you'll mount it on G2, and it must match for all sessions. Then note
+orientation it will be mounted in on G2, and it must match for all sessions. Then note
 the `--rotate` value curate needs for that orientation (try 0 first; 90/180/270 if rotated; the
-contact sheet tells you if it's upside-down).
+contact sheet shows whether it is upside-down).
 
 ---
 
@@ -73,7 +73,7 @@ contact sheet tells you if it's upside-down).
 
 Full detail incl. the **standard pose set** (run it every session): `vision/capture-checklist.md`. Short form:
 
-1. Ask yourself: **tag name** (`alex`), **which session** (1, 2, or 3).
+1. Decide the **tag name** (`alex`), **which session** (1, 2, or 3).
 2. Room as bright as reasonable (the `--rotate`/AE settings help, but light is
    the real lever).
 3. Launch the live preview:
@@ -90,11 +90,11 @@ Full detail incl. the **standard pose set** (run it every session): `vision/capt
 
    **Motion-gated saving is on by default** (`G2_CAP_GATE=12`): a held pose saves
    ~1 frame (plus one every `G2_CAP_KEEPALIVE=8` s), and frames flow again when
-   you move — so you don't drown in near-identical shots. The status line shows
+   the subject moves, so near-identical shots do not pile up. The status line shows
    `saved N (M skipped, static)`. Move *slowly and deliberately* through each
    pose and it captures the whole arc; freeze and it stops. `G2_CAP_GATE=0`
    restores the old "save every 4th frame" behaviour.
-4. Pose sequence — you can leave capturing ON the whole time; move slowly:
+4. Pose sequence — capturing can stay ON the whole time; the subject moves slowly:
    - **distance:** close (~1.5 ft) → mid (~3 ft) → far (~5–6 ft), straight on
    - **head:** slow full turn L↔R; chin up; chin down; look away L/R/up
    - **expression:** talking, smile, neutral, surprised
@@ -120,7 +120,7 @@ python tools/curate_captures.py \
 
 - Scores every frame (brightness / contrast / sharpness), drops rejects,
   **removes near-duplicates** (two passes: a held pose → 1 frame but a slow
-  head-turn keeps its arc; then a tight global pass drops a pose you captured
+  head-turn keeps its arc; then a tight global pass drops a pose captured
   twice), spread-samples across the timeline, rotates upright, writes a **YOLO
   `.txt` per positive** from the detection box (`--label-region face` tightens it
   toward the face; the *image* stays full-frame — never crop training images for
@@ -134,7 +134,7 @@ python tools/curate_captures.py \
   for that person.
 - Open `_contact_sheet.png`: images upright? (else change `--rotate`.) Poses
   varied? Faces exposed?
-- Some "negatives" may actually be you (Person Detection missed you) — at
+- Some "negatives" may actually be the subject (Person Detection missed them) — at
   upload, delete those or label them `alex`; don't use them as real negatives.
 
 Re-run with tweaked flags freely — it's non-destructive (raw frames kept).
@@ -169,8 +169,8 @@ python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library \
 # -> ~/Desktop/G2Memory/g2_vision_library/upload/   (import THIS folder in step 6)
 ```
 
-`--classes` order = class-id order = your `VISION_LABELS`. It also runs on a raw
-root (`<class>/session_*/curated/…`) if you skip the library.
+`--classes` order = class-id order = the `VISION_LABELS` order. It also runs on a raw
+root (`<class>/session_*/curated/…`) if the library is skipped.
 
 ---
 
@@ -179,8 +179,8 @@ root (`<class>/session_*/curated/…`) if you skip the library.
 1. **Models → Training → Image Object Detection** tab → **Image Collection
    Training** (NOT "Quick Training" — that has no upload).
 2. **Step 1** — object name: `alex`.
-3. **Step 2** — skip the "Connect" (that's live capture; you have files).
-4. **Step 3** — **Import Dataset** → your `upload/` folder. The `.txt` files are
+3. **Step 2** — skip the "Connect" (that is live capture; files already exist).
+4. **Step 3** — **Import Dataset** → the `upload/` folder. The `.txt` files are
    YOLO pre-labels; images land under **Labeled** with boxes **already drawn**.
    - **Do NOT run SenseCraft's auto-label** — it single-classes everything. The
      `.txt` files already carry the right class per image.
@@ -191,7 +191,7 @@ root (`<class>/session_*/curated/…`) if you skip the library.
 5. **Step 4** — target device **Grove Vision AI V2** → **Start Training**
    (~10–30 min, cloud).
 
-### Where the labels come from — you barely label anything
+### Where the labels come from — almost nothing is labelled by hand
 
 Object detection is **one flat dataset, all classes uploaded together**; the
 class is set by the id in each `.txt`, not by folders. There is no "upload one
@@ -199,9 +199,9 @@ class at a time" and there never will be — the model trains on all classes
 jointly. `combine_for_upload.py --classes a,b,c` builds that folder and writes
 `classes.txt` / `data.yaml` alongside.
 
-The boxes are made **at capture time**, not by you:
+The boxes are made **at capture time**, not by hand:
 
-| class | box source | your effort |
+| class | box source | manual effort |
 |---|---|---|
 | `person` | Person-Detection base model → `.json` sidecar → `curate` writes the `.txt` | **none** — already labelled in the library |
 | `dog`, `cat` | capture with a **COCO-80** model loaded → sidecar has dog/cat boxes → `curate` writes `.txt` | none for frames it caught; hand-box the misses |
@@ -214,10 +214,10 @@ pan, so —
   jpgs, `g2promote ledge`. ~20-30 min for ~200 frames.
 - **Or** box ~1 frame in 10 in any labeller, then
   `python tools/interp_labels.py <curated_dir> --class-id 3` interpolates a box
-  onto every frame between your keyframes; spot-check the ones it flags as far
+  onto every frame between the keyframes; spot-check the ones it flags as far
   from a keyframe, then promote.
 
-> **Architecture lock (2026-09-09):** whatever path you take, the model has to be
+> **Architecture lock (2026-09-09):** whatever path is taken, the model has to be
 > **Swift-YOLO** — the GV2 firmware's box decoder understands nothing else. A
 > standard Ultralytics YOLOv8 model (e.g. from an Ultralytics Colab) will flash,
 > run on the NPU, and return `boxes:[]` forever. SenseCraft **web** training is
@@ -233,9 +233,9 @@ replaces it:
 1. **Try "Retrain" on the library person model first.** Model Library ->
    "Person Detection--Swift YOLO" -> look for **Retrain / Train your own /
    Clone to project / Edit dataset**. If present, it opens that model's dataset
-   (thousands of person images) in Training -- add a class `alex`, import your
+   (thousands of person images) in Training -- add a class `alex`, import the
    `alex/upload/`, assign the boxes to `alex`, train. That's literally on top of
-   it: keeps the big `person` class, adds yours.
+   it: keeps the big `person` class and adds a new one.
 2. **No retrain option -> a 2-class project.** Training -> a project / multi-class
    object-detection flow (NOT the single-object "Image Collection Training").
    Classes `person` + `alex`. Import `alex/upload/` as `alex`; add a few hundred
@@ -264,7 +264,7 @@ household member / pet as another class in the same project over time.
    ```
    VISION_LABELS=alex python -m pi_pipeline.vision serial /dev/cu.usbmodem58FA1045341
    ```
-   Point it at yourself → `alex` boxes with a score; nothing on an empty room.
+   Point it at the subject → `alex` boxes with a score; nothing on an empty room.
    0 detections = the dataset was too weak (dark / too few / one condition) —
    recapture better and retrain. It's cheap and repeatable.
 
@@ -287,7 +287,7 @@ unrecognised person defaulted to `curious`.
 | Symptom | Cause / fix |
 |---|---|
 | "Resource busy" opening the serial port | SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB). |
-| Few pre-labels (`raw pos` low in curate) | Feed is sideways → Person Detection misses you. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those. |
+| Few pre-labels (`raw pos` low in curate) | Feed is sideways → Person Detection misses the subject. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those. |
 | Curated images upside-down / sideways | Wrong `--rotate` — try 90 / 180 / 270; the contact sheet shows it. |
 | Dark / grainy frames | `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses. |
 | Only a handful of positives after curate | De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames. |

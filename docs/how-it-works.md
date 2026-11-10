@@ -1,3 +1,8 @@
+---
+audience: visitor
+kind: concept
+---
+
 # How It Works
 
 A plain-language tour of G2's parts: **walking, voice, memory, vision, behavior and the link**. Enough to understand the shape of each without reading the code. How the modules fit together technically: [`architecture.md`](architecture.md). What is working right now: [`STATUS.md`](STATUS.md).
@@ -33,14 +38,14 @@ The guiding design choice: these are **independent systems**, not one "brain." V
 
 **One conversation turn, start to finish:**
 
-1. **Wake word.** G2 listens locally for his name ("gee two"). Nothing else happens until he hears it, so he is not constantly recording or calling the network. After a reply the microphone stays open for a short follow-up window so you do not repeat the name every turn; a question opens a longer one. "Let's talk" starts a conversation mode that listens without the wake word until a quiet gap.
-2. **Listen.** What you say is transcribed on the Pi (Vosk).
+1. **Wake word.** G2 listens locally for his name ("gee two"). Nothing else happens until he hears it, so he is not constantly recording or calling the network. After a reply the microphone stays open for a short follow-up window so the name need not be repeated every turn; a question opens a longer one. "Let's talk" starts a conversation mode that listens without the wake word until a quiet gap.
+2. **Listen.** The speech is transcribed on the Pi (Vosk).
 3. **Local commands first.** A set of spoken commands never reach Claude: stop and emergency stop, sleep and shut down, "the floor is tile", "walk for ten seconds", and more. They are fast, free and work offline. [`guides/voice-commands.md`](guides/voice-commands.md)
 4. **Think.** Anything else goes to Claude through the API, together with relevant memory. Claude replies with words and may call a tool to move.
 5. **Speak.** The reply is turned into speech on the Pi (Piper), run through a robot-voice effect, and played on the speaker. The next sentence is synthesised while the previous one plays.
 6. **Act.** If Claude called `perform_skill` (sit, wave, walk), the command goes out over the link.
 
-Only step 4 uses the cloud, and API calls are used sparingly. G2 also plays short sounds (a chime at the wake word, cues when the gait switches or a picture is taken) so you can tell what he is doing without looking.
+Only step 4 uses the cloud, and API calls are used sparingly. G2 also plays short sounds (a chime at the wake word, cues when the gait switches or a picture is taken) so it is clear what he is doing without looking.
 
 **Where it runs:** on the Pi, started at boot as a service. On a laptop the same code runs in text mode with mock hardware.
 
@@ -52,11 +57,11 @@ Only step 4 uses the cloud, and API calls are used sparingly. G2 also plays shor
 
 **The fix:** a small local database (SQLite) on the Pi holding the full log of every exchange and a short list of durable facts worth keeping ("their name is Sam," "they have a cat named Biscuit").
 
-**How it is used:** before each message to Claude, the memory system assembles a short context block: a pinned core of the most important facts, the highest-ranked other facts (importance and recency), and any older conversations that look related to what you just said (a keyword relevance search over the log). It is prepended to the prompt, so Claude seems to remember without the whole history being resent.
+**How it is used:** before each message to Claude, the memory system assembles a short context block: a pinned core of the most important facts, the highest-ranked other facts (importance and recency), and any older conversations that look related to what was just said (a keyword relevance search over the log). It is prepended to the prompt, so Claude seems to remember without the whole history being resent.
 
-**How facts are created:** Claude decides. When you say something durable, it calls the `remember` tool, with no extra API call.
+**How facts are created:** Claude decides. When something durable is said, it calls the `remember` tool, with no extra API call.
 
-**Keeping it tidy:** when G2 has been idle a while (or is told to go to sleep), one consolidation call merges duplicate facts and drops trivial ones, with every change logged. A command-line tool (`python -m pi_pipeline.memory …`) lets you view, search, add, pin or prune what G2 knows. Memory is not coupled to movement or vision.
+**Keeping it tidy:** when G2 has been idle a while (or is told to go to sleep), one consolidation call merges duplicate facts and drops trivial ones, with every change logged. A command-line tool (`python -m pi_pipeline.memory …`) can view, search, add, pin or prune what G2 knows. Memory is not coupled to movement or vision.
 
 ---
 
@@ -68,7 +73,7 @@ Only step 4 uses the cloud, and API calls are used sparingly. G2 also plays shor
 
 1. **Awareness and avoidance.** A fast local reflex watches the detections and, with a wall-distance estimate from pictures, turns G2 away from a near wall. No Claude, no network.
 2. **"What do you see."** On request, one picture goes to Claude along with the detector's labels, and G2 describes the scene aloud.
-3. **Exploration pictures.** During exploration G2 stops at times to take pictures of things worth a look. A review page lets you name them, and named things are what recognition builds on.
+3. **Exploration pictures.** During exploration G2 stops at times to take pictures of things worth a look. A review page is used to name them, and named things are what recognition builds on.
 
 **Recognition is by instance, not category.** The detector knows a handful of specific things. For everything else there is a second system that fingerprints a photo crop and compares it with a library of earlier ones: a close match means "the same thing again," nothing close means "something new," which joins the library unnamed until someone names it. It runs only in moments G2 is already standing still, caps its disk use, and never uploads anything. The pieces exist and are tested; wiring them into exploration is not finished.
 

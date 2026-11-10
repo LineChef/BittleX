@@ -1,3 +1,8 @@
+---
+audience: contributor
+kind: concept
+---
+
 # Architecture
 
 How the pieces of G2 fit together: the hardware, the software that runs on each side, and the seams between them. This page is the map; the detail pages it links to are the territory. What is deployed and working right now: [`STATUS.md`](STATUS.md). A plain-language tour: [`how-it-works.md`](how-it-works.md).

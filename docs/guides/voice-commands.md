@@ -8,15 +8,15 @@ Everything G2 responds to by voice, in three layers:
    the last two use a small 1-5 level scale, see below).
 2. **Conversational skills** -- the physical moves Claude can choose to perform
    mid-conversation via the `perform_skill` tool (`pi_pipeline/voice/skills.py`).
-   You don't need the exact wording for these -- just ask naturally ("can you
-   sit down?", "go for a walk") and Claude picks the matching skill.
+   The exact wording is not needed for these: a natural request ("can you
+   sit down?", "go for a walk") is enough, and Claude picks the matching skill.
 3. **Diagnostics** -- Claude can look up G2's own logs mid-conversation via the
    `diagnostics_query` tool, to answer "why did you fall" / "what's your
    status" instead of guessing. See below.
 
 G2 never moves silently: every recognized local command and every Claude turn
 gets a short acknowledgement (a chirp + "heard" cue, then the spoken reply) so
-you know it registered before anything happens.
+it is clear the command registered before anything happens.
 
 ## Local commands
 
@@ -30,7 +30,7 @@ match more than one (e.g. emergency stop beats everything).
 | "mic off", "mike off", "microphone off", "turn off your mic", "mute your mic"; add "for 20 minutes", "for half an hour", "for an hour" | **The wake word off** for 10 minutes (or the length said, at most 2 hours): neither "G2" nor "hey buddy" wakes him; he says "Mic off for N minutes". | Only the stop words (row above, said on their own) are still heard. He turns it back on himself and says "Mic back on". To end it early: `g2mic on` or the review page's **Mic on** button (he cannot hear "mic on" while it is off). Survives a restart (`voice/wake_pause.py`). |
 | "mic on", "is your mic on", "mic status" | Says the mic is on (or, from `g2mic`, how long is left). | Only reachable while the wake word is on. |
 | "shut down", "shutdown", "power down", "power off", "go dormant", "shut yourself down", "time to shut down" | Lies down, then goes dormant. | Graceful -- not the emergency freeze, not an OS power-off. Wake word brings it back. |
-| "come here", "come to me", "over here", "here boy", "walk to me", "come over here" | Walks directly to you. | One-shot directed walk to whoever's nearest. Distinct from "come back" below. |
+| "come here", "come to me", "over here", "here boy", "walk to me", "come over here" | Walks directly to the speaker. | One-shot directed walk to whoever's nearest. Distinct from "come back" below. |
 | "walk for ten seconds", "walk forward for 25 seconds", "walk for a minute", "walk 15 seconds", "start walking", "walk forward" | Walks straight ahead with the learned gait for that long (a bare "walk forward" = 10 s, at most 60 s), **no API call**. | Added 2026-10-09 (the Claude round trip for it was unreliable). Numbers as words or digits. Anything longer ("walk for eight seconds and then wave", "walk over to the kitchen") still goes to Claude; "walk to me" is come-here. |
 | "look around", "go ahead and look around", "have a look around", "exploration mode", "explore", "go explore", "go and explore", "check things out", "go for a wander", "wander around", "go for walkies" | Arms Tier 1 roam exploring. | Voice-armed only -- G2 won't wander on its own until asked. Leg-budget leashed; comes back on its own when it runs low. |
 | "stop exploring", "stop looking around", "stop wandering", "come back", "thats enough", "that will do" | Disarms roam exploring. | |
@@ -38,15 +38,15 @@ match more than one (e.g. emergency stop beats everything).
 | "go to sleep" | Curls up (`kzz`), camera off, power to headless -- now, overriding a person being present. | Lighter than "shut down": no lie-flat-first settle, and it wakes back up on the wake word or a new interaction rather than staying dormant until told. |
 | "dismissed", "dismiss", "false alarm", "false trigger" | Said after G2 woke to a wake word nobody said: the listening window closes **at once, in silence** (only the short closing tone), nothing goes to Claude, and the wake log counts that trigger as a false one (`wake_log` then uses it when it suggests `G2_WAKE_MIN_CONF`). | Chosen 2026-10-18; "sleep" could not be used because "go to sleep" already curls him up. Strict: "dismiss the class" is a normal sentence and goes to Claude. Works at the first window after the wake word and in a follow-up window. |
 | "you're in the kitchen", "we are in the living room", "this room is the hallway" | Tells G2 which room he is in (a short list of room names, plus rooms he already knows). Explorations, goal sessions and pictures are filed under it for 6 hours; he answers "Okay, the kitchen." with no Claude call. See `G2_CURRENT_PLACE`. |
-| "enable gir mode", "gir level 4", "disable gir", "gir mode off", ... | Toggles the `gir` character trait (a stylised "chaotic little robot" personality overlay), on a **1-5 level** (`DEFAULT_LEVEL` 2 if you just say "on" with no number). | G2 speaks the level back with what it does, e.g. *"Okay, gir mode on, level 4 of 5: clearly a character but still useful."* Old-style "to 70%" / "to full" phrasing still works too, mapped onto the nearest 1-5 level for the echo-back. |
+| "enable gir mode", "gir level 4", "disable gir", "gir mode off", ... | Toggles the `gir` character trait (a stylised "chaotic little robot" personality overlay), on a **1-5 level** (`DEFAULT_LEVEL` 2 if "on" is said with no number). | G2 speaks the level back with what it does, e.g. *"Okay, gir mode on, level 4 of 5: clearly a character but still useful."* Old-style "to 70%" / "to full" phrasing still works too, mapped onto the nearest 1-5 level for the echo-back. |
 | "narration level 4", "verbosity level 1", "set narration to level 5" | Sets how much G2 narrates its own actions/reasoning, on a **1-5 level** (3 = default/normal). | G2 speaks the level back with what it does, e.g. *"Okay, narration level 4: detailed -- explain actions and reasoning as you go."* Session-only, like the mood hint -- resets on restart. |
 | "turn on your chirps", "enable chirps", "chirps on", "start chirping" | Re-enables chirps, live -- no restart. | |
 | "turn off your chirps", "disable chirps", "chirps off", "stop chirping" | Disables chirps, live -- no restart. | The "heard you" ack chirp still fires either way; it's deliberately exempt so a misheard command is never silent. |
 | "the floor is tile", "we're on hardwood", "this is a tile floor", "set the floor to carpet" (tile, hardwood, carpet, laminate, linoleum, concrete, rug, mat) | Sets the floor label that every run log records (`g2floor`), with no API call. **"This is a ..." only counts as a floor when the word *floor* ends it** (otherwise it is the naming command and takes a picture). Say it at the start of a session and when G2 moves to another floor. | G2 says *"Okay, the floor is tile."* Works in normal voice mode and in exploration sessions. |
-| "what is your power level", "how much battery do you have left", "how much battery do you have", "what is your battery" | Tells you his battery as a **percent** (the G2 pack read at rest, converted from its voltage) and the Pi's estimated percent and time left (from the measured 3.28 h runtime and the time since boot). | While he is walking he says he cannot read it. If you told him he is plugged in, the Pi part is skipped. Never volts. |
+| "what is your power level", "how much battery do you have left", "how much battery do you have", "what is your battery" | Reports G2's battery as a **percent** (the G2 pack read at rest, converted from its voltage) and the Pi's estimated percent and time left (from the measured 3.28 h runtime and the time since boot). | While he is walking he says he cannot read it. If you told him he is plugged in, the Pi part is skipped. Never volts. |
 | "what floor are you on", "which floor" | Asks which floor label is set. | G2 reads it back, or says he does not know. |
 | "punt", "punt it", "punt the ball", "go punt", "do a punt", "punt test" | One ball-punt attempt (arm fitted): stand, find the ball, walk up, punch once, rest. | The voice service steps aside for it and comes back. [`punt.md`](punt.md) |
-| "practise", "practice", "let's practise", "practise walls", "practise the punt" | He picks a goal to practise (your priority order, how much he needs it, what he can do now), says which and why, and starts it: the punt's goal session or a 5-minute exploration roam for walls. | Local, no API call. [`goals.md`](goals.md) section 8 |
+| "practise", "practice", "let's practise", "practise walls", "practise the punt" | He picks a goal to practise (the stored priority order, how much he needs it, what he can do now), says which and why, and starts it: the punt's goal session or a 5-minute exploration roam for walls. | Local, no API call. [`goals.md`](goals.md) section 8 |
 | "ball goal", "punt goal", "start the ball goal", "goal attempt", "start a goal attempt" | A goal session: up to 10 punt attempts, each one judged on the Pi and the next one changed from it. | The voice service steps aside and comes back; then he says any new suggestion: answer "confirm", "cancel" or "review" (silence = review). Without the arm fitted he says "I need the arm for that goal." [`goals.md`](goals.md) |
 
 A few short reproachful phrases ("leave me alone", "stop it", "be quiet", "shut
@@ -77,7 +77,7 @@ commands -- they just nudge G2's mood toward subdued for a while.
 | a beckoning / "come here" gesture mid-conversation | the `come_here` gesture (a wave-over, not a walk -- see note below) |
 | go to the zero position | move all joints to zero |
 
-Note: the *local* "come here" phrase above (walking to you) and this
+Note: the *local* "come here" phrase above (walking to the speaker) and this
 `come_here` *skill* (a beckoning gesture, no walking) are different moves
 sharing a name. Because local commands are checked first, saying "come here"
 exactly always triggers the walk; the beckoning gesture only comes up if
@@ -102,22 +102,22 @@ Three topics:
 to actually read the tool's result before it means anything -- and this
 codebase's tool-result convention (shared with `perform_skill`/`remember`) is
 deliberately deferred to the *next* turn, to avoid a second API round-trip on
-every tool call. So the practical shape is: you ask, G2 acknowledges ("let me
-check"), and the real answer lands once you say anything next -- not
+every tool call. So the practical shape is: a question gets an acknowledgement ("let me
+check"), and the real answer lands at the next thing said to G2 -- not
 instantly in the same reply. This is a known tradeoff, not a bug.
 
 **Coverage gap, as of 2026-09:** `last_failure` covers most of the failure
 taxonomy (`loop.stall`, `link.lost`, `servo.thermal_cooldown`, `battery.sag`,
 `jam.detected`, etc.) but not falls specifically yet -- `RecoveryFSM`
 (`pi_pipeline/link/recovery.py`), which classifies a fall, isn't wired into
-the live runtime yet, only tested standalone. "Why did you fall" will answer
+the live runtime yet, only tested standalone. "Why did you fall" is answered
 from whatever *else* is in the log around that time, not the fall itself,
 until that integration lands (real fall-recovery testing needs real hardware
 anyway).
 
 ## The BiBoard's own voice module (heard by the board, not the Pi)
 
-G2's BiBoard has a separate offline voice module with **no wake word**: it listens all the time and acts on its fixed phrases (40 in two languages, plus up to 10 you record in learning mode). It
+G2's BiBoard has a separate offline voice module with **no wake word**: it listens all the time and acts on its fixed phrases (40 in two languages, plus up to 10 recorded in learning mode). It
 does not go through the Pi's voice loop, so a phrase meant for the Pi can also trigger it. Details and the incident history: [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md).
 
 | Say | What it does | Serial equivalent |
@@ -128,7 +128,7 @@ does not go through the Pi's voice loop, so a phrase meant for the Pi can also t
 | "rest" | One of the module's fixed commands (G2 lies down). "stop" is not one | -- |
 
 **Pi-side command (2026-10-10), for when the module has fallen back to Korean or Chinese:** say "gee two, switch to English" (also "fix your language", "reset your language", "set your language to English"). The Pi answers
-"Okay, setting my voice module to English." and sends `XAc`, `XAb`, `XAa` about 1.2 s apart (the documented recovery, never `Xa` / `XAd`). It works while the module is in the wrong language because the Pi hears you, not the module. It needs the voice
+"Okay, setting my voice module to English." and sends `XAc`, `XAb`, `XAa` about 1.2 s apart (the documented recovery, never `Xa` / `XAd`). It works while the module is in the wrong language because the Pi hears the speaker, not the module. It needs the voice
 service running (`g2-voice`) and G2 not mid-gait (raw tokens are skipped while a gait runs). Local command, no API call (`voice_language` in `voice/commands.py`).
 
 Other serial settings for the same module (sent by the Pi or `check_serial`, never spoken): `XAb` Chinese, `XAc` enable, `XAe` learning mode. If it answers "ok" but the body does not move, send `XA`
@@ -148,22 +148,22 @@ run on their own, no wake word needed. See
 | Sound | Means |
 |---|---|
 | **beep** (one short bright note) | he heard the wake word and is listening |
-| **boop** (one lower, rounder note) | he thinks you have finished speaking and has your words |
+| **boop** (one lower, rounder note) | G2 decides the speaker has finished and has the words |
 | **two falling notes** | the follow-up window ended: he has stopped listening (say the wake word again) |
 
-On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`). The two falling notes play when the follow-up window closes: the mic stays open `G2_FOLLOW_UP_S` seconds after a reply (default 5; 0 = no window, so no closing notes), and 8 s (`G2_QUESTION_WINDOW_S`) after a reply that ends in a question (user, 2026-10-10).
+On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`). The two falling notes play when the follow-up window closes: the mic stays open `G2_FOLLOW_UP_S` seconds after a reply (default 5; 0 = no window, so no closing notes), and 8 s (`G2_QUESTION_WINDOW_S`) after a reply that ends in a question.
 
 
 ## G2's character sounds (2026-10-10)
 
 | Sound | Plays when | Turn off |
 |---|---|---|
-| **grunt** (low "hmph") | you rebuff him ("shut up", "go away" and the like) | `G2_GRUNT=0` |
+| **grunt** (low "hmph") | G2 is rebuffed ("shut up", "go away" and the like) | `G2_GRUNT=0` |
 | **losing horn** (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip) | he refuses a request (today: a gait he cannot switch to), and when he tips over at any time, walking or standing (the stand guard watches the IMU for a tilt past 60 deg for 0.3 s; `G2_FALL_HORN=0` for the fall) | `G2_REFUSE_SOUND=0` |
 | *(not built)* a recognition miss, "what is this?" with no match | the instance recognizer is not connected to the spoken "what is this?" yet (that goes to Claude's vision); add the horn when it is |
 | **sigh / yawn** | going to sleep after 5 min at rest / waking | `G2_SLEEP_AFTER_S=0` |
-| **turning away** (two soft falling notes, about 0.35 s, 70% of the usual level) | an exploring G2 turns away from a near wall, so you can tell why he turns (prototype, 2026-10-10) | `G2_WALL_SOUND=0` (and `G2_WALL_STEER=0` stops the steering itself) |
-| **oof** | built; will play when G2 hits a wall, once wall recognition and wall-distance calibration are trained (user, 2026-10-10; a bump cannot be told from walking in the 5 Hz IMU) | n/a |
+| **turning away** (two soft falling notes, about 0.35 s, 70% of the usual level) | an exploring G2 turns away from a near wall, so the reason for the turn is audible (prototype, 2026-10-10) | `G2_WALL_SOUND=0` (and `G2_WALL_STEER=0` stops the steering itself) |
+| **oof** | built; will play when G2 hits a wall, once wall recognition and wall-distance calibration are trained (a bump cannot be told from walking in the 5 Hz IMU) | n/a |
 
 Audition any of them on a dev machine: `G2_SPEAKER_SOUNDS=1 python -m pi_pipeline.voice.prompt_tones grunt|refuse|oof|sigh|yawn` (G2's level is a very small fraction of full scale; never pass a large `peak`).
 
@@ -176,7 +176,7 @@ Saying "explore" / "go ahead and look around": he says "Exploration mode.", then
 | Say | Does |
 |---|---|
 | "hi step" / "high step" / "highstep" / "switch to high step" / "switch to hi step" / "switch to highstep" / "step mode" | switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction. |
-| "carpet mode" / "switch to carpet mode" / "carpet walk" / "carpet gait" (2026-10-20) | switches to carpet mode: **walks play Petoi's own firmware carpet gait (`kcarpetF`)** (user, 2026-10-21), with no learned policy, in place of the normal walk. Answering "carpet" to "What surface will I be walking on?" (or "the floor is carpet") switches to it too, and naming another floor switches back. A bare "carpet" is a floor answer, never a gait switch. Turning and the other skills stay the firmware tokens. The carpet-only learned policy file (`Release_CandidateCarpet_ppo.onnx`) is not what carpet mode plays. |
+| "carpet mode" / "switch to carpet mode" / "carpet walk" / "carpet gait" (2026-10-20) | switches to carpet mode: **walks play Petoi's own firmware carpet gait (`kcarpetF`)**, with no learned policy, in place of the normal walk. Answering "carpet" to "What surface will I be walking on?" (or "the floor is carpet") switches to it too, and naming another floor switches back. A bare "carpet" is a floor answer, never a gait switch. Turning and the other skills stay the firmware tokens. The carpet-only learned policy file (`Release_CandidateCarpet_ppo.onnx`) is not what carpet mode plays. |
 | "switch to default gait" / "default gait" / "walk normally" / "switch to normal" / "switch to walk mode" / "walk mode" / "normal mode" / "normal walk" / "carpet mode off" | back to the normal walk (the deployed policy). |
 
 Works in the voice loop and during an exploration session (one shared state, `gait/gait_mode.py`); a short double beep plays when the gait really switches. The switch takes effect at the next walk or exploration leg.

@@ -18,11 +18,11 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
 
 * **Importance.** The `remember` tool takes an `importance` (1-5; 5 = names, who lives here, pets, how G2 looks). Injected facts are
   ranked by importance plus a recency bonus that halves every two weeks, so a name outranks a passing remark when the 30-slot cap bites.
-* **Core facts** (`core` flag, set by Claude for identity-level facts or by you with `python -m pi_pipeline.memory pin <id>`): always
+* **Core facts** (`core` flag, set by Claude for identity-level facts or by hand with `python -m pi_pipeline.memory pin <id>`): always
   injected in their own block ("About you and your people"), up to `G2_MEMORY_CORE_MAX` (12), never rotated out. "I look like ..." is
   always core, importance 5, and is a single slot (the newest replaces the older).
 * **Sightings.** When G2 looks, his spoken description and the detector's labels are kept as a sighting (text only, date only, no
-  picture), searchable, pruned after `G2_OBSERVATION_DAYS` (30). They join the prompt only when you ask about the past ("what did you see
+  picture), searchable, pruned after `G2_OBSERVATION_DAYS` (30). They join the prompt only when the past is asked about ("what did you see
   earlier", "did you notice...", "last time", and since 2026-10-18 "where's the ...", "what did you find", anything about exploring). `python -m pi_pipeline.memory sightings`. "Forget that" removes the session's sightings too.
   Each exploration also leaves one sighting built from its recap (`reflection/recap.py` `observation_from_recap`): what the detector saw at the
   survey stops, the room he was mostly in, bumps and falls. Local data only; no picture and no extra API call.
@@ -30,7 +30,7 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
   source `goal_lesson`, importance 2, never core. Built from his own counts; no API call.
 * **Places** (`places.py`, 2026-11-06). Per room, counts only and no dates or times: things the detector saw, falls and bumps, explorations and goal sessions held there, pictures taken there, the floor. A room is told to him ("you're in the kitchen"), never invented; it lapses after 6 hours. A summary of a room reaches the prompt when it is mentioned or asked about. Falls and bumps are counted here, not written as sightings.
 * **Goal notes.** One `goal_summary` fact per goal replaces the per-session lessons (those stay in the journal; `G2_GOAL_LESSONS=1` saves them again). Neither kind is put in the chat prompt unless the ball, a goal, practice or learning comes up.
-* **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or you tell him to go to sleep, and at least
+* **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or he is told to go to sleep, and at least
   `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones
   (importance 1-2), and may write up to 3 reflections ("It seems ...", stored with source `reflection`, no dates or routines). At most
   one pass per `G2_CONSOLIDATE_MIN_INTERVAL_S` (6 h) per run of the service. Core facts are never dropped, at most 5 facts are removed per

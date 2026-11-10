@@ -1,7 +1,6 @@
 # Guides
 
-How to do a thing on the current build.
-
+Step-by-step instructions for running, configuring and setting up G2. Start with [Operating G2](operating-g2.md) for day-to-day use, or [Pi bring-up](pi-bring-up.md) when setting up from scratch.
 
 ### Operate
 

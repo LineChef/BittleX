@@ -275,7 +275,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`c
 
 ## `report`
 
-Docs that mention this family: [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +54.
+Docs that mention this family: [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +53.
 
 | File | Size | Cited by |
 |---|---|---|

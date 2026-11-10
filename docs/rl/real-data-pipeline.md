@@ -4,7 +4,7 @@ Goal (user): every run G2 makes is captured automatically, and every retrain inh
 Rule that overrides the goal: **only data that can help gait training reaches the sim; anything noisy or harmful is filtered, quarantined or left out, and the data is audited periodically.**
 Related: [`hardware-logging.md`](hardware-logging.md) (what a log carries).
 
-## Decisions (user, 2026-10-07)
+## Decisions
 
 1. Approval is **semi-automatic**: collection, sync, filtering and fitting are automatic; a calibration snapshot is used by a retrain only once approved, and a change that stays within the noise and passes every check is approved automatically (see Approval).
 2. The data store is **outside the repo** (`~/g2_data/` on the Mac); only non-personal summaries are committed.
@@ -33,7 +33,7 @@ Every run gets a sidecar with: kind, policy name, commands, git commit, hardware
 ## Hardware epochs and surfaces
 
 - **Epoch** (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
-- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category (user, 2026-10-07) and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
+- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
   Grout depth is unmeasured; the logs will show how often feet catch. Snags are not detected on the robot today, so they appear in the log only as IMU and command signatures; a hand label would make them usable for hazard rates (offered to the user, not built).
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
@@ -57,7 +57,7 @@ Why: on 2026-10-18 the store held 625 runs, 38 usable and only 2 from the curren
 5. **The floor label is a body-fit gate.** The timing fits do not depend on the floor; the person's overrides and the 72 h limit still apply to body fits.
 6. **A run that did not end cleanly (a fall, a crash, a stale IMU, any stop but `stopped` or `complete`) is used up to its last second.** The cut is one second (`END_CUT_S`); the late-tick, stale-IMU and missing-value checks and the fitted rows ignore the cut part (`window()` in the ingest tool is shared with the builder). The end reason stays in the manifest, so falls still count for event rates.
 
-Result on the same 625 runs: 195 usable (111 for body fits, 195 for timing fits), 407 quarantined, 23 excluded; the current epoch has 18 runs and 132 s for the timing fits (it had 2). The builder's accepted number is unchanged (`G2E_IMU_HOLD_STEPS` 16); `G2E_CMD_PATH_EXTRA_MS_MAX` stays refused (user, 2026-10-08).
+Result on the same 625 runs: 195 usable (111 for body fits, 195 for timing fits), 407 quarantined, 23 excluded; the current epoch has 18 runs and 132 s for the timing fits (it had 2). The builder's accepted number is unchanged (`G2E_IMU_HOLD_STEPS` 16); `G2E_CMD_PATH_EXTRA_MS_MAX` stays refused.
 The 247 runs with too few rows (239 of them empty: the log was opened and no walk row was written) are unchanged and still need an explanation. Not built, asked for later: pooling the timing fits across hardware epochs, and reporting empty logs separately.
 
 ## Keeping drift out of the sim (guards, agreed 2026-10-07)
@@ -99,7 +99,7 @@ may drop beyond its noise. A change that fails is blocked.
 | A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded | **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks | at the next session after the proposal exists; always reviewed before a 20M go |
 | Harm check fails | **Blocked**, not approvable until the cause is understood | |
 
-**Training launches (user, 2026-10-07).** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
+**Training launches.** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
 1. **Automatic when idle:** a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is running on the Mac (no training, benchmark or other test in progress, so nothing gets a random slowdown), at most one per snapshot, and its result is reported. The harm check (benchmark scoring, no training) follows the same idle-only rule.
 2. **Always before a 20M:** when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first, on an otherwise idle Mac (reused if one already finished for that snapshot), and its result is reported before the 20M starts.
 When the user launches a run, it uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
@@ -111,7 +111,7 @@ Fitted **parameters** (servo strength, latency, IMU noise, ...) are symmetric by
 
 ## Event labels
 
-No voice notes and no per-event labels (user, 2026-10-07). Falls are recorded by the log (`end_reason: fall`, the fall guard) and by the user telling Claude when one happened (Claude notes the time against the session). Snags will be frequent on kitchen tile, so they are counted
+No voice notes and no per-event labels. Falls are recorded by the log (`end_reason: fall`, the fall guard) and by the user telling Claude when one happened (Claude notes the time against the session). Snags will be frequent on kitchen tile, so they are counted
 statistically from their IMU and command signatures per metre walked and per floor, never labelled one by one.
 Snapshots are immutable and numbered; "current" is a pointer, so reverting is safe.
 
@@ -154,6 +154,6 @@ Roll and pitch spread from today's usable tile runs sit at about 5.5 and 2.7 deg
 ## Phase 3 first run (2026-10-08)
 
 `g2cal build` on 121 ingested runs (35 usable, 119 s of steady walking on tile, current epoch): `G2E_IMU_HOLD_STEPS` 16 (the profile's value, 35 runs, reproducible); `G2E_CMD_PATH_EXTRA_MS_MAX` 12.5 against the profile's 4, beyond noise, so it needs a person's approval (the quantity is the loop's 99th-percentile tick minus its median, an approximation of command-path delay). Roll and pitch spread on tile 5.4 and 2.6 deg. Snapshot 0001 is waiting for its harm check, which runs when the Mac is idle.
-Two ingest gates were changed for the same reason (they rejected almost every walk since 2026-10-07): the front-foot heading hold, now on in every walk, no longer disqualifies a run unless it worked hard (mean |u| over 0.30); and the floor-label age limit is now 72 hours (user, 2026-10-08; it was 12), and a person can state the floor for any time range (`~/g2_data/floor_overrides.json`: a list of {from, to, surface}; it replaces the recorded label, and `unknown` takes those runs out of every fit until the floor is known; all of 2026-10-08 is `unknown` for now because the morning walks were not all on kitchen tile). Most of the 2026-10-08 morning runs are still unusable because exploration walks are 1 to 4 s long (see the first-result section above for how to get more usable seconds).
+Two ingest gates were changed for the same reason (they rejected almost every walk since 2026-10-07): the front-foot heading hold, now on in every walk, no longer disqualifies a run unless it worked hard (mean |u| over 0.30); and the floor-label age limit is now 72 hours (it was 12), and a person can state the floor for any time range (`~/g2_data/floor_overrides.json`: a list of {from, to, surface}; it replaces the recorded label, and `unknown` takes those runs out of every fit until the floor is known; all of 2026-10-08 is `unknown` for now because the morning walks were not all on kitchen tile). Most of the 2026-10-08 morning runs are still unusable because exploration walks are 1 to 4 s long (see the first-result section above for how to get more usable seconds).
 
-**Decision (user, 2026-10-08): `G2E_CMD_PATH_EXTRA_MS_MAX` is not approved.** The fitted 12.5 ms (the loop's 99th-percentile tick minus its median) stays out of every snapshot: `g2cal reject G2E_CMD_PATH_EXTRA_MS_MAX` records the refusal in `~/g2_data/calibration/rejected.json`; the parameter is still measured and reported, never applied, until `g2cal unreject`. Snapshot 0001, which carried it, is superseded and was never approved.
+**Decision: `G2E_CMD_PATH_EXTRA_MS_MAX` is not approved.** The fitted 12.5 ms (the loop's 99th-percentile tick minus its median) stays out of every snapshot: `g2cal reject G2E_CMD_PATH_EXTRA_MS_MAX` records the refusal in `~/g2_data/calibration/rejected.json`; the parameter is still measured and reported, never applied, until `g2cal unreject`. Snapshot 0001, which carried it, is superseded and was never approved.

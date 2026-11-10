@@ -16,7 +16,7 @@ bit). None of it needs the robot.
 ## 0. Connectors / adapters to have on hand (order ahead)
 
 From the repo's hardware research (`docs/hardware/specs.md`, `pi-power.md`) —
-what you physically need to join the three boards:
+what is physically needed to join the three boards:
 
 | Link | What connects | What to buy |
 |---|---|---|
@@ -40,7 +40,7 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 |---|---|
 | 512 MB RAM, soldered, not expandable | the whole voice stack (Vosk ~300 MB runtime + Piper/onnxruntime + Python) barely fits; swap is mandatory, running voice+vision together is doubtful, PyTorch is a bad idea (see §7) |
 | 4× Cortex-A53 @ 1 GHz (ARMv8, aarch64) | must run **64-bit** Pi OS for ML wheels; compiles are slow; real-time TTS/STT is not guaranteed — must be measured |
-| Wi-Fi `brcmfmac` with power-save **on by default** (Bookworm) | SSH stalls/drops under CPU load until you disable it — *do this first*, it's miserable to diagnose later ([forum](https://forums.raspberrypi.com/viewtopic.php?t=357629)) |
+| Wi-Fi `brcmfmac` with power-save **on by default** (Bookworm) | SSH stalls or drops under CPU load until it is disabled. Do this first; the fault is hard to diagnose later ([forum](https://forums.raspberrypi.com/viewtopic.php?t=357629)) |
 | Bookworm = NetworkManager, config lives in `/boot/firmware/` not `/boot/` | old `wpa_supplicant.conf` / `ssh` file tricks are dead; use the Imager ([zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/)) |
 | **PiSugar S** is a *dumb* UPS — no I²C, no battery %, no voltage query | can only sense "external power present"; battery monitoring must be external or skipped; the fancier PiSugar 2/3 are what the tutorials assume ([PiSugar docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series)) |
 | serial on the Zero 2 W defaults to the flaky **mini-UART** (`/dev/ttyS0`); the good PL011 is tied to Bluetooth | for a reliable BiBoard link, disable BT and take the PL011 — done in config, no robot needed |
@@ -54,8 +54,8 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 3. Choose Storage → the 32 GB card.
 4. **Edit Settings (the gear / "OS customisation")** — this is the whole headless setup, do it now:
    - hostname: e.g. `g2pi`  → reachable as `g2pi.local` via mDNS
-   - enable **SSH** → "Allow public-key authentication only", paste your Mac's `~/.ssh/id_ed25519.pub` (make one with `ssh-keygen -t ed25519` if you don't have it)
-   - username + password: set a real user (there is **no default `pi` user** on Bookworm — if you skip this you cannot log in)
+   - enable **SSH** → "Allow public-key authentication only", paste the Mac's `~/.ssh/id_ed25519.pub` (make one with `ssh-keygen -t ed25519` if none exists)
+   - username + password: set a real user (there is **no default `pi` user** on Bookworm, so skipping this makes login impossible)
    - Wi-Fi SSID + password + **Wi-Fi country** (must be set or the radio stays off)
    - locale / timezone / keyboard
 5. Write, wait, eject.
@@ -70,8 +70,8 @@ and a `wpa_supplicant.conf` in /boot" method **no longer works**
 1. Card into the Pi, micro-USB power into the **PWR** port (the inner one on the
    Zero 2 W; the outer is USB-data). Plain USB PSU for now, not the PiSugar.
 2. Wait 1–3 min (first boot resizes the filesystem and reboots once).
-3. From the Mac: `ssh g2pi@g2pi.local`. If `.local` doesn't resolve, find the IP
-   from your router and `ssh g2pi@192.168.x.y`.
+3. From the Mac: `ssh g2pi@g2pi.local`. If `.local` does not resolve, find the IP
+   in the router and `ssh g2pi@192.168.x.y`.
 4. `sudo apt update && sudo apt full-upgrade -y && sudo reboot`.
 
 Gotcha: the green LED. On the Zero 2 W it's mostly a power/activity light; a
@@ -156,7 +156,7 @@ free -h ; swapon --show
 ```
 
 (High `swappiness` is counter-intuitive but correct *when the primary swap is
-zram* — you want cold pages compressed into RAM early, not an OOM kill.)
+zram*: cold pages should be compressed into RAM early, not cause an out-of-memory kill.)
 
 ## 5. Serial for the BiBoard link (config only, no robot yet)
 
@@ -250,7 +250,7 @@ a missing sidecar silently falls back to 22°). **Not** a full
 toolchain plus its checkpoints, TensorBoard logs, and GIFs (**~4.7 GB today,
 and it only grows** with every training run on `development`), none of which
 G2 ever runs. On a 32 GB card that's not fatal, but it's dead weight for
-zero benefit, and it compounds every time you re-sync.
+zero benefit, and it compounds with every re-sync.
 
 ```bash
 # on the Pi — system libs the wheels need (git isn't required for this)
@@ -279,7 +279,7 @@ python -m pytest                          # link/recovery/memory/skills are offl
 ```
 
 **What those two `rsync` lines actually do**, run *from the Mac* (source =
-your local checkout, destination = the Pi over SSH, same `g2pi@g2pi.local` from
+the local checkout, destination = the Pi over SSH, same `g2pi@g2pi.local` from
 §2 above — no separate git step, no GitHub reachability needed from the Pi at
 all):
 - `-a` ("archive") — recurse into subdirectories and preserve permissions,
@@ -288,8 +288,8 @@ all):
 - `-v` — verbose, print what's transferring.
 - `-z` — compress in transit, worth it over Wi-Fi.
 - `--delete` (first line only) — also remove anything on the Pi's
-  `pi_pipeline/` that no longer exists in the Mac's copy, so a file you
-  deleted or renamed locally doesn't linger there stale. Left off the second
+  `pi_pipeline/` that no longer exists in the Mac's copy, so a file
+  deleted or renamed locally does not linger there stale. Left off the second
   line since it's a single named file, not a directory to keep in sync.
 - Only changed files actually transfer on a re-run (rsync diffs by size +
   mtime) — so re-syncing after a small edit is fast, not a full re-copy.
@@ -299,7 +299,7 @@ robot)? `git clone --filter=blob:none --no-checkout <repo> ~/bittleX && cd
 ~/bittleX && git sparse-checkout set pi_pipeline rl_training/opencat-gym/trained
 && git checkout development` gets the same result without ever downloading
 `rl_training`'s history/checkpoints — more moving parts than `rsync`, so it's
-not the default here, but it's there if you want `git pull` to update instead.
+not the default here, but it is available for updating with `git pull` instead.
 
 **Why the audio install is the fragile step (detail):** packages with compiled
 code ship as *wheels* per OS+CPU+Python. If no `linux_aarch64` wheel matches,
@@ -358,7 +358,7 @@ robot not involved):
 | 60 s all-core load | 40.8 → 51.5 °C, throttle flags 0x0, scheduler jitter 10 ms | OK |
 
 That is roughly 30× (Piper) and 12× (Vosk) slower than the Mac baseline above. The Vosk number is a whole-file batch run, so the live
-streaming path should lag less after you stop speaking, but it is not measured yet. Open: re-run with the Claude API section enabled,
+streaming path should lag less after speech stops, but it is not measured yet. Open: re-run with the Claude API section enabled,
 measure streaming latency, and try the `x_low` voice and a lighter recognizer if spoken replies stay slower than real time.
 
 **Freeing graphics memory on a headless Pi (done 2026-10-04, takes effect after a reboot).** The Zero 2 W has 512 MB, of which ~416 MB is visible; 64 MB is
@@ -399,10 +399,10 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
 - [ ] **Keep it patched:** `sudo apt update && sudo apt full-upgrade` on setup
       and periodically; enable `unattended-upgrades`.
 - [ ] **Wi-Fi:** on the home network behind the router NAT (not a bridged/guest
-      SSID that can't reach the internet if you need the API). `wifi.powersave 2`
+      SSID that can't reach the internet if the API is needed). `wifi.powersave 2`
       is already set in §3.
-- [ ] **The BiBoard has its own Wi-Fi + BLE** (for Petoi's mobile app). If you
-      don't use the app, disable the board's Wi-Fi, or at least change its AP
+- [ ] **The BiBoard has its own Wi-Fi + BLE** (for Petoi's mobile app). If the
+      app is not used, disable the board's Wi-Fi, or at least change its AP
       password — otherwise it's a second, open radio into the robot.
 - [ ] **API key is revocable.** Note where to revoke it (Anthropic console) so a
       lost robot is a 2-minute fix. Consider a dedicated key with a spend cap.
@@ -411,7 +411,7 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
       refuses dates/times/schedules (`store.has_temporal_detail`).
 - [ ] **Vision stays on-chip.** The Grove module does detection on its own NPU
       and sends only labels+boxes over serial — raw frames never leave it.
-- [ ] **Mic: continuous wake word while powered on (user decision, 2026-09-05).**
+- [ ] **Mic: continuous wake word while powered on.**
       G2 is session-powered, not a 24/7 fixture, so the exposure window is "on
       and started in `--mode voice`" (`--mode text` never opens the mic). Wake
       phrase is **"G2"** (`G2_WAKE_WORD=gee two`). After each reply a ~60 s
@@ -426,7 +426,7 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
 - [ ] **What still goes to the Anthropic API every turn:** the speech
       transcript, rolling history, and recalled memory facts (which include
       names). That's inherent to a cloud brain. Ask Anthropic about **Zero Data
-      Retention** if server-side retention matters to you.
+      Retention** if server-side retention matters.
 - [ ] **Personal media** (B15 training photos of people/pets/home) lives only in
       the gitignored `training_data/` etc. — and note that whatever service
       trains the model (SenseCraft / Roboflow / Colab) receives those images.

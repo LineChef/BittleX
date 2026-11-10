@@ -1,3 +1,8 @@
+---
+audience: contributor
+kind: reference
+---
+
 # The docs bundle: showing these docs on a website
 
 Every reader-facing documentation page in the repo is packaged, on every push, as a **bundle** of plain files that a website can read and render as its own pages. There is no server or API to run: the bundle is static files on GitHub Pages. This page describes how it is built and published, the file format, and how the React site (Vite) loads it. Build code: [`../../tools/build_docs_bundle.py`](../../tools/build_docs_bundle.py); the workflow: `.github/workflows/docs-bundle.yml`.

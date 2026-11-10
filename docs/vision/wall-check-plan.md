@@ -44,7 +44,7 @@ With the 24 in rule, looks every 3 s and the sound at 200% he turned away from t
 ## Camera timing, warm-up and the failure signal (2026-10-10)
 Every exploration or voice picture now: waits until the IMU shows G2 has stopped swaying (`gait/stillness.py`: the newest 5 frames, 1 s, within 0.5 deg; it gives up after 6 s and takes the picture anyway, and a missing IMU never blocks one), warms the camera up for EVERY picture (`G2_PICTURE_PREP_EVERY_S` default 0; the voice service meters the light before every look), and is taken again once, keeping the better, when its brightness is outside 85 to 140 or more than 2% is blown out; the saved `.json` says whether it was still and retaken. The survey stand settle is 3.3 s (2.5 s plus the 0.8 s eased stand-up ramp). Any failed command plays the wrong-answer horn (`voice/fail_sound.py`, at most once every 8 s, `G2_FAIL_SOUND=0` silences it): a motion command the serial link cannot send, a refused unsafe command, a failed Claude call or turn, a picture that could not be taken, a restart or power-off that did not work.
 
-## Where this is going (user, 2026-10-10)
+## Where this is going
 Once wall avoidance is reliable, which will take more sessions with varied wall types and the planned training photos, most of the random turns can be switched off so he bounces around like a robot vacuum. Not yet: keep the explorer's turns (8 s legs) until the avoider has been shown reliable on several wall types.
 
 ## A new leg after a wall look turns toward the open side (2026-10-10)

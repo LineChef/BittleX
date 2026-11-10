@@ -21,7 +21,7 @@ Commands in this folder use `../../.venv/bin/python`. Tests: `../../.venv/bin/py
 - Difficulty never ramps above what a capable policy can pass (`passability_audit.py`).
 - Do not overwrite `run20m_resid30_ppo` (the fallback base) or `run20m_ppo` (the reference).
 - Give a timing estimate with a completion clock time when launching anything (`tools/eta.py`).
-- Intermediate checkpoints are not kept (user, 2026-10-17); a new run writes its own. Never put a run's `--tag` text in a shell command: it trips `any_training()`.
+- Intermediate checkpoints are not kept; a new run writes its own. Never put a run's `--tag` text in a shell command: it trips `any_training()`.
 
 ## The scripts
 

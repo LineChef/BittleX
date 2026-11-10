@@ -1,6 +1,6 @@
 # Downloaded models (outside the repo)
 
-Rule (user, 2026-10-07): nothing is downloaded from the internet without telling the user first and waiting for a yes. Models live in `~/g2_data/models/` on the Mac, never in the repo. Each is checked against the hash its host publishes.
+Rule: nothing is downloaded from the internet without telling the user first and waiting for a yes. Models live in `~/g2_data/models/` on the Mac, never in the repo. Each is checked against the hash its host publishes.
 
 | File | Source | Size (bytes) | SHA-256 | Checked against | Approved |
 |---|---|---|---|---|---|

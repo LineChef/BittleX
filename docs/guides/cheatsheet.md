@@ -1,8 +1,13 @@
+---
+audience: builder
+kind: reference
+---
+
 # Cheat sheet
 
-Commands you run, one example per row: copy it and change the value. Every option is in [`shell-helpers.md`](shell-helpers.md) (`g2help` prints it in the terminal). Before G2 moves: [`operating-g2.md`](operating-g2.md). Setup, training, bring-up and repo commands: [`cheatsheet-advanced.md`](cheatsheet-advanced.md).
+Commands to run, one example per row: copy it and change the value. Every option is in [`shell-helpers.md`](shell-helpers.md) (`g2help` prints it in the terminal). Before G2 moves: [`operating-g2.md`](operating-g2.md). Setup, training, bring-up and repo commands: [`cheatsheet-advanced.md`](cheatsheet-advanced.md).
 
-**Jump to:** [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#walk-tests) · [Explore](#explore) · [Ball goal](#ball-goal-and-punts) · [Claw and camera](#claw-and-camera) · [Data](#data-and-review) · [Pi power](#pi-power-and-network) · [Voice and mic](#voice-and-mic) · [Say to G2](#things-you-say-to-g2) · [A to Z](#a-to-z)
+**Jump to:** [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#walk-tests) · [Explore](#explore) · [Ball goal](#ball-goal-and-punts) · [Claw and camera](#claw-and-camera) · [Data](#data-and-review) · [Pi power](#pi-power-and-network) · [Voice and mic](#voice-and-mic) · [Say to G2](#things-to-say-to-g2) · [A to Z](#a-to-z)
 
 ## Most used
 
@@ -78,7 +83,7 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 | `g2goal limit ball_punt punt_max_in 3 5` | keep it between 3 and 5 |
 | `g2goal undo ball_punt punt_max_in` | ban the value he settled on |
 | `g2goal forget ball_punt punt_max_in` | drop what he learned for it |
-| `g2goal overrides ball_punt` | list your pins and limits |
+| `g2goal overrides ball_punt` | list the pins and limits |
 | `g2goal verdict ball_punt 22 wrong` | attempt 22 was scored wrong |
 | `g2goal set ball_punt --attempts 8` | change a goal's size |
 | `g2goal reset ball_punt --yes` | forget everything it learned |
@@ -158,16 +163,16 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 
 By voice: "G2, mic off for 20 minutes". The review page shows a **Mic on** button while it is off.
 
-## Things you say to G2
+## Things to say to G2
 
 Wake with "gee two". The full list: [`voice-commands.md`](voice-commands.md).
 
 | Say | Does |
 |---|---|
 | "emergency stop" / "resume" | freeze and hold / release |
-| "gee two, let's talk" / "that's all" | talk without the wake word until you stop |
+| "gee two, let's talk" / "that's all" | talk without the wake word until "that's all" |
 | "go ahead and look around" / "end exploration mode" | start / end exploration |
-| "come here" | walk to you |
+| "come here" | walk to the speaker |
 | "hi step" / "walk normally" | switch gait |
 | "the floor is tile" | set the floor label |
 | "what do you see" | describe a picture |
