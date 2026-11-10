@@ -412,6 +412,25 @@ class SerialLink:
         transitions.play(standup.ramp_poses(start, standup.balance_pose(), secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
         return transitions.balance_pose()
 
+    def _tilt_after_stand(self, seconds: float = 0.7):
+        """The body's roll and pitch (median of the IMU frames over `seconds`) just after a stand-up, for the motion-event log; None if there were no frames. Never raises."""
+        try:
+            import math
+            from ..gait.imu_parse import parse_imu_line
+            if not hasattr(self._ser, "in_waiting"):         # not a real port (a test's fake): a failed read would flag the link as disconnected
+                return None
+            self._write_pose("gP")
+            time.sleep(seconds)
+            rows = [parse_imu_line(x) for x in (self.poll_imu() or [])]
+            self._write_pose("gp")
+            rows = [r for r in rows if r is not None]
+            if len(rows) < 2:
+                return None
+            med = lambda v: sorted(v)[len(v) // 2]       # noqa: E731
+            return {"roll": round(med([math.degrees(r[0]) for r in rows]), 1), "pitch": round(med([math.degrees(r[1]) for r in rows]), 1), "n": len(rows)}
+        except Exception:  # noqa: BLE001
+            return None
+
     def _attention_entry_eased(self) -> bool:
         """Move into the attention pose (legs straight) as an eased `K` skill instead of the firmware `kcalib` (which drives every joint at once at full speed). UNTESTED on G2 until the next session
         (motion_feel.ATT_ENTRY_EASED turns it off). True if it handled the command (including "already there"); False means the caller sends `kcalib` as before."""
@@ -559,8 +578,9 @@ class SerialLink:
                     time.sleep(0.3)
             if gyro and not keep_on:
                 self._write_pose("gb")                             # off again right after the rise: never left on in the attention / sit poses (the board's own rc / up flipped him there)
+            ev["tilt_after"] = self._tilt_after_stand()                # how he stands once the rise is over (2026-11-10: he ends up on his hind legs after the exploration's attention stand-ups)
             self.last_motion_command, self._last_motion_t = "kbalance", time.monotonic()
-            log.info("stand-up played as a K skill (%d bytes)", len(data))
+            log.info("stand-up played as a K skill (%d bytes), tilt after: %s", len(data), ev["tilt_after"])
             return True
         except Exception as e:  # noqa: BLE001
             log.error("K-skill stand-up failed (%s)", e)
