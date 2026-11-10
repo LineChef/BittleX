@@ -16,9 +16,9 @@ log = logging.getLogger("g2.stillness")
 
 
 class StillnessWaiter:
-    def __init__(self, poll, *, window: int = 5, max_std_deg: float = 0.5, clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.1):
+    def __init__(self, poll, *, window: int = 5, max_std_deg: float = 0.5, no_frames_s: float = 0.6, clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.1):
         self._poll = poll                                    # poll() -> a list of raw IMU lines (SerialLink.poll_imu / an ImuFanout consumer's poll_imu)
-        self.window, self.max_std_deg = window, max_std_deg
+        self.window, self.max_std_deg, self.no_frames_s = window, max_std_deg, no_frames_s
         self._clock, self._sleep, self._poll_s = clock, sleep, poll_s
         self.last_std: float | None = None
 
@@ -51,6 +51,8 @@ class StillnessWaiter:
                 self.last_std = s
                 if s <= self.max_std_deg:
                     return True
+            if got == 0 and self._clock() - t0 >= self.no_frames_s:
+                break                                        # the board prints its IMU only while a skill runs (gP / gp), so a standing G2 sends none: do not wait the whole timeout for frames that will not come (2026-11-10: 6 s before every picture)
             self._sleep(self._poll_s)
         if got == 0:
             log.info("no IMU frames while waiting for G2 to be still: taking the picture anyway")

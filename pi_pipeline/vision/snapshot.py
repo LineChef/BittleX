@@ -261,14 +261,16 @@ class CameraSnapshotter:
     def _grab_one(self) -> Snapshot | None:
         """One inference with its picture, or None if the module does not answer in time. Caller holds the lock."""
         self._ser.reset_input_buffer()
+        t0 = self._clock()
         self._ser.write(_ONE_SHOT)
-        deadline = self._clock() + self._timeout_s
+        deadline = t0 + self._timeout_s
         while self._clock() < deadline:
             raw = self._ser.readline()
             if not raw:
                 continue
             snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
             if snap is not None:
+                log.info("camera grab took %.2f s", self._clock() - t0)         # how long one request-to-picture takes (2026-11-10: pictures are slow in the chase)
                 return snap
         log.warning("camera gave no picture within %.0f s", self._timeout_s)
         return None

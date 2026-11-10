@@ -113,6 +113,9 @@ def _fmt_s(x: float) -> str:
     return f"{x:.0f} s"
 
 
+METER_EVERY_S = 30.0       # how often a ball-goal session re-meters the light inside the voice service (seconds; the service default is before every picture)
+
+
 @register("ball_punt")
 class BallPunt:
     name = "ball_punt"
@@ -168,6 +171,9 @@ class BallPunt:
             else:
                 self._link = sh.link
             self.camera = bc._SnapshotCamera(sh.camera)                     # not closed here: the service owns it
+            if hasattr(sh.camera, "_meter_every_s"):                        # the service meters the light before EVERY picture (meter_every_s=0, made for rare pictures): in the chase that is two extra camera
+                self._saved_meter_s = sh.camera._meter_every_s              # grabs with G2 standing still at each look, and the exposure was "unchanged since it was set" nearly every time (2026-11-10). The goal
+                sh.camera._meter_every_s = METER_EVERY_S                    # session meters every METER_EVERY_S (a claw look still forces one); the service's setting is put back on release
         else:
             from ..link.serial_link import SerialLink
             from ..vision.snapshot import CameraSnapshotter
@@ -216,6 +222,13 @@ class BallPunt:
             except Exception:  # noqa: BLE001
                 pass
         self._consumers = []
+        saved = getattr(self, "_saved_meter_s", None)
+        if saved is not None and self._shared is not None:
+            try:
+                self._shared.camera._meter_every_s = saved
+            except Exception:  # noqa: BLE001
+                pass
+            self._saved_meter_s = None
 
     def battery_ok(self, min_pct: int) -> tuple[bool, str]:
         if self._link is None:

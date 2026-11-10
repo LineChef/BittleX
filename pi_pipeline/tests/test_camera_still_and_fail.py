@@ -29,7 +29,7 @@ def test_it_waits_for_new_still_frames_and_gives_up_without_blocking_when_there_
     w = StillnessWaiter(lambda: next(it, []), clock=clk, sleep=clk.sleep)
     assert w.wait(timeout_s=10.0) is True and 0.0 < clk.t < 10.0                      # still once five NEW steady frames are in
     clk2 = Clock()
-    assert StillnessWaiter(lambda: [], clock=clk2, sleep=clk2.sleep).wait(timeout_s=3.0) is None and clk2.t >= 3.0      # no IMU: the picture is taken anyway
+    assert StillnessWaiter(lambda: [], clock=clk2, sleep=clk2.sleep).wait(timeout_s=3.0) is None and 0.5 <= clk2.t < 1.0      # no IMU: the picture is taken anyway, after a short wait (the board prints no IMU while G2 stands)
     clk3 = Clock()
     n = [0]
 

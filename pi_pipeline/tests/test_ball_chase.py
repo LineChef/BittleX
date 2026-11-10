@@ -857,7 +857,7 @@ def test_a_line_up_turn_stops_on_the_gyro_not_the_clock():
     assert sent.index("kwkR") < sent.index("kbalance")
     stop_at = [at for c, at in lk.sent if c == "kbalance"][0] - [at for c, at in lk.sent if c == "kwkR"][0]
     assert stop_at < 0.5                                                                            # stopped by the yaw, long before the timed second
-    assert r.last_turn_deg is not None and r.last_turn_deg < 8.0 and r.last_turn_s == stop_at
+    assert r.last_turn_deg is not None and r.last_turn_deg < 8.0 and abs(r.last_turn_s - stop_at) < 1e-6
 
 
 def test_a_gyro_turn_that_barely_moves_ends_at_the_cap_and_no_imu_means_the_timed_turn():

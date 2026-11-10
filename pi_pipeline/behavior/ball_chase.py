@@ -210,6 +210,7 @@ ALIGN_GAIN = 0.4               # a line-up pulse turns only this share of the be
 SEARCH_SIDE_DEADBAND_DEG = 6.0 # a ball last seen less than this far off straight tells nothing about which way it went: the search side is chosen by chance
 ALIGN_MAX_DEG = 6.0            # (user, 2026-11-03: still turning too much) one line-up pulse is sized to turn at most this many degrees, whatever the bearing; more pulses do the rest (ALIGN_TRIES)
 ALIGN_MIN_DEG = 3.0            # the smallest line-up turn asked for (gyro-stopped turns, 2026-11-05)
+ALIGN_MIN_RUN_S = 0.25         # a gyro-stopped turn is never ended on the yaw sooner than this after the start (2026-11-10: "asked 6.0 deg, got 11.3 deg in 0.03 s": a first reading that was already off by a few degrees ended the turn before he moved)
 ALIGN_STOP_LEAD_DEG = 1.5      # the gyro stop sends `kbalance` this many degrees early: the body keeps turning a moment after it
 ALIGN_CAP_S = 2.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
 ALIGN_YAW_STOP = os.environ.get("G2_ALIGN_YAW_STOP", "1").strip().lower() not in ("0", "off", "false", "no")      # `0`: the line-up turns are timed (from the learned turn pace) instead of stopped on the yaw (owner's idea, 2026-11-08)
@@ -847,7 +848,9 @@ class SerialRobot:
                     log.warning("yaw spike: %.1f deg in %.2f s is faster than a turn can be: ignored (counting from here)", dyaw, self._clock() - t0)
                     yaw0 = self._yaw
                 elif dyaw >= max(0.0, stop_yaw_deg - ALIGN_STOP_LEAD_DEG):
-                    break
+                    if self._clock() - t0 >= ALIGN_MIN_RUN_S:
+                        break
+                    yaw0 = self._yaw                      # too early to be a real turn: count from this reading instead
             self._sleep(0.02 if yaw0 is not None else 0.05)
         ran = self._clock() - t0
         n_imu = min(len(self._imu_t), len(self._roll))
@@ -1334,6 +1337,23 @@ CONFIRM_DIM_S = 1.2            # the wait before the second picture that confirm
 CONFIRM_BEARING_DEG = 15.0     # the second picture must show it within this many degrees of where the first did
 
 
+SAME_SCENE_DIFF = 3.0          # mean grey-level difference (0-255, on a 24x24 thumbnail) under which two pictures from the same still pose are the same scene
+def _scene_signature(jpeg: bytes | None):
+    """A tiny grey thumbnail of a picture, to tell whether a repeat look from the same still pose shows anything new (2026-11-10: he stood still and took the same empty picture again and again). None if it cannot be made."""
+    if not jpeg:
+        return None
+    try:
+        import io
+        from PIL import Image
+        return list(Image.open(io.BytesIO(jpeg)).convert("L").resize((24, 24)).getdata())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _same_scene(a, b) -> bool:
+    return a is not None and b is not None and len(a) == len(b) and sum(abs(x - y) for x, y in zip(a, b)) / len(a) < SAME_SCENE_DIFF
+
+
 def confirm_ball(camera, ball: BallReading | None, sleep=time.sleep, trace: list | None = None) -> BallReading | None:
     """A ball only the loose "dim" pass found (it also takes round green things on the floor, 2026-11-01) counts only when the next picture shows it again, within CONFIRM_BEARING_DEG.
     Any other reading is returned as it is."""
@@ -1543,6 +1563,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
     wall_state: dict = {}
     still_from = clock()                                  # when he last stopped moving: the still time before each move is logged (the legs let go after 7 to 10 s)
     still_step = 0                                        # the step he last moved in: pictures taken since = steps - still_step
+    last_empty = None                                     # thumbnail of the last picture with no ball, while he has not moved since: a repeat of the same scene is not looked at a third time
     parts: dict = {}                                      # where that still time went since the last move: {"settle": s, "camera": s, ...} (logged with it, 2026-11-02)
 
     def timed(name, fn, *a, **kw):
@@ -1562,12 +1583,14 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             say("battery low or unreadable: stopping")
             return "battery"
         wall = None
+        scene = None
         if pending is not None:
             ball, pending = pending, None
             last_move = None                              # a claw-look reading is from another camera pose: not a before / after pair
         else:
             timed("settle", sleep, settle_s)                  # let the body stop swaying before the picture (in the attention pose, or standing while he dials in close to the ball)
             jpeg = timed("camera", camera.look)
+            scene = _scene_signature(jpeg)
             if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
                 say(f"[{steps}] no picture from the camera: looking again")
                 note(kind="no_picture")
@@ -1591,6 +1614,11 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                     say(f"[{steps}] wall reading ignored: {dropped}")
                     note(kind="wall", event="ignored", why=dropped)
         note(kind="look", ball=_ball_dict(ball), **({"wall_in": None if wall.nearest_in is None else round(wall.nearest_in, 1)} if wall is not None else {}))
+        if ball is None and scene is not None and _same_scene(scene, last_empty) and planner.last_dist is None and planner.lost + 1 < LOST_LOOKS:
+            planner.lost = LOST_LOOKS - 1                       # the same empty picture twice from one still pose: another look would show the same, so the search starts now
+            note(kind="same_scene")
+            say(f"[{steps}] the picture is the same as the last one (no ball, not moved): no more repeat looks")
+        last_empty = scene if ball is None else None
         if announce is not None:                          # real-time signal of what he sees (user, 2026-10-25): "searching" when a search starts, "target acquired" when the ball is found again
             if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or planner.search_i > 0 or not seen):
                 announce("target acquired")
@@ -1611,6 +1639,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 if act.seconds > cap:
                     act = Action(act.kind, round(cap, 2), act.degrees, act.why + f" (cut short: a wall {wall.nearest_in:.0f} in ahead)")
         planner.prev_kind = act.kind
+        if act.kind != "look":
+            last_empty = None                                   # he moves (or looks around with the claw): the next empty picture is a new scene
         log_decision(steps, act, ball, wall, planner, clock() - t_start)
         say(f"[{steps}] {'ball ' + format(ball.distance_in, '.0f') + ' in ' + format(ball.bearing_deg, '+.0f') + ' deg' if ball else 'no ball'} -> {act.kind}: {act.why}")
         if dry_run or act.kind == "look":
