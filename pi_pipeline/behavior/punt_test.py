@@ -110,7 +110,8 @@ def main() -> None:
         print("\nended")
     finally:
         cam.close()
-        link.send("krest", read_reply=False, settle=0.0)                 # rest at the end
+        from .ball_chase import ensure_rest
+        ensure_rest(link)                                                # rest at the end, confirmed
         time.sleep(2.5)
 
 

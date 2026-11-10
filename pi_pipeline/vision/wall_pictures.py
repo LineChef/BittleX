@@ -181,7 +181,7 @@ def shot(args) -> int:
             time.sleep(1.5)
         still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
         cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump,
-                                exposure_check=True, meter_every_s=0.0, idle_close_s=0)
+                                exposure_check=True, idle_close_s=0)
         snap, retaken = best_picture(lambda prep: cam.snapshot())
         if snap is None:
             print("no picture (the camera did not answer)")

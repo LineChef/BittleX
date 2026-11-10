@@ -16,7 +16,7 @@ import time
 
 log = logging.getLogger("g2.claw_survey")
 
-SETTLE_S = 1.5            # after each swing, before the picture: the camera's frames are about 1 s old (CLAUDE.md), so a shorter wait shows the pose before the move
+SETTLE_S = 0.8            # after each swing, before the picture: THE chase's CLAW_SETTLE_S (one claw look in every mode, owner 2026-11-10); the old frame is dropped by `discard` below, not by waiting longer
 RAISE_FIRST = True        # from the attention pose the claw sits between the front legs and cannot pan there: raise it straight up first (ball_chase.CLAW_RAISE_FIRST)
 
 
@@ -59,9 +59,9 @@ def look_seconds() -> float:
     return moves / CLAW_DEG_S + 3 * SETTLE_S + 1.0
 
 
-def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False) -> str:
+def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None) -> str:
     """The look. `snapshot(kind)` takes one picture (None = no camera: the arm still moves). Throwaway pictures are `look_left` / `look_right`; the centre one is `kind`.
-    Returns "ok", "stopped" (stopped() went true between moves) or "error"; the arm always ends lowered. Never raises."""
+    `discard()` throws away one stale camera frame before each picture (the voice loop passes the camera's `discard_one`; the exploration's picture saver already takes throwaway frames). Returns "ok", "stopped" (stopped() went true between moves) or "error"; the arm always ends lowered. Never raises."""
     from .ball_chase import CLAW_LIFT_DEG, CLAW_PAN_DEG, CLAW_PAN_SIGN
     left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG              # the pan that points the camera to G2's left
     here = (0.0, 0.0)
@@ -78,6 +78,8 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
             _smooth(link, here, (pan, CLAW_LIFT_DEG), sleep, stopped)
             here = (pan, CLAW_LIFT_DEG)
             sleep(SETTLE_S)
+            if discard is not None:
+                discard()                                                             # the module answers with the picture of the PREVIOUS request: ask once and drop it, as the chase's look does (ball_chase._SnapshotCamera.look)
             if snapshot is not None:
                 snapshot(label)
     except _Halt:

@@ -556,6 +556,8 @@ class BehaviorDriver:
         w = i.wall
         if not self._wall_steer or w is None or now < self._wall_turn_until:
             return None
+        if self._wall_unbelieved(w):
+            return None                           # the camera's "8 in, again" is not believed (the chase's rule); the IMU contact sequence still handles a real wall
         if w.t <= self._wall_seen_t or now - w.t > self.WALL_STALE_S:
             return None
         blocked = w.state == "blocked"
@@ -580,6 +582,22 @@ class BehaviorDriver:
         self._last_reason = why
         return fx
 
+    def _wall_unbelieved(self, w) -> bool:
+        """The same rule as the ball chase's `vet_wall` (ball_chase.wall_stuck_count): a wall reading at the calibration's closest row for WALL_STUCK_LOOKS fresh looks in a row is not believed (on the claw camera it
+        came back nearly every look, 2026-11-01). Counted once per look. A bump (the IMU contact signal) still acts whatever the camera says."""
+        from .ball_chase import WALL_STUCK_LOOKS, wall_stuck_count
+        st = getattr(self, "_wall_vet", None)
+        if st is None:
+            st = self._wall_vet = {"stuck": 0, "t": None}
+        if w is None:
+            return False
+        if st["t"] != w.t:
+            st["t"] = w.t
+            n = wall_stuck_count(w.nearest_in, st)
+            if n == WALL_STUCK_LOOKS:
+                logging.getLogger("g2.wall.steer").info("wall reading ignored: it has said %s in for %d looks in a row", w.nearest_in, n)
+        return st["stuck"] >= WALL_STUCK_LOOKS
+
     def note_contact(self, ev: dict | None = None) -> None:
         """The IMU says he is pushing into something while walking forward (`gait/imu_stall.py`, the hit detector in the walk loop; called from the walk thread): the next tick starts the hit
         sequence. `G2_IMU_CONTACT=0` ignores it."""
@@ -594,7 +612,7 @@ class BehaviorDriver:
         if os.environ.get("G2_HIT_WALL", "1") == "0" or now < self._hit_until:
             return None
         contact = os.environ.get("G2_IMU_CONTACT", "1") != "0" and self._contact_t > self._contact_seen and time.monotonic() - self._contact_t <= self.CONTACT_FRESH_S
-        fresh = w is not None and w.t > self._wall_seen_t and now - w.t <= self.HIT_STALE_S
+        fresh = w is not None and w.t > self._wall_seen_t and now - w.t <= self.HIT_STALE_S and not self._wall_unbelieved(w)
         stuck = (fresh and w.nearest_in is not None and w.prev_nearest_in is not None and w.prev_age_s is not None and 1.5 <= w.prev_age_s <= 7.0
                  and w.nearest_in <= self.STUCK_NEAREST_IN and w.prev_nearest_in <= self.STUCK_NEAREST_IN and abs(w.nearest_in - w.prev_nearest_in) <= 2.0 and w.near_groups >= 3
                  and self._last_wall_reaction < w.t - w.prev_age_s)            # two looks in a row at the same close wall and no turn in between: he is not getting anywhere

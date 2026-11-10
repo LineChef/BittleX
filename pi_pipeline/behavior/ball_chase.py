@@ -164,6 +164,13 @@ WALL_STUCK_LOOKS = 3           # this many looks in a row at that reading and th
 WALL_BALL_CONE_DEG = 50.0      # a ball seen this close to straight ahead is seen THROUGH the space a wall would fill (user, 2026-11-01: was 35; a ball at +45 deg let a false 8 in wall turn him, and he fell)
 
 
+def wall_stuck_count(nearest_in: float | None, state: dict) -> int:
+    """Count the looks in a row that read the calibration's closest row (WALL_MIN_READING_IN) in state["stuck"]; any other reading resets it. THE rule for a wall reading that is not believed (WALL_STUCK_LOOKS
+    in a row): used by the ball chase (`vet_wall`) and by the exploration's wall steer and hit sequence alike (owner, 2026-11-10: one behavior in every mode)."""
+    state["stuck"] = state.get("stuck", 0) + 1 if nearest_in is not None and nearest_in <= WALL_MIN_READING_IN else 0
+    return state["stuck"]
+
+
 def vet_wall(wall: "WallSeen | None", ball: BallReading | None, state: dict) -> tuple["WallSeen | None", str]:
     """Believe the wall reading only when it makes sense (user, 2026-11-01: he turned away from a ball right in front of him, three times in one run, and fell during one of the turns).
     Returns (the wall to use or None, why it was dropped or ""). Dropped when
@@ -174,7 +181,7 @@ def vet_wall(wall: "WallSeen | None", ball: BallReading | None, state: dict) -> 
     if wall is None or wall.nearest_in is None:
         state["stuck"] = 0
         return wall, ""
-    state["stuck"] = state.get("stuck", 0) + 1 if wall.nearest_in <= WALL_MIN_READING_IN else 0
+    wall_stuck_count(wall.nearest_in, state)
     if ball is not None and abs(ball.bearing_deg) <= WALL_BALL_CONE_DEG and wall.nearest_in <= WALL_MIN_READING_IN and wall.nearest_in + 2.0 < ball.distance_in:
         return WallSeen(None, wall.turn, None), f"a wall {wall.nearest_in:.0f} in ahead would hide the ball I see {ball.distance_in:.0f} in away"
     if state["stuck"] >= WALL_STUCK_LOOKS:

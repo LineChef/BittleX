@@ -454,7 +454,20 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         fall["fn"] = _on_fall
 
         from .gait.stand_guard import StandGuard
-        guard = StandGuard(consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
+
+        def _sag_recover(roll, pitch):
+            """Standing legs sagged: the same recovery as in the voice service (attention pose, then up again, back legs first; ball_chase.SerialRobot.recover_sag) on this session's own IMU copy. One behavior in every mode (owner, 2026-11-10)."""
+            from .behavior.ball_chase import SerialRobot
+            c = consumer()
+            try:
+                SerialRobot(c).recover_sag((pitch, roll))
+            finally:
+                try:
+                    fan.release(c)
+                except Exception:  # noqa: BLE001
+                    pass
+
+        guard = StandGuard(consumer(), on_sag=_sag_recover, is_standing=lambda: getattr(link, "last_motion_command", "") not in ("", "d", "krest", "ksit", "kcalib"), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
                            balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None,
                            on_fall=lambda: __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN")).start()   # tipped over at any time (the walker's own fall also plays it once)
 

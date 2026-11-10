@@ -542,7 +542,7 @@ g2explore() { bash "$G2_ROOT/tools/g2_explore.sh" "$@"; }
 # g2stop [voice|explore]  -- the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride.
 g2stop() { bash "$G2_ROOT/tools/g2_safe_stop.sh" "$@"; }
 # g2rest  -- send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first.
-g2rest() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send d"; }
+g2rest() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.rest_now"; }
 
 # g2english  -- set the BiBoard's onboard voice module back to English (it falls back to Chinese after some power cycles): sends XAc (enable), XAb, XAa (English), 1.2 s apart,
 # the documented recovery (same as saying "G2, switch to English"). Never sends Xa or XAd (they silently break its voice commands).

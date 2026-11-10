@@ -119,7 +119,8 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
     except Exception:  # noqa: BLE001
         volt_read = None
     for i in range(cycles):
-        lk.send("krest", read_reply=False, settle=0.0)
+        from .ball_chase import ensure_rest
+        ensure_rest(lk)
         sleep(rest_s)
         lk.send("gP", read_reply=False, settle=0.0)
         sleep(0.3)
@@ -260,7 +261,8 @@ def main() -> None:
         print("ended")
     finally:
         try:                                            # always laid in the rest position at the end, a fall included (owner, 2026-11-08: "make sure we always put g2 in rest position after a fall is detected"; he cannot do it by hand)
-            link.send("krest", read_reply=False, settle=0.0)
+            from .ball_chase import ensure_rest
+            ensure_rest(link)
         except Exception:  # noqa: BLE001
             pass
 

@@ -150,13 +150,62 @@ class WalkerSink:
         if abs(r) < self.TURN_MIN_RAD or self.turning():
             return                              # too small to bother, or a turn is already running
         side = "right" if r >= 0 else "left"
-        dur = min(9.0 if urgent else self.TURN_MAX_S, math.degrees(abs(r)) * self.TURN_GAIN / self.TURN_RATE_DPS[side])      # an urgent turn-around may take up to 9 s
+        dur = min(9.0 if urgent else self.TURN_MAX_S, math.degrees(abs(r)) * self.TURN_GAIN / self._turn_rate(side))      # an urgent turn-around may take up to 9 s
         self._firmware()
         self._last = ""
         self._send_once(opencat.WALK_RIGHT if r >= 0 else opencat.WALK_LEFT)
         self._turn_until = self._clock() + dur
         log.info("timed turn %s %.0f deg for %.1f s", side, math.degrees(abs(r)), dur)
         self._watch_turn(side, math.degrees(abs(r)), dur)
+        self._stop_on_yaw(side, math.degrees(abs(r)) * self.TURN_GAIN, dur)
+
+    def _turn_rate(self, side: str) -> float:
+        """The turn rate (deg/s): G2's own measured pace for this attachment and floor once there is enough of it (behavior/chase_pace.py, the book the ball chase uses), else the fixed table."""
+        try:
+            from ..behavior.chase_pace import MIN_SAMPLES, book_for_now
+            e = book_for_now(save=False).data.get(f"turn_deg_s:{side}")
+            if e and e.get("n", 0) >= MIN_SAMPLES and float(e["value"]) > 1.0:
+                return float(e["value"])
+        except Exception:  # noqa: BLE001
+            pass
+        return self.TURN_RATE_DPS[side]
+
+    def _stop_on_yaw(self, side: str, want_deg: float, dur: float) -> None:
+        """End a timed turn on the gyro, as the ball chase's line-up turns do (ball_chase._skill): once the yaw has changed by `want_deg` less ALIGN_STOP_LEAD_DEG, never before ALIGN_MIN_RUN_S, a wrapped or
+        spiking reading ignored. The timed length stays the cap. No yaw reading: the timer alone ends it (owner, 2026-11-10: one behavior in every mode)."""
+        fn = self.yaw_fn
+        if fn is None:
+            return
+        try:
+            from ..behavior.ball_chase import ALIGN_MIN_RUN_S, ALIGN_STOP_LEAD_DEG, YAW_SPIKE_MARGIN_DEG, YAW_SPIKE_RATE_DEG_S, _yaw_diff
+            y0 = fn()
+            if y0 is None:
+                return
+            until = self._turn_until
+
+            def watch():
+                nonlocal y0
+                t0 = self._clock()
+                while self._clock() < until and self._turn_until == until:
+                    time.sleep(0.05)
+                    y = fn()
+                    if y is None:
+                        continue
+                    run = self._clock() - t0
+                    d = abs(_yaw_diff(y, y0))
+                    if d > YAW_SPIKE_RATE_DEG_S * run + YAW_SPIKE_MARGIN_DEG:
+                        y0 = y                         # faster than a turn can be: a sensor spike, count from here
+                        continue
+                    if run >= ALIGN_MIN_RUN_S and d >= max(0.0, want_deg - ALIGN_STOP_LEAD_DEG):
+                        if self._turn_until == until:  # still the same turn: end it now; walk() restarts cleanly
+                            self._turn_until = self._clock()
+                            log.info("turn stopped on the gyro after %.1f s: %.0f of %.0f deg", run, d, want_deg)
+                        return
+
+            th = threading.Thread(target=watch, name="turn-yaw-stop", daemon=True)
+            th.start()
+        except Exception:  # noqa: BLE001
+            pass
 
     def _watch_turn(self, side: str, asked_deg: float, dur: float) -> None:
         """Log how far the IMU says the timed turn really went (asked vs got), a second or so after it ends. Never raises."""

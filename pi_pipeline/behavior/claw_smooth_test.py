@@ -70,7 +70,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("ended")
     finally:
-        link.send("krest", read_reply=False, settle=0.0)          # always, a fall included (owner, 2026-11-08)
+        from .ball_chase import ensure_rest
+        ensure_rest(link)                                         # always, a fall included (owner, 2026-11-08), confirmed with the board
 
 
 if __name__ == "__main__":

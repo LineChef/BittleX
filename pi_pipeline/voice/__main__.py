@@ -191,7 +191,7 @@ def main() -> None:
                                            save_dir=settings.vision_save_dir or None,
                                            keep_days=settings.picture_keep_days,
                                            exposure_check=settings.vision_exposure_check,
-                                           meter_every_s=0.0, wait_still=wait_still)      # meter the light before EVERY picture (user, 2026-10-10: pictures are rare now)
+                                           wait_still=wait_still)      # the light is metered every 30 s like everywhere else (the camera default); it was before EVERY picture while pictures were rare (2026-10-10), which cost two extra grabs per look in the chase
 
         namer = None
         if camera is not None:                             # "this is the dishwasher" works in plain voice mode too, not only inside an exploration session

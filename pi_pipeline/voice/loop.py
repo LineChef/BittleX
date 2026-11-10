@@ -289,7 +289,7 @@ class VoiceLoop:
                 from ..behavior import claw_survey
                 self._pose_token("kcalib")
                 time.sleep(2.0)
-                claw_survey.run_claw_look(self._claw_link, lambda label: setattr(self, "_claw_jpeg", self._camera.snapshot()) if label == "look" else None, "look")
+                claw_survey.run_claw_look(self._claw_link, lambda label: setattr(self, "_claw_jpeg", self._camera.snapshot()) if label == "look" else None, "look", discard=getattr(self._camera, "discard_one", None))
                 self._pose_token("kup")
                 time.sleep(SurveyConfig().stand_settle_s)
                 return
@@ -425,7 +425,7 @@ class VoiceLoop:
                 elif kind == "claw" and self._claw_link is not None:          # the claw look: the throwaway pictures are kept as look_left / look_right, the centre one is the named one
                     from ..behavior import claw_survey
                     got = {}
-                    claw_survey.run_claw_look(self._claw_link, lambda label: got.__setitem__(label, self._namer(label)), payload)
+                    claw_survey.run_claw_look(self._claw_link, lambda label: got.__setitem__(label, self._namer(label)), payload, discard=getattr(self._camera, "discard_one", None))
                     saved = got.get(payload)
                 elif kind == "shot":
                     saved = self._namer(payload)

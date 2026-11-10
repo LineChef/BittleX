@@ -97,8 +97,8 @@ def main() -> None:
         print("ended")
     finally:
         try:                                            # always laid in the rest position at the end, a fall included (owner, 2026-11-08)
-            link.send("krest", read_reply=False, settle=0.0)
-            time.sleep(3.0)
+            from .ball_chase import ensure_rest
+            ensure_rest(link)
         except Exception:  # noqa: BLE001
             pass
 
