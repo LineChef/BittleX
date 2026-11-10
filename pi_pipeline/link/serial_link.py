@@ -497,7 +497,13 @@ class SerialLink:
             if j0:
                 ev["legs"] = [int(j0[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
             ev["rested_first"] = False
-            if pose == "unknown":
+            if pose == "unknown" and j0 is not None:
+                # a readable pose that is not one of the four (the survey bow, the check lean): eased from the angles the board reports, never a `krest` first (owner, 2026-11-10: "ease the bow to rest";
+                # the rest-first rule of 2026-11-09 stays for an UNREADABLE pose)
+                log.info("stand-up: the pose is not a known one: easing up from the angles the board reports")
+                ev["eased_from_reported"] = True
+                last = "unknown"                                  # the start is the reported angles, whatever was sent last
+            elif pose == "unknown":
                 log.warning("stand-up: the pose is %s: laying him in rest first", "unreadable" if j0 is None else "not a known one")
                 self._write_pose("krest")
                 time.sleep(REST_FIRST_S)

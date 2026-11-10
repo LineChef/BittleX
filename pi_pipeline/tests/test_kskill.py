@@ -286,14 +286,14 @@ def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first
     lk.last_motion_command = "krest"
     assert lk._stand_up_kskill(standup) is True
     assert not any(w.strip() == b"krest" for w in wrote)
-    # 2. legs in a pose that is none of the known ones: rest first (krest, then gb), then the K stand-up
+    # 2. legs in a readable pose that is none of the known ones (the survey bow): eased up from the angles the board reports, no rest first (owner, 2026-11-10)
     wrote.clear()
     odd = [a + 40 for a in goal]
-    reads = iter([_legs_joints(odd), _legs_joints(prof["rest_urdf_deg"])] + [_legs_joints(goal)] * 50)
+    reads = iter([_legs_joints(odd), _legs_joints(odd)] + [_legs_joints(goal)] * 50)
     monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: next(reads))
     lk.last_motion_command = "kbalance"
     assert lk._stand_up_kskill(standup) is True
-    assert wrote[0].strip() == b"krest" and wrote[1].strip() == b"gb" and _k_message(wrote)[:1] == b"K"
+    assert not any(w.strip() == b"krest" for w in wrote) and _k_message(wrote)[:1] == b"K"
     # 3. unreadable on every try: three reads, then the rest first as well
     wrote.clear()
     n = []
@@ -302,5 +302,5 @@ def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first
     assert lk._stand_up_kskill(standup) is True and wrote[0].strip() == b"krest" and len(n) >= 3
     ev = [json.loads(line) for line in open(tmp_path / "ev.jsonl")]
     assert [e["event"] for e in ev] == ["stand_up"] * 3
-    assert [e["pose_read"] for e in ev] == ["sit", "unknown", "unknown"] and [e["rested_first"] for e in ev] == [False, True, True]
-    assert ev[0]["start"] == "ksit" and ev[1]["start"] == "krest" and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
+    assert [e["pose_read"] for e in ev] == ["sit", "unknown", "unknown"] and [e["rested_first"] for e in ev] == [False, False, True]
+    assert ev[0]["start"] == "ksit" and ev[1]["start"] == "unknown" and ev[1]["eased_from_reported"] is True and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
