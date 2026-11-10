@@ -65,7 +65,7 @@ the same floor, the values he keeps hold their record in the next session, the n
 Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 
 **Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
-attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt".
+attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt". A measured rate replaces the default only after 2 clean samples (`MIN_SAMPLES` in `behavior/chase_pace.py`); until then the defaults time the moves: 28 deg/s for a turn and 24 for a pulse since 2026-11-09 (they were 6 and 4, the old arm policy turn, while the firmware turn that is now the default gait runs about 28, so every plain turn overshot). Plain turns and the turn after a claw look stop on the gyro like the line-up turns.
 
 ### Editing from the Goals tab
 

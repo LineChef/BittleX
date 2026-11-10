@@ -104,7 +104,7 @@ It is read at the **start of every run** (voice or not), so a change takes effec
 when he is that close, leaves a ball lying nearer a wall than that, and stops a walk on a bump. It uses the camera's wall reading as it is (calibrating it is optional); with no
 wall calibration at all the run prints "wall check: off". [`goals.md`](goals.md) section 8.
 
-**Walking** is always the learned default gait policy (the arm's saved gait), never Petoi's walk (user, 2026-10-31). Each walk and turn is timed from the pace and turn rates G2 measures
+**Walking** is always the learned default gait policy (the arm's saved gait), never Petoi's walk (user, 2026-10-31). (Superseded 2026-11-08: the default gait is now Petoi's scripted `kwkF` walk, `G2_DEFAULT_GAIT=firmware`; see `STATUS.md`.) Each walk and turn is timed from the pace and turn rates G2 measures
 himself from the camera (`~/.local/share/g2/chase_pace.json`, per attachment and floor). **In a goal session** ([`goals.md`](goals.md)) G2 changes most of these settings himself between
 attempts, starting from the values in this file; he never writes to this file except when you confirm one of his suggestions.
 
