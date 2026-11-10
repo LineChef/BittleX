@@ -575,6 +575,11 @@ def classify_pose(joints) -> str:
     return best if err <= POSE_TOL_DEG else "unknown"
 
 
+def _yaw_diff(a: float, b: float) -> float:
+    """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
+    return (a - b + 180.0) % 360.0 - 180.0
+
+
 def read_joints(link, timeout_s: float = 1.0, sleep=time.sleep, clock=time.monotonic) -> list[int] | None:
     """The 16 joint angles from the firmware's `j` (stops the IMU stream first: the read often failed while it ran), or None (no reply, a garbled one, or a link that cannot read)."""
     import re
@@ -842,7 +847,7 @@ class SerialRobot:
                 state = "fell"
                 break
             if yaw0 is not None and self._yaw is not None:
-                dyaw = abs(self._yaw - yaw0)
+                dyaw = abs(_yaw_diff(self._yaw, yaw0))
                 if dyaw > YAW_SPIKE_RATE_DEG_S * (self._clock() - t0) + YAW_SPIKE_MARGIN_DEG:
                     spikes += 1
                     log.warning("yaw spike: %.1f deg in %.2f s is faster than a turn can be: ignored (counting from here)", dyaw, self._clock() - t0)
@@ -872,7 +877,7 @@ class SerialRobot:
         if yaw0 is not None:
             self._fell()                                  # the last frames: where the yaw ended once the body had stopped
             if self._yaw is not None:
-                self.last_turn_deg, self.last_turn_s = abs(self._yaw - yaw0), ran
+                self.last_turn_deg, self.last_turn_s = abs(_yaw_diff(self._yaw, yaw0)), ran
                 log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s", stop_yaw_deg, self.last_turn_deg, ran)
         self._tx("gp")
         self._moved_at = self._clock()
@@ -1828,12 +1833,15 @@ def _stand_if_lying(link, token: str = "kbalance") -> bool:
     2026-11-01). Then a fixed wait, as before 2026-11-02: only the attention flow polls the board until it reads the stand. Never raises. Returns whether the pose could be read."""
     import re
     try:
-        s = link._ser
-        s.reset_input_buffer()
-        s.write(b"j\n")
-        time.sleep(1.0)
-        rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
-        j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
+        if callable(getattr(link, "poll_imu", None)) and callable(getattr(link, "pop_other", None)):
+            j = read_joints(link)                              # through the link's own reader: inside the voice service the link is a LockedLink/fan-out with no `_ser` (2026-11-10: "could not check the pose", he was not stood up)
+        else:
+            s = link._ser
+            s.reset_input_buffer()
+            s.write(b"j\n")
+            time.sleep(1.0)
+            rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
+            j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
         pose = classify_pose(j[:16] if j else None)
         if pose == "stand":                                   # (the old test, j[8] < 40 and j[12] > 30, read the REST pose as standing; it only worked because the raw read usually failed)
             return True
