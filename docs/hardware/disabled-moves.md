@@ -1,4 +1,4 @@
-# Disabled moves (pod payload, 2026-10-18)
+# Disabled moves (pod payload)
 
 With the Pi pod and the AI head on (about 481 g, 46% of it over the front feet), any move that leaves G2 on three feet, extends the legs or jumps tips him over. The wave flipped him twice in one session (both times triggered by mis-heard speech), and the owner reported the same for the other one-foot moves.
 

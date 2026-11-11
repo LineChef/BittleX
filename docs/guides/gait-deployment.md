@@ -28,7 +28,7 @@ Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and c
 
 The deployed policy is named by `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py`; every previous release stays on the Pi as a fallback.
 
-1. **Promote.** `tools/g2_promote_policy.sh TAG NAME` exports a checkpoint under a release name, points `DEFAULT_POLICY` at it, runs the test suite, commits and pushes on the current branch, then arms the deploy. For an already-exported candidate use `rl_training/opencat-gym/promote_release.py --candidate … --name …` (it never overwrites an existing release). Promotion is the user's decision.
+1. **Promote.** `tools/g2_promote_policy.sh TAG NAME` exports a checkpoint under a release name, points `DEFAULT_POLICY` at it, runs the test suite, commits and pushes on the current branch, then arms the deploy. For an already-exported candidate use `rl_training/opencat-gym/promote_release.py --candidate … --name …` (it never overwrites an existing release). Promotion needs explicit approval.
 2. **Deploy.** `tools/g2_deploy_when_online.sh` waits for the Pi to answer, `rsync`s `pi_pipeline/` and the policy files (never a `git clone`), and restarts the voice service. `--once` deploys now, `--cancel` disarms a waiting watcher. It never touches the Pi's `.env`, `.venv` or memory data, and it **refuses to run during an exploration, a baseline run or a walk**.
 3. **Check.** Before assuming the Pi matches the repo, dry-run the sync: `rsync -an --itemize-changes pi_pipeline/ $G2_PI:bittleX/pi_pipeline/`. The deployed commit is written to `pi_pipeline/.deployed_commit`.
 
@@ -89,9 +89,9 @@ The mapping and signs were verified on G2, but repeat these steps after a servo 
 
 - **The Mac cannot reach the Pi ("No route to host", EHOSTUNREACH) but another machine can:** (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on.
 
-  A Deny answer to the "find devices on your local network" prompt blocks that app's connections to every LAN device while the router may still answer, and a program that was already running keeps the old answer until it is quit and reopened (`claude --continue` resumes a Claude Code session). Cause on 2026-11-04.
+  A Deny answer to the "find devices on your local network" prompt blocks that app's connections to every LAN device while the router may still answer, and a program that was already running keeps the old answer until it is quit and reopened .
 
-  (2) **An MDM or endpoint-security agent** blocking the local subnet (Jamf, 2026-09-22; turning it off fixed it at once; `profiles status` saying "no MDM" does not rule it out). (3) The router: client isolation, guest network. First confirm the Pi is on at all: it also looks unreachable when it was shut down. `ping` the Pi's raw IP, then `ssh -vvv`
+  (2) **An MDM or endpoint-security agent** blocking the local subnet (Jamf; turning it off fixed it at once; `profiles status` saying "no MDM" does not rule it out). (3) The router: client isolation, guest network. First confirm the Pi is on at all: it also looks unreachable when it was shut down. `ping` the Pi's raw IP, then `ssh -vvv`
 
 
-*The original bring-up used a self-contained script, `scripts/pi_setup.sh`, that built a synthetic policy stub and uploaded its report to a public paste service. It was removed on 2026-10-17 in favor of `pi_pipeline/setup_pi.sh`; it is in git history.*
+*The original bring-up used a self-contained script, `scripts/pi_setup.sh`, that built a synthetic policy stub and uploaded its report to a public paste service. It was removed in favor of `pi_pipeline/setup_pi.sh` and is in git history.*

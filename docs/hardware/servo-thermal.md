@@ -2,7 +2,7 @@
 
 Research + mitigation plan for the servo "thermal cliff": the sharp, non-linear
 torque collapse when a P1S servo (or its driver) crosses a current/temperature
-limit under sustained load. Researched 2026-09-05.
+limit under sustained load. 
 
 ## Status at a glance
 
@@ -111,7 +111,7 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 
 ### Layer 1 — sensorless estimator + indicator (no new hardware, no retraining)
 
-> **BUILT 2026-09-10 (constants still placeholders — need §4b bench data).**
+> **Built (constants still placeholders — need §4b bench data).**
 > `pi_pipeline/gait/thermal_guard.py`: the I²t estimator was already there; added
 > the **3-tier per-joint indicator** (`ThermalTier` GREEN/AMBER/RED at 50 % / 85 %
 > of the estimated trip, on `GuardSnapshot.tiers` / `.hottest_tier`) and a
@@ -146,7 +146,7 @@ per-joint `H_j` so the model can be tuned from real runs.
 
 ### Layer 2 — behaviour-layer duty-cycle governor (no retraining)
 
-> **BUILT 2026-09-10 (constants placeholders).** `pi_pipeline/behavior/thermal_governor.py`
+> **Built (constants placeholders).** `pi_pipeline/behavior/thermal_governor.py`
 > — `ThermalGovernor.update(hottest_tier) -> GovernorDecision` (speed_scale,
 > soften_gait, avoid_uphill, hold_pose, reason). AMBER → 0.55× speed + soften +
 > avoid-uphill hint; RED → hold `COOLDOWN_POSE_DEG` (folded, frame-supported)

@@ -36,10 +36,9 @@ tools and personality is known.
 
 ## What leaves the device
 
-The user's words for each turn go to whichever backend answers it. In `routed` mode the fast backend receives the system prompt, the rolling
+The spoken words of each turn go to whichever backend answers it. In `routed` mode the fast backend receives the system prompt, the rolling
 conversation history, and the tool definitions; recalled memory is withheld by default. A hosted fast backend is a third party with its own
-retention policy. Do not point it at a service you haven't approved for that data (the repo owner's rule: warn before sending personal data
-off the device).
+retention policy. Do not point it at a service that is not approved for that data. Personal data is never sent off the device without a warning first.
 
 ## Testing and limits
 

@@ -39,6 +39,32 @@ FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 GENERATED_PAGES = ("docs/guides/env-reference.md", "docs/guides/shell-helpers.md", "docs/guides/cheatsheet.md", "docs/guides/cheatsheet-advanced.md")
 ATTRIBUTION_RE = re.compile(r"\((?:user|owner)[,:] ?20\d\d-\d\d-\d\d")
+# Published pages read as a product specification, not as working notes (docs/maintaining-docs.md, "Writing a published page"): these patterns are the note-taking voice.
+NOTE_PATTERNS = (
+    ("assistant", re.compile(r"\b(?:tell|ask|let|have) Claude\b|\bClaude Code\b|\bClaude's (?:own )?(?:session|work)\b", re.I)),
+    ("people", re.compile(r"\b(?:the user|the owner|owner|the user's|user's)\b")),
+    ("first person", re.compile(r"(?<![\w`/.-])(?:I|we|we've|we're|our|ours|us|my)(?![\w`/.-])(?!\s*[=:(])")),
+    ("date in prose", re.compile(r"\b20\d\d-\d\d-\d\d\b")),
+    ("history", re.compile(r"\b(?:turned out|was tried|were tried|we tried|was found|were found|earlier (?:session|run|version)s?|at first|originally|previously)\b", re.I)),
+)
+
+
+def note_voice_hits(text):
+    """[(line number, category, matched text)] for note-taking wording in a page's prose (code fences, front matter and link targets ignored)."""
+    body = re.sub(r"^---\n.*?\n---\n", lambda m: "\n" * m.group(0).count("\n"), text, count=1, flags=re.S)
+    out, infence = [], False
+    for i, line in enumerate(body.splitlines(), 1):
+        if FENCE_RE.match(line):
+            infence = not infence
+            continue
+        if infence:
+            continue
+        prose = re.sub(r"`[^`]*`|\"[^\"]*\"|\u201c[^\u201d]*\u201d", "", re.sub(r"\]\([^)]*\)", "]", line))      # code, link targets and quoted speech (a spoken command may say "we" or "my") are not prose
+        for cat, rx in NOTE_PATTERNS:
+            m = rx.search(prose)
+            if m:
+                out.append((i, cat, m.group(0)))
+    return out
 CELL_WORDS, LONG_LINE = 40, 700
 
 
@@ -71,6 +97,10 @@ def readability_warnings(path, text):
             out.append(f"{path}:{i}: attribution tag in a published page; keep who decided what in the working notes")
     if not has_intro:
         out.append(f"{path}: no opening paragraph; the site uses it as the page summary")
+    hits = [] if generated else note_voice_hits(text)
+    if hits:
+        cats = sorted({c for _n, c, _m in hits})
+        out.append(f"{path}: {len(hits)} note-style wording hit(s) ({', '.join(cats)}); write it as a specification (python tools/check_docs.py --notes lists them)")
     return out
 
 
@@ -296,10 +326,20 @@ def main():
     ap.add_argument("--staged", action="store_true")
     ap.add_argument("--root", default=None)
     ap.add_argument("--quiet-warnings", action="store_true")
+    ap.add_argument("--notes", action="store_true", help="list the note-style wording in published pages, line by line")
     args = ap.parse_args()
     root = args.root or subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip() \
         or os.getcwd()
     files = md_files(root, staged=args.staged)
+    if args.notes:
+        total = 0
+        for f in files:
+            if published(f) and f not in GENERATED_PAGES:
+                for n, cat, m in note_voice_hits(open(os.path.join(root, f), encoding="utf-8").read()):
+                    print(f"{f}:{n}: {cat}: {m}")
+                    total += 1
+        print(f"{total} hit(s)")
+        return 0
     errors, warnings = check(root, files)
     errors += backlog_errors(root)
     errors += helpers_doc_errors(root)

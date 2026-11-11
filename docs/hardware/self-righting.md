@@ -35,7 +35,7 @@ python pi_pipeline/gait/getup_test.py rc --balance off    # the state the explor
 
 Place him on his side by hand first, on the floor, hands near; never on his back. The script refuses to start if he is upright, and every attempt is appended to `~/g2_runs/getup_results.jsonl`. Results go here when run.
 
-**Results (2026-10-18, pod + AI head payload, paused; resume later):**
+**Results (pod + AI head payload, paused; resume later):**
 
 - **1**: Move: `rc` (firmware); Side: right (roll about 108 deg); Balance: on; Result: not up: the body rose about 20 deg toward vertical for under a second, then fell back
 - **2**: Move: `s_rl_rc` (streamed, head pinned, 1 s per keyframe); Side: left (roll about -99 deg); Balance: off; Result: not up: roll did not change at all in 21 s (not yet known whether the legs moved)
@@ -50,11 +50,11 @@ Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg a
 
 ## History of this page
 
-- **Early research (2026-09-01):** the stock self-right was believed to be narrow: disabled for fast gaits, and one community project reported it does not self-right from a supine fall.
+- **Early research:** the stock self-right was believed to be narrow: disabled for fast gaits, and one community project reported it does not self-right from a supine fall.
 - **Simulation (Run 6):** an RL policy that drives only the 8 walking joints did not learn to right the robot from a full tip-over (0% recovered). That is a simulation result: episodes ended at about 74° of tilt, below the firmware's 85° flip line, so the policy never saw the flipped state, and the scripted keyframes were not available as an action.
-- **Correction (2026-09-07):** a real Bittle X was observed flipping itself back over from its back, so the earlier framing was a simulation gap, not a physical limit.
-- **Confirmation on G2 (2026-09-28):** done on the project's own unit, as above.
-- **Literature (2026-09-01):** most learned fall-recovery work is on robots with hip abduction (a roll joint), which Bittle lacks, so the self-righting half does not transfer. What does transfer is treating recovery as a separate skill with a switch, trained against harsh disturbances.
+- **Correction:** a real Bittle X was observed flipping itself back over from its back, so the earlier framing was a simulation gap, not a physical limit.
+- **Confirmation on G2:** done on the project's own unit, as above.
+- **Literature:** most learned fall-recovery work is on robots with hip abduction (a roll joint), which Bittle lacks, so the self-righting half does not transfer. What does transfer is treating recovery as a separate skill with a switch, trained against harsh disturbances.
 
 ## Sources
 - Petoi Bittle product page and Doc Center (remote controller, balance and recovery behavior, the BiBoard V1 remote incompatibility).

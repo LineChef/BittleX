@@ -5,7 +5,7 @@ kind: overview
 
 # Current status
 
-G2 is a Petoi Bittle X quadruped that walks with a learned gait, listens and talks through Claude, remembers what it is told, and explores on its own. This page says what works today, what has only been tested in part, and what is still being fixed. It is the single page for the current state, updated after each round of hardware testing, and was last revised on 2026-11-09. Older dated write-ups are in the repository history.
+G2 is a Petoi Bittle X quadruped that walks with a learned gait, listens and talks through Claude, remembers what it is told, and explores on its own. This page says what works today, what has only been tested in part, and what is still being fixed. It is the single page for the current state, updated after each round of hardware testing, and carries its last-changed date in the site header. Dated write-ups stay in the repository's working notes.
 
 The longer story of how each part works is in [How it works](how-it-works.md); the full list of abilities is in [Capabilities](capabilities.md).
 
@@ -24,7 +24,7 @@ The longer story of how each part works is in [How it works](how-it-works.md); t
 - **Brain.** A Raspberry Pi Zero 2 W in a printed pod on G2's back. It runs the voice, memory, vision and walking software, and talks to the BiBoard over a serial cable. Details in [As built](hardware/as-built.md).
 - **Eyes.** A Grove Vision AI V2 camera that runs object detection on the camera itself.
 - **Ears and voice.** A small microphone and speaker on the Pi.
-- **Neck attachment.** A claw arm is fitted, with its camera on the claw. It replaced the Petoi AI Head that was fitted earlier. Wider shoulders were added on 2026-11-03. G2 now weighs a little over 530 g with all of it. How attachments change the settings: [Attachments](guides/attachments.md).
+- **Neck attachment.** A claw arm is fitted, with its camera on the claw. It replaced the Petoi AI Head that was fitted earlier. Wider shoulders are fitted. G2 now weighs a little over 530 g with all of it. How attachments change the settings: [Attachments](guides/attachments.md).
 - **Power.** G2 runs on its own battery pack. The Pi runs on a small PiSugar pack that lasts about three hours.
 
 ## What works
@@ -50,7 +50,7 @@ G2 can wander a room, turn away from walls, react to bumps, stop to take picture
 
 ### The ball goal
 
-G2 can be given a goal: find a ball, walk up to it and punt it. A session is up to ten attempts, and G2 adjusts its approach between attempts based on what worked. More on this in [Goals](guides/goals.md). Results are mixed. Early sessions scored well, and later ones dropped. Part of the cause was found on 2026-11-09: the default turn speed was far lower than the real turn speed, so turns overshot. The fix is deployed and has not been tested on G2.
+G2 can be given a goal: find a ball, walk up to it and punt it. A session is up to ten attempts, and G2 adjusts its approach between attempts based on what worked. More on this in [Goals](guides/goals.md). Results are mixed. Early sessions scored well, and later ones dropped. Part of the cause was a default turn speed far lower than the real turn speed, which made turns overshoot. The corrected default is deployed and has not been tested on G2.
 
 ## What is deployed
 
@@ -84,7 +84,7 @@ Everything below is on the Pi.
 
 The walls goal, "G2, practise", the spoken goal suggestions and operator overrides, the policy walk toward a ball with self-measured pace, vision reflexes while walking, the full application over a long period, the teach tool, the recognition labelling pictures, the per-leg wall look, conversation mode as a hardware test, and the pose read before stand-up.
 
-## Open problems
+## Known limitations
 
 1. **Falls at transitions.** Most falls happen in turns and pose changes. Of 154 logged ball-goal attempts, 18 recorded a fall, 13 of them in turns, and most falls are never logged. Safeguards exist (a pose gate, a steady check, calm stops, the claw look as the only look) but none has had a valid test round. Voided rounds were caused by a drill bug, a voice-module move and a silent board.
 2. **Legs going limp.** After about ten seconds standing still, the leg servos can lose strength. The leading explanation is the servos' overload protection, worst on the back legs, which carry the raised arm. A sag check from the motion sensor now re-stands G2. It is untested on the robot.
@@ -93,7 +93,7 @@ The walls goal, "G2, practise", the spoken goal suggestions and operator overrid
 5. **The board's own voice module** hears the television and starts moves by itself. The command log marks such moves "not from the Pi". "Be quiet" makes the module ignore basic commands, and there is no known way to silence only its spoken "ok".
 6. **The camera** answers each request with the previous picture, so each picture is taken twice and the first dropped. It sometimes stops answering during exploration.
 7. **The wall estimator** needs recalibrating for the claw camera. It reads "8 in" almost every time, so the chase distrusts that reading.
-8. **Late walk ticks** reached 30 percent in exploration. The serial send no longer waits for the bytes to drain. This is untested.
+8. **Late walk ticks** reached 30 percent in exploration. The serial send does not wait for the bytes to drain. This is untested.
 9. **Speech arrives 7 to 17 seconds late** during exploration. Lines are now cached and pre-made at idle.
 10. **Wake-word false triggers.** About four in seven triggers were nearby talk. A confidence threshold is set and is being tuned from the log.
 11. **The bump reflex misses thin obstacles** such as chair legs.
@@ -102,11 +102,11 @@ The walls goal, "G2, practise", the spoken goal suggestions and operator overrid
 14. **Ledges.** No policy crosses step-ups above 0.3 in in simulation.
 15. **Minor.** An unexplained ticking from the board during some walks, and a stiffer, louder back-left shoulder servo.
 
-## Decisions pending
+## Open decisions
 
 - **The Petoi AI Head** is an extra voice model started by its button. Claude stays the main brain and nothing is integrated for now.
 - **Claude descriptions of survey pictures** (one billed call per picture) are on hold.
-- **A new 20-million-step training run** starts only on the owner's go-ahead and never on top of a finished long run.
+- **A new 20-million-step training run** starts only on explicit approval and never on top of a finished long run.
 - **Gait comparisons on G2** are not run. Policies are compared in simulation only.
 
 ## What happens next

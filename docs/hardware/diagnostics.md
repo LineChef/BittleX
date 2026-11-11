@@ -1,7 +1,7 @@
 # Hardware diagnostics and black-box logging
 
 Goal: when something unknown goes wrong on the real robot, have enough recorded
-context to figure out what happened without reproducing it. Drafted 2026-09-05,
+context to figure out what happened without reproducing it. 
 pre-hardware.
 
 ---
@@ -11,7 +11,7 @@ pre-hardware.
 - **Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`)**: **Built and in use**
 - **Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`)**: **Built and in use**
 - **System sampling for battery and Pi thermal (`diag/sysmon.py`)**: Built; the Pi-specific reads degrade to nothing off the Pi
-- **Crash forensics for the voice service and exploration (`diag/crashwatch.py`)**: **Built and in use** (2026-10-08)
+- **Crash forensics for the voice service and exploration (`diag/crashwatch.py`)**: **Built and in use**
 - **Disk-space warning (`util/disk.py`)**: **Built and in use**
 - **Live Wi-Fi stream to a laptop, longer-term trend storage**: **Designed, not built** (Phase 3, only if needed)
 
@@ -179,7 +179,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ## Phasing
 
-- **Phase 1 — DONE (2026-09-08), pre-hardware:**
+- **Phase 1 — DONE, pre-hardware:**
   `pi_pipeline/diag/` built (`f18230c`) — `Diag` JSONL logger + `DiagLogHandler`
   / `bridge_stdlib_logging` + `RingBuffer` + manifest writer (git SHA/dirty,
   config snapshot, policy hash, argv/host) + `python -m pi_pipeline.diag
@@ -190,13 +190,13 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
   - `thermal_guard` / `recovery` — stay pure; their driving loop (`run_gait`)
     logs from the guard snapshot / `last_reason`. **done via the loop.**
   - `serial_link` — emits `link.lost` / `link.reconnect` with a `gap_s`
-    (2026-09-08). **done.**
+. **done.**
   - `BehaviorDriver` — emits `DIAG` *effect* markers on every transition;
     `behavior/diag_bridge.py` `emit_tick(tick)` turns them into
     `mode.transition` / `posture.transition` / `enroll.*` / `cliff.reflex`
     events. 3 tests. **done.**
   - Folding `run_gait --log` CSV in as a ring-buffer source: still open (minor).
-- **Phase 2 — non-hardware parts DONE (2026-09-10):**
+- **Phase 2 — non-hardware parts DONE:**
   - `pi_pipeline/diag/watchdog.py` — `WatchdogCore` (pure timing logic:
     heartbeat Hz + stall latch, fake-clock tested) + `Watchdog` thread. Control
     loop calls `wd.beat()` each tick; the thread logs `sys/INFO/heartbeat`
@@ -224,7 +224,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 Phase 1 is not hardware-gated and pairs naturally with the ONNX-export /
 Pi-bring-up work already queued.
 
-## Disk-space warning (added 2026-10-04)
+## Disk-space warning 
 
 `pi_pipeline/util/disk.py` warns when the SD card passes `G2_DISK_WARN_PCT` (default 85%): the voice service checks at startup and every 30 minutes,
 logs a WARNING (journal) and writes a `disk.full` event to the diagnostics log, and repeats at most every 6 hours while it stays above; dropping
@@ -233,7 +233,7 @@ back below re-arms it. `python -m pi_pipeline.doctor` shows the same figure. The
 `~/g2_runs` and `~/g2_cap`; there is no automatic cleanup of them yet.
 
 
-## Crash forensics for the voice service and exploration sessions (2026-10-08)
+## Crash forensics for the voice service and exploration sessions
 
 A native crash (segmentation fault in Vosk, PortAudio or onnxruntime) kills the process with no Python traceback, so `pi_pipeline/diag/crashwatch.py`
 leaves a record while the process runs and reads it at the next start. Files are in `~/.local/share/g2/crash/` (`G2_CRASH_DIR`):

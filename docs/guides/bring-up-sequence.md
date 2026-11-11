@@ -1,6 +1,6 @@
 # When the hardware arrives — ordered bring-up
 
-> **Moved verbatim from `docs/project-plan.md` on 2026-10-02** when the plan was trimmed to a roadmap. This is the full detail for
+> **Moved verbatim from `docs/project-plan.md`** when the plan was trimmed to a roadmap. This is the full detail for
 > the ordered day-1 bring-up sequence (the executable version is `python -m pi_pipeline.bringup`). Current state is in [`../STATUS.md`](../STATUS.md); the roadmap item is in [`../project-plan.md`](../project-plan.md).
 
 ## When the hardware arrives — ordered bring-up
@@ -9,7 +9,7 @@ The phases above are grouped by system; this is the sequence to actually work
 through once the Bittle X + BiBoard land (the Pi bring-up is already done — see
 Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 
-> **2026-09-20 — pre-arrival research pass against Petoi's official docs.**
+> **Pre-arrival research pass against Petoi's official docs.**
 > Cross-checked this sequence against the actual Bittle X V2 user manual
 > (calibration/first-power-on pages) rather than just firmware source —
 > findings + sourced corrections in
@@ -42,7 +42,7 @@ wired to the frame" and picks up the original step order (weighing,
 serial link, voice, RL, vision, integration) unchanged in substance —
 only renumbered.
 
-> **Update (2026-10-09): walking tests now start on his feet on the floor with your hands near; the user's rule is no held-in-the-air or air-first tests (see [`operating-g2.md`](operating-g2.md)). The stand-only steps below are for assembly, calibration and bench servo work; for anything that walks, follow the newer rule.**
+> **Update: walking tests start with G2 on his feet on the floor and a hand near; no test is held in the air or run air-first (see [`operating-g2.md`](operating-g2.md)). The stand-only steps below are for assembly, calibration and bench servo work; for anything that walks, follow the newer rule.**
 >
 > **Rule: stay on the calibration stand through step 13a. No floor time before
 > then.** Everything through "verify servo signs" — assembly, calibration,
@@ -55,7 +55,7 @@ only renumbered.
 > earned once `--openloop` confirms the servo signs are right — that's the one
 > thing that actually requires ground contact to test honestly (H1, step 13b).
 >
-> **2026-09-28 — stand mismatch.** Petoi shipped the Nybble calibration
+> **Stand mismatch.** Petoi shipped the Nybble calibration
 > stand, not the Bittle one; it doesn't fit G2 cleanly. Order the correct
 > one in parallel. In the meantime, the actual hazard this rule guards
 > against is *the project's own* joint commands with an unknown servo sign
@@ -136,7 +136,7 @@ mechanically," not a guess.
 7. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
 8. `python -m pi_pipeline.doctor --serial` (passive handshake; **note the firmware
    version** in the `?` banner — the gait's command-timing model and 5 Hz IMU throttle
-   were traced from OpenCatEsp32 source as of 2026-09-08) → **on the stand:**
+   were traced from the OpenCatEsp32 source) → **on the stand:**
    `check_serial firstmove` again, now through the Pi → once clean, `send kbalance`
    → `skills` → **`allmoves` again** (same command as Phase 0 step 3, now
    through the Pi's wiring) — diff this session's `events.jsonl` against the

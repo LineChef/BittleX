@@ -67,7 +67,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase3-r
 
 ## `decisions`
 
-Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md) +28.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +28.
 
 - **`hs_report/decisions.md`**: Size: 11 KB; Cited by: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`README.md`](../hardware/README.md), [`project-plan-detail.md`](../plan-detail/project-plan-detail.md) +1
 - **`v6_report/decisions.md`**: Size: 1 KB; Cited by: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`README.md`](../hardware/README.md), [`project-plan-detail.md`](../plan-detail/project-plan-detail.md) +1

@@ -58,7 +58,7 @@ order), the same format the RL env / SkillSwitch consume.
 > Applies for the life of the Pi/PiSugar mount; revisit only if the mount is
 > redesigned to be impact-rated.
 >
-> **`excited` skipped too (2026-09-15).** Investigated as a possible turn-in-place
+> **`excited` skipped too.** Investigated as a possible turn-in-place
 > substitute (see `docs/project-plan.md`'s turning notes) — no confirmed
 > firmware token, best-guess proxy was `tbl`-style bounce/rock, replayed in
 > PyBullet with explicit yaw tracking: ~1° net yaw over 3 cycles, no real

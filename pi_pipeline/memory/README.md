@@ -11,10 +11,10 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
 - **Exchanges**: What: the conversation transcript, one row per turn, mirrored into an FTS5 index; How it's used: relevance-searched at recall time for *older* turns related to what was just said
 - **Facts**: What: short durable notes G2 chose to keep ("Their name is Sam."); How it's used: the top `G2_MEMORY_MAX_FACTS` (by recency of creation/use) are injected every turn
 
-- **Exchanges:** Since 2026-10-07 turns that were only a short command ("rest", "walk forward") and exact repeats within 10 minutes are not logged (`G2_MEMORY_LOG_COMMANDS=1` brings them back); `python -m pi_pipeline.memory.review trash-commands [--apply]` moves the old ones to a trash you can restore from
+- **Exchanges:** Turns that are only a short command ("rest", "walk forward") and exact repeats within 10 minutes are not logged (`G2_MEMORY_LOG_COMMANDS=1` brings them back); `python -m pi_pipeline.memory.review trash-commands [--apply]` moves the old ones to a trash you can restore from
 
 
-### Importance, core facts, sightings, consolidation (2026-10-05)
+### Importance, core facts, sightings, consolidation
 
 
 * **Importance.** The `remember` tool takes an `importance` (1-5; 5 = names, who lives here, pets, how G2 looks). Injected facts are
@@ -29,7 +29,7 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
   survey stops, the room he was mostly in, bumps and falls. Local data only; no picture and no extra API call.
 * **Goal lessons.** A goal session (`goals/`) saves up to 3 notes about what he changed and why ("Punt the ball: Punching from 3 in works best so far: 6 of 8 good, against 2 of 6 with 4 in. I'm keeping it.") as facts with
   source `goal_lesson`, importance 2, never core. Built from his own counts; no API call.
-* **Places** (`places.py`, 2026-11-06). Per room, counts only and no dates or times: things the detector saw, falls and bumps, explorations and goal sessions held there, pictures taken there, the floor. A room is told to him ("you're in the kitchen"), never invented; it lapses after 6 hours. A summary of a room reaches the prompt when it is mentioned or asked about. Falls and bumps are counted here, not written as sightings.
+* **Places** (`places.py`). Per room, counts only and no dates or times: things the detector saw, falls and bumps, explorations and goal sessions held there, pictures taken there, the floor. A room is told to him ("you're in the kitchen"), never invented; it lapses after 6 hours. A summary of a room reaches the prompt when it is mentioned or asked about. Falls and bumps are counted here, not written as sightings.
 * **Goal notes.** One `goal_summary` fact per goal replaces the per-session lessons (those stay in the journal; `G2_GOAL_LESSONS=1` saves them again). Neither kind is put in the chat prompt unless the ball, a goal, practice or learning comes up.
 * **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or he is told to go to sleep, and at least
   `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones

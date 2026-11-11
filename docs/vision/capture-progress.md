@@ -233,7 +233,7 @@ people + pets now; plan a top-up pass once mounted. `ledge` waits for the mount.
 
 ---
 
-## The loop — automated (2026-09-14, recommended)
+## The loop — automated (recommended)
 
 Capture is still manual — everything after it isn't. `g2cam` starts the live
 preview and tells you the exact follow-up when you stop it:

@@ -55,7 +55,7 @@ This is the same pose used earlier (2026-09-28, pre-reflash) to rule out
 a per-leg zero-point offset while chasing the `vtF` stumble; see
 Petoi's assembly guide.
 
-## After the front-left shoulder servo was replaced (2026-10-06)
+## After the front-left shoulder servo was replaced
 
 The front-left shoulder servo (servo 8) was replaced on 2026-10-06 and the
 joint calibration was redone afterwards; the date of the second calibration was
@@ -64,7 +64,7 @@ about 40 degrees per 12.5 s). The walk logs record it.
 Re-run the procedure above and the `kbalance` check after any servo
 replacement.
 
-## Offsets before the arm firmware (2026-10-24)
+## Offsets before the arm firmware
 
 Read from the Petoi Desktop App's Joint Calibrator on the stock Bittle X firmware, with the AI head build, just before the swap to the Petoi robot arm and the Bittle
 X+Arm reflash (a reflash can reset the calibration). The arm's servo cables were unplugged from the BiBoard for the reading. Petoi's labels: "Arm" is the upper leg
@@ -92,7 +92,7 @@ questions, and every leg offset above was unchanged. In the arm build the calibr
 - **2 claw open**: 1 (Auto)
 - **8 to 15 legs**: as in the table above
 
-## After the legs were removed and refitted (2026-10-31)
+## After the legs were removed and refitted
 
 The legs came off for the wide-shoulder and paw fitting, which meant unplugging their servo cables. After refitting, the calibration pose looked right on all four
 legs, but Stand folded both right legs up toward the body and jammed them against the frame, while the left legs stood normally.

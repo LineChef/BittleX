@@ -75,7 +75,7 @@ liveness (replies with a "Do-Re-Mi" tone, works regardless of language --
 tests only that it's not muted); "be quiet" mutes it; "bing bing" is the
 spoken equivalent of `XAa` (switch to English).
 
-**Switching it on and off (confirmed 2026-10-03):** speak to G2. **"Be quiet"** makes the module ignore basic commands such as "rest";
+**Switching it on and off:** speak to G2. **"Be quiet"** makes the module ignore basic commands such as "rest";
 **"play sound"** turns them back on (Do-Re-Mi tone). Per Petoi's docs the module listens continuously with **no wake word**, has 40 fixed
 commands (two languages) plus up to 10 you record yourself in learning mode; **"rest" is one of the fixed commands, "stop" is not.**
 While it is on, a phrase meant for the Pi can also trigger it.
@@ -175,7 +175,7 @@ practice), accel in g, angles in degrees, **yaw printed negated**.
 `PRINT_ACCELERATION` is unconditionally defined in current firmware, so the
 accel triplet is always present — there is no gyro-only variant.
 
-**No angular rate, 5 Hz ceiling — how the Pi side handles it (2026-09-22).**
+**No angular rate, 5 Hz ceiling — how the Pi side handles it.**
 The line carries acceleration, not angular velocity; the raw-gyro print path
 is dead code (commented out in `print6AxisMacro()`, which isn't even
 called). And `print6Axis()` returns early unless 200 ms have passed since its
@@ -314,7 +314,7 @@ English-default fix re-applied** (`XAc`/`XAb`/`XAa`, see the voice module
 section above) since that was EEPROM-persisted too.
 
 **Checked GitHub `main` the same night for anything worth catching up
-on — nothing urgent, one thing to know about.** `B10_260527` (2026-05-27)
+on — nothing urgent, one thing to know about.** `B10_260527`
 is ~6 weeks behind `main`'s newest firmware-code commit (`DATE "260717"`,
 2026-07-17); every commit in that gap was reviewed directly via the
 GitHub API. None of it matters for the project: the camera-kills-IMU bug above is
@@ -328,7 +328,7 @@ module) and unrelated marketing/README commits.
 **One real, small thing this surfaced: the voice-module Chinese-default
 bug (see the voice module section above, first hit 2026-09-28) has an
 actual upstream root-cause fix — but it lands one day after the build.**
-`main` commit `9cf4e8d` (2026-05-28) changes `configConstants.h`'s
+`main` commit `9cf4e8d` changes `configConstants.h`'s
 factory EEPROM default for `EEPROM_CURRENT_LAN` from `'b'` (Chinese) to
 `'a'` (English); a same-day commit (`b189c34`) simplifies
 `voiceSyncAtStartup()`'s language-sync logic (the `Ac->Ab->Aa` special
@@ -473,7 +473,7 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 - Anything using firmware balance (the scripted `kwkF` contender with gyro assist, voice
   skills, the `gB` that `run_gait` restores on exit) depends on this being calibrated.
 
-## More bring-up facts (2026-10-01)
+## More bring-up facts
 
 - `X?` prints the module table; the BiBoard's `?` prints only the name and version.
 - `P` prints the battery voltage (`Voltage: 7.81 V`); readings lag a little and the pack read
@@ -487,7 +487,7 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 - While `gc` is running the IMU readings swing wildly and the body rocks; wait before reading it.
 
 
-## Standing wobble (2026-10-04)
+## Standing wobble
 
 **Symptom:** standing on the calibration stand, G2 is steady at first (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
 

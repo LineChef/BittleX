@@ -21,7 +21,7 @@ Walking, vision, voice and memory are separate systems that run side by side. Th
 ## Phases
 
 - **Repo setup and orientation**: Done.
-- **Walking policy training in simulation**: Done. Several policies were trained, and one is deployed. New gait training starts only on the owner's go-ahead.
+- **Walking policy training in simulation**: Done. Several policies were trained, and one is deployed. New gait training starts only on explicit approval.
 - **Hardware assembly**: Done. The Pi sits in a printed pod, the camera is mounted, and a microphone and speaker are fitted. A claw arm is fitted on the neck. See [As built](hardware/as-built.md).
 - **Basic control**: Done. A serial link to the control board drives walking, turning and the built-in skills.
 - **Sim-to-real deployment**: Walking works on hardwood. Layers for steering, stand-ups, falls and heat protect it. Tile and carpet remain open.
@@ -34,7 +34,7 @@ Walking, vision, voice and memory are separate systems that run side by side. Th
 
 - **Every new training run is a fresh candidate.** A run is scored against the deployed policy and replaces it only if it is clearly better. Policies are never trained on top of a finished long run.
 - **Difficulty never exceeds what a capable policy can pass.** Each simulated hazard has a measured upper limit, and impossible episodes are treated as bugs.
-- **Vision stays out of the walking policy.** Putting vision inside the policy was tried and closed. Vision instead chooses a scripted skill or a speed above the gait.
+- **Vision stays out of the walking policy.** Putting vision inside the policy is out of scope. Vision instead chooses a scripted skill or a speed above the gait.
 - **Cloud calls are used sparingly.** Anything that can run on the Pi, such as command tables, rules and geometry, runs there. See [Voice commands](guides/voice-commands.md) for which commands stay local.
 - **Every stand-up is the slow, eased stand-up.** G2 never uses the firmware's own quick stand-up.
 - **The firmware is not forked.** The software is an application on top of Petoi's OpenCat firmware.

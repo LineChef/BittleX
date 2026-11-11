@@ -14,26 +14,26 @@ Goal (user): G2 looks often enough to notice a wall coming, not so often that co
 4. **Cost control:** no look while sleeping, resting or during a picture stop (the survey picture counts as a look); never faster than once per 3 s; the last 20 estimates are kept in memory and only the log line per look is written (a flagged "turn" case also saves its jpeg to a small ring of 10 for review).
 5. **Failure handling:** two bad grabs in a row (camera error) keeps the current behavior (short legs of 3 s) and logs it; the wall logic must never block the safe stop.
 
-## Calibration from pictures (2026-10-10)
+## Calibration from pictures
 The first calibration was built from labelled recognition pictures, not by moving a box: `python -m pi_pipeline.vision.wall_distance pictures ~/g2_wall_pics shot_007 shot_008 shot_009 shot_010 shot_011` (the same median-of-the-middle-three-groups rule as `calibrate`; `calibrate_from_pictures` / `check_against_pictures` in `wall_distance.py`).
 
 Pictures were taken with G2 standing, wall straight on, at 8, 12, 16, 24 and 40 in; the second pass (picked up and re-placed each time) repeated within 3 px, and a simple lens model (floor line = 115 + 608 / distance in inches, in a 240 px picture) fits to 2 px.
 
 Limits: rows come in steps of 1/24 of the picture (10 px), so between 8 and 24 in the reading is good to about 2 to 4 in, and beyond 24 in it only tells far from near (24 to 40 in differ by 14 px). Pictures stay on the Pi (`~/g2_wall_pics`), never in the repo.
 
-## Wall and detection logging (2026-10-10)
+## Wall and detection logging
 Every wall look in an exploration session is one line in `~/.local/share/g2/wall_dryrun.jsonl`: time, state (`clear` / `far` / `near` = nearest wall base at or inside 12 in / `blocked`), nearest distance in inches and per column group, the turn it would make, the exploration mode, and for near / blocked looks a picture name; the pictures are a ring of the newest 20 in `~/.local/share/g2/wall_pics` (plus one clear look every 5 minutes, for comparison).
 
 Detections (animals) were already logged per day in `~/g2_runs/detections/`. Read both with `python -m pi_pipeline.vision.wall_stats [--days N]`: looks per state, a histogram of the nearest wall in inches, the turns it would make, the times he stayed near a wall, and how often each detection label was seen. `G2_WALL_DRYRUN=0` turns the wall log off. Nothing here moves G2.
 
-## False near readings and the wall-height rule (2026-10-10)
+## False near readings and the wall-height rule
 A wall 10 ft away read as 9 in because a bright sheen on the glossy floor looked like an obstacle base. `base_rows` now takes an obstacle only if it rises at least 6 consecutive grid rows (a quarter of the picture); shorter patches (a sheen, a floor-grain strip) are skipped and the search goes on upward.
 
 Checked on the 13 saved pictures: 10 ft now reads 40 in or more ("far"), the 16 in shot that had a floor-grain outlier reads 16 in on all groups, and every wall from 8 to 40 in is unchanged. Still biased: the 6 ft shot reads about 20 in because the wall's own reflection on the floor adds a row or two; beyond 24 in the estimator can only tell far from near.
 
 The log also marks `near_confirmed` when two looks in a row are near. A chair or table leg (narrow, under a quarter of the picture tall) is no longer an obstacle for this estimator.
 
-## Prototype picture set 1 and the camera roll (2026-10-10)
+## Prototype picture set 1 and the camera roll
 The first 13 wall pictures are **prototype set 1** (about 4 deg of camera roll, the floor line 12 px lower on the right than the left on all 11 straight-on shots; shots 1 to 9 overexposed, mean brightness about 172 against a target of about 100; taken through the voice service's picture path, not the detection feed the exploration peeks use).
 
 The user decided NOT to correct the roll in software (a fixed correction could throw other readings off) and to retake better pictures in a later session, accepting that left/right turning may be a little off at first; the roll is recorded in the labels file for that session. The calibration built from set 1 is provisional.
@@ -77,7 +77,7 @@ It takes priority over the 24 in / 12 in wall turn and holds off new wall reacti
 
 Not built yet: a contact signal that does not depend on the 3 s look (no forward progress from the speed estimate, the jam guard's servo strain, or a sudden IMU pitch change), so a hit that happens between looks is only caught at the next look. Not yet tested on G2 (the Pi was out of battery).
 
-## Camera timing, warm-up and the failure signal (2026-10-10)
+## Camera timing, warm-up and the failure signal
 Every exploration or voice picture now: waits until the IMU shows G2 has stopped swaying (`gait/stillness.py`: the newest 5 frames, 1 s, within 0.5 deg; it gives up after 6 s and takes the picture anyway, and a missing IMU never blocks one), warms the camera up for EVERY picture (`G2_PICTURE_PREP_EVERY_S` default 0; the voice service meters the light before every look), and is taken again once, keeping the better, when its brightness is outside 85 to 140 or more than 2% is blown out; the saved `.json` says whether it was still and retaken.
 
 The survey stand settle is 3.3 s (2.5 s plus the 0.8 s eased stand-up ramp).
@@ -87,7 +87,7 @@ Any failed command plays the wrong-answer horn (`voice/fail_sound.py`, at most o
 ## Where this is going
 Once wall avoidance is reliable, which will take more sessions with varied wall types and the planned training photos, most of the random turns can be switched off so he bounces around like a robot vacuum. Not yet: keep the explorer's turns (8 s legs) until the avoider has been shown reliable on several wall types.
 
-## A new leg after a wall look turns toward the open side (2026-10-10)
+## A new leg after a wall look turns toward the open side
 When the explorer starts a new leg and the freshest wall look (under 8 s old, a wall within 60 in) names a side with more room, the new heading goes that way (at least 0.6 rad) instead of the explorer's random heading. It uses only the looks he already takes; no extra camera use. `G2_LEG_TURN_OPEN=0` turns it off. The backup behaviour the user described (a hit he did not turn away from in time: oof, back up, turn away again) is the hit sequence above; a separate bounce mode was not needed.
 
 ## Steps

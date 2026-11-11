@@ -17,7 +17,7 @@ Front is the head end; left and right are G2's left and right.
 - **Speaker**: **At the rear of the pod**, wings in the side grooves, body toward the rear grille. Its 2-pin lead goes to the rear end of the amp
 - **Amplifier (NS4168)**: On the **right wall**, bottom edge in a slot, top edge under two nubs, set with a dab of glue
 - **Microphone (SPH0645)**: On the **right wall near the front**, in slots in a post and a ledge; the port faces the wall, the header is at the front edge. A fork under the panel holds its top edge
-- **Petoi AI head**: On the neck in place of the stock head (2026-10-18): its servo in the stock head's servo port
+- **Petoi AI head**: On the neck in place of the stock head: its servo in the stock head's servo port
 - **BiBoard link**: Three jumpers (TX2, RX2, GND) from the Pi header to BiBoard's 5-pin socket; the two +5V sockets stay empty (the Pi has its own power). Wire detail: [`build-logs/pi-biboard-build-notes.md`](../docs/hardware/build-logs/pi-biboard-build-notes.md)
 
 - **Pod (body + top panel):** Clicks onto the four pegs: set it 7 mm behind its place with the grille to the rear, slide it 7 mm forward until it clicks (about 3.2 N). No tools, glue or tape. To remove: open the panel, pull the three BiBoard plugs off, slide the body 7 mm rearward and lift
@@ -28,7 +28,7 @@ Front is the head end; left and right are G2's left and right.
 
 What changed from the interim mount (2026-09-29 to 2026-10-17): the camera moved from the front of the case to the top of the pod, the speaker stays at the very back, and the microphone moved from the top of the lid to the right wall near the front. The payload is now inside one pod instead of PiSugar's own case velcroed to a modified cover. The pod is designed for the **PiSugar S**. The project's site, guide and 3D viewer say "PiSugar 2" throughout; that is an error in their documentation (confirmed by the owner, who is the case's designer), so read every "PiSugar 2" there as the PiSugar S.
 
-**Mass:** the design's own figure is **135 g with the electronics** (center of mass 9.0 mm from the robot center). **G2's weighed payload (Pi, PiSugar S, camera, speaker, microphone, wiring and the pod) is 185 g** (2026-10-17), against 168 g with the previous mount: 17 g (about 10%) more.
+**Mass:** the design's own figure is **135 g with the electronics** (center of mass 9.0 mm from the robot center). **G2's weighed payload (Pi, PiSugar S, camera, speaker, microphone, wiring and the pod) is 185 g**, against 168 g with the previous mount: 17 g (about 10%) more.
 
 G2 now also carries the **Petoi AI Head** (42 g, Petoi's figure; it replaces the stock head on the head servo), counted on top of the 185 g: payload **227 g**, about 50% of Petoi's recommended 1 lb (453.6 g) maximum carry (owner's recollection, not yet sourced). With the base robot unchanged at about 254 g, the whole robot is about **481 g** (was 422 g).
 

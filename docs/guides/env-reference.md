@@ -146,7 +146,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 - **`G2_FLOOR_PROMPT_S`**: Default at the read: `"10"`; Read in: `loop.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - **`G2_FLOOR_SKIP`**: Default at the read: —; Read in: `g2_explore.sh`; Documented in: [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md)
 - **`G2_FLOOR_TRIM_MAX_AGE_H`**: Default at the read: `FLOOR_LABEL_MAX_AGE_H`; Read in: `heading_hold.py`; Documented in: [`gait-deployment.md`](gait-deployment.md), [`settings-switches.md`](settings-switches.md)
-- **`G2_FOLLOW_UP_S`**: Default at the read: `3.0`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`pi-bring-up.md`](pi-bring-up.md), [`settings-switches.md`](settings-switches.md) +1
+- **`G2_FOLLOW_UP_S`**: Default at the read: `3.0`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`operating-lessons.md`](operating-lessons.md), [`pi-bring-up.md`](pi-bring-up.md) +2
 - **`G2_FOOT_HOLD`**: Default at the read: `"off"`; Read in: `heading_hold.py`; Documented in: [`.env.example`](../../.env.example), [`gait-deployment.md`](gait-deployment.md)
 - **`G2_FOOT_HOLD_FF`**: Default at the read: `"0"`; Read in: `heading_hold.py`; Documented in: not documented
 - **`G2_FOOT_TRIM`**: Default at the read: —; Read in: `heading_hold.py`; Documented in: [`attachments.md`](attachments.md), [`gait-deployment.md`](gait-deployment.md), [`settings-switches.md`](settings-switches.md)
@@ -241,7 +241,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 - **`G2_PROFILE`**: Default at the read: `"0"`; Read in: `explore_session.py`; Documented in: [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md), [`diagnostics.md`](../hardware/diagnostics.md)
 - **`G2_PROMPT_CACHE`**: Default at the read: `"1h"`; Read in: `config.py`, `api_log.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - **`G2_PUNT_SETTINGS`**: Default at the read: `PATH`; Read in: `punt_settings.py`; Documented in: not documented
-- **`G2_QUESTION_WINDOW_S`**: Default at the read: `3.0`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md)
+- **`G2_QUESTION_WINDOW_S`**: Default at the read: `3.0`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`operating-lessons.md`](operating-lessons.md), [`settings-switches.md`](settings-switches.md) +1
 - **`G2_RECALL_MAX_CHARS`**: Default at the read: `2400`; Read in: `config.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - **`G2_REFLECT`**: Default at the read: `"dry"`; Read in: `config.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - **`G2_REFUSE_SOUND`**: Default at the read: —; Read in: `loop.py`, `prompt_tones.py`; Documented in: [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md)

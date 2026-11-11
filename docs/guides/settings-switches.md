@@ -13,7 +13,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - **`G2_WALL_SOUND`**: Default: on; What it does: the two-note turn-away sound
 - **`G2_HIT_SOUND`**: Default: on; What it does: the long "ooooof" when he hits a wall
 - **`G2_ACK_TONE`**: Default: `short_tone`; What it does: what acknowledges a command sent to Claude: `short_tone`, `ack_whistle`, `buzzer`, `off` (`star_trek_whistle` still works)
-- **`G2_FOLLOW_UP_S`**: Default: 3 (5 until 2026-11-01); What it does: seconds the mic stays open after a reply (0 = no window, so no closing notes); `G2_QUESTION_WINDOW_S` (3; 8 until 2026-11-01) after a question
+- **`G2_FOLLOW_UP_S`**: Default: 3; What it does: seconds the mic stays open after a reply (0 = no window, so no closing notes); `G2_QUESTION_WINDOW_S` (3) after a question
 
 ## Exploration and walls
 
@@ -45,10 +45,10 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 
 - **`G2_STAND_RAMP_S`**: Default: 0.8; What it does: the eased stand-up (`off` / 0 = the old single jump; tests turn it off)
 - **`G2_TRANSITION_RAMP_S`**: Default: 2.0; What it does: the longest eased move into a firmware skill's first frame (`link/transitions.py`)
-- **`G2_EASE_PICTURE_POSES`**: Default: off; What it does: `1` eases the bow, look up and check like every other skill (`link/transitions.py`); off by default since 2026-10-18 (user: eased they were too slow)
+- **`G2_EASE_PICTURE_POSES`**: Default: off; What it does: `1` eases the bow, look up and check like every other skill (`link/transitions.py`); off by default because the eased poses are too slow
 - **`G2_POSE_BALANCE`**: Default: on; What it does: every pose (a firmware skill that is not a gait, the stand, lying down or calibration) plays with the firmware gyro balance on
 - **`G2_WAKE_LOG`**: Default: `~/.local/share/g2/wake_triggers.jsonl`; What it does: every wake trigger and what followed it, for counting false triggers (`python -m pi_pipeline.voice.wake_log --days 7`); `off` turns it off
-- **`G2_WAKE_MIN_CONF`**: Default: 0.6 (was 0, off; 2026-11-06); What it does: a wake phrase Kaldi is less sure of than this (0 to 1, lowest word confidence) is ignored
+- **`G2_WAKE_MIN_CONF`**: Default: 0.6 (0 turns the check off); What it does: a wake phrase Kaldi is less sure of than this (0 to 1, lowest word confidence) is ignored
 - **`G2_EXPLORE_INPROCESS`**: Default: 0; What it does: `1`: "go ahead and look around" runs the exploration inside the voice service (same link, walker, memory, speech engine and microphone; no (see below)
 - **`G2_FLOOR_TRIM_MAX_AGE_H`**: Default: 12; What it does: a floor label older than this is not used to pick a per-floor trim (`g2attach floor-trim`); the general trim applies
 - **`G2_BODY_STATE`**: Default: `~/.local/share/g2/body_state.json`; What it does: how the body has been doing (low battery, a recent fall, the last exploration), folded into each Claude turn's mood hint and the idle timing (`personality/body.py`); `off` turns it off
@@ -69,17 +69,17 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - **`G2_ANNOUNCE_ONLINE`**: Default: on; What it does: `off` silences "G2 online."
 
 - **G2_TRANSITION_RAMP_S:** a move takes as long as its fastest joint needs to stay under 80 deg/s (at least 0.25 s; the bow, look up and check are not eased), sent 40 times a second; `off` / 0 = the firmware's own jump; tests turn it off
-- **G2_POSE_BALANCE:** `gB` just before it, after its ease; the stand guard sends `gb` once he has been still for its quiet window (`link/transitions.py`, `gait/stand_guard.py`). On since 2026-10-19 (user: the pod swinging tipped him in poses that ran with balance off); `0` goes back to balance off
+- **G2_POSE_BALANCE:** `gB` just before it, after its ease; the stand guard sends `gb` once he has been still for its quiet window (`link/transitions.py`, `gait/stand_guard.py`). On by default, because the pod swinging tipped G2 in poses that ran with balance off; `0` goes back to balance off
 - **G2_WAKE_MIN_CONF:** 0 = off. Every trigger logs its confidence (`journalctl -u g2-voice \| grep "wake word"`); pick the value once real calls and background talk separate
 - **G2_WAKE_MIN_CONF:** Raise it for fewer false triggers, lower it if he stops hearing you. The look-alikes “gg”, “gee gee” and similar never wake him.
 - **G2_EXPLORE_INPROCESS:** `1`: "go ahead and look around" runs the exploration inside the voice service (same link, walker, memory, speech engine and microphone; no stop and restart of `g2-voice`, no second Piper/Vosk load). Needs `explore`, `vision` and `vision_safety` on in the service's own `G2_FEATURES`; otherwise, or at `0`, the separate `g2-explore` session runs as before. Not yet tried on G2
 - **G2_FLOOR_PROMPT_S:** Asked when the floor label is unknown or older than `G2_FLOOR_PROMPT_MAX_AGE_H` (default `1` hour); answer a floor ("tile") or "same"; no answer never blocks the roam
 
 
-## Exploration pictures, contact and one-sound-at-a-time (2026-10-10)
+## Exploration pictures, contact and one-sound-at-a-time
 
 - **`G2_SURVEY_CLAW`**: Default: auto; What it does: with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) (see below)
-- **`G2_AVOID_CHIRP`**: Default: off; What it does: `1` brings back the soft chirp when he turns away from a wall (off since 2026-11-06)
+- **`G2_AVOID_CHIRP`**: Default: off; What it does: `1` brings back the soft chirp when he turns away from a wall (off by default)
 - **`G2_POSE_GATE`**: Default: on (unproven); What it does: before a move that follows a pose change, and before a pose change shortly after a move, the body's real tilt is checked and lagging legs are re-seated; `0` turns it off (see `plan-detail/falls-at-transitions-2026-11-06.md`)
 - **`G2_STOP_CALM`**: Default: on (unproven); What it does: a firmware move waits up to 0.4 s for a calm moment before its stop; `0` stops immediately as before
 - **`G2_LEG_CORRECT`**: Default: on (unproven); What it does: a leg joint the board holds off its stand angle after a stand-up is driven back to it (just those joints, read back); `0` reports only
@@ -107,7 +107,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - **G2_RELEASE_VOICE:** a line that needs synthesis during the session loads it first (about 10 s); `0` keeps it loaded
 
 
-## Locations, logs and limits (added 2026-10-17)
+## Locations, logs and limits 
 
 Where G2 keeps things, and the limits people occasionally change. Every variable the code reads, with its default, is listed in [`env-reference.md`](env-reference.md).
 
@@ -135,13 +135,13 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 - **`G2_NOISE_LOG`**: Default: `~/.local/share/g2/noise.jsonl`; What it does: the log of BiBoard commands that make a noise; `off` turns the file off
 - **`G2_GAIT_MODE_FILE`, `G2_GALLERY_PENDING`**: Default: `~/.local/share/g2/gait_mode.json`, `.../gallery_pending.json`; What it does: the shared gait mode and the pictures queued for the object gallery
 - **`G2_STATE_DIR`**: Default: `~/.local/share/g2`; What it does: where `bringup` keeps its progress file
-- **`G2_DEFAULT_GAIT`**: Default: `firmware` (since 2026-11-08; was `policy`); What it does: `firmware`: walks are Petoi's scripted gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, and the (see below)
+- **`G2_DEFAULT_GAIT`**: Default: `firmware` (`policy` selects the learned walk); What it does: `firmware`: walks are Petoi's scripted gait (`kwkF`, played as `wkArmF` on the arm): the voice service makes no learned walker, and the (see below)
 - **`G2_GYRO_BALANCE` (and `G2_EASING`, `G2_BLENDING`, `G2_GAIT_SWITCHING`, `G2_SKILLS`, `G2_FALL_RECOVERY`)**: Default: unset (the fitted attachment's profile decides); What it does: `0` / `1` overrides that attachment profile flag for one run, so a hardware A/B needs no profile edit or deploy
-- **`G2_GYRO_GAITS`**: Default: off (experiment, 2026-11-08); What it does: `1`: the firmware gyro balance is switched on (`gB`, then a 0.3 s gap, `G2_GYRO_GAIT_GAP_S`) just before a scripted gait and stays (see below)
+- **`G2_GYRO_GAITS`**: Default: off (experiment); What it does: `1`: the firmware gyro balance is switched on (`gB`, then a 0.3 s gap, `G2_GYRO_GAIT_GAP_S`) just before a scripted gait and stays (see below)
 - **(no switch) the stand-up**: Default: always the eased `K` skill on the arm build; What it does: **Hard rule:** every stand-up is the board-played eased `K` skill, from rest, a sit, the attention pose or the pose the board reports
 - **`pi_pipeline/motion_feel.py` (and `G2_STAND_STEPS`, `G2_STAND_SPEED`, `G2_STAND_PAUSE`, `G2_STAND_WAIT_S`, `G2_CLAW_DEG_S`, `G2_CLAW_STEPS_PER_S`; override file `~/.local/share/g2/motion_feel.json` on the Pi)**: Default: the numbers in that file; What it does: how slow moves feel: the `K`-skill stand-up's stages, speed, pause and wait, and the claw raise's speed and step rate. The file explains each number
 - **`G2_MOTION_EVENTS`**: Default: on (`~/.local/share/g2/motion_events.jsonl`); What it does: one line per stand-up: the pose the board reported before it, whether he was laid in rest first (an unknown or unreadable (see below)
-- **`G2_ATT_STAND`**: Default: `smooth` (since 2026-11-08); What it does: the stand-up from the attention pose is one motion: the front legs start 0.35 s after the back legs (when they are (see below)
+- **`G2_ATT_STAND`**: Default: `smooth` ; What it does: the stand-up from the attention pose is one motion: the front legs start 0.35 s after the back legs (when they are (see below)
 - **`G2_CONVERSATION_WINDOW_S`, `G2_CONVERSATION_MAX_S`**: Default: 20, 600; What it does: conversation mode ("let's talk"): how long G2 waits for you to start each turn, and the session limit; 0 for the window turns the mode off
 - **`G2_CONVERSATION_MAX_WORDS`, `G2_SIDE_MAX_WORDS`**: Default: 30, 14; What it does: a turn heard without the wake word that runs longer than this is dropped before Claude (the first number applies in conversation mode); 0 means no limit
 - **`G2_VOLUME`**: Default: 65; What it does: the one volume, percent of max, for every sound G2 plays (his voice, the tones, the alarms, the camera sounds) and the buzzer (65 -> `b6`); held to 75. No sound has a level of its own
@@ -149,9 +149,9 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 - **`G2_TASK_SCOPE_STRICT`**: Default: off (on in the tests); What it does: `1` makes a task that changes a setting it did not declare raise (util/task_scope.py)
 - **`G2_BATTERY_STRICT`**: Default: off; What it does: `1` stops a test when the pack cannot be read (default: warn and go on)
 
-- **G2_STOP_MIN_CONF:** A stop phrase counts only when the recogniser has finished the sentence, the whole sentence is the phrase, and every word has at least this confidence (0 = no confidence check). A stop heard then while G2 lies at rest is ignored, not announced. Noise used to be taken for "abort" and "halt" and he said "Stopping." over and over (2026-11-04)
+- **G2_STOP_MIN_CONF:** A stop phrase counts only when the recogniser has finished the sentence, the whole sentence is the phrase, and every word has at least this confidence (0 = no confidence check). A stop heard then while G2 lies at rest is ignored, not announced. Noise used to be taken for "abort" and "halt" and he said "Stopping." over and over
 - **G2_GOAL_INPROCESS:** goal sessions (`g2ball`, "G2, ball goal") run inside the running voice service, borrowing its serial link, IMU stream and camera, so the port to the BiBoard is never closed. `0` = the old hand-over: the service is stopped, the session runs on its own, the service is started again (also `g2goal run GOAL --standalone`). Needs a serial link and a camera in the service, else it falls back by itself
-- **G2_DROP_FRAGMENTS:** a turn of one or two filler words ("yeah", "ah", "the") right after the wake word is dropped with no reply and no saved record, and in the follow-up window (no question asked) a single word or filler pair is dropped too. `0` brings the old behaviour back. (2026-11-06: half of a week's wake triggers were false)
+- **G2_DROP_FRAGMENTS:** a turn of one or two filler words ("yeah", "ah", "the") right after the wake word is dropped with no reply and no saved record, and in the follow-up window (no question asked) a single word or filler pair is dropped too. `0` turns the filter off. Half of the wake triggers logged in one week were false, which is why it exists
 - **G2_PLACES:** short summaries reach the prompt when a room is mentioned or asked about. `python -m pi_pipeline.memory place list` shows it
 - **G2_GOAL_LESSONS:** by default the notes stay in the journal and ONE `goal_summary` fact per goal is kept, shown in chat only when the ball, a goal or practice comes up
 - **G2_PROMPT_CACHE:** the part of every Claude request that never changes (tool list and system prompt, about 2,500 tokens) is cached and billed at a tenth of the input price on a hit: `1h`, `5m` or `off`. The mood, narration and gait hints sit after the cached part so changing one never resets it. `g2api` shows the tokens read from the cache
@@ -177,7 +177,7 @@ On the Mac and in the tools:
 
 - **`G2_DATA_DIR`**: Default: `~/g2_data`; What it does: the Mac's real-data store
 - **`G2_CAL_POLICIES`**: Default: the frozen reference and the newest final policy; What it does: the policies a calibration must not harm (the harm check)
-- **`G2_REMOTE_MEMORY_DB`**: Default: `.local/share/g2/g2_memory.db`; What it does: the memory database `g2membackup` copies, relative to the Pi user's home
+- **`G2_REMOTE_MEMORY_DB`**: Default: `.local/share/g2/g2_memory.db`; What it does: the memory database `g2membackup` copies, relative to the Pi account's home directory
 - **`G2_REVIEW_NO_OPEN`**: Default: unset; What it does: set it to stop the review page (`g2pics`, `g2pimem`) from opening a browser
 - **`G2_VISION_CLASSES`**: Default: unset; What it does: the class order for the vision library, e.g. `a,b,dog,cat`; the real names are personal, so set it in your shell, not in the repo
 - **`G2_CAM_PORT`, `G2_CAM_AEBUMP`, `G2_CAM_IDLE_EXIT`**: Default: first camera port, `0x30`, 10; What it does: the camera preview: serial port, auto-exposure lift (0 disables) and the idle-exit seconds

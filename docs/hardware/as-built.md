@@ -9,13 +9,13 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 - **IMU**: What it is: ICM42670 (6-axis, no magnetometer) on the BiBoard; Notes: Stock stream is 5.0 Hz; `az` reads about 9.9 m/s² at rest; Detail: [`petoi-firmware-reference.md`](petoi-firmware-reference.md)
 - **Computer**: What it is: Raspberry Pi Zero 2 W (WH kit), 32 GB microSD; Notes: Debian 12 on the Pi; deployed to by `rsync`; Detail: [`../guides/pi-bring-up.md`](../guides/pi-bring-up.md)
 - **Pi power**: What it is: PiSugar S, 1200 mAh; Notes: Powers the Pi independently of the robot's pack; no battery readout (runtime is estimated from uptime); after a clean shutdown the Pi stays powered until the PiSugar switch is flipped by hand; Detail: [`pi-power.md`](pi-power.md)
-- **Camera**: What it is: Petoi AI Vision Camera Module (Grove Vision AI V2: Cortex-M55 + Ethos-U55); Notes: On the Pi's USB (`/dev/ttyACM0`); runs the detector on itself and sends detections, not video; on top of the pod at the front, lens forward (since 2026-10-17); Detail: [`../vision/README.md`](../vision/README.md)
-- **Microphone**: What it is: HiLetgo SPH0645 I²S MEMS breakout; Notes: On the Pi header; on the pod's right wall near the front (since 2026-10-17). Very quiet: digital gain is applied in software; Detail: [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md)
+- **Camera**: What it is: Petoi AI Vision Camera Module (Grove Vision AI V2: Cortex-M55 + Ethos-U55); Notes: On the Pi's USB (`/dev/ttyACM0`); runs the detector on itself and sends detections, not video; on top of the pod at the front, lens forward ; Detail: [`../vision/README.md`](../vision/README.md)
+- **Microphone**: What it is: HiLetgo SPH0645 I²S MEMS breakout; Notes: On the Pi header; on the pod's right wall near the front . Very quiet: digital gain is applied in software; Detail: [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md)
 - **Speaker**: What it is: NULLLAB NS4168 I²S amplifier with 3 W speaker; Notes: On the Pi header (shares the mic's I²S clock lines); speaker at the rear of the pod, amp on its right wall; Detail: [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md)
-- **Wide shoulders and paws**: What it is: Printing, not installed (2026-10-24): 0.2 in wider shoulder parts (track 2.76 to 3.16 in) and four hinged clip-on paws; Notes: Chosen from simulator results only; Detail: [`../../blueprints/paws-and-wide-shoulders.md`](../../blueprints/paws-and-wide-shoulders.md)
+- **Wide shoulders and paws**: What it is: Printing, not installed: 0.2 in wider shoulder parts (track 2.76 to 3.16 in) and four hinged clip-on paws; Notes: Chosen from simulator results only; Detail: [`../../blueprints/paws-and-wide-shoulders.md`](../../blueprints/paws-and-wide-shoulders.md)
 - **Case**: What it is: Bittle X Platform v3.2 (stock back cover with four pegs) plus the Bittle X Pi add-on v0.24 pod, designed for the PiSugar S and this project's parts; Notes: [project page and files](https://beetlebugorg.github.io/bittlex/); Detail: [`../../blueprints/mounting.md`](../../blueprints/mounting.md)
 
-- **Case:** clicks on, no tools. Installed 2026-10-17; replaces the velcroed PiSugar case on a modified cover
+- **Case:** clicks on, no tools. It replaces the earlier velcroed PiSugar case on a modified cover
 
 
 ## Connections
@@ -26,7 +26,7 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 - **Pi to mic and amp**: The 40-pin header, I²S (`googlevoicehat-soundcard` overlay)
 - **Wi-Fi**: Home network, with a phone hotspot saved as a backup
 
-- **AI head to BiBoard:** Grove cable in G1 (UART2) with all four wires, so the head shares UART2 with the Pi and can send firmware commands (skills, rest, `g` = gyro toggle) when you talk to it. Kept this way by the owner's choice (2026-10-18) with the rules in [`../guides/operating-g2.md`](../guides/operating-g2.md); the no-risk alternative is power without the data lines, through a spare Grove cable or adapter with only +5 V and GND (the head's own cable is one molded plug)
+- **AI head to BiBoard:** Grove cable in G1 (UART2) with all four wires, so the head shares UART2 with the Pi and can send firmware commands (skills, rest, `g` = gyro toggle) when it is spoken to. The operating rules for this arrangement are in [`../guides/operating-g2.md`](../guides/operating-g2.md). A lower-risk alternative is power without the data lines, through a spare Grove cable or adapter with only +5 V and GND (the head's own cable is one molded plug)
 
 
 Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html).
@@ -34,7 +34,7 @@ Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../..
 ## Mass and balance
 
 - **Base robot**: about 254 g
-- **Payload (Pi, PiSugar, camera, speaker, mic, wiring, pod)**: **185 g** weighed 2026-10-17 (the project's own model figure is 135 g). The previous mount's payload was 168 g, roughly 100 × 40 × 38 mm
+- **Payload (Pi, PiSugar, camera, speaker, mic, wiring, pod)**: **185 g** as weighed (the simulation model uses 135 g). The earlier mount's payload was 168 g, roughly 100 × 40 × 38 mm
 - **Petoi AI Head**: 42 g (Petoi's figure), on the head servo in place of the stock head; counted on top of the payload above
 - **Whole robot**: about 481 g (254 g base + 185 g payload + 42 g AI head). With the previous mount and no AI head: about 422 g
 - **Front/rear share, standing**: not weighed with the pod and AI head; the sim says about 51% front. With the previous mount: about 46% front, 54% rear (measured range roughly 44 to 50%)

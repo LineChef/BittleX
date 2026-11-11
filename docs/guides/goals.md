@@ -22,7 +22,7 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
 - **It ends by itself**: after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand)
 - **A fall after a good punt**: the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit (see below)
 
-- **Start:** He says "Starting the goal: punt the ball." and the session runs **inside the running voice service** (since 2026-11-05): nothing is stopped or restarted, the serial port to the BiBoard is never closed, and the service's camera and IMU stream are used. Without voice: `g2ball` (same as `g2goal run ball_punt`): it asks the running service to start the goal and follows its log in your terminal
+- **Start:** He says "Starting the goal: punt the ball." and the session runs **inside the running voice service** : nothing is stopped or restarted, the serial port to the BiBoard is never closed, and the service's camera and IMU stream are used. Without voice: `g2ball` (same as `g2goal run ball_punt`): it asks the running service to start the goal and follows its log in your terminal
 - **Old way:** It is also the fallback when the service has no camera or serial link. After a stop and restart the BiBoard often went silent to the Pi (no answer to `P`, no IMU frames, the session ended `board_silent`, [`../STATUS.md`](../STATUS.md) open problems 15 and 18)
 - **Stop:** use `g2ballstop` (or `g2goal stop`; he finishes the current move and rests) or `g2stop`. Ctrl-C in the `g2ball` terminal asks the session to stop
 - **A fall after a good punt:** the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit, noted "then I fell", and counts for what he learns; the session still ends. A fall with no successful punt stays a fall (score 0)
@@ -33,8 +33,7 @@ He stands still for 5 s between attempts and rests at the end. Short cues: "targ
 ## 3. His suggestions
 
 Most settings are his to change ("free"). A few belong to the operator: he may only suggest a change ("ask"; today only the lunge speed), and some he never touches ("fixed").
-When the voice service comes back after a session, he says each new suggestion, for example *"I have a suggestion from my practice at punt the ball: a lunge time of 0.1 s instead of
-0.12 s, because I punched from 3.1 in but the ball only went 4 in. Say confirm, cancel, or review."* No wake word is needed for the answer.
+When the voice service comes back after a session, he says each new suggestion, for example *"I have a suggestion from my practice at punt the ball: a lunge time of 0.1 s instead of 0.12 s, because I punched from 3.1 in but the ball only went 4 in. Say confirm, cancel, or review."* No wake word is needed for the answer.
 
 - **"confirm" (or "yes")**: the change goes into the punt settings file
 - **"cancel" (or "no")**: dropped; he will not suggest that value again for a while
@@ -68,7 +67,7 @@ the same floor, the values he keeps hold their record in the next session, the n
 Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 
 **Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
-attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt". A measured rate replaces the default only after 2 clean samples (`MIN_SAMPLES` in `behavior/chase_pace.py`); until then the defaults time the moves: 28 deg/s for a turn and 24 for a pulse since 2026-11-09 (they were 6 and 4, the old arm policy turn, while the firmware turn that is now the default gait runs about 28, so every plain turn overshot). Plain turns and the turn after a claw look stop on the gyro like the line-up turns.
+attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt". A measured rate replaces the default only after 2 clean samples (`MIN_SAMPLES` in `behavior/chase_pace.py`); until then the defaults time the moves: 28 deg/s for a turn and 24 for a pulse (the firmware turn that is the default gait runs about 28, and lower defaults made every plain turn overshoot). Plain turns and the turn after a claw look stop on the gyro like the line-up turns.
 
 ### Editing from the Goals tab
 
@@ -109,7 +108,7 @@ file. Every override is in the report under "Overrides". `g2goal reset ball_punt
 - **Plain punts count too.** A "G2, punt" or `g2punt` attempt is scored and added to the ball goal's records (shown as "Plain punt" in the report); nothing is changed by it.
 - **A new floor or new hardware starts from his best elsewhere.** His records are kept per attachment, floor and hardware epoch. Under new conditions he starts from his best
   values on the nearest other ones (the same floor on the previous hardware first), with fresh records, so old evidence never holds him at an old answer. **When the hardware changes
-  the hardware** (ARM2's wider shoulders and paws, a new servo), add an entry to `pi_pipeline/telemetry/hardware_epochs.json` (or ask Claude Code to) and deploy; his walking
+  the hardware** (ARM2's wider shoulders and paws, a new servo), add an entry to `pi_pipeline/telemetry/hardware_epochs.json` and deploy; his walking
   pace and turn rates start from the old values the same way.
 - **A settled setting is left alone.** When one value clearly beats the values next to it, he moves on to the next setting his failures point at; it is looked at again if that
   value starts failing.
@@ -128,7 +127,7 @@ file. Every override is in the report under "Overrides". `g2goal reset ball_punt
 - **"G2, practise"** (or "practice"): he picks what to practise from the stored order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
   goal session, or a 5-minute exploration roam for walls). "G2, practise walls" or "practise the punt" names one. `g2goal practise` shows his scores without moving him.
 
-## 8b. The "Identify new objects" goal (2026-11-06)
+## 8b. The "Identify new objects" goal
 
 `g2goal run discover_objects`, or "G2, find new objects" / "G2, object goal". A session is 3 roams of about 3 minutes (10 minutes at most, `minutes` in the goal), in any room and with the head or the arm fitted. G2 explores; whenever something that matches no named object is in view (not a person, not the base of a wall) he takes the picture routine, and the pictures are filed as an unnamed candidate under the room he was told he is in (`you're in the kitchen`). Nothing is named by him: open `g2pics`, look at the new candidates on the Pictures tab and name or promote them, or answer when he asks "what am I looking at?".
 
@@ -136,7 +135,7 @@ An attempt is scored from what the roam left behind: **new object** (a new candi
 
 It needs an exploration to run: inside the voice service that is `G2_EXPLORE_INPROCESS=1` with the explore, vision and vision_safety features on (not yet tried on G2); when the service is not set up for it, `g2goal run` falls back to the old stop-and-run hand-over (`--standalone`).
 
-**What the first run showed (2026-11-06):** the hand-over run works, with two things to know. The roam skips the speech models (`--light`: no narration, no wake word), because with them loaded the process ran out of memory and sat in swap, never reaching the roam. And the gallery's queue of promoted pictures (`~/.local/share/g2/gallery_pending.json`) is learned at the start of every roam: at about 2 s a picture with the learned embedder, a long queue (349 pictures) held the roam for minutes, so a stale queue is moved aside, not learned again, after a rebuild (`tools/rebuild_gallery.py`). Result of the first run: 0 of 3 (3 to 4 usable pictures each, all of things already known).
+**What the first run showed:** the hand-over run works, with two things to know. The roam skips the speech models (`--light`: no narration, no wake word), because with them loaded the process ran out of memory and sat in swap, never reaching the roam. And the gallery's queue of promoted pictures (`~/.local/share/g2/gallery_pending.json`) is learned at the start of every roam: at about 2 s a picture with the learned embedder, a long queue (349 pictures) held the roam for minutes, so a stale queue is moved aside, not learned again, after a rebuild (`tools/rebuild_gallery.py`). Result of the first run: 0 of 3 (3 to 4 usable pictures each, all of things already known).
 
 **Plain exploration feeds the goal too:** every exploration of a minute or more is judged like a roam (new candidates, usable pictures) and starts with the goal's learned look settings (peek interval, fallback picture, pickiness; a value set by hand wins). The goal's own roams are not counted twice. When a goal session ends normally (all attempts, the target, the time), the "da naaaa" plays once; not after a fall, a stop, the battery or a silent board.
 

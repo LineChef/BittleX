@@ -4,7 +4,7 @@ How G2 gets useful perception out of the Grove Vision AI V2 given its hard
 constraint, and how to build it up over time. Companion doc:
 [`person-recognition.md`](person-recognition.md).
 
-Status 2026-09-06: person-detection model deployed + validated end-to-end; the
+Status: person-detection model deployed + validated end-to-end; the
 `pi_pipeline/vision/` consumers (`SerialDetectionFeed`, `Avoider`, `scene`,
 `terrain_feature`) are built and mock-tested; the multi-model management below is
 **not built**.
@@ -33,7 +33,7 @@ Status 2026-09-06: person-detection model deployed + validated end-to-end; the
 ## The hard constraint
 
 **The module runs exactly one model at a time. No concurrent inference.**
-Confirmed on hardware 2026-09-06: `AT+MODELS?` returns a single slot; switching
+Confirmed on hardware: `AT+MODELS?` returns a single slot; switching
 models is a **full reflash (~1–2 min)** on this firmware (`software 2025.01.02`).
 `AT+MODEL=<id>` + restart-inference is ~0.5 s but that re-selects the *same*
 model, not a different one. Whether a genuine multi-slot exists is untested —

@@ -99,7 +99,7 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
   (idle, walking, talking, vision on) on a full charge until the Pi browns out,
   a few times, to get mean runtime and its spread. Do this early in hardware
   bring-up.
-- **Built 2026-09-05:** `pi_pipeline/power/` (CPU governor / Wi-Fi power-save
+- **Built:** `pi_pipeline/power/` (CPU governor / Wi-Fi power-save
   toggle / disable-unused peripherals) and `behavior/idle_posture.py` (idle-REST
   staged descent — sit, then lie down, with life signs). Battery-*aware*
   behaviour (rest sooner on low charge) is blocked on the estimate above.

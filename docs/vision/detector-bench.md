@@ -57,7 +57,7 @@ should reproduce, at minimum:
 - Motion blur / vibration effect while walking.
 - Low-light and backlit behaviour in the real room.
 
-## Low-light: auto-exposure lift (bench, 2026-09-06)
+## Low-light: auto-exposure lift (bench)
 
 Stock Himax tuning aims the OV5647 auto-exposure **dim** -- WPT/BPT target
 regs `0x3A0F`/`0x3A10`/`0x3A1B`/`0x3A1E` default `~0x32`/`0x24`. In a dim
@@ -78,7 +78,7 @@ exposure). Options if a fixed value isn't good enough: adaptive (read
 frame brightness, adjust), or gain instead of exposure (brighter without
 blur, noisier). Hardware-gated.
 
-## Camera orientation vs. detection (2026-09-06)
+## Camera orientation vs. detection
 
 The OV5647's native readout is fixed; **physically rotating the module
 rotates the scene within the frame.** With the module in one orientation

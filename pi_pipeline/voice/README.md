@@ -117,7 +117,7 @@ machine can point `PIPER_MODEL_PATH` at a `medium` voice for nicer audio.
 `sounddevice` needs PortAudio — macOS `brew install portaudio`, Pi
 `sudo apt install libportaudio2`.
 
-### Verified on the dev machine (macOS, 2026-08-31)
+### Verified on the dev machine (macOS)
 
 `vosk 0.3.44`, `piper-tts 1.7.0`, `sounddevice 0.5.6`, `onnxruntime 1.23.2`.
 Checked without a live mic: Piper synthesises + plays through the default output;

@@ -139,7 +139,7 @@ and the carpet detector. For those, a tape-measured average speed per dedicated 
 ## Phases and status
 
 - **0**: What: Inventory, schema, epochs file, capture module with tests; Status: **done 2026-10-07** (`pi_pipeline/telemetry/`, the hook in `run_gait.run()`, `g2floor`; tests in `test_autolog.py`; not yet on the Pi)
-- **1**: What: Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi; Status: **policy-walk capture done and verified on G2 (2026-10-07)**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started
+- **1**: What: Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi; Status: **policy-walk capture done and verified on G2**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started
 - **2**: What: Sync, ingest gates, store, `g2data status`; Status: **built 2026-10-07** (`tools/g2_ingest.py`, `g2data sync
 - **3**: What: Calibration builder, harm check, snapshots, approval, `g2_profile` loading; Status: **built 2026-10-08** (`tools/g2_calibrate.py`, `g2cal`; background loop `tools/g2_bg_jobs.sh`, `g2bg`, calling `tools/g2_cal_auto.sh`; tests in `test_g2_calibrate.py`)
 - **4**: What: Backfill of the 2026-10-01 to 10-07 logs by epoch; Status: not started
@@ -156,7 +156,7 @@ Why runs are not usable: 15 had a steady window under 2 s (exploration walks in 
 Roll and pitch spread from today's usable tile runs sit at about 5.5 and 2.7 deg, in line with the hardwood baselines (roll about 5, pitch about 2.5), so tile does not look different on these two measures yet; the snag analysis (tile versus hardwood, per metre walked) is the next step and needs more tile data plus a same-day hardwood control.
 
 
-## Phase 3 first run (2026-10-08)
+## Phase 3 first run
 
 `g2cal build` on 121 ingested runs (35 usable, 119 s of steady walking on tile, current epoch): `G2E_IMU_HOLD_STEPS` 16 (the profile's value, 35 runs, reproducible); `G2E_CMD_PATH_EXTRA_MS_MAX` 12.5 against the profile's 4, beyond noise, so it needs a person's approval (the quantity is the loop's 99th-percentile tick minus its median, an approximation of command-path delay). Roll and pitch spread on tile 5.4 and 2.6 deg. Snapshot 0001 is waiting for its harm check, which runs when the Mac is idle.
 Two ingest gates were changed for the same reason (they rejected almost every walk since 2026-10-07): the front-foot heading hold, now on in every walk, no longer disqualifies a run unless it worked hard (mean |u| over 0.30); and the floor-label age limit is now 72 hours (it was 12), and a person can state the floor for any time range (`~/g2_data/floor_overrides.json`: a list of {from, to, surface}; it replaces the recorded label, and `unknown` takes those runs out of every fit until the floor is known; all of 2026-10-08 is `unknown` for now because the morning walks were not all on kitchen tile).

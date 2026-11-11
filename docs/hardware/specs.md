@@ -52,7 +52,7 @@ open items on the bench once the parts are in hand.
   plan (sensorless I²t estimator, behaviour-layer governor, thermal-aware
   residual policy): [`servo-thermal.md`](servo-thermal.md); backlog item H11.
 
-## Servo position feedback (researched 2026-09-01)
+## Servo position feedback
 
 **Confirmed it exists on the hardware.** Petoi added position feedback to servos
 manufactured after **March 2024** (all with a label/laser-mark after May 2024,
@@ -86,7 +86,7 @@ mirror) · `fl` / `fr` = record / replay a hand-puppeted skill · `c16` = auto
 joint calibration. The higher-level modes need **all** joints to be feedback
 servos.
 
-**CONFIRMED ON REAL HARDWARE, 2026-09-28** — this is exactly the "30-second
+**Confirmed on real hardware** — this is exactly the "30-second
 check on arrival" above, just run later than day-1. `check_serial send f`
 returned a real 9-value row; querying again after moving one leg by hand
 (no move command sent) changed exactly that leg's two joints by ~150° and
@@ -119,7 +119,7 @@ separate CLI calls).
   quasi-static **stalled/blocked-joint detection**, and sim-to-real calibration
   spot-checks — all things that tolerate a slow, blocking read.
 
-## Mounted payload weight (BOM estimate, 2026-09-03)
+## Mounted payload weight (BOM estimate)
 
 The sim adds a payload body for the Pi stack on the rear spine
 (`opencat_gym_env.py` `PAYLOAD_MASS_*` / `PAYLOAD_POS`). The original 75 g ± 35 g
@@ -166,11 +166,11 @@ Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
   — weigh each sub-assembly, balance it on an edge for its CoM — and set
   `PAYLOAD_*` / `HEAD_*` to the measured values.
 
-## G2 weights as used in the sim (2026-10-06)
+## G2 weights as used in the sim
 
 One measurement, the rest assumed. **Do not look these up again; re-weigh and edit this table if anything changes.**
 
-- **Whole G2** with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing, 2026-10-06); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
+- **Whole G2** with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
 - **Base robot (Bittle X V2, alloy servos, battery)**: Mass: about 301 g (superseded: 254 g, see the 2026-10-15 section below); Basis: assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare.; In the sim (`PAYLOAD_PROFILE=case`): URDF links
 - **Camera cluster (Grove Vision AI V2 + OV5647 + case + cable)**: Mass: 15 g; Basis: estimate; Seeed publishes no weight for the module; In the sim (`PAYLOAD_PROFILE=case`): front body at (0.055, 0, 0.020) m, 15 +/- 5 g
 - **Speaker + amp (NS4168 kit)**: Mass: 20 g; Basis: estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit; In the sim (`PAYLOAD_PROFILE=case`): rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g
@@ -178,7 +178,7 @@ One measurement, the rest assumed. **Do not look these up again; re-weigh and ed
 
 All of it is attached to the case, which sits on the middle of the spine: camera at the front, speaker at the very back, microphone on top of the lid.
 
-**Superseded mount (2026-10-17):** the weights and positions in this section and the one above were measured with the previous case (PiSugar's case velcroed on a modified cover).
+**Superseded mount:** the weights and positions in this section and the one above were measured with the previous case (PiSugar's case velcroed on a modified cover).
 
 G2 now carries the Bittle X Pi add-on, whose design figure is 135 g with the electronics and a center of mass 9.0 mm from the robot center ([`../../blueprints/mounting.md`](../../blueprints/mounting.md)). The camera is now on top of the pod, the microphone on its right wall near the front, the speaker at the rear. The payload was weighed at 185 g (was 168 g, +17 g or about 10%).
 
@@ -191,7 +191,7 @@ The sim's front share with both is about 51% (about 46% with the old mount; the 
 Both bodies are fixed on the body and never vary from episode to episode: the pod block is exactly 185 g, perfectly balanced and flush on the torso, and the AI head is exactly 42 g at one fixed spot, both welded stiffly enough to stay within 1 mm of their places while walking. `case2` (168 g) stays for reproducing earlier runs.
 The mic weighs almost nothing and is counted in the spine block. Mass randomization in training stays at +/-18% on every body link.
 
-## Proposed build: component weights and balance (2026-10-15)
+## Proposed build: component weights and balance
 
 Study of the "Bittle X Pi Add-on v0.16 on Platform v3.1" model published at
 <https://beetlebugorg.github.io/bittlex/viewer/> (66 part meshes, volumes read
@@ -361,7 +361,7 @@ open-Q answers in [`pi-bring-up.md`](../guides/pi-bring-up.md)):**
 - → Confirms the Pi Zero 2 W side of the power plan; the BiBoard 5-pin Pi socket
   compatibility is still the open item.
 
-### Weight distribution, standing (measured 2026-10-07)
+### Weight distribution, standing 
 
 One scale and a spacer, G2 standing with the case and payload on (front feet on the scale, back feet on a spacer, then swapped). First weighing: front legs 171 g, back legs 210 g, whole robot 416 g.
 Second weighing: front legs 185 g, back legs 206 g (the two readings sum to 381 g and 391 g, 25 to 41 g under the total, so the scale and the spacer were not the same height). Front share: 44.9% and 47.3%, about

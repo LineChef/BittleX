@@ -341,7 +341,7 @@ Mac baseline (x86, for reference — the Pi will be much slower): Piper+Vosk
 loaded = ~300 MB RSS, Piper synth 0.06x realtime, Vosk transcribe 0.19x,
 Piper→Vosk word recall ~90%. It measures the things the plan flags as untested:
 
-**Measured on the real Pi Zero 2 W, 2026-10-03** (`en_US-ryan-low` + the small Vosk model, no API key set so the Claude round-trip was skipped,
+**Measured on the real Pi Zero 2 W** (`en_US-ryan-low` + the small Vosk model, no API key set so the Claude round-trip was skipped,
 robot not involved):
 
 - **RAM total / baseline process**: Result: 416 MB / 15 MB
@@ -357,7 +357,7 @@ That is roughly 30× (Piper) and 12× (Vosk) slower than the Mac baseline above.
 streaming path should lag less after speech stops, but it is not measured yet. Open: re-run with the Claude API section enabled,
 measure streaming latency, and try the `x_low` voice and a lighter recognizer if spoken replies stay slower than real time.
 
-**Freeing graphics memory on a headless Pi (done 2026-10-04, takes effect after a reboot).** The Zero 2 W has 512 MB, of which ~416 MB is visible; 64 MB is
+**Freeing graphics memory on a headless Pi (takes effect after a reboot).** The Zero 2 W has 512 MB, of which ~416 MB is visible; 64 MB is
 reserved for graphics and the `vc4-kms-v3d` display driver sets aside a further 256 MB pool. G2 has no HDMI screen and its camera is the USB Grove Vision AI
 (serial, `/dev/ttyACM0`, which does not touch the GPU), so `/boot/firmware/config.txt` now has `gpu_mem=16` and the `vc4-kms-v3d` overlay commented out (backup:
 `config.txt.bak-pre-gpumem` beside it). To get a display or a CSI ribbon camera back: restore the overlay line (or copy the backup over `config.txt`), remove or

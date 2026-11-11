@@ -21,7 +21,7 @@ stock, default way to run a Pi on Bittle: *"All of the robots run on
 NyBoard/BiBoard which can power the Pi and communicate with the Pi through the
 serial port in the 2x5 socket."*
 
-**Correction (2026-09-15):** an earlier version of this doc quoted *"Reduced
+**Correction:** an earlier version of this doc quoted *"Reduced
 motion capability may happen when connected to Pi! A stronger battery is
 needed"* as if it were general Petoi guidance. Re-traced to its source
 (`guide.petoi.com`'s Raspberry-Pi-serial-port page): that warning is on the
@@ -114,7 +114,7 @@ from Petoi's own official board diagram, see
 
 # Power-management measures — maximizing runtime
 
-Drafted 2026-09-05. Two independent budgets:
+Two independent budgets:
 
 - **Robot 2S pack (7.4 V, 1000 mAh, 2 A typ / 5 A peak)** — leg servos + BiBoard.
   Caps *walking time* (~45–60 min active). Relaxed servos draw ≈ 0; any held
@@ -139,7 +139,7 @@ Power, lowest → highest: **REST (`d`) < sit (`ksit`) < stand (`kup`)**.
 Resume cost: REST → walking is ~1–2 s + a rebalance; stand → walking is instant.
 So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 
-## Power log and measured runtime (2026-10-10)
+## Power log and measured runtime
 The voice service keeps a power diary at `~/.local/share/g2/power_log.jsonl` (`G2_POWER_LOG`), one fsynced line per event: `start` / `stop` (with whether the OS was shutting down), `sleep` / `wake` (with the reason), a heartbeat `alive` every minute (awake or asleep), and `runtime` at the next start.
 
 After the Pi goes quiet, the last line says whether G2 was asleep or awake and when he was last alive. Read it with `python -m pi_pipeline.power log [N]`; `python -m pi_pipeline.power stats` summarises the sleeps (how many, how long, what woke him, the share of the time asleep).
