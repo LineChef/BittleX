@@ -239,6 +239,7 @@ class VoiceLoop:
         self._conv_started = 0.0
         # bridge to the behaviour runtime (if running alongside); no-op otherwise
         self._events = on_event or (lambda **_kw: None)
+        self._explore_request = None                       # set by the service: the ExploreRequester whose question this loop answers
         # slow-moving mood from interaction recency -> a one-line system-prompt
         # note + (on the robot) idle-timing bias. Needs a memory to read
         # recency from; harmless without one (stays NEUTRAL -> empty hint).
@@ -592,6 +593,17 @@ class VoiceLoop:
             raise KeyboardInterrupt
 
         cmd = match_local_command(user_text)
+        req = getattr(self, "_explore_request", None)
+        if req is not None and req.is_open():              # G2 asked "Can I go exploring?": a plain yes arms the roam like "G2, explore", a no sends him back to waiting (behavior/explore_request.py)
+            ans = req.answer(user_text)
+            if ans == "yes":
+                cmd = "explore"
+            elif ans == "no":
+                self._cue.set("speaking")
+                self._speak("Okay, maybe later.")
+                self._set_session()
+                self._cue.set("idle")
+                return
         if cmd is None:                                    # "hi step and walk forward": switch the gait here, then handle the rest as its own request
             from ..gait import gait_mode
             both = gait_mode.split_compound(user_text)

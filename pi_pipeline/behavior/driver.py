@@ -549,6 +549,14 @@ class BehaviorDriver:
             return "after_bow"
         return None
 
+    @property
+    def phase(self) -> str:
+        """What G2 is doing in the one exploration task (owner, 2026-11-10): "move" (walking: a roam leg, a turn-away), "pause" (a choreography is running: a survey stop, a hit sequence, a naming look), or
+        "look" (standing or resting and watching, not walking). It is read from the mode and the choreography, so no second state can disagree with them; a change is logged (DIAG "phase")."""
+        if self.mode.mode in (Mode.EXPLORE, Mode.APPROACH):
+            return "pause" if self._choreo.busy else "move"
+        return "look"
+
     def _wall_reflex(self, i: DriverInputs, now: float) -> list | None:
         """A near wall steers an exploring G2 away from it (the wall estimate is a prototype: it can be wrong in either direction, and the user is watching). Acts on a wall look
         that is fresh and either blocked or near on two looks in a row, once per look, toward the side with more room; a soft falling sound says why he turns. Never walks into a wall:
@@ -1021,6 +1029,10 @@ class BehaviorDriver:
             diags.append(Effect(EffectKind.DIAG, ("mode", f"{self._prev_mode.value}->{mode.value}"),
                                 self.mode.last_reason))
             self._prev_mode = mode
+        ph = self.phase
+        if ph != getattr(self, "_prev_phase", "look"):
+            diags.append(Effect(EffectKind.DIAG, ("phase", f"{getattr(self, '_prev_phase', 'look')}->{ph}"), reason))
+            self._prev_phase = ph
         if self.idle.posture is not self._prev_posture:
             diags.append(Effect(EffectKind.DIAG,
                                 ("posture", f"{self._prev_posture.value}->{self.idle.posture.value}"),

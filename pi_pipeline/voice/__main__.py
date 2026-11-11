@@ -275,6 +275,7 @@ def main() -> None:
             if _goals_request.enabled():
                 _goals_request.watch(lambda phrase: getattr(wake, "poke", lambda _t: None)(phrase))
 
+        sleep_watch_ref = None
         if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)
             from ..power import power as _power
             from ..power.sleep_watch import SleepWatch, WakeHook
@@ -288,6 +289,7 @@ def main() -> None:
                                      is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), after_s=settings.sleep_after_s,
                                      on_sleep=_sleep_steps, on_wake=_wake_steps,
                                      on_event=(power_log.event if power_log else None)).start()
+            sleep_watch_ref = sleep_watch
             _prev_on_command = getattr(actuator, "on_command", None)
 
             def _on_command(_prev=_prev_on_command):
@@ -296,6 +298,22 @@ def main() -> None:
                     _prev()
             actuator.on_command = _on_command
             wake = WakeHook(wake, sleep_watch)
+        explore_request = None
+        if voice and link is not None and audible and args.actuator == "serial" and sleep_watch_ref is not None:
+            from ..behavior import explore_request as _er
+            if _er.enabled():                                                     # G2 asks before he explores, and walks only on a yes (owner, 2026-11-10)
+                from ..power import battery as _battery
+
+                def _may_ask() -> bool:
+                    if sleep_watch_ref.asleep or getattr(actuator, "busy", False) or exploring.is_set():
+                        return False
+                    ok, _pct, _v = _battery.motion_gate(link, min_percent=40)
+                    return bool(ok)
+
+                def _ask() -> None:
+                    tts.speak(_er.ASK_LINE)
+                explore_request = _er.ExploreRequester(idle_s=sleep_watch_ref.idle_s, eligible=_may_ask, ask=_ask,
+                                                       ask_after_s=float(os.environ.get("G2_EXPLORE_ASK_AFTER_S", "180") or 180)).watch()
         loop = VoiceLoop(
             wake_word=wake,
             stt=stt,
@@ -319,9 +337,12 @@ def main() -> None:
             on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),
             shutdown_confirm_s=settings.shutdown_confirm_s,
         )
+        loop._explore_request = explore_request
         try:
             loop.run_forever()
         finally:
+            if explore_request is not None:
+                explore_request.stop()
             crash.stop()                                  # a normal end (Ctrl-C, systemctl stop) is not reported as a crash at the next start
             if watcher:
                 watcher.stop()

@@ -35,6 +35,10 @@ class SleepWatch:
             except Exception:  # noqa: BLE001 -- going to sleep or waking must never take the voice service down
                 log.warning("%s step failed", what, exc_info=True)
 
+    def idle_s(self) -> float:
+        """Seconds since the last command, exchange or wake (the explore request counts its idle time from the same clock)."""
+        return self._clock() - self._last
+
     def note_activity(self, why: str = "activity") -> None:
         """Any command or exchange: restart the rest timer, and wake if asleep."""
         self._last = self._clock()
