@@ -77,7 +77,7 @@ TOP_LAYOUT = [("Start here", ["how-it-works", "capabilities", "STATUS", "project
               ("Under the hood", ["architecture", "rl", "code"]),
               ("About", ["about", "legal"])]
 # Working notes stay in the repo but never reach the site: plans, backlogs, history, outside-project reviews, run logs.
-EXCLUDED_DIRS = ("docs/plan-detail/", "docs/planned/", "docs/archive/", "docs/research/", "docs/rl/real-walk-data/", "docs/hardware/build-logs/")
+EXCLUDED_DIRS = ("docs/plan-detail/", "docs/planned/", "docs/archive/", "docs/research/", "docs/hardware/build-logs/")
 EXCLUDED_FILES = {"docs/vision/capture-progress.md", "docs/vision/wall-check-plan.md", "docs/backlog.md", "docs/maintaining-docs.md", "docs/rl/real-walk-log.md", "docs/rl/hw1-log.md",
                   "docs/rl/carpet-findings-2026-10-20.md", "docs/rl/getup-sim-replay.md", "docs/rl/h1-rubric.md", "docs/rl/sysid-capture-plan.md",
                   "docs/rl/training-upgrade-2026-10.md"}
@@ -155,8 +155,6 @@ def section_for(path, route):
 
 def is_page(path):
     if not path.endswith(".md"):
-        return False
-    if path.startswith("docs/rl/real-walk-data/") and not path.endswith("README.md"):
         return False
     return route_for(path) is not None
 

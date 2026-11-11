@@ -104,7 +104,7 @@ def main():
     ap.add_argument("--fit", action="store_true")
     ap.add_argument("--jobs", type=int, default=6)
     a = ap.parse_args()
-    logs = a.logs or sorted(glob.glob(os.path.join(HERE, "..", "..", "docs", "rl", "real-walk-data", "2026-10-06", "*.csv")))
+    logs = a.logs or sorted(glob.glob(os.path.join(os.environ.get("G2_REAL_WALK_DATA", os.path.expanduser("~/g2_data/real_walk_data")), "2026-10-06", "*.csv")))
     real = [real_stats(load_log(l)) for l in logs]
     if not a.fit:
         for l, r in zip(logs, real):

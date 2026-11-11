@@ -7,7 +7,7 @@ Working notes for whoever edits the documentation. This page is not published on
 One home per fact; everything else links. Don't restate the deployed policy, a status, or a test count anywhere else —
 `python tools/check_docs.py` (run by the pre-commit hook) fails on broken links, hard-coded test counts, and the policy name in the wrong page.
 
-- A run, test or measurement: the relevant dated log: [`rl/real-walk-log.md`](rl/real-walk-log.md) (real robot; what each hardware log carries: [`rl/hardware-logging.md`](rl/hardware-logging.md)), [`rl/hw1-log.md`](rl/hw1-log.md) (training), other `rl/*` logs; raw data goes in `rl/real-walk-data/`
+- A run, test or measurement: the relevant dated log: [`rl/real-walk-log.md`](rl/real-walk-log.md) (real robot; what each hardware log carries: [`rl/hardware-logging.md`](rl/hardware-logging.md)), [`rl/hw1-log.md`](rl/hw1-log.md) (training), other `rl/*` logs; raw data goes in `~/g2_data/real_walk_data/` (outside the repository; the earlier logs are in git history)
 - A state change (new policy deployed, hardware fixed or broken, something tested for the first time): [`STATUS.md`](STATUS.md) — plus a line in the log that holds the detail
 - A capability lands or is parked: [`capabilities.md`](capabilities.md) (and [`STATUS.md`](STATUS.md) if it changes what is deployed)
 - A decision is made or a phase item is done: the entry in [`project-plan.md`](project-plan.md) (checkbox + one line + link to the detail)

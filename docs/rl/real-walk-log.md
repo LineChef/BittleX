@@ -1,5 +1,7 @@
 # Real-hardware walk log
 
+The raw CSV logs this log cites are in `~/g2_data/real_walk_data/` (outside the repository; git history keeps the originals).
+
 First walks of G2 on real floors. Started 2026-10-01. Hard floor and ~1/4 in (6.4 mm) pile
 carpet, off the stand, payload = what V2.1 was trained with but **mounted only temporarily**
 (it can shift between runs; not accounted for yet). Run logs are CSVs written by
@@ -9,13 +11,13 @@ Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 > **Status: a running log; the newest sections are last. Start with "Current conclusions" below.**
 >
 > Raw logs, an index of every file and the non-CSV measurements are archived in
-> [`real-walk-data/2026-10-01/`](real-walk-data/2026-10-01/README.md).
+> `real-walk-data/2026-10-01/`.
 
 ## Current conclusions (as of 2026-10-17)
 
-What the dated sections below add up to. Each point links to the evidence; the data folders are in [`real-walk-data/`](real-walk-data/). Which policy is deployed and what is open: [`../STATUS.md`](../STATUS.md).
+What the dated sections below add up to. Each point links to the evidence; the data folders are in `real-walk-data/`. Which policy is deployed and what is open: [`../STATUS.md`](../STATUS.md).
 
-- Hardwood walking works: V2.1 walked six steady 10-cycle runs (about 0.118 m/s). V4 walked at the commanded speed with no falls and less sway than the scripted walk ([`2026-10-09`](real-walk-data/2026-10-09/README.md)). V6 walks 20 s lanes within about 3.5 in of the line with a fixed front-left foot trim of `fl=-0.3` ([`2026-10-10`](real-walk-data/2026-10-10/README.md)); measured forward speed is about 0.093 m/s against 0.10 commanded.
+- Hardwood walking works: V2.1 walked six steady 10-cycle runs (about 0.118 m/s). V4 walked at the commanded speed with no falls and less sway than the scripted walk (`2026-10-09`). V6 walks 20 s lanes within about 3.5 in of the line with a fixed front-left foot trim of `fl=-0.3` (`2026-10-10`); measured forward speed is about 0.093 m/s against 0.10 commanded.
 - The front feet steer G2: About 9 to 10 deg/s of turn per unit of front-foot trim; the back feet do not. Longer right strides turn him left, the opposite of the sim. See "Which foot steers G2" below.
 - The big early drift was mostly a faulty servo. V2.1 turned about 140 deg right in 12.7 s with the front-left shoulder servo faulty; after it was replaced (2026-10-06) the drift fell to about 40 deg. The rest is a learned left-right asymmetry and the floor.
 - A fixed trim beats the closed-loop hold for the newer policies. The hold straightened V2.1 (+148 deg without it, +13 to +21 deg with it), but V4's hold overshot to 60 deg left. The hold is now off by default (`G2_FOOT_HOLD=fl` turns it on). Trims were measured on hardwood only, and the drift grows faster than the distance: a trim that is right at 4 ft can be 29 in off at 6 ft. Logged yaw does not track the tape, so judge steering by the tape.
@@ -67,7 +69,7 @@ been pushed since the camera/IMU-link work (`development` at `6a2e7e7`).
 
 ## Servo troubleshooting -- state at the end of the session (2026-10-02)
 
-Raw data and printed tables: [`real-walk-data/2026-10-02/`](real-walk-data/2026-10-02/README.md). Detail below
+Raw data and printed tables: `real-walk-data/2026-10-02/`. Detail below
 under "Servo feedback tests".
 
 Symptoms (user, after re-calibrating the limbs): (1) the FR shoulder visibly lags/sags *after* the servos relax --

@@ -29,11 +29,6 @@ def test_route_for(path, route):
     assert B.route_for(path) == route
 
 
-def test_real_walk_data_csvs_are_not_pages_but_readmes_are():
-    assert B.is_page("docs/rl/real-walk-data/2026-10-10/README.md")
-    assert not B.is_page("docs/rl/real-walk-data/2026-10-10/notes.md")
-
-
 PAGES = {"docs/guides/cheatsheet.md": "guides/cheatsheet", "docs/README.md": "", "docs/guides/README.md": "guides",
          "pi_pipeline/voice/README.md": "code/pi_pipeline/voice"}
 ASSETS = {"docs/guides/operating-g2-quick-guide.pdf"}
@@ -79,7 +74,7 @@ def test_title_summary_and_headings():
 
 @pytest.mark.parametrize("path,excluded", [
     ("docs/plan-detail/phase7-voice.md", True), ("docs/planned/ai-head/README.md", True), ("docs/archive/history.md", True),
-    ("docs/research/community-projects.md", True), ("docs/rl/real-walk-log.md", True), ("docs/rl/real-walk-data/2026-10-10/README.md", True),
+    ("docs/research/community-projects.md", True), ("docs/rl/real-walk-log.md", True),
     ("docs/backlog.md", True), ("docs/maintaining-docs.md", True),
     ("docs/STATUS.md", False), ("docs/guides/cheatsheet.md", False), ("docs/rl/training-pipeline.md", False), ("blueprints/README.md", False),
 ])

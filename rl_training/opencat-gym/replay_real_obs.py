@@ -52,7 +52,7 @@ def main():
     ap.add_argument("logs", nargs="*")
     ap.add_argument("--policy", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "trained", "Release_CandidateV2.1_ppo.onnx"))
     a = ap.parse_args()
-    logs = a.logs or sorted(glob.glob(os.path.join(_ROOT, "docs", "rl", "real-walk-data", "2026-10-06", "*.csv")))
+    logs = a.logs or sorted(glob.glob(os.path.join(os.environ.get("G2_REAL_WALK_DATA", os.path.expanduser("~/g2_data/real_walk_data")), "2026-10-06", "*.csv")))
     pol = ResidualGaitPolicy(onnx_path=a.policy)
     for path in logs:
         rpy, logged = load(path)
