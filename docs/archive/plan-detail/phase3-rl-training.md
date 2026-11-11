@@ -18,7 +18,7 @@ leave no shippable gait — worst case is a wasted overnight.
   cruise / commanded cells** at ≥ `run20m_ppo` — no base-walking regression;
   (2) adds a capability or robustness `run20m_ppo` lacks; (3) clears the
   sim→real path (ONNX + parity + Pi budget, already built for `run20m_ppo`).
-- **Eval caveat:** a vision policy that correctly slows/stops at obstacles will
+- Eval caveat: a vision policy that correctly slows/stops at obstacles will
   score lower mean speed on an obstacle course — that is not a regression. Judge
   base capability on obstacle-free cells; judge obstacle cells on
   traverse-success / cleared count / fall rate, not speed. See
@@ -26,25 +26,25 @@ leave no shippable gait — worst case is a wasted overnight.
 
 ### Current state
 
-- **Phase 3 gait locked:** `auto_gait_final`, tag `phase3-gait`. Straight
+- Phase 3 gait locked: `auto_gait_final`, tag `phase3-gait`. Straight
   level-ground walk at 0.256 m/s (≈50 Hz-basis; see the control-rate note below),
   1.29 m per 251-step episode, heading drift 0.16° (non-accumulating), 4.5 cm
   lateral wander, never falls, stride 0.103 m, `diagonal_trot_corr` −0.59.
   Config: `FAC_HEADING=5.0`, `PAW_Z_TARGET=0.020`, `FAC_GAIT_SYMMETRY=3.5` on top
   of v6. On `development`; checkpoint at
   `rl_training/opencat-gym/trained/phase3-gait_ppo.zip` (gitignored).
-- **Later gait, on `development` via Run 6:** `auto_rec_r5_ppo`, tag
+- Later gait, on `development` via Run 6: `auto_rec_r5_ppo`, tag
   `gait-v7-stumble-catch` — crisper trot (`diagonal_trot_corr` −0.58), tighter
   heading (7.6° max drift), always-on stumble-catch balance term, no
   obstacle-course falls; ~7% slower forward than `phase3-gait`.
-- **Run 7 ("walk"), closed:** best checkpoint `walk_r2`, tag `walk-v8-r2` — 0%
+- Run 7 ("walk"), closed: best checkpoint `walk_r2`, tag `walk-v8-r2` — 0%
   falls, best heading of the project, but converges slow (~0.07 m/s vs the 0.11
   target). The Run 7 env config (273-dim observation, `TARGET_SPEED` tracking
   bonus, impulse drills) is now on `development`, but `phase3-gait` and
   `gait-v7-stumble-catch` remain the reference gaits until a real-hardware
   head-to-head. Established that big-stumble recovery can't be reward-tuned
   further on this control setup.
-- **Sim benchmark, learned vs scripted** (`benchmark_gaits.py`,
+- Sim benchmark, learned vs scripted: (`benchmark_gaits.py`,
   [`docs/archive/rl/gait-benchmark.md`](../rl/gait-benchmark.md)): on flat ground the learned
   gaits win — `phase3-gait` covers ~4× the distance of open-loop `wkF` keyframes.
   On obstacle courses the scripted keyframes are hard to beat; `phase3-gait` does
@@ -52,7 +52,7 @@ leave no shippable gait — worst case is a wasted overnight.
   RL earns its place for flat efficiency, not (yet) for obstacle robustness. The
   scripted side is open-loop only here — the firmware's gyro-balance layer would
   widen its obstacle lead — so confirm on hardware.
-- **Refinement regimen + Phase 4 stance-recovery — DONE (2026-09-03).** The
+- Refinement regimen + Phase 4 stance-recovery — DONE (2026-09-03). The
   pause was lifted 2026-09-02 for a pre-hardware push; the regimen produced
   **`run20m_ppo`** (20M from-scratch, G4b recipe — command-conditioned residual
   gait, payload-conditioned, tracks speed commands to 0.007 m/s, walks a −24°
@@ -64,7 +64,7 @@ leave no shippable gait — worst case is a wasted overnight.
   3e-4 on a converged policy). Details:
   [`docs/archive/rl/refinement-regimen.md`](../rl/refinement-regimen.md),
   [`docs/archive/rl/phase4-decision-log.md`](../rl/phase4-decision-log.md).
-- **Sim gait work is now done pending hardware.** The open question — is a
+- Sim gait work is now done pending hardware. The open question — is a
   learned gait actually better than OpenCat's scripted `wkF` for plain walking —
   has a sim answer above; the real-robot head-to-head confirms it against the
   *firmware* gait. Next steps are ONNX export + Pi bring-up, then that
@@ -79,7 +79,7 @@ leave no shippable gait — worst case is a wasted overnight.
   is done pending the real-robot H1 head-to-head.** The remaining scenario ideas
   live in [`docs/planned/hardware-gated-backlog.md`](../../planned/hardware-gated-backlog.md),
   each with a trigger. Detail of the push itself is kept below for history.
-  - **Rough-terrain training.** The base recipe's `ROUGH_TERRAIN` was ~1.8 mm
+  - Rough-terrain training: The base recipe's `ROUGH_TERRAIN` was ~1.8 mm
     amplitude — cosmetic. Built a proper rough course: `CARPET`, a single
     `GEOM_HEIGHTFIELD` body (no scattered obstacles), 13 mm multi-octave bumps +
     a broad ~±11 mm/1.5 m rolling swell, std-normalised so it fills the height
@@ -88,11 +88,11 @@ leave no shippable gait — worst case is a wasted overnight.
     "rubble" (`run20m_rough` 3.5 M, `run20m_rough2` stopped ~1.4 M) — both
     retired; the single heightfield deflects feet instead of catching edges and
     is one collision body (cheaper sim). Branch `gait-rough`.
-  - **`run20m_carpet`** — continuation from `run20m_ppo`, `CARPET` on for 50 % of
+  - `run20m_carpet`: continuation from `run20m_ppo`, `CARPET` on for 50 % of
     DR episodes (rest keep the flat/sloped plane so slope/obstacle DR is
     unchanged), `--finetune-lr 1e-4 --finetune-target-kl 0.05`, 4 M steps.
     Launched 2026-09-03. Verdict pending its learned-vs-scripted + decathlon eval.
-  - **Robustness backlog** — the categorised list of real-world scenarios still
+  - Robustness backlog: the categorised list of real-world scenarios still
     to train/eval (single-servo failure, IMU bias/mount tilt, pick-up &
     set-down, directional terrain catches, slope transitions, friction
     asymmetry, …): [`docs/planned/robustness-backlog.md`](../../planned/robustness-backlog.md).
@@ -119,7 +119,7 @@ leave no shippable gait — worst case is a wasted overnight.
   campaigns running.** (Note: the detailed day-to-day between 2026-09-05 and
   this entry lives in the dated `docs/rl/*.md` logs, not backfilled here —
   this is a rollup of today specifically.)
-  - **`RESIDUAL_SCALE_DEG` widened 22 -> 30** (fresh 20M run, `run20m_resid30_ppo`),
+  - `RESIDUAL_SCALE_DEG` widened 22 -> 30: (fresh 20M run, `run20m_resid30_ppo`),
     full Stage 3 benchmark suite run against the prior `run20m_ppo` base
     (decathlon, gaits-vs-scripted, recovery probe, action-trace, leg-tinting
     replays — published report). Close overall, but resid30 wins decisively
@@ -132,7 +132,7 @@ leave no shippable gait — worst case is a wasted overnight.
     [`docs/archive/rl/resid30-log.md`](../rl/resid30-log.md) have the full report and
     reasoning; `run20m_ppo` kept in `trained/` as the prior-base reference
     point, not deleted.
-  - **Gait-friction campaign** (why the residual spends ~4-8deg even on calm
+  - Gait-friction campaign: (why the residual spends ~4-8deg even on calm
     flat ground): amplitude-scaling the reference pose by commanded speed
     tried and **reverted after two rounds**, both clear regressions (residual
     usage roughly doubled, then still ~1.5x worse even with a much narrower
@@ -147,7 +147,7 @@ leave no shippable gait — worst case is a wasted overnight.
     `IMITATION_FADE_FACTOR`'s Phase 4b history) extra residual-cost weight
     specifically while the robot is stable, designed to avoid punishing
     reactions to genuine stumbles.
-  - **Resiliency campaign**: reframed around the R-series backlog's finding
+  - Resiliency campaign: reframed around the R-series backlog's finding
     that *stalling*, not falling, is this gait's dominant real-world failure
     mode. Built and smoke-tested four new probe scripts (IMU bias, within-
     episode latency/thermal ramp, aggressive command transitions, a
@@ -161,7 +161,7 @@ leave no shippable gait — worst case is a wasted overnight.
     real, measured reduction in stalling — Phase 4a already showed training
     ledge exposure without that fix in place makes things worse ("backs
     away from steps").
-  - **Researched, deliberately not pursued:** continuous proprioceptive
+  - Researched, deliberately not pursued: continuous proprioceptive
     "feel the ground" blind climbing — the successful literature (ANYmal
     and others) depends on real-time joint-torque sensing G2 doesn't have;
     the confirmed servo position-feedback on the ordered hardware is too
@@ -190,7 +190,7 @@ Setup blockers hit and resolved (kept in case they recur elsewhere):
 - Skipped `stable-baselines3[extra]` (Atari deps need SDL2) — plain
   `stable-baselines3` + `gymnasium` + `tensorboard`.
 
-**Control rate:** one `env.step()` runs 3 PyBullet substeps at the default
+Control rate: one `env.step()` runs 3 PyBullet substeps at the default
 1/240 s → **80 Hz control** (`CONTROL_HZ`). `evaluate_policy.py` assumed 50 Hz
 through Run 6; Run 7 corrected it — multiply pre-Run-7 reported m/s by 1.6 to
 compare. The real BiBoard control rate is ~48–50 Hz (servo PWM limit), relevant
@@ -258,7 +258,7 @@ recovery; settle RL-vs-scripted on real hardware (the H1 head-to-head).**
   foot-level terrain awareness. Real robustness needs a reward that explicitly
   values balance recovery (not just forward speed) plus domain randomization —
   both now in place from Run 5 on.
-- **Heading signal on real hardware:** the BiBoard IMU (MPU6050/ICM42670) is
+- Heading signal on real hardware: the BiBoard IMU (MPU6050/ICM42670) is
   6-axis — **no magnetometer**, so there's no absolute yaw reference; real yaw is
   gyro-integrated and drifts over seconds-to-minutes. The sim optimises against a
   perfect quaternion yaw. Bias the reward/observation toward **yaw rate** (clean
@@ -268,7 +268,7 @@ recovery; settle RL-vs-scripted on real hardware (the H1 head-to-head).**
   [`docs/hardware/specs.md`](../../hardware/specs.md).
 - Imitation-learning approaches from the UVA/Harvard Bittle research (stretch,
   optional).
-- **Reactive obstacle purchase:** teach the policy that when a front foot is
+- Reactive obstacle purchase: teach the policy that when a front foot is
   blocked it should lift higher to get on top. Learnable in sim but needs
   per-foot contact/height in the observation, which the real Bittle can't sense —
   so it wouldn't transfer. The transferable version is a taller-obstacle

@@ -8,9 +8,9 @@ has moved on.
 
 ## Repositories
 
-- **`PetoiCamp/OpenCatEsp32` (aka `OpenCatEsp32-Quadruped-Robot`)**: **BiBoard/ESP32 firmware — this is G2's.**
-- **`PetoiCamp/OpenCat`**: NyBoard/AVR firmware (older boards)
-- **`PetoiCamp/OpenCat-Old`**: legacy
+- `PetoiCamp/OpenCatEsp32` (aka `OpenCatEsp32-Quadruped-Robot`): **BiBoard/ESP32 firmware — this is G2's.**
+- `PetoiCamp/OpenCat`: NyBoard/AVR firmware (older boards)
+- `PetoiCamp/OpenCat-Old`: legacy
 
 `OpenCatEsp32/src/`: `src.ino` (serial parser / main loop), `imu.h` + `mpu6050/`
 (IMU fusion + exception detection), `reaction.h` (`dealWithExceptions()` — auto
@@ -61,11 +61,11 @@ above and not decoded from the project's own firmware source — confirmed inste
 from [Petoi's official docs](https://docs.petoi.com/extensible-modules/voice-command-module)
 and against the real board 2026-09-28:
 
-- **`XAa`**: set English as default language
-- **`XAb`**: set Chinese as default language
-- **`XAc`**: enable the voice module
-- **`XAd`**: disable the voice module
-- **`XAe`**: enter learning mode
+- `XAa`: set English as default language
+- `XAb`: set Chinese as default language
+- `XAc`: enable the voice module
+- `XAd`: disable the voice module
+- `XAe`: enter learning mode
 
 Not blocked by `opencat.is_safe()` (only `c`/`cd` are). There's also a
 physical dial switch on the bottom of the BiBoard extension hat (Bittle X
@@ -75,7 +75,7 @@ liveness (replies with a "Do-Re-Mi" tone, works regardless of language --
 tests only that it's not muted); "be quiet" mutes it; "bing bing" is the
 spoken equivalent of `XAa` (switch to English).
 
-**Switching it on and off:** speak to G2. **"Be quiet"** makes the module ignore basic commands such as "rest";
+Switching it on and off: speak to G2. **"Be quiet"** makes the module ignore basic commands such as "rest";
 **"play sound"** turns them back on (Do-Re-Mi tone). Per Petoi's docs the module listens continuously with **no wake word**, has 40 fixed
 commands (two languages) plus up to 10 you record yourself in learning mode; **"rest" is one of the fixed commands, "stop" is not.**
 While it is on, a phrase meant for the Pi can also trigger it.
@@ -111,27 +111,27 @@ incident — this module's state lives in the same EEPROM/NVS wiped by
 `esptool erase_flash`, so re-applying this sequence is now an expected
 step after any future full reflash, not a fault to re-diagnose.
 
-- **`k<skill>`**: name: `T_SKILL`; meaning: run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF`
-- **`m<idx> <deg> …`**: name: `T_INDEXED_SIMULTANEOUS_ASC`; meaning: move joint(s), chainable — `m0 30 8 -35`
-- **`b<note> <dur> …`**: name: `T_BEEP`; meaning: buzzer melody: pairs of (note, duration)
-- **`d`**: name: `T_REST`; meaning: rest posture, servos off (ends a looping gait)
-- **`P`**: name: `T_POWER`; meaning: **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack)
-- **`j` / `j <idx>`**: name: `T_JOINTS`; meaning: **return all joint angles / one joint**
-- **`f`**: name: `T_SERVO_FEEDBACK`; meaning: servo position feedback (if the servo chip supports it)
-- **`g`**: name: `T_GYRO`; meaning: gyro function toggle (bare `g`)
-- **`gU` / `gu`**: name: `C_GYRO_UPDATE` / `_OFF`; meaning: continuous gyro data update on/off (already **on by default from boot** — `updateGyroQ = true` is set during IMU init, so `gU` is rarely needed just to get data flowing)
-- **`gB` / `gb`**: name: `C_GYRO_BALANCE` / `_OFF`; meaning: turn gyro balancing on/off
-- **`gc`**: name: `C_GYRO_CALIBRATE`; meaning: calibrate the IMU
-- **`gP`**: name: `C_PRINT` (in the `g`-context); meaning: **start CONTINUOUS 6-axis print** — sets `printGyroQ = true`, which is what actually makes `readEnvironment()` call `print6Axis()` every loop
-- **`gp`**: name: `C_PRINT_OFF`; meaning: stop it — **NOT symmetric with `gP`**, this is "print once then stop", not a toggle; sending `gP` twice does not turn it off
-- **`p`**: name: `T_PAUSE`; meaning: pause
-- **`t`**: name: `T_TILT`; meaning: tilt command
-- **`c` / `cd`**: name: calibration / factory; meaning: **never send from the pipeline**
+- `k<skill>`: name: `T_SKILL`; meaning: run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF`
+- `m<idx> <deg> …`: name: `T_INDEXED_SIMULTANEOUS_ASC`; meaning: move joint(s), chainable — `m0 30 8 -35`
+- `b<note> <dur> …`: name: `T_BEEP`; meaning: buzzer melody: pairs of (note, duration)
+- `d`: name: `T_REST`; meaning: rest posture, servos off (ends a looping gait)
+- `P`: name: `T_POWER`; meaning: **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack)
+- `j` / `j <idx>`: name: `T_JOINTS`; meaning: **return all joint angles / one joint**
+- `f`: name: `T_SERVO_FEEDBACK`; meaning: servo position feedback (if the servo chip supports it)
+- `g`: name: `T_GYRO`; meaning: gyro function toggle (bare `g`)
+- `gU` / `gu`: name: `C_GYRO_UPDATE` / `_OFF`; meaning: continuous gyro data update on/off (already **on by default from boot** — `updateGyroQ = true` is set during IMU init, so `gU` is rarely needed just to get data flowing)
+- `gB` / `gb`: name: `C_GYRO_BALANCE` / `_OFF`; meaning: turn gyro balancing on/off
+- `gc`: name: `C_GYRO_CALIBRATE`; meaning: calibrate the IMU
+- `gP`: name: `C_PRINT` (in the `g`-context); meaning: **start CONTINUOUS 6-axis print** — sets `printGyroQ = true`, which is what actually makes `readEnvironment()` call `print6Axis()` every loop
+- `gp`: name: `C_PRINT_OFF`; meaning: stop it — **NOT symmetric with `gP`**, this is "print once then stop", not a toggle; sending `gP` twice does not turn it off
+- `p`: name: `T_PAUSE`; meaning: pause
+- `t`: name: `T_TILT`; meaning: tilt command
+- `c` / `cd`: name: calibration / factory; meaning: **never send from the pipeline**
 
-- **b<note> <dur> …:** Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it
+- b<note> <dur> …: Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it
 
 
-**CONFIRMED 2026-09-20, corrects the previous entry here:** `v`/`V` are still
+CONFIRMED 2026-09-20, corrects the previous entry here: `v`/`V` are still
 not a real token at all (grepped current `main` source directly — no match
 anywhere in the command parser), and `pi_pipeline/gait/run_gait.py` /
 `sysid_collect.py` were both sending it until this date, which would have
@@ -199,28 +199,28 @@ reflash. Full story, in order:**
    distinct-sample rate). Chip prefix confirmed `ICM:` (ICM42670, not
    MPU6050). Also noted `az` read ~9.9 at rest, consistent with **m/s²**,
    not "g" as this doc used to say.
-2. **Cross-validated under real load same day**: `--probe-imu-load`
+2. Cross-validated under real load same day: `--probe-imu-load`
    (sends the neutral stand pose at 80 Hz on the same UART while
    counting IMU lines, the actual shared-bus condition the control loop
    runs under) measured **93.0 Hz** — same ballpark, still nowhere near
    5 Hz, ruling out a fluke/burst reading.
-3. **2026-09-29, read BiBoard's full two-line `?` banner properly**
+3. 2026-09-29, read BiBoard's full two-line `?` banner properly
    (a naive single-read grabs only line 1, leaving line 2 as backlog for
    whatever reads next — same class of bug as the `allmoves` desync
    documented below): line 1 `Bittle X`, line 2 a version string,
    **`B10_251121`** — read as a 2025-11-21 build, ~10 months older than
    the `main`-branch source review (2026-09-07/09-20). Strong
    circumstantial evidence the stale build had different IMU timing.
-4. **Separately that same night**, found and fixed a real firmware bug
+4. Separately that same night: , found and fixed a real firmware bug
    (below) requiring a full flash erase + reflash to Petoi's *current*
    official firmware via the Desktop App.
-5. **After the reflash, re-ran `--probe-imu`: exactly 5.0 Hz** (25 lines /
+5. After the reflash, re-ran `--probe-imu`: exactly 5.0 Hz (25 lines /
    5 s) — matching the documented `PRINT6AXIS_MIN_INTERVAL` cap exactly,
    on the nose. Confirms step 3's theory directly rather than just
    circumstantially: the stale ~10-month-old build genuinely had
    different (much faster) IMU print timing than current firmware.
 
-**Practical upshot:** `hw1_20m`/`Release_CandidateV2`/`V2.1` were all
+Practical upshot: `hw1_20m`/`Release_CandidateV2`/`V2.1` were all
 trained under the *correct* assumption (`IMU_HOLD_STEPS=16`, 5 Hz) for
 G2's real, current firmware. A same-night retrain campaign built around
 the stale 93-249 Hz reading (`docs/rl/hw1-log.md` Round 5) was abandoned
@@ -232,11 +232,11 @@ to catching the reflash-worthy bug, but its premise no longer holds.
 Separate from the serial tokens above — a status/enable table for
 BiBoard's extension modules, confirmed from `src/moduleManager.h`:
 
-- **`S`**: module: Serial (Grove_Serial, i.e. Pi/UART2); letter: `B`; module: Backtouch
-- **`A`**: module: Voice; letter: `U`; module: Ultrasonic
-- **`T`**: module: Touch; letter: `G`; module: Gesture
-- **`L`**: module: Light; letter: `C`; module: Camera
-- **`D`**: module: infrared Distance; letter: `Q`; module: Quick_demo
+- `S`: module: Serial (Grove_Serial, i.e. Pi/UART2); letter: `B`; module: Backtouch
+- `A`: module: Voice; letter: `U`; module: Ultrasonic
+- `T`: module: Touch; letter: `G`; module: Gesture
+- `L`: module: Light; letter: `C`; module: Camera
+- `D`: module: infrared Distance; letter: `Q`; module: Quick_demo
 
 Printed as `?`'s status dump: a header row of these letters, then a `0`/`1`
 row (also reachable via `X`+letter, e.g. `XC`'s enable prints it). **`G`
@@ -348,12 +348,12 @@ Desktop App release newer than 1.2.9.
 
 ### Exception detection (`imu.h` `getImuException()`)
 
-- **`IMU_EXCEPTION_FLIPPED` (-1)**: `fabs(ypr[roll]) > 85°` **and** accel-Z near/below 0
-- **`IMU_EXCEPTION_LIFTED` (-2)**: `pitch < -50°` or `pitch > 75°`
-- **`IMU_EXCEPTION_KNOCKED` (-3)**: Z-axis accel shock vs previous frame
-- **`IMU_EXCEPTION_PUSHED` (-4)**: X/Y accel shock ≈ 4.9 g (X) / 7.3 g (Y)
-- **`IMU_EXCEPTION_FREEFALL` (-6)**: —
-- **`IMU_EXCEPTION_TURNING` (-7)**: —
+- `IMU_EXCEPTION_FLIPPED` (-1): `fabs(ypr[roll]) > 85°` **and** accel-Z near/below 0
+- `IMU_EXCEPTION_LIFTED` (-2): `pitch < -50°` or `pitch > 75°`
+- `IMU_EXCEPTION_KNOCKED` (-3): Z-axis accel shock vs previous frame
+- `IMU_EXCEPTION_PUSHED` (-4): X/Y accel shock ≈ 4.9 g (X) / 7.3 g (Y)
+- `IMU_EXCEPTION_FREEFALL` (-6): —
+- `IMU_EXCEPTION_TURNING` (-7): —
 
 `gFactor = GRAVITY / 8192 ≈ 0.00122`.
 
@@ -370,7 +370,7 @@ if (gyroBalanceQ) {
 
 - Fires **only if gyro assist is on** (`gyroBalanceQ`).
 - Runs skill `rc` **once**, same skill for supine and side falls (no differentiation).
-- **No retry / give-up logic** — if still flipped after `rc` finishes, the exception
+- No retry / give-up logic: if still flipped after `rc` finishes, the exception
   re-triggers next tick → effectively "keep trying `rc`" until upright or gyro off.
 
 **Sim-fidelity gap (why self-right failed to train — see `self-righting-research.md`):**
@@ -399,7 +399,7 @@ From `PetoiCamp/OpenCat` (AVR/NyBoard) and `PetoiCamp/OpenCatEsp32` (ESP32/BiBoa
   mid-sequence).
 - 16 servo channels total: 4 for head/tail/gripper, 12 for the legs — 8 of those
   (shoulder + knee ×4) are `WALKING_DOF`, the joints gait keyframes drive.
-- **Why it matters here:** this is the opposite of the RL approach. The trained
+- Why it matters here: this is the opposite of the RL approach. The trained
   policy needs its own runtime path to drive the same 8 walking servos — either
   bypassing the skill-array system or injecting learned frames in the same format
   — rather than selecting from `skillNameWithType`.
@@ -408,9 +408,9 @@ From `PetoiCamp/OpenCat` (AVR/NyBoard) and `PetoiCamp/OpenCatEsp32` (ESP32/BiBoa
 
 `InstinctBittleESP.h` stores each skill as `const int8_t <name>[] PROGMEM = {…}`.
 
-- **`p > 1`**: kind: **gait** (loops); header: 4 bytes `[period, expRoll, expPitch, ratio]`; frame: 8 int8 leg-joint angles (DOF 8..15)
-- **`p == 1`**: kind: **posture**; header: 4 bytes; frame: 16 int8 full-DOF angles
-- **`p < -1`**: kind: **behaviour**; header: 7 bytes `[period, expRoll, expPitch, ratio, loopStart, loopEnd, loopCycles]`; frame: 16 angles + 4 timing params
+- `p > 1`: kind: **gait** (loops); header: 4 bytes `[period, expRoll, expPitch, ratio]`; frame: 8 int8 leg-joint angles (DOF 8..15)
+- `p == 1`: kind: **posture**; header: 4 bytes; frame: 16 int8 full-DOF angles
+- `p < -1`: kind: **behaviour**; header: 7 bytes `[period, expRoll, expPitch, ratio, loopStart, loopEnd, loopCycles]`; frame: 16 angles + 4 timing params
 
 `ratio` (`angleDataRatio`): 1 or 2 — angles are divided by it on storage if any
 exceed 128, so multiply back on read. Petoi leg-column order
@@ -424,14 +424,14 @@ Generalises `build_wkf_reference.py` to any skill → `<name>_ref.npy`, shape
 drop-in `FAC_IMITATION` anchor via `G2E_SKILL_REF=<name>` (env re-loads
 `WKF_REF`/`STAND_POSE`; unset = wkF, byte-identical).
 
-- **`wkf_ref`**: firmware: `wkF`; period: 116; per-joint deg (min…max): knee-swing ≈ 42°; vs wkF: —; what it is: the standing walk (current anchor)
-- **`cr_ref`**: firmware: `crF`; period: 103; per-joint deg (min…max): shoulders 22…110, **knees −52…−29 (always flexed)**; vs wkF: **mean 34.8°**; what it is: **crawl — deep crouch, biggest coordination delta.** Best "add a skill" test anchor.
-- **`tr_ref`**: firmware: `trF`; period: 48; per-joint deg (min…max): knee-swing **48°** (widest); vs wkF: mean 20.5°; what it is: trot — faster, bouncier, biggest foot lift
-- **`vt_ref`**: firmware: `vtF`; period: 37; per-joint deg (min…max): knees −22…9, higher shoulders; vs wkF: mean 11.7°; what it is: "step" — stiff marching step, *smaller* knee swing than wkF (not a high-step)
-- **`bk_ref`**: firmware: `bkF`; period: 43; per-joint deg (min…max): knee-swing 21°; vs wkF: mean 11.6°; what it is: backward walk
-- **`rc_ref`**: firmware: `rc`; period: 5 (behaviour); per-joint deg (min…max): knees to 200°, shoulders to −176°; vs wkF: mean 55°; what it is: **self-right keyframes** (approx — timing params dropped). Reference for the sim self-right work, not a locomotion gait.
+- `wkf_ref`: firmware: `wkF`; period: 116; per-joint deg (min…max): knee-swing ≈ 42°; vs wkF: —; what it is: the standing walk (current anchor)
+- `cr_ref`: firmware: `crF`; period: 103; per-joint deg (min…max): shoulders 22…110, **knees −52…−29 (always flexed)**; vs wkF: **mean 34.8°**; what it is: **crawl — deep crouch, biggest coordination delta.** Best "add a skill" test anchor.
+- `tr_ref`: firmware: `trF`; period: 48; per-joint deg (min…max): knee-swing **48°** (widest); vs wkF: mean 20.5°; what it is: trot — faster, bouncier, biggest foot lift
+- `vt_ref`: firmware: `vtF`; period: 37; per-joint deg (min…max): knees −22…9, higher shoulders; vs wkF: mean 11.7°; what it is: "step" — stiff marching step, *smaller* knee swing than wkF (not a high-step)
+- `bk_ref`: firmware: `bkF`; period: 43; per-joint deg (min…max): knee-swing 21°; vs wkF: mean 11.6°; what it is: backward walk
+- `rc_ref`: firmware: `rc`; period: 5 (behaviour); per-joint deg (min…max): knees to 200°, shoulders to −176°; vs wkF: mean 55°; what it is: **self-right keyframes** (approx — timing params dropped). Reference for the sim self-right work, not a locomotion gait.
 
-**Note for the adapter skill probe:** `cr` (crouch) is a better test skill than a
+Note for the adapter skill probe: `cr` (crouch) is a better test skill than a
 hand-tuned "high-step" `PAW_Z_TARGET` — it's a real firmware trajectory with the
 largest limb-coordination difference from wkF, so it's the clearest yes/no on
 "can a frozen base + adapter acquire a new skill." `tr` (trot) is the natural
@@ -449,7 +449,7 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
   BiBoard V1; when active it takes priority over USB for reading commands.
 - Fastest link test, no motion: send `b16 10 12 12` from the Pi -- G2 chirps and
   the reply `b` comes back on the Pi's RX.
-- **Framing differs from USB.** Over the Pi's UART the IMU stream's frames
+- Framing differs from USB: Over the Pi's UART the IMU stream's frames
   (`ICM: ...`) are terminated by a TAB, not a newline; only the `gP` echo line
   carries `\r\n`. `SerialLink._pop_record` splits IMU frames on tabs (non-IMU
   replies such as the `X?` table contain tabs and are left alone).
@@ -489,17 +489,17 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 
 ## Standing wobble
 
-**Symptom:** standing on the calibration stand, G2 is steady at first (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
+Symptom: standing on the calibration stand, G2 is steady at first (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
 
 **Measured with `gait/stand_log.py`** (passive: IMU print `gP` plus a `P` voltage read, no motion commands; the `g2-voice` service stopped so only one process uses the port). Logs: `~/g2_runs/stand01..05*.csv` on the Pi.
 - Episodes: roll up to ~4-6 degrees and pitch up to ~9-11 degrees peak-to-peak; one sustained run settled into a steady cycle at **about 1.9 Hz** (roll, pitch and the accelerometer all agree), pitch ~±5 degrees by the accelerometer. At 5 Hz sampling, 1.9 Hz could also be an alias of ~3.1 Hz.
 - It is **real body motion**, not an IMU glitch: a tilt computed from the accelerometer alone (gravity direction, independent of the firmware's fusion) swings as much or more than the fused roll/pitch.
-- **Not the battery** (7.86-7.94 V throughout) and **not the Pi's periodic `P` read** (the service was off).
-- **A/B with firmware gyro balance off (`gb`):** calm from the first second, and a deliberate nudge (6.7 degrees peak-to-peak) died out in under 10 seconds. With balance on, comparable nudges ring for 40+ seconds.
+- Not the battery: (7.86-7.94 V throughout) and **not the Pi's periodic `P` read** (the service was off).
+- A/B with firmware gyro balance off (`gb`): calm from the first second, and a deliberate nudge (6.7 degrees peak-to-peak) died out in under 10 seconds. With balance on, comparable nudges ring for 40+ seconds.
 - Conclusion: the balance feedback loop, fed by an IMU that updates at 5 Hz (see the IMU rate notes above), is marginally stable and locks into a limit cycle once disturbed; some starts (a stand-up from rest) disturb it without any touch.
 - Side notes: the firmware's accumulated yaw counter can jump by exactly 360 degrees mid-episode (an unwrap artifact; the wrapped yaw is unchanged), and the front-left shoulder servo's faults (see `rl/real-walk-log.md`) may make it easier to excite but are not needed to explain it.
 
-**Fix (2026-10-04, `pi_pipeline/gait/stand_guard.py`):** (1) firmware gyro balance is kept off while G2 is idle: the voice service sends `gb` at start and every 60 s, and the serial actuator sends `gB` just before a firmware gait skill and `gb` just after it (and after rest or any posture); (2) a guard thread reads the 5 Hz IMU print and, if roll or pitch swings at least 0.8 degrees (standard deviation) with at least 4 mean-crossings per 4-second window for 4 s straight, sends `gb`.
+Fix (2026-10-04, `pi_pipeline/gait/stand_guard.py`): (1) firmware gyro balance is kept off while G2 is idle: the voice service sends `gb` at start and every 60 s, and the serial actuator sends `gB` just before a firmware gait skill and `gb` just after it (and after rest or any posture); (2) a guard thread reads the 5 Hz IMU print and, if roll or pitch swings at least 0.8 degrees (standard deviation) with at least 4 mean-crossings per 4-second window for 4 s straight, sends `gb`.
 
 Replaying the five logs: it trips about 5 s after a wobble starts in every log that has one, and never on the balance-off log. It also catches stands started by the BiBoard's own voice module (those never pass through the Pi). Everything pauses while a gait runs, and for 8 s after any command the Pi sends.
 

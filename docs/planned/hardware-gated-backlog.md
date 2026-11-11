@@ -25,17 +25,17 @@ Status legend: 🔴 blocked on hardware · 🟡 partial sim work possible now ·
 actually better than OpenCat's firmware `wkF` (which has a live gyro-balance
 layer the sim baseline doesn't) for plain walking on real ground?
 
-- **Contenders:** firmware `wkF` · `run20m_ppo` (current base) · `gait-v7-stumble-catch` · `walk-v8-r2`
-- **Measure:** sim-to-real gap per gait, forward speed, heading drift, fall rate
+- Contenders: firmware `wkF` · `run20m_ppo` (current base) · `gait-v7-stumble-catch` · `walk-v8-r2`
+- Measure: sim-to-real gap per gait, forward speed, heading drift, fall rate
   on real thresholds/rugs/slopes, power draw, recovery from real shoves.
-- **Trigger:** hardware assembled + policy deployed (ONNX on the Pi, or on-MCU).
+- Trigger: hardware assembled + policy deployed (ONNX on the Pi, or on-MCU).
   This is step one, not a maybe.
-- **Outcome decides:** whether to keep building on RL locomotion at all, or fall
+- Outcome decides: whether to keep building on RL locomotion at all, or fall
   back to firmware gaits + a perception layer.
 
 ## H2 — Payload re-tuning  🟡
 
-> **Picked up 2026-10-06 by [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md):** the measured 422 g `case` payload goes into the V3 base recipe.
+> Picked up 2026-10-06 by [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md): the measured 422 g `case` payload goes into the V3 base recipe.
 
 `run20m_ppo` is **payload-conditioned** — trained with a single 75 g welded rear
 payload every episode. The gait's stability leans on that mass.
@@ -52,14 +52,14 @@ bodies** so the fore/aft CoM split is right:
 - `run20m_ppo` does **not** have this (still frozen at the old lumped 75 g rear).
   The next training run picks it up.
 
-- **Trigger:** the real built stack weighs meaningfully off ~76 g combined (weigh
+- Trigger: the real built stack weighs meaningfully off ~76 g combined (weigh
   it), OR the spine/head mass split or positions differ from the estimate above,
   OR something is added/removed later (e.g. camera stays off, bigger battery).
-- **Work:** set `PAYLOAD_MASS_*` / `HEAD_MASS_*` / positions to the **measured**
+- Work: set `PAYLOAD_MASS_*` / `HEAD_MASS_*` / positions to the **measured**
   values (kitchen scale; balance each sub-assembly on an edge for its CoM), then
   a from-scratch 20M run — or a clean `--finetune-lr` continuation from
   `run20m_ppo` if the delta is small. Re-run the decathlon payload-on.
-- **Cheap-ish** and high-value — a wrong payload model is a direct sim-to-real error.
+- Cheap-ish: and high-value — a wrong payload model is a direct sim-to-real error.
 
 ## H3 — Clean re-run of the 4a ledge test  🟡  ⚪
 
@@ -67,11 +67,11 @@ Phase 4a (ledge terrain in training DR) regressed the walk, **but that run was o
 a diverged policy** (the `--from` LR bug, fixed in commit `bcf20fd`). The verdict
 is unreliable.
 
-- **Trigger:** hardware testing shows G2 actually trips on door sills / rug edges
+- Trigger: hardware testing shows G2 actually trips on door sills / rug edges
   / cables / low curbs that the current gait + firmware balance don't handle.
-- **Work:** one continuation, `--from trained/run20m_ppo --finetune-lr 1e-4`,
+- Work: one continuation, `--from trained/run20m_ppo --finetune-lr 1e-4`,
   `LEDGE_PROB ≈ 0.12`, height cap ~12–15 mm, `LEDGE_RANDOMIZE` on. ~3.5M steps.
-- **Skip permanently if** real thresholds turn out fine — folding curbs into the
+- Skip permanently if: real thresholds turn out fine — folding curbs into the
   walk policy is B13 tier-2 and low priority.
 
 ## H4 — Active stance recovery, from scratch  🔴  ⚪
@@ -81,10 +81,10 @@ is unreliable.
 zero recovery gain). Two independent findings say the ceiling is the control
 setup, not the reward: this, and the original Run 6/7 conclusion.
 
-- **Trigger:** the H1 head-to-head shows real servo torque supports active
+- Trigger: the H1 head-to-head shows real servo torque supports active
   recovery *better than sim predicted* — i.e. the ceiling was a sim artefact, not
   physics. (If hardware confirms the ceiling is real, this stays closed forever.)
-- **Work:** from-scratch 20M-class run with the diagonal-support catch bonus +
+- Work: from-scratch 20M-class run with the diagonal-support catch bonus +
   loosened in-recovery residual baked in from step 0, not bolted on. Gated on the
   green-light checklist ([[project_longrun_trigger]]).
 - Measure with `benchmark_recovery.py` (payload off — the payload masks recovery
@@ -97,10 +97,10 @@ setup, not the reward: this, and the original Run 6/7 conclusion.
 Turning was **dropped in G4** — `cmd_yaw` is always 0, heading-hold only. Firmware
 turn gaits (`wkL`/`wkR`) work today.
 
-- **Trigger:** firmware turns oscillate or overshoot during *visual pursuit* on
+- Trigger: firmware turns oscillate or overshoot during *visual pursuit* on
   hardware, or fail on real terrain. Decision gate is **after** the vision
   pursuit layer is running on the robot — see B2.
-- **Work:** add `cmd_yaw` back to the observation + a yaw-rate tracking reward,
+- Work: add `cmd_yaw` back to the observation + a yaw-rate tracking reward,
   from-scratch (the current policy never learned it). One command-conditioned
   policy, not a separate turn gait.
 
@@ -108,13 +108,13 @@ turn gaits (`wkL`/`wkR`) work today.
 
 B2. Only if autonomy-mode testing surfaces a concrete gap.
 
-- **Sidestep:** mechanically capped on Bittle (planar fore-aft legs, no lateral
+- Sidestep: mechanically capped on Bittle (planar fore-aft legs, no lateral
   reach). **Trigger:** go-to-object / charger-docking on hardware shows a
   positioning need that turn-step-turn can't cover. Even then, expect a shuffle.
-- **Sneak (slow, low, quiet):** not an RL problem — a posture + cadence variant
+- Sneak (slow, low, quiet): not an RL problem — a posture + cadence variant
   of the existing walk. **Do this as a Skill Composer keyframe** (needs B3 +
   hardware), not a training run. Personality/patrol value (B4/B6/B7).
-- **Backward as its own tuned gait:** the current policy does `cmd_fwd < 0`
+- Backward as its own tuned gait: the current policy does `cmd_fwd < 0`
   already; only revisit if hardware shows backing up is unreliable.
 
 ## H7 — Climb as a separate skill policy  🔴  🟢 CONFIRMED NEED (2026-09-15)
@@ -139,11 +139,11 @@ full ledge-climb (no need to lift the body onto a taller surface) — a
 plausible easier on-ramp to validate the reach-plant-shift primitive on real
 hardware before attempting a full climb.
 
-- **No longer gated on "a demonstrated need"** — confirmed 2026-09-15: G2
+- No longer gated on "a demonstrated need": confirmed 2026-09-15: G2
   needs a climb/clear-a-ledge skill. Scheduled once the body is in hand, not
   deferred behind a trigger.
-- **Highest sim-to-real risk on the roadmap** — contact-rich, posture-dependent.
-- **Tier 2 (~25–70 mm):** a conditioning-input extension of the walk policy
+- Highest sim-to-real risk on the roadmap: contact-rich, posture-dependent.
+- Tier 2 (~25–70 mm): a conditioning-input extension of the walk policy
   rather than a separate policy — the Phase 4 ledge primitive is the on-ramp.
 - Needs hardware to validate at all.
 
@@ -159,10 +159,10 @@ foot-grip + a human in the loop — none of which PyBullet's contact model
 reproduces. Details in the Phase F RESULT block of `vision-goal-locomotion-plan.md`.
 
 **On-hardware plan (both worth exploring, per 2026-09-15 discussion):**
-- **Scripted first:** port `cmh` directly, hand-tune approach distance +
+- Scripted first: port `cmh` directly, hand-tune approach distance +
   keyframe timing against a real step. Cheapest way to learn whether it climbs
   at all on real friction/grip, which sim couldn't answer.
-- **Learned residual:** a `cmh`-anchored residual (the standard recipe,
+- Learned residual: a `cmh`-anchored residual (the standard recipe,
   `docs/rl/skill-learning-method.md`), trained on real IMU rather than
   PyBullet, could generalize across ledge heights/materials/approach angles
   in a way a fixed keyframe can't — worth trying once the scripted version
@@ -178,7 +178,7 @@ reproduces. Details in the Phase F RESULT block of `vision-goal-locomotion-plan.
 B1. Shrink the policy to run on Bittle's own ESP32 (BiBoard V1) instead of the
 Pi, per the "Tiny RL for Quadruped Locomotion using Decision Transformers" work.
 
-- **Trigger:** measure `predict()` latency for the ONNX policy on the real Pi
+- Trigger: measure `predict()` latency for the ONNX policy on the real Pi
   Zero 2 W (a step already in the plan). If the Pi *can't* hit control rate, or
   if freeing the Pi for voice/vision/memory is worth it, this becomes real.
 - Research-heavy; a distinct pipeline from PPO + PyBullet.
@@ -189,7 +189,7 @@ The RL policy **can't** self-right (no roll-axis DOF — [[project_g2_no_self_ri
 Firmware has a scripted self-right, but only for slow side/forward falls and with
 no BiBoard-V1 IR trigger.
 
-- **Do now (sim): DONE 2026-09-10, re-verified 2026-09-24** — replayed `rc`/`rl`
+- Do now (sim): DONE 2026-09-10, re-verified 2026-09-24: replayed `rc`/`rl`
   in PyBullet (`reference_gait/verify_getup_reference.py`). Fixed the URDF's
   joint-range limits (too narrow for `rc_ref.npy`'s real angles) and a second,
   independent script-level clamp that was silently truncating them too — real
@@ -207,9 +207,9 @@ no BiBoard-V1 IR trigger.
   imitation) if this ever gets picked up as its own project. The sim can't
   validate the firmware get-up either way; hardware testing is mandatory.
   Full write-up: [`getup-sim-replay.md`](../rl/getup-sim-replay.md).
-- **Trigger (hardware):** G2 falls in orientations the firmware self-right
+- Trigger (hardware): G2 falls in orientations the firmware self-right
   doesn't cover, often enough to matter.
-- **Work:** almost certainly a **keyframe/scripted** skill (Skill Composer), not
+- Work: almost certainly a **keyframe/scripted** skill (Skill Composer), not
   RL — plus a fall-orientation classifier to pick the right recovery. Possibly an
   IR-trigger workaround for BiBoard V1.
 
@@ -222,9 +222,9 @@ foot during low-clearance swing (nothing above the flat floor plane to catch a
 foot), and extra resistance planting into / lifting out of the pile bed at each
 footfall (contact-model stiffness/damping only approximates this).
 
-- **Trigger:** hardware assembled, ONNX policy deployed, real carpet available
+- Trigger: hardware assembled, ONNX policy deployed, real carpet available
   (already true today).
-- **Work:** `pi_pipeline/gait/sysid_collect.py` on hard floor, then the same
+- Work: `pi_pipeline/gait/sysid_collect.py` on hard floor, then the same
   fixed sequence on the real carpet — matched commands, so it's a clean A/B.
   `sysid_collect.py` currently only logs *commanded* joint angles; extend it to
   also log the servo **position feedback readback** (`readAllFeedbackFast()` —
@@ -233,14 +233,14 @@ footfall (contact-model stiffness/damping only approximates this).
   angle) is available, not just IMU tilt/rate. No torque/current feedback exists
   on these servos — resistance has to be inferred from tracking-error + IMU
   residual, not read directly as a force.
-- **Fit in two passes, not one:** first fit motor `max_force`/`kp`/`kd`/latency
+- Fit in two passes, not one: first fit motor `max_force`/`kp`/`kd`/latency
   against the **hard-floor** log only (today's `sysid_replay.py --fit`, no
   changes needed) to lock the actuator model. Then, holding those fixed, fit
   `CARPET_SOFT` + friction (currently not exposed to `sysid_replay.py` at all —
   its sim only loads a bare rigid `plane.urdf`) against the **carpet** log's
   residual gap. Fitting everything at once would let carpet resistance leak into
   the wrong parameters (e.g. inflate `max_force` to compensate for foot drag).
-- **Diagnostic for which mechanism is real:** condition the real-vs-sim residual
+- Diagnostic for which mechanism is real: condition the real-vs-sim residual
   (tracking-error and IMU tilt/rate) on the log's existing gait-phase tag. A
   residual concentrated at plant/liftoff phase points at the contact model
   (stiffness/damping term); one spread across the swing-phase window instead
@@ -251,7 +251,7 @@ footfall (contact-model stiffness/damping only approximates this).
   pile height, rough drag-force reading (paw-sized weight + fish/luggage scale)
   vs the same pull on bare floor — not a substitute for sysid, just a check the
   current guess isn't wildly off before hardware exists.
-- **R10 (resiliency campaign, long-duration drift) deferred here (2026-09-18).**
+- R10 (resiliency campaign, long-duration drift) deferred here (2026-09-18).
   R10 originally found severe stalling on carpet (speed decayed to 0 m/s by
   60s) on an older checkpoint, in sim. User's call: re-verify this on real
   carpet once hardware exists rather than re-run it in sim against current
@@ -272,21 +272,21 @@ robot, plus cumulative coreless-brush / gear / driver wear. Full write-up,
 mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
 [`../hardware/servo-thermal.md`](../hardware/servo-thermal.md).
 
-- **Trigger:** any real-robot session where a servo visibly sags / a joint
+- Trigger: any real-robot session where a servo visibly sags / a joint
   freezes mid-task, OR the H1 head-to-head runs long enough to matter. Also
   fires if the long-episode eval (below) shows the base policy doesn't shed
   effort as joints warm.
-- **Do-now sim work (not gated):** dynamic per-joint thermal model in the env
+- Do-now sim work (not gated): dynamic per-joint thermal model in the env
   (re-trigger the existing `TORQUE_CUTBACK` from a live `T` state), thermal
   observation behind a flag, long-episode eval measuring time-to-trip. Then a
   Stage-2 thermal-aware **residual** finetune off `run20m_ppo` (base frozen) —
   temps in the obs, heating-rate reward `R_th`.
-- **Deployable without any training:** Layer 1 (I²t sensorless estimator +
+- Deployable without any training: Layer 1 (I²t sensorless estimator +
   3-tier per-joint indicator, spoken via the voice pipeline) + Layer 2
   (behaviour-layer duty-cycle governor + cooldown pose). Ship first.
-- **The one missing number:** real trip time + cooldown rate from a single
+- The one missing number: real trip time + cooldown rate from a single
   bench test once hardware is up — calibrates `k_gen`/`k_diss`/`T_trip`.
-- **Specifically re-evaluate `_MAX_CONTINUOUS_S`** (the 8-min "take a break"
+- Specifically re-evaluate `_MAX_CONTINUOUS_S`: (the 8-min "take a break"
   backstop in `thermal_guard.py`). It is NOT a thermal estimate — just a blind
   floor. Once the heat estimator is calibrated, check whether it reliably
   catches the danger case on its own; if so, **raise `_MAX_CONTINUOUS_S` a lot
@@ -296,7 +296,7 @@ mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
 
 ## H12 — Training-course redesign  🟡  ⚪
 
-> **Picked up 2026-10-06 by [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md):** the sharp box obstacles come back in the V3 course.
+> Picked up 2026-10-06 by [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md): the sharp box obstacles come back in the V3 course.
 
 The redesigned rubble-primary / wider-slope course was tested head-to-head as a
 fresh 20M (`run20m_newcourse`, 2026-09-05). **Negative result** — equivalent on
@@ -307,16 +307,16 @@ steps, carpet, rough ground, and OOD slopes (decathlon report + artifact
 generalises to real thresholds; the rubble swap (rounded shapes, `RUBBLE_PROB`
 0.80) removed it by subtraction.
 
-- **Keep from the new course:** the heightfield slope-geometry bug fix
+- Keep from the new course: the heightfield slope-geometry bug fix
   (`01cf87e`), the wider slope range, the richer rubble variety. Parked as the
   `run20m_newcourse` env diff.
-- **The redesign hypothesis, untested:** old-course sharp obstacles back in +
+- The redesign hypothesis, untested: old-course sharp obstacles back in +
   `RUBBLE_PROB` down + ledge/step and bare-robot episodes as an *explicit*
   curriculum (not incidental). Could beat the old course; unproven.
-- **Trigger:** a green-lit ~20M run is happening anyway (post-hardware, per the
+- Trigger: a green-lit ~20M run is happening anyway (post-hardware, per the
   [[project_longrun_trigger]] checklist). Fold the redesign into that run's
   final env — don't spend a standalone 20M just to test the course.
-- **User intent (2026-09-05):** wants to revisit building a better course
+- User intent (2026-09-05): wants to revisit building a better course
   eventually; tabled while gait training is paused pre-hardware.
 
 ## H13 — Servo response characterization (τ, speed ceiling)  🟡
@@ -334,14 +334,14 @@ ceiling**. `firmware_model.py` models the firmware's own command-timing ramp
 but treats each interpolated waypoint as instantly achieved, with no
 separate physical-servo-lag term on top.
 
-- **Trigger:** hardware arrival — servo type (alloy vs. plastic gears) and
+- Trigger: hardware arrival — servo type (alloy vs. plastic gears) and
   board revision change the real numbers, so BittleJuice's 33ms/137°/s can't
   be assumed for G2 without measuring it.
-- **Do-now sim work:** DONE — `servo_saturation_check.py` built and run
+- Do-now sim work: DONE — `servo_saturation_check.py` built and run
   against `base1_20m` (26.33% over the assumed ceiling, see above). Re-run
   against whatever policy comes out of the current Phase B/C campaign, and
   again once G2's real ceiling is known.
-- **If characterization shows a real mismatch:** model servo response lag
+- If characterization shows a real mismatch: model servo response lag
   properly (fit the command-timing filter and the actuator model *together*
   against the measured step response, per BittleJuice's explicit warning
   against double-counting lag if they're fit separately) rather than just
@@ -353,21 +353,21 @@ Requested 2026-10-07 as an investigation only (the user chose plain system ident
 Instead of fitting a few numbers (`maxForce`, gains, latency), train a small network on logged hardware data to predict what a servo does for a given
 commanded angle and recent joint history, and have the sim call it in place of its simple position-control model.
 
-- **Trigger:** plain system identification (fit servo and body parameters to the logs) leaves a gap the few-number model cannot close, for example
+- Trigger: plain system identification (fit servo and body parameters to the logs) leaves a gap the few-number model cannot close, for example
   load-dependent sag or the stuck-servo behavior seen on the FL shoulder.
-- **Limit to settle first:** servo feedback arrives at about 9 Hz (see H13), far below the 80 Hz loop, so the net would learn from sparse readings; check
+- Limit to settle first: servo feedback arrives at about 9 Hz (see H13), far below the 80 Hz loop, so the net would learn from sparse readings; check
   how much step-response data H13 yields before building anything.
-- **Work (not started):** collect paired command / reading logs across loads (in the air, standing, walking), train, validate on held-out logs, then
+- Work (not started): collect paired command / reading logs across loads (in the air, standing, walking), train, validate on held-out logs, then
   plug into the env behind a default-off flag and compare against the system-identification model on the same benchmark cells.
 
 ---
 
 ## Do-now sim tasks (not hardware-gated)
 
-- **Get-up sim replay** (H9) — watch the existing scripts in PyBullet.
-- **ONNX export + numerical-parity check** — export `run20m_ppo`, confirm the
+- Get-up sim replay: (H9) — watch the existing scripts in PyBullet.
+- ONNX export + numerical-parity check: export `run20m_ppo`, confirm the
   exported policy matches the PyTorch one step-for-step before the Pi arrives.
-- **Diagnostics / black-box logging — Phase 1** (`pi_pipeline/diag/`) — structured
+- Diagnostics / black-box logging — Phase 1: (`pi_pipeline/diag/`) — structured
   session log + ring buffer + manifest + summarize/replay tooling so hardware
   failures are debuggable. Plan: [`../hardware/diagnostics.md`](../hardware/diagnostics.md).
   Not hardware-gated; pairs with the ONNX/bring-up work.

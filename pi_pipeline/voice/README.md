@@ -8,22 +8,22 @@ Every stage is an interface with a dev implementation and a robot implementation
 
 ## Modules
 
-- **`conversation.py`**: Anthropic client, rolling history, `perform_skill` + `remember` tools. Turns a reply into `AssistantTurn(speech, actions, facts)`. Memory seam (`send(..., memory_context=)`); `set_personality()` swaps the persona mid-session.
-- **`skills.py`**: Curated OpenCat skill catalogue + serial command mapping (`walk_forward` → `kwkF`).
-- **`actuator.py`**: `MockActuator` (logs) / `SerialActuator` (BiBoard over serial).
-- **`tts.py`**: `MacTTS` (`say`) / `PiperTTS` (+ `synth_to_wav`) / `PrintTTS`.
-- **`stt.py`**: `TextSTT` (stdin) / `VoskSTT` (mic; + `transcribe_wav`).
-- **`wake_word.py`**: `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when (see below)
-- **`wake_log.py`**: every wake trigger and what followed it (`~/.local/share/g2/wake_triggers.jsonl`); `python -m pi_pipeline.voice.wake_log --days 7` counts the false ones and suggests a `G2_WAKE_MIN_CONF`.
-- **`speech_cache.py`**: disk cache of synthesised lines (`~/.cache/g2/speech`, `G2_SPEECH_CACHE`), keyed by text, voice file, style and rate; `PiperTTS.prepare` reads and fills it, and the voice service pre-makes the exploration narration lines a minute after start-up (`G2_SPEECH_PREWARM`).
-- **`commands.py`**: spoken commands the loop handles itself (no Claude call)
-- **`cues.py`**: listening / thinking / speaking indicator (log now; buzzer/posture later).
-- **`loop.py`**: the orchestrator.
-- **`livecheck.py`**: real-API end-to-end check (`python -m pi_pipeline.voice.livecheck`; needs a key).
-- **`__main__.py`**: CLI entrypoint.
+- `conversation.py`: Anthropic client, rolling history, `perform_skill` + `remember` tools. Turns a reply into `AssistantTurn(speech, actions, facts)`. Memory seam (`send(..., memory_context=)`); `set_personality()` swaps the persona mid-session.
+- `skills.py`: Curated OpenCat skill catalogue + serial command mapping (`walk_forward` → `kwkF`).
+- `actuator.py`: `MockActuator` (logs) / `SerialActuator` (BiBoard over serial).
+- `tts.py`: `MacTTS` (`say`) / `PiperTTS` (+ `synth_to_wav`) / `PrintTTS`.
+- `stt.py`: `TextSTT` (stdin) / `VoskSTT` (mic; + `transcribe_wav`).
+- `wake_word.py`: `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when (see below)
+- `wake_log.py`: every wake trigger and what followed it (`~/.local/share/g2/wake_triggers.jsonl`); `python -m pi_pipeline.voice.wake_log --days 7` counts the false ones and suggests a `G2_WAKE_MIN_CONF`.
+- `speech_cache.py`: disk cache of synthesised lines (`~/.cache/g2/speech`, `G2_SPEECH_CACHE`), keyed by text, voice file, style and rate; `PiperTTS.prepare` reads and fills it, and the voice service pre-makes the exploration narration lines a minute after start-up (`G2_SPEECH_PREWARM`).
+- `commands.py`: spoken commands the loop handles itself (no Claude call)
+- `cues.py`: listening / thinking / speaking indicator (log now; buzzer/posture later).
+- `loop.py`: the orchestrator.
+- `livecheck.py`: real-API end-to-end check (`python -m pi_pipeline.voice.livecheck`; needs a key).
+- `__main__.py`: CLI entrypoint.
 
-- **wake_word.py:** `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when no audio block arrives for 6 s (`G2_MIC_WATCHDOG`, backlog B27). Two optional gates: `G2_WAKE_MIN_CONF` (lowest word confidence) and `G2_WAKE_MAX_BEFORE` (words before the phrase in the same utterance).
-- **commands.py:** "forget that", "go to sleep", "enable/disable gir mode", and **"dismissed"** (after a false wake: closes the window silently and logs the trigger as false; chosen because "go to sleep" already curls him up). Also parses the answer to the floor question he asks before a roam (`parse_floor_answer`, asked by `loop.py` `_ask_floor`; `G2_FLOOR_PROMPT_S`).
+- wake_word.py: `AlwaysAwake` / `VoskWakeWord`. One microphone stream for the life of the process, kept alive by a supervised keeper that reopens it when no audio block arrives for 6 s (`G2_MIC_WATCHDOG`, backlog B27). Two optional gates: `G2_WAKE_MIN_CONF` (lowest word confidence) and `G2_WAKE_MAX_BEFORE` (words before the phrase in the same utterance).
+- commands.py: "forget that", "go to sleep", "enable/disable gir mode", and **"dismissed"** (after a false wake: closes the window silently and logs the trigger as false; chosen because "go to sleep" already curls him up). Also parses the answer to the floor question he asks before a roam (`parse_floor_answer`, asked by `loop.py` `_ask_floor`; `G2_FLOOR_PROMPT_S`).
 
 
 ## Run it
@@ -46,13 +46,13 @@ python -m pi_pipeline.voice --mode voice
 The mic is only live while G2 is powered on and started in `--mode voice`
 (`--mode text` never opens it). Within voice mode:
 
-- **Follow-up window.** After a reply G2 keeps listening for `G2_FOLLOW_UP_S` seconds (default 60, reset on every exchange) so a normal conversation never re-triggers the wake word. Only a real lull closes it.: Large value ≈ "awake until I say 'go to sleep'". `G2_FOLLOW_UP_S=0` -> every turn needs the wake word (most private).
-- **Conversation mode.** Say "gee two, let's talk" (only the short phrase; "let's talk about X" is a normal request): G2 keeps listening without the wake word, waiting `G2_CONVERSATION_WINDOW_S` (default 20, 0 = mode off) for you to start speaking each turn. It ends on a quiet gap, "that's all" / "we're done" / "end conversation", "go to sleep", or after `G2_CONVERSATION_MAX_S` (600).: Every turn is a Claude call, including anything the mic hears in that window.
-- **Side chatter.** A turn heard WITHOUT the wake word (a question window or conversation mode) is dropped before Claude when it runs longer than `G2_SIDE_MAX_WORDS` (14; `G2_CONVERSATION_MAX_WORDS` 30 inside conversation mode; 0 = no limit), or when it says it is aimed elsewhere ("I'm not talking to you"). A dropped question-window turn closes the window; in conversation mode the mode stays on unless the remark was aimed elsewhere. Stop / shut-down commands always work.: Turns after the wake word are never dropped for length.
-- **"go to sleep"** — ends the follow-up window immediately; the next turn needs the wake word.: `commands.py`
-- **"dismissed"** — said after a wake word nobody said: closes the window at once, silently; the wake log counts it as a false trigger.: `commands.py`, `wake_log.py`
-- **"forget that"** (also "scratch that", "don't remember that", …) — deletes every exchange and fact recorded since the wake word, and is never sent to Claude.: `commands.py` + `Memory.forget_session`
-- **Goal suggestions at start-up.** After a goal session (the service starts again when it ends), G2 says each new suggestion for a setting only you change and listens once, with no wake word, for "confirm", "cancel" or "review" (silence = review).: `loop.py` `_offer_goal_suggestions`, `goals/suggestions.py`; `G2_GOAL_SUGGEST=0` turns it off
+- Follow-up window: After a reply G2 keeps listening for `G2_FOLLOW_UP_S` seconds (default 60, reset on every exchange) so a normal conversation never re-triggers the wake word. Only a real lull closes it.: Large value ≈ "awake until I say 'go to sleep'". `G2_FOLLOW_UP_S=0` -> every turn needs the wake word (most private).
+- Conversation mode: Say "gee two, let's talk" (only the short phrase; "let's talk about X" is a normal request): G2 keeps listening without the wake word, waiting `G2_CONVERSATION_WINDOW_S` (default 20, 0 = mode off) for you to start speaking each turn. It ends on a quiet gap, "that's all" / "we're done" / "end conversation", "go to sleep", or after `G2_CONVERSATION_MAX_S` (600).: Every turn is a Claude call, including anything the mic hears in that window.
+- Side chatter: A turn heard WITHOUT the wake word (a question window or conversation mode) is dropped before Claude when it runs longer than `G2_SIDE_MAX_WORDS` (14; `G2_CONVERSATION_MAX_WORDS` 30 inside conversation mode; 0 = no limit), or when it says it is aimed elsewhere ("I'm not talking to you"). A dropped question-window turn closes the window; in conversation mode the mode stays on unless the remark was aimed elsewhere. Stop / shut-down commands always work.: Turns after the wake word are never dropped for length.
+- "go to sleep": ends the follow-up window immediately; the next turn needs the wake word.: `commands.py`
+- "dismissed": said after a wake word nobody said: closes the window at once, silently; the wake log counts it as a false trigger.: `commands.py`, `wake_log.py`
+- "forget that": (also "scratch that", "don't remember that", …) — deletes every exchange and fact recorded since the wake word, and is never sent to Claude.: `commands.py` + `Memory.forget_session`
+- Goal suggestions at start-up: After a goal session (the service starts again when it ends), G2 says each new suggestion for a setting only you change and listens once, with no wake word, for "confirm", "cancel" or "review" (silence = review).: `loop.py` `_offer_goal_suggestions`, `goals/suggestions.py`; `G2_GOAL_SUGGEST=0` turns it off
 
 Speech that never triggers the wake word is never transcribed or stored — the
 Vosk wake grammar only matches the wake phrase.
@@ -80,8 +80,8 @@ Piper voices (`en`) live at
 Tiers: `low` (16 kHz, small, buzzy), `medium` (22 kHz, the sweet spot for the
 Pi), `high` (bigger + slower, likely too heavy for a Pi Zero 2 W). Fetched into `models/piper/` by `fetch_models.sh`:
 
-- **`en_US-ryan-low`**: current default; warm male but low-tier, noticeably synthetic
-- **`en_US-ryan-medium`**: same voice, clean; warm, casual, relaxed — good companion fit
+- `en_US-ryan-low`: current default; warm male but low-tier, noticeably synthetic
+- `en_US-ryan-medium`: same voice, clean; warm, casual, relaxed — good companion fit
 
 Voices tried and removed from the local folder on 2026-10-17: `en_US-amy-medium` (female, bright and upbeat), `en_US-hfc_male-medium` (male, very natural, personality-neutral) and `en_GB-alan-medium` (British male, composed, some gravitas). They download from the same repo the same way.
 
@@ -102,9 +102,9 @@ bash pi_pipeline/fetch_models.sh
 
 **Decided set for the Pi Zero 2 W:**
 
-- **STT**: model: `vosk-model-small-en-us-0.15` (~40 MB zip, ~300 MB RAM at runtime); why: the only Vosk English model that fits — the others are 1–2 GB
-- **TTS primary**: model: `en_US-ryan-low` (16 kHz); why: lightest tier Piper still ships; warm male, fits G2's persona
-- **TTS upgrade**: model: `en_US-ryan-medium` (22 kHz, same voice, cleaner); why: switch to it **iff** `benchmark_pi.py --all-voices` shows its synth < ~0.7× real-time with RAM headroom on the actual Pi
+- STT: model: `vosk-model-small-en-us-0.15` (~40 MB zip, ~300 MB RAM at runtime); why: the only Vosk English model that fits — the others are 1–2 GB
+- TTS primary: model: `en_US-ryan-low` (16 kHz); why: lightest tier Piper still ships; warm male, fits G2's persona
+- TTS upgrade: model: `en_US-ryan-medium` (22 kHz, same voice, cleaner); why: switch to it **iff** `benchmark_pi.py --all-voices` shows its synth < ~0.7× real-time with RAM headroom on the actual Pi
 
 Piper `x_low` voices are gone from the current `rhasspy/piper-voices` repo, so
 `low` is the floor. If `low` still can't hit real-time on the Zero 2 W the

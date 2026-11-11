@@ -2,9 +2,9 @@
 
 Automatic capture of every walk, so real-robot data turns into sim calibration without anyone asking. The full plan and the Mac-side steps (`g2_ingest.py`, `g2_calibrate.py`): [`../../docs/rl/real-data-pipeline.md`](../../docs/rl/real-data-pipeline.md).
 
-- **`autolog.py`**: Every policy walk (and scripted walk) with no explicit `--log` writes `~/g2_runs/auto/<date>/<kind>_<time>.csv` plus a JSON sidecar: kind, hardware epoch, floor, policy, commands, why it ended. It must never stop a walk; `G2_AUTOLOG=off` disables it (the tests do)
-- **`epochs.py`, `hardware_epochs.json`**: Dated hardware changes. Fits use the current epoch only; the user says when hardware changes
-- **`labels.py`**: Data-type labels for captured runs (snag, fall, collision, pick-up, steady walk, …)
+- `autolog.py`: Every policy walk (and scripted walk) with no explicit `--log` writes `~/g2_runs/auto/<date>/<kind>_<time>.csv` plus a JSON sidecar: kind, hardware epoch, floor, policy, commands, why it ended. It must never stop a walk; `G2_AUTOLOG=off` disables it (the tests do)
+- `epochs.py`, `hardware_epochs.json`: Dated hardware changes. Fits use the current epoch only; the user says when hardware changes
+- `labels.py`: Data-type labels for captured runs (snag, fall, collision, pick-up, steady walk, …)
 
 ```bash
 python -m pi_pipeline.telemetry surface [LABEL]       # show or set the floor (hardwood, tile, carpet, …)

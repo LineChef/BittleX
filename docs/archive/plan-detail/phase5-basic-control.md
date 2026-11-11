@@ -5,7 +5,7 @@
 
 ## Phase 5 — Basic programming & control
 
-**Status:** the serial control layer is built and tested (mock/offline) —
+Status: the serial control layer is built and tested (mock/offline) —
 `pi_pipeline/link/`. `SerialLink` (lazy open, auto-reconnect, non-raising
 `send()`), `opencat.py` (command-string builders + `is_safe()` calibration
 block), and `check_serial.py` diagnostics. `voice/SerialActuator` now goes
@@ -23,7 +23,7 @@ through it. Command reference and a hardware bring-up checklist are in
 - [x] Test the vision module's on-device detection via the SenseCraft AI Model
       Assistant web debug GUI. **Done 2026-09-05** — stock classification model
       deployed, live feed + labels confirmed.
-- **Camera → Pi is over USB, not the Grove/GPIO pins** (decided 2026-09-05 from
+- Camera → Pi is over USB, not the Grove/GPIO pins (decided 2026-09-05 from
       the Seeed wiki): the Grove 4-pin connector is **I²C** (`0x62`), not UART.
       Link the module USB-C → the Pi's USB *data* port (Pi Zero 2 W: the *inner*
       micro-USB) → it enumerates as `/dev/ttyACM0`, same SSCMA AT/JSON protocol,

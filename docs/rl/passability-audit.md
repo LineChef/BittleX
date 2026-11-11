@@ -11,9 +11,9 @@ The surface-transition floor was built from two slabs, each tilted about its own
 
 ## The audit (`rl_training/opencat-gym/passability_audit.py`)
 
-- **Part A, geometry** (`geometry`): no policy. For each hazard at a pinned level (1.0 and the 1.25 ceiling, with hard levels x1.10), generate 300 episodes with the training sampler and scan the lane ahead with rays: the forced rise (smallest wall that must be climbed in the next 1.2 m over three lanes), the ground tilt, and whether the body overlaps the ground at the start.
-- **Part B, capability** (`capability`): the best policies (V2.1, K3, the 20M) against each hazard at rising magnitudes (side-hill 4-20 deg, climb 8-30 deg, descent 8-24 deg, ledge 2.5-8 cm), 20 episodes per cell; success = stayed up and covered at least half the commanded distance. The top threshold of a family is the largest magnitude the best policy passes at least half the time. Results: `trained/passability_capability.json` (local). Runs when the Mac is idle.
-- **Scene checks** (`scene`): floating or sunk obstacles, obstacles on the start, overlaps.
+- Part A, geometry: (`geometry`): no policy. For each hazard at a pinned level (1.0 and the 1.25 ceiling, with hard levels x1.10), generate 300 episodes with the training sampler and scan the lane ahead with rays: the forced rise (smallest wall that must be climbed in the next 1.2 m over three lanes), the ground tilt, and whether the body overlaps the ground at the start.
+- Part B, capability: (`capability`): the best policies (V2.1, K3, the 20M) against each hazard at rising magnitudes (side-hill 4-20 deg, climb 8-30 deg, descent 8-24 deg, ledge 2.5-8 cm), 20 episodes per cell; success = stayed up and covered at least half the commanded distance. The top threshold of a family is the largest magnitude the best policy passes at least half the time. Results: `trained/passability_capability.json` (local). Runs when the Mac is idle.
+- Scene checks: (`scene`): floating or sunk obstacles, obstacles on the start, overlaps.
 
 ## Which hazards a run trains on
 

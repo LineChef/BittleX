@@ -12,7 +12,7 @@ The full roadmap and decision log are in
 
 ## Project Goals
 
-- **Locomotion**: a *command-following* walking policy trained by reinforcement
+- Locomotion: a *command-following* walking policy trained by reinforcement
   learning (simulation → sim-to-real), rather than switching between hand-scripted
   gaits. It takes a speed and heading command and produces the gait — stand,
   start/stop, forward, backward — and stays upright across slopes, obstacles,
@@ -21,31 +21,31 @@ The full roadmap and decision log are in
   depends on foot-slip and a firmware gyro-assist a training sim can't
   reproduce, so it's handled by falling back to scripted firmware gaits
   (`wkL`/`wkR`) instead.
-- **Recovery**: detect a fall from the IMU, run the firmware get-up skill for the
+- Recovery: detect a fall from the IMU, run the firmware get-up skill for the
   falls the hardware *can* recover from, and know when it needs a human.
-- **Perception → navigation**: an onboard AI vision module for obstacle
+- Perception → navigation: an onboard AI vision module for obstacle
   detection, and reactive skill-switching — recognize an obstacle or ledge it
   can't just walk over, and swap in the right scripted response (step over,
   climb, back out) before handing back to the walk policy.
-- **Voice**: natural spoken conversation powered by the Claude API (speech-to-text
+- Voice: natural spoken conversation powered by the Claude API (speech-to-text
   → Claude → text-to-speech), with movement used as body language. Running on the Pi
   with a real microphone and speaker; "shut down" lies G2 down and powers the Pi off.
   It can also take a picture and describe what it sees.
-- **Memory**: persistent context across conversations (facts ranked by importance,
+- Memory: persistent context across conversations (facts ranked by importance,
   a sleep-time consolidation pass, and a log of which facts shape answers), and a
   sense of place (which room it's in) built up over time.
-- **Power awareness**: low-battery alerts for G2's pack, a measured runtime estimate
+- Power awareness: low-battery alerts for G2's pack, a measured runtime estimate
   for the Pi's battery, and a Wi-Fi fallback to a phone hotspot.
-- **Autonomy**: Claude as a slow deliberative layer on top of the reactive
+- Autonomy: Claude as a slow deliberative layer on top of the reactive
   control — deciding where to go, what to look at, and whether to approach
   something, from what it sees and remembers.
 
 ## Hardware
 
-- **Petoi Bittle X V2 (alloy servos)**: Core quadruped platform, built on OpenCat / BiBoard V1 (ESP32)
-- **Raspberry Pi Zero 2 W**: Runs the voice / memory / vision / Claude pipeline
-- **PiSugar S 1200 mAh**: Independent Pi power, not shared with the servo battery — see [`docs/hardware/pi-power.md`](docs/hardware/pi-power.md)
-- **Petoi AI Vision Camera Module**: Grove Vision AI V2, onboard neural processor for on-device inference
+- Petoi Bittle X V2 (alloy servos): Core quadruped platform, built on OpenCat / BiBoard V1 (ESP32)
+- Raspberry Pi Zero 2 W: Runs the voice / memory / vision / Claude pipeline
+- PiSugar S 1200 mAh: Independent Pi power, not shared with the servo battery — see [`docs/hardware/pi-power.md`](docs/hardware/pi-power.md)
+- Petoi AI Vision Camera Module: Grove Vision AI V2, onboard neural processor for on-device inference
 
 Full parts list, costs, and vendor-doc specs: [`docs/hardware/parts-and-decisions.md`](docs/hardware/parts-and-decisions.md)
 and [`docs/hardware/specs.md`](docs/hardware/specs.md).
@@ -65,14 +65,14 @@ The current state — what is deployed, what has been tested on the robot, open 
 Say the wake word, "gee two" (or "hey buddy"), then the command. A short beep means he is listening, a lower boop means he has your words. The full list, with what each one does, is in
 **[`docs/guides/voice-commands.md`](docs/guides/voice-commands.md)**; the ones you will use most:
 
-- **"G2, explore" / "go ahead and look around"**: exploration mode ([how it works](docs/guides/exploration-mode.md))
-- **"G2, ball goal"**: a goal session: up to 10 ball-punt attempts, each one changing the next ([how it works](docs/guides/goals.md))
-- **"that's enough" / "end exploration mode"**: ends the exploration
-- **"walk forward for ten seconds", "come here"**: a walk, or a walk to you
-- **"hi step" / "walk normally"**: switches the walking gait
-- **"emergency stop" / "resume"**: freezes him now / lets him move again
-- **"go to sleep" / "shut down"**: curls up and sleeps / lies down and goes dormant
-- **"switch to English"**: resets the voice module's language (when it falls back to Korean)
+- "G2, explore" / "go ahead and look around": exploration mode ([how it works](docs/guides/exploration-mode.md))
+- "G2, ball goal": a goal session: up to 10 ball-punt attempts, each one changing the next ([how it works](docs/guides/goals.md))
+- "that's enough" / "end exploration mode": ends the exploration
+- "walk forward for ten seconds", "come here": a walk, or a walk to you
+- "hi step" / "walk normally": switches the walking gait
+- "emergency stop" / "resume": freezes him now / lets him move again
+- "go to sleep" / "shut down": curls up and sleeps / lies down and goes dormant
+- "switch to English": resets the voice module's language (when it falls back to Korean)
 
 Switches for sounds and behaviours: [`docs/guides/settings-switches.md`](docs/guides/settings-switches.md).
 

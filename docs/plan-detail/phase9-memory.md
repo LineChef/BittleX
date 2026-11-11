@@ -5,7 +5,7 @@
 
 ## Phase 9 — Memory system
 
-**Status:** built and tested on the dev machine — `pi_pipeline/memory/`, wired
+Status: built and tested on the dev machine — `pi_pipeline/memory/`, wired
 into the voice loop through the `Memory.recall` / `Memory.record` seam.
 
 - [x] **Persistent store** — SQLite (`memory/data/g2_memory.db`, gitignored;

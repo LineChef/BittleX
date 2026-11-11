@@ -1,6 +1,6 @@
 # H1 — Learned vs Scripted Gait: real-robot head-to-head rubric
 
-**The question:** is `run20m_ppo` (the RL walking policy) actually better than
+The question: is `run20m_ppo` (the RL walking policy) actually better than
 OpenCat's firmware `wkF` for plain walking on the real G2 — better enough to keep
 building the RL locomotion track, or does G2 fall back to firmware gaits + a
 perception layer?
@@ -17,9 +17,9 @@ comparison table + verdict).
 
 ## Contenders
 
-- **SCR**: what: firmware `wkF` + gyro-assist; how to run: `kwkF` over serial; gyro assist ON (its real advantage)
-- **RL**: what: `run20m_ppo`, policy in full control; how to run: `run_gait.py --cmd <v>` (firmware balance OFF — it sends `g`)
-- **RL+b**: what: `run20m_ppo` *with* firmware gyro-assist underneath; how to run: `run_gait.py --cmd <v> --keep-firmware-balance`
+- SCR: what: firmware `wkF` + gyro-assist; how to run: `kwkF` over serial; gyro assist ON (its real advantage)
+- RL: what: `run20m_ppo`, policy in full control; how to run: `run_gait.py --cmd <v>` (firmware balance OFF — it sends `g`)
+- RL+b: what: `run20m_ppo` *with* firmware gyro-assist underneath; how to run: `run_gait.py --cmd <v> --keep-firmware-balance`
 
 RL+b is a real deployment option, not just a curiosity — a second independent
 balance loop under the policy may transfer better than either alone. Test all
@@ -32,12 +32,12 @@ three; the headline comparison is **SCR vs RL**.
 Run every contender on each. Start easy; stop a contender early only if it's
 clearly unsafe.
 
-- **C1**: surface / obstacle: hard flat floor; why: baseline — speed, heading, gait quality
-- **C2**: surface / obstacle: low-pile carpet / rug; why: the real deployment surface; friction + compliance
-- **C3**: surface / obstacle: a single ~15 mm threshold / door sill; why: the disturbance the sim's payload masked
-- **C4**: surface / obstacle: a shallow board ramp, ~8–10° up, then down; why: slope handling
-- **C5**: surface / obstacle: a few scattered ~20–30 mm obstacles (bottle caps, cardboard); why: foot clearance / trip resistance
-- **C6**: surface / obstacle: flat floor + a **measured** lateral shove mid-walk; why: stance recovery — the Phase-4 question, finally on hardware
+- C1: surface / obstacle: hard flat floor; why: baseline — speed, heading, gait quality
+- C2: surface / obstacle: low-pile carpet / rug; why: the real deployment surface; friction + compliance
+- C3: surface / obstacle: a single ~15 mm threshold / door sill; why: the disturbance the sim's payload masked
+- C4: surface / obstacle: a shallow board ramp, ~8–10° up, then down; why: slope handling
+- C5: surface / obstacle: a few scattered ~20–30 mm obstacles (bottle caps, cardboard); why: foot clearance / trip resistance
+- C6: surface / obstacle: flat floor + a **measured** lateral shove mid-walk; why: stance recovery — the Phase-4 question, finally on hardware
 
 For C6, "measured" = a repeatable push: a small weight on a string swung from a
 fixed drop, or a luggage scale pulled to a target force (record the peak). Same
@@ -51,13 +51,13 @@ push for every contender.
 battery droop and servo warm-up hit everyone equally. One battery charge per
 session; note the surface temperature (servo torque drifts with heat).
 
-- **forward speed** (m/s): how: lay out a 1.0–1.5 m lane; time from start line to finish line (phone stopwatch or video frame count); notes: for SCR use its natural speed; for RL command the speed that *matches* SCR's measured speed **and** also RL's own "cruise" (0.10) — report both
-- **heading drift** (deg): how: lateral offset at the finish line ÷ lane length, → `atan`; notes: + or − (which way it curves)
-- **fall rate**: how: falls ÷ N runs on that condition; notes: a "fall" = body on the ground / needs manual reset
-- **recovery (C6 only)**: how: of the shoves that caused a visible stagger, fraction where it caught and kept walking without a fall; eyeball time-to-resettle (video); notes: this is H4's real answer too
-- **gait quality** (0–3): how: video review: 3 = clean diagonal trot, feet clearing, low body bounce; 0 = dragging / stumbling / hopping; notes: score blind if you can (rename clips)
-- **power / endurance** (proxy): how: PiSugar S has no telemetry — use an inline USB power meter on the BiBoard 5 V feed if you have one, else: time to first brown-out walking continuously on C1, one run each; notes: rough; a tie-breaker, not a headline
-- **the "can't" column**: how: does the contender do it *at all*: hold a commanded speed (creep 0.04 / fast 0.14), stand on command, walk backward, hold heading to <5°?; notes: SCR structurally can't; RL's whole value proposition
+- forward speed: (m/s): how: lay out a 1.0–1.5 m lane; time from start line to finish line (phone stopwatch or video frame count); notes: for SCR use its natural speed; for RL command the speed that *matches* SCR's measured speed **and** also RL's own "cruise" (0.10) — report both
+- heading drift: (deg): how: lateral offset at the finish line ÷ lane length, → `atan`; notes: + or − (which way it curves)
+- fall rate: how: falls ÷ N runs on that condition; notes: a "fall" = body on the ground / needs manual reset
+- recovery (C6 only): how: of the shoves that caused a visible stagger, fraction where it caught and kept walking without a fall; eyeball time-to-resettle (video); notes: this is H4's real answer too
+- gait quality: (0–3): how: video review: 3 = clean diagonal trot, feet clearing, low body bounce; 0 = dragging / stumbling / hopping; notes: score blind if you can (rename clips)
+- power / endurance: (proxy): how: PiSugar S has no telemetry — use an inline USB power meter on the BiBoard 5 V feed if you have one, else: time to first brown-out walking continuously on C1, one run each; notes: rough; a tie-breaker, not a headline
+- the "can't" column: how: does the contender do it *at all*: hold a commanded speed (creep 0.04 / fast 0.14), stand on command, walk backward, hold heading to <5°?; notes: SCR structurally can't; RL's whole value proposition
 
 Log raw runs (a notebook row per run: contender, condition, run #, time, offset,
 fell y/n, notes). `run_gait.py --log` writes the RL runs' per-tick IMU +
@@ -97,16 +97,16 @@ pass doesn't move it, fall back.
 The head-to-head answers "does it transfer." The ID tooling answers "*why*, and
 what to fix" — run it in the same session:
 
-1. **`sysid_collect.py`** (Pi) — runs a fixed calibration sequence (defined
+1. `sysid_collect.py`: (Pi) — runs a fixed calibration sequence (defined
    static poses held under gravity + a slow open-loop `wkF` cycle) while logging
    the `V` IMU stream + every command sent. Also `run_gait.py --log` during the
    H1 walks.
-2. **`sysid_replay.py`** (Mac) — replays that exact command sequence **open-loop**
+2. `sysid_replay.py`: (Mac) — replays that exact command sequence **open-loop**
    in the sim env (feed the recorded joint targets straight to the servos, no
    policy) and diffs the resulting body-tilt / angular-rate trajectories against
    the real IMU log. The gap = the sim-to-real gap, per metric, no joint
    feedback required.
-3. **`sysid_replay.py --fit`** — sweeps the sim's actuator params
+3. `sysid_replay.py --fit`: sweeps the sim's actuator params
    (`maxForce`, position/velocity gains, a command-latency term via
    `CMD_LATENCY_STEPS`) to minimise that trajectory gap. Output: the corrected
    sim model to retrain against if H1 lands in the "middle result".

@@ -4,9 +4,9 @@ How a policy trained in simulation reaches the real robot, how the on-Pi loop ru
 
 ## What runs where
 
-- **Mac**: What: Trains the policy, exports it, validates the export, deploys; Code: `rl_training/opencat-gym/`, `tools/`
-- **Pi**: What: The 80 Hz control loop that runs the exported policy; Code: `pi_pipeline/gait/`
-- **BiBoard**: What: Receives joint commands (`i` command, all joints at once), streams the IMU at 5 Hz; Code: OpenCat firmware
+- Mac: What: Trains the policy, exports it, validates the export, deploys; Code: `rl_training/opencat-gym/`, `tools/`
+- Pi: What: The 80 Hz control loop that runs the exported policy; Code: `pi_pipeline/gait/`
+- BiBoard: What: Receives joint commands (`i` command, all joints at once), streams the IMU at 5 Hz; Code: OpenCat firmware
 
 Only two things travel to the Pi: `pi_pipeline/` and the exported policy, a `.onnx` file (under 1 MB) with its `.onnx.json` sidecar. `rl_training/` and `docs/` never do.
 
@@ -16,11 +16,11 @@ The trained network is a *residual*: its output, bounded to ±30° per joint, is
 
 The **sidecar** (`<name>.onnx.json`) travels with every policy and is read by both the validator and the Pi:
 
-- **`residual_scale_deg`**: The residual bound the policy was trained with (30)
-- **`cmd_send_every_n`**: Send a joint command every n-th control tick; the Pi follows it by default
-- **`heading_blind`**: If true, the Pi feeds the policy a yaw of 0 (steering is done outside the policy)
-- **`checkpoint`, `exported`, `levers`**: Provenance
-- **`modes`**: Optional. The gaits the policy was trained for; without it, `normal` only
+- `residual_scale_deg`: The residual bound the policy was trained with (30)
+- `cmd_send_every_n`: Send a joint command every n-th control tick; the Pi follows it by default
+- `heading_blind`: If true, the Pi feeds the policy a yaw of 0 (steering is done outside the policy)
+- `checkpoint`, `exported`, `levers`: Provenance
+- `modes`: Optional. The gaits the policy was trained for; without it, `normal` only
 
 Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and check parity with `verify_onnx.py` (ONNX versus the torch policy) and `validate_deploy.py` (drives the Pi-side `residual_policy.py` in lockstep with the sim: observation, action and rounded joint targets must match). Score a policy through G2's real control path with `benchmark_decathlon.py --hw i`.
 
@@ -28,9 +28,9 @@ Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and c
 
 The deployed policy is named by `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py`; every previous release stays on the Pi as a fallback.
 
-1. **Promote.** `tools/g2_promote_policy.sh TAG NAME` exports a checkpoint under a release name, points `DEFAULT_POLICY` at it, runs the test suite, commits and pushes on the current branch, then arms the deploy. For an already-exported candidate use `rl_training/opencat-gym/promote_release.py --candidate … --name …` (it never overwrites an existing release). Promotion needs explicit approval.
-2. **Deploy.** `tools/g2_deploy_when_online.sh` waits for the Pi to answer, `rsync`s `pi_pipeline/` and the policy files (never a `git clone`), and restarts the voice service. `--once` deploys now, `--cancel` disarms a waiting watcher. It never touches the Pi's `.env`, `.venv` or memory data, and it **refuses to run during an exploration, a baseline run or a walk**.
-3. **Check.** Before assuming the Pi matches the repo, dry-run the sync: `rsync -an --itemize-changes pi_pipeline/ $G2_PI:bittleX/pi_pipeline/`. The deployed commit is written to `pi_pipeline/.deployed_commit`.
+1. Promote: `tools/g2_promote_policy.sh TAG NAME` exports a checkpoint under a release name, points `DEFAULT_POLICY` at it, runs the test suite, commits and pushes on the current branch, then arms the deploy. For an already-exported candidate use `rl_training/opencat-gym/promote_release.py --candidate … --name …` (it never overwrites an existing release). Promotion needs explicit approval.
+2. Deploy: `tools/g2_deploy_when_online.sh` waits for the Pi to answer, `rsync`s `pi_pipeline/` and the policy files (never a `git clone`), and restarts the voice service. `--once` deploys now, `--cancel` disarms a waiting watcher. It never touches the Pi's `.env`, `.venv` or memory data, and it **refuses to run during an exploration, a baseline run or a walk**.
+3. Check: Before assuming the Pi matches the repo, dry-run the sync: `rsync -an --itemize-changes pi_pipeline/ $G2_PI:bittleX/pi_pipeline/`. The deployed commit is written to `pi_pipeline/.deployed_commit`.
 
 **Roll back** by setting `DEFAULT_POLICY` to the previous release file and running `tools/g2_deploy_when_online.sh --once`.
 
@@ -50,7 +50,7 @@ A stand-up before any walk uses the eased 0.8 s ramp (`standup.py`). Any exit re
 
 **Steering.** The front feet steer G2. Each policy has a fixed front-left foot trim (`DEFAULT_TRIMS` in `heading_hold.py`, overridden with `G2_FOOT_TRIM`); the closed-loop heading hold is off unless `G2_FOOT_HOLD=fl`. Trims were measured on hardwood only. A trim measured on one floor can be saved per policy (`python -m pi_pipeline.attachments floor-trim tile fl=-0.1`); it applies when the floor label (`g2floor`, always set by a person) is under 12 h old (`G2_FLOOR_TRIM_MAX_AGE_H`). Order: `G2_FOOT_TRIM`, the per-floor trim, the attachment's saved trim, `DEFAULT_TRIMS`. Each walk prints the floor it used.
 
-**Guards on every walk:** servo heat estimate and cutback (`thermal_guard.py`), jam reflex from joint strain (`jam_guard.py`), carpet detection from IMU speed (`carpet.py`, `speed_estimate.py`), fall guard, an IMU stall detector for wall contact, and a battery read every few seconds with a rest on a critical reading. The loop also stops if no IMU frame arrives for a set time or the loop overruns.
+Guards on every walk: servo heat estimate and cutback (`thermal_guard.py`), jam reflex from joint strain (`jam_guard.py`), carpet detection from IMU speed (`carpet.py`, `speed_estimate.py`), fall guard, an IMU stall detector for wall contact, and a battery read every few seconds with a rest on a critical reading. The loop also stops if no IMU frame arrives for a set time or the loop overruns.
 
 **Gait switching.** "Hi step" and "walk normally" (voice, from any mode) set a shared gait mode (`gait_mode.py`). A policy that lists the mode in its sidecar plays it with its learned correction; any other plays the gait's scripted base without a correction and says so.
 
@@ -80,14 +80,14 @@ The mapping and signs were verified on G2, but repeat these steps after a servo 
 
 ## Troubleshooting
 
-- **The walk never starts or no IMU frames**: The raw IMU lines; the yaw field once overflowed and made every line unparseable (fixed in `imu_parse.py`). [`operating-lessons.md`](operating-lessons.md)
-- **Heading drifts**: The foot trim for this policy and floor
-- **A leg moves the wrong way**: `deploy_map.SERVO_SIGN` and step 3 above
-- **The loop overruns or lags**: Whether something else is using the Pi (exploration, speech); [`../hardware/diagnostics.md`](../hardware/diagnostics.md)
-- **The Mac cannot reach the Pi ("No route to host", `EHOSTUNREACH`) but another machine can**: Check in this order
-- **Deploy refused**: An exploration, baseline run or walk is active; `bash tools/g2_explore.sh status`
+- The walk never starts or no IMU frames: The raw IMU lines; the yaw field once overflowed and made every line unparseable (fixed in `imu_parse.py`). [`operating-lessons.md`](operating-lessons.md)
+- Heading drifts: The foot trim for this policy and floor
+- A leg moves the wrong way: `deploy_map.SERVO_SIGN` and step 3 above
+- The loop overruns or lags: Whether something else is using the Pi (exploration, speech); [`../hardware/diagnostics.md`](../hardware/diagnostics.md)
+- The Mac cannot reach the Pi ("No route to host", `EHOSTUNREACH`) but another machine can: Check in this order
+- Deploy refused: An exploration, baseline run or walk is active; `bash tools/g2_explore.sh status`
 
-- **The Mac cannot reach the Pi ("No route to host", EHOSTUNREACH) but another machine can:** (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on.
+- The Mac cannot reach the Pi ("No route to host", EHOSTUNREACH) but another machine can: (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on.
 
   A Deny answer to the "find devices on your local network" prompt blocks that app's connections to every LAN device while the router may still answer, and a program that was already running keeps the old answer until it is quit and reopened .
 

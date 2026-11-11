@@ -8,25 +8,25 @@ pre-hardware.
 
 ## Status at a glance
 
-- **Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`)**: **Built and in use**
-- **Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`)**: **Built and in use**
-- **System sampling for battery and Pi thermal (`diag/sysmon.py`)**: Built; the Pi-specific reads degrade to nothing off the Pi
-- **Crash forensics for the voice service and exploration (`diag/crashwatch.py`)**: **Built and in use**
-- **Disk-space warning (`util/disk.py`)**: **Built and in use**
-- **Live Wi-Fi stream to a laptop, longer-term trend storage**: **Designed, not built** (Phase 3, only if needed)
+- Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`): **Built and in use**
+- Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`): **Built and in use**
+- System sampling for battery and Pi thermal (`diag/sysmon.py`): Built; the Pi-specific reads degrade to nothing off the Pi
+- Crash forensics for the voice service and exploration (`diag/crashwatch.py`): **Built and in use**
+- Disk-space warning (`util/disk.py`): **Built and in use**
+- Live Wi-Fi stream to a laptop, longer-term trend storage: **Designed, not built** (Phase 3, only if needed)
 
 Package overview: [`../../pi_pipeline/diag/README.md`](../../pi_pipeline/diag/README.md).
 
 ## What exists today
 
-- **Per-module `logging`** — `logging.getLogger("g2.link")`, `"g2.link.recovery"`,
+- Per-module `logging`: `logging.getLogger("g2.link")`, `"g2.link.recovery"`,
   etc. Goes to stderr/console. Not captured, not correlated, no session index.
-- **`run_gait --log`** — per-tick CSV (t, rpy, gyro, 8 joint deg, and now
+- `run_gait --log`: per-tick CSV (t, rpy, gyro, 8 joint deg, and now
   `guard_state / hottest_j / hottest_frac / duty_s`). Gait loop only.
-- **`benchmark_pi.py`** — one-shot timing/thermal/RAM harness, not a run logger.
-- **`sysid_collect.py`** — logs commanded joint angles for offline sysid.
+- `benchmark_pi.py`: one-shot timing/thermal/RAM harness, not a run logger.
+- `sysid_collect.py`: logs commanded joint angles for offline sysid.
 
-**Gaps:** nothing unified across subsystems, no session manifest, no severity
+Gaps: nothing unified across subsystems, no session manifest, no severity
 taxonomy, no pre-incident telemetry, no way to line up a vision event against a
 gait event against a link event, no crash context.
 
@@ -104,16 +104,16 @@ A supervisor thread:
 Anticipated failure modes, each emitted with structured context so one call
 gives you the event *and* the black box:
 
-- **`link.lost` / `link.reconnect`**: Fired by: `serial_link`; Context: consecutive timeouts, gap ms
-- **`imu.parse_fail` / `imu.stale`**: Fired by: `run_gait`; Context: raw line, consecutive misses
-- **`servo.stall`**: Fired by: `thermal_guard`; Context: joint, tracking error, held s
-- **`servo.thermal_cooldown`**: Fired by: `thermal_guard`; Context: reason, per-joint heat, duty s
-- **`fall.detected`**: Fired by: `recovery`; Context: roll/pitch, classified body state
-- **`onnx.overrun`**: Fired by: `residual_policy`; Context: step ms vs budget
-- **`battery.sag`**: Fired by: watchdog; Context: voltage, threshold
-- **`pi.thermal_throttle`**: Fired by: watchdog; Context: `vcgencmd get_throttled` bits, SoC temp
-- **`loop.stall`**: Fired by: watchdog; Context: last tick age, last ring row
-- **`wifi.drop`**: Fired by: watchdog / voice; Context: RSSI, ping RTT
+- `link.lost` / `link.reconnect`: Fired by: `serial_link`; Context: consecutive timeouts, gap ms
+- `imu.parse_fail` / `imu.stale`: Fired by: `run_gait`; Context: raw line, consecutive misses
+- `servo.stall`: Fired by: `thermal_guard`; Context: joint, tracking error, held s
+- `servo.thermal_cooldown`: Fired by: `thermal_guard`; Context: reason, per-joint heat, duty s
+- `fall.detected`: Fired by: `recovery`; Context: roll/pitch, classified body state
+- `onnx.overrun`: Fired by: `residual_policy`; Context: step ms vs budget
+- `battery.sag`: Fired by: watchdog; Context: voltage, threshold
+- `pi.thermal_throttle`: Fired by: watchdog; Context: `vcgencmd get_throttled` bits, SoC temp
+- `loop.stall`: Fired by: watchdog; Context: last tick age, last ring row
+- `wifi.drop`: Fired by: watchdog / voice; Context: RSSI, ping RTT
 
 ---
 
@@ -121,16 +121,16 @@ gives you the event *and* the black box:
 
 Debugging behaviour needs the *reason*, not just the action. Convention:
 
-- **State machines stay pure** (no `diag` import — keeps them unit-testable) but
+- State machines stay pure: (no `diag` import — keeps them unit-testable) but
   each exposes a `last_reason: str` explaining its most recent `update()`.
   Implemented: `behavior/idle_posture.py` (`IdlePosture`),
   `behavior/mode_controller.py` (`ModeController`), `behavior/explore.py`
   (`Explorer`, 2026-09-08). To add: `RecoveryFSM`, vision `avoidance`.
-- **`BehaviorDriver`** composes those and emits the transition markers itself
+- `BehaviorDriver`: composes those and emits the transition markers itself
   (as `DIAG` effects); the runtime's bindings log each one through `behavior/bindings.py`
   `_default_diag`, with the level and event name from `behavior/diag_bridge.py`'s map
   (wired 2026-10-18; `diag report` reads them as the behaviour timeline).
-- **The driving loop logs the transition** with the reason + the inputs that
+- The driving loop logs the transition: with the reason + the inputs that
   produced it, only when something actually changes:
 
   ```python
@@ -179,7 +179,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ## Phasing
 
-- **Phase 1 — DONE, pre-hardware:**
+- Phase 1 — DONE, pre-hardware:
   `pi_pipeline/diag/` built (`f18230c`) — `Diag` JSONL logger + `DiagLogHandler`
   / `bridge_stdlib_logging` + `RingBuffer` + manifest writer (git SHA/dirty,
   config snapshot, policy hash, argv/host) + `python -m pi_pipeline.diag
@@ -196,7 +196,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
     `mode.transition` / `posture.transition` / `enroll.*` / `cliff.reflex`
     events. 3 tests. **done.**
   - Folding `run_gait --log` CSV in as a ring-buffer source: still open (minor).
-- **Phase 2 — non-hardware parts DONE:**
+- Phase 2 — non-hardware parts DONE:
   - `pi_pipeline/diag/watchdog.py` — `WatchdogCore` (pure timing logic:
     heartbeat Hz + stall latch, fake-clock tested) + `Watchdog` thread. Control
     loop calls `wd.beat()` each tick; the thread logs `sys/INFO/heartbeat`
@@ -218,7 +218,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
     (rate-limited) once real readings exist.
   - Unit-tested. **Still hardware-gated:** validating the black box captures a real
     fall / link drop; the battery ADC source.
-- **Phase 3 — as needed:** live Wi-Fi stream + laptop listener, longer-term
+- Phase 3 — as needed: live Wi-Fi stream + laptop listener, longer-term
   trend rollups across sessions.
 
 Phase 1 is not hardware-gated and pairs naturally with the ONNX-export /

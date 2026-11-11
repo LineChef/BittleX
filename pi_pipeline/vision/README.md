@@ -5,15 +5,15 @@ results to the Pi over serial (BiBoard's ESP32 can't stream frames — see the
 project plan). This package turns that stream into detections and does two things
 with them:
 
-1. **Local obstacle-avoidance reflex** — fast, no network. `avoidance.py`.
-2. **Scene description** — "what do you see" answered in G2's voice via Claude.
+1. Local obstacle-avoidance reflex: fast, no network. `avoidance.py`.
+2. Scene description: "what do you see" answered in G2's voice via Claude.
    `scene.py`. Decoupled: it takes an `ask(str) -> str` callable, never imports
    `voice`.
 
 As with voice/memory, every hardware-specific piece is behind an interface with
 a mock, so it's all testable now.
 
-**Model status:** a custom **3-class detector** (a household member + `dog` +
+Model status: a custom **3-class detector** (a household member + `dog` +
 `cat`) is trained and running on the actual camera —
 `docs/vision/custom-model-recipe.md` (the reproducible recipe) and
 `docs/vision/capture-progress.md` (the improvement plan). Still needed: an
@@ -22,13 +22,13 @@ on the camera being physically mounted on the frame.
 
 ## Modules
 
-- **`feed.py`**: `Detection` + `DetectionFeed`: `MockDetectionFeed` (scripted frames, `approaching()` scenario builder) / `SerialDetectionFeed` (parses camera serial messages).
-- **`avoidance.py`**: `Avoider.decide(frame) -> AvoidanceAction` (`NONE`/`STOP`/`BACK_UP`/`TURN_LEFT`/`TURN_RIGHT`). Debounced; urgent hazards preempt the cooldown. `ACTION_SKILL` maps actions to robot skills.
-- **`cliff_guard.py`**: `CliffGuard.update(EdgeReading) -> CliffAction` (`NONE`/`SLOW`/`STOP`/`TURN_AWAY_*`/`BACK_UP`/`FREEZE`) — the "don't walk off the desk" reflex (behaviour-ideas B16)
-- **`scene.py`**: `summarize(frame)` (deterministic text) and `narrate(frame, ask)` (spoken-style, LLM-injected).
-- **`__main__.py`**: demo CLI.
+- `feed.py`: `Detection` + `DetectionFeed`: `MockDetectionFeed` (scripted frames, `approaching()` scenario builder) / `SerialDetectionFeed` (parses camera serial messages).
+- `avoidance.py`: `Avoider.decide(frame) -> AvoidanceAction` (`NONE`/`STOP`/`BACK_UP`/`TURN_LEFT`/`TURN_RIGHT`). Debounced; urgent hazards preempt the cooldown. `ACTION_SKILL` maps actions to robot skills.
+- `cliff_guard.py`: `CliffGuard.update(EdgeReading) -> CliffAction` (`NONE`/`SLOW`/`STOP`/`TURN_AWAY_*`/`BACK_UP`/`FREEZE`) — the "don't walk off the desk" reflex (behaviour-ideas B16)
+- `scene.py`: `summarize(frame)` (deterministic text) and `narrate(frame, ask)` (spoken-style, LLM-injected).
+- `__main__.py`: demo CLI.
 
-- **cliff_guard.py:** Zero-debounce stop, N clear scans to resume, turn *away* from the edge bearing, pivot-too-close or boxed-in → `FREEZE` (call a human). **Decision logic only** — the floor-vs-edge detector is stubbed (`MockEdgeFeed`) and every `CliffGuardConfig` value marked `HARDWARE-GATED` needs tuning on the real mounted camera.
+- cliff_guard.py: Zero-debounce stop, N clear scans to resume, turn *away* from the edge bearing, pivot-too-close or boxed-in → `FREEZE` (call a human). **Decision logic only** — the floor-vs-edge detector is stubbed (`MockEdgeFeed`) and every `CliffGuardConfig` value marked `HARDWARE-GATED` needs tuning on the real mounted camera.
 
 
 ## Try it (no hardware)
@@ -63,7 +63,7 @@ One JSON object per line, **921600 baud**:
 - `boxes` values are **integers**: box **centre** `(x, y)` and size `(w, h)` in
   **model-input pixels** (192 or 240 for common pretrained models — set
   `VISION_FRAME_PX`), `score` 0–100, `target_id` a class index.
-- **Labels are not in the message.** Set `VISION_LABELS` to the deployed model's
+- Labels are not in the message: Set `VISION_LABELS` to the deployed model's
   class names in id order (empty → `obj<id>`).
 - `perf` = `[preprocess_ms, inference_ms, postprocess_ms]`; other events ignored.
 
@@ -77,14 +77,14 @@ One JSON object per line, **921600 baud**:
   slightly disagree; the sscma struct says centre).
 - Tune `AvoiderConfig` thresholds against real detections + the robot's stopping
   distance.
-- **`CliffGuard` — cliff/edge avoidance, highest priority.** A "floor vs. edge
+- `CliffGuard` — cliff/edge avoidance, highest priority: A "floor vs. edge
   ahead" classifier via the `classes()` path (single sensor slot is taken by
   this camera, so it must be camera-based), zero-debounce, preempts every other
   behavior. Full design: `docs/planned/behavior-ideas.md` B16. Higher stakes than
   anything else here: a miss is a fall.
 - Wire `Avoider` decisions to the actuator and `narrate` to the voice loop in the
   Phase 10 runtime.
-- **After vision works, revisit the locomotion policy** with perception in the
+- After vision works, revisit the locomotion policy: with perception in the
   loop — the Phase 8 "Target capability" in the project plan.
 
 ## `terrain_feature.py` (removed)

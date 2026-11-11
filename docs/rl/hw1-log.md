@@ -1,19 +1,19 @@
 # hw1 — training under G2's real control path
 
-> **Note (2026-10-17):** scripts for closed campaigns named on this page (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree; recover one with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.
+> Note (2026-10-17): scripts for closed campaigns named on this page (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree; recover one with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.
 
-> **2026-10-01:** the deployed policy (`DEFAULT_POLICY`) is now `Release_CandidateV2.1` (see Round 4 below), exported with a `cmd_send_every_n: 3` sidecar. `hw1_20m` remains on the Pi as a baseline.
+> 2026-10-01: the deployed policy (`DEFAULT_POLICY`) is now `Release_CandidateV2.1` (see Round 4 below), exported with a `cmd_send_every_n: 3` sidecar. `hw1_20m` remains on the Pi as a baseline.
 
 ## Current conclusions (as of 2026-10-17)
 
 What the rounds below add up to. The detail that follows is the evidence; later chains are in [`training-pipeline.md`](training-pipeline.md) and [`../STATUS.md`](../STATUS.md).
 
-- **The real control path shapes the gait.** The firmware's orientation stream is capped at 5 Hz and carries no angular rate; `m` moves joints one at a time (about 144 ms for 8 joints) while `i` moves them together at about 250 deg/s. A policy is trained and scored through that path (`--hw i`, a command every third tick).
-- **The "limp" was a simulator bug, not a gait problem.** The welded payload locked the body's rotation; fixing the payload inertia removed it. Conclusions drawn from locked-body results are flagged for re-checking ([`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md)).
-- **Staged, single-skill training beat training everything at once.** The parallel-combined candidate regressed on ledges as training went on; teaching one mechanic at a time (flat, transitions, carpet, step, snag, ledges last) and then consolidating gave V2, then V2.1 after yaw tuning.
-- **A retrain on a 93 to 249 Hz IMU premise was abandoned.** The faster rate was a stale-firmware artifact; on current firmware the real rate is 5.0 Hz, so V2.1's original assumptions stood and that lineage was dropped.
-- **Lineage since:** V2.1 (the default into early October), V3 (a retrain against the measured payload and steering), V4 (the frontier-curriculum upgrade; Candidate A deployed 2026-10-09), V5 (about equal to the scripted walk, not promoted), V6 (deployed, heading-blind, promoted by the user although it did not beat V4 on the sim benchmark). Details: [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) and the V5 and V6 plans.
-- **What still limits the sim result:** no policy crosses step-ups above 7.5 mm; the 10 deg cross-slope and small rubble are where V4 loses to V3. The high-step creep attempt (2026-10-12/13) did not improve on V6.
+- The real control path shapes the gait: The firmware's orientation stream is capped at 5 Hz and carries no angular rate; `m` moves joints one at a time (about 144 ms for 8 joints) while `i` moves them together at about 250 deg/s. A policy is trained and scored through that path (`--hw i`, a command every third tick).
+- The "limp" was a simulator bug, not a gait problem. The welded payload locked the body's rotation; fixing the payload inertia removed it. Conclusions drawn from locked-body results are flagged for re-checking ([`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md)).
+- Staged, single-skill training beat training everything at once. The parallel-combined candidate regressed on ledges as training went on; teaching one mechanic at a time (flat, transitions, carpet, step, snag, ledges last) and then consolidating gave V2, then V2.1 after yaw tuning.
+- A retrain on a 93 to 249 Hz IMU premise was abandoned. The faster rate was a stale-firmware artifact; on current firmware the real rate is 5.0 Hz, so V2.1's original assumptions stood and that lineage was dropped.
+- Lineage since: V2.1 (the default into early October), V3 (a retrain against the measured payload and steering), V4 (the frontier-curriculum upgrade; Candidate A deployed 2026-10-09), V5 (about equal to the scripted walk, not promoted), V6 (deployed, heading-blind, promoted by the user although it did not beat V4 on the sim benchmark). Details: [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) and the V5 and V6 plans.
+- What still limits the sim result: no policy crosses step-ups above 7.5 mm; the 10 deg cross-slope and small rubble are where V4 loses to V3. The high-step creep attempt (2026-10-12/13) did not improve on V6.
 
 **2026-09-22 → 23.** Started as the "IMU feedback rate" priority (stock firmware
 prints orientation at 5 Hz, the policy runs at 80 Hz). Tracing it through the
@@ -23,26 +23,26 @@ model of the real control path, `hw1_20m`, is the release candidate.
 
 ## What the hardware actually does (traced from OpenCatEsp32 source, 2026-09-08)
 
-- **IMU:** `imu.h` `print6Axis()` returns early unless 200 ms have passed
+- IMU: `imu.h` `print6Axis()` returns early unless 200 ms have passed
   (`PRINT6AXIS_MIN_INTERVAL`) — a **5 Hz** ceiling on every call site. The
   `MCU:`/`ICM:` line carries accel + yaw/pitch/roll, **no angular rate**.
   Details: [`hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md).
-- **Joint commands:** `m` (`T_INDEXED_SEQUENTIAL_ASC`) moves the listed joints
+- Joint commands: `m` (`T_INDEXED_SEQUENTIAL_ASC`) moves the listed joints
   **one at a time** (1° per 8 ms each, +10 ms per joint) — ≥144 ms per 8-joint
   command against the 12.5 ms control tick. `i` (`T_INDEXED_SIMULTANEOUS_ASC`)
   moves them together, eased at 2° per 8 ms (~250°/s cap; the walk needs up to
   ~420°/s). No serial command changes that easing (`transformSpeed`).
-- **Backlog:** `read_serial()` slurps every waiting byte and the newline strip
+- Backlog: `read_serial()` slurps every waiting byte and the newline strip
   keeps only the **oldest** command — a slow command format means lag plus
   skipped targets.
-- **Balance mode:** bare `g` *toggles* gyro balance; with balance on, the
+- Balance mode: bare `g` *toggles* gyro balance; with balance on, the
   firmware also runs its own lifted / fall / push reflex skills over whatever the
   Pi commands. Use `gb` (off) / `gB` (on).
 
 ## Sim measurements
 
-- **`resilience_imu_rate.py` — 5 Hz held orientation, no rate, vs the 80 Hz training condition (7 hard cells × 40 eps)**: No measurable cost: 107 vs 111 falls / 280
-- **`resilience_joint_cmd.py` — `firmware_model.py` timing between policy and servos (8 cells × 20 eps)**: `m`: G2 doesn't walk (~0 m/s, 2 % of commands run, ~650 ms lag). `i`: ~96 % of ideal speed, ~55 ms lag, ~9° joint error. `i` with `transformSpeed` 0 (firmware change): ≈ ideal
+- `resilience_imu_rate.py` — 5 Hz held orientation, no rate, vs the 80 Hz training condition (7 hard cells × 40 eps): No measurable cost: 107 vs 111 falls / 280
+- `resilience_joint_cmd.py` — `firmware_model.py` timing between policy and servos (8 cells × 20 eps): `m`: G2 doesn't walk (~0 m/s, 2 % of commands run, ~650 ms lag). `i`: ~96 % of ideal speed, ~55 ms lag, ~9° joint error. `i` with `transformSpeed` 0 (firmware change): ≈ ideal
 
 The run20m checkpoints need `G2E_RESIDUAL_SCALE_DEG=22` (env default 30 since
 resid30); both probes and `validate_deploy.py` now take the scale from the
@@ -73,10 +73,10 @@ policy's sidecar (below).
 
 ## Benchmark bugs (`benchmark_decathlon.py` / `benchmark_gaits.py`)
 
-- **Scripted baseline wasn't the scripted walk.** In residual mode,
+- Scripted baseline wasn't the scripted walk: In residual mode,
   `ScriptedGait`'s absolute-mode action was applied as a residual — ~7.5° mean,
   22° max off `wkF`. Now a zero residual = exactly `wkF`.
-- **Cell knobs leaked.** The bare-robot cells' `PAYLOAD_PROB=0` carried into
+- Cell knobs leaked: The bare-robot cells' `PAYLOAD_PROB=0` carried into
   every later cell (T7.x–T9.x ran without the payload). The old "learned falls
   62 % on the 18° climb" was that artifact (0 % with the payload). `_apply`
   now restores every cell knob's default first.
@@ -91,21 +91,21 @@ policy's sidecar (below).
 
 ## Sim-vs-hardware audit
 
-- **IMU 5 Hz / no rate**: `IMU_HOLD_STEPS`, `IMU_RATE_ZERO` (obs only; the Pi feeds an exact 0 rate, so no noise on it)
-- **Command path**: `CMD_PATH="i"` via `firmware_model.py` + `CMD_PATH_EXTRA_MS_MAX` (0–4 ms unmodelled firmware work)
-- **Body mass**: URDF 269 g = bottom of Petoi's 269–353 g; G2 has alloy servos → `BODY_MASS_SCALE=1.12` (~301 g). Re-set from the bring-up weigh-in
-- **IMU mount tilt / servo zero error**: `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`
-- **Servo torque / speed**: Fine: 0.2 N·m vs 0.29 peak; `i` easing (250°/s) is below the P1S (~800°/s)
-- **Payload, joint obs, int-degree commands**: Already matched
-- **Hardware-only**: Firmware version vs the traced source (bring-up 8a), roll/pitch sign (13a), low-battery cutoff 7.0 V → `rest`
+- IMU 5 Hz / no rate: `IMU_HOLD_STEPS`, `IMU_RATE_ZERO` (obs only; the Pi feeds an exact 0 rate, so no noise on it)
+- Command path: `CMD_PATH="i"` via `firmware_model.py` + `CMD_PATH_EXTRA_MS_MAX` (0–4 ms unmodelled firmware work)
+- Body mass: URDF 269 g = bottom of Petoi's 269–353 g; G2 has alloy servos → `BODY_MASS_SCALE=1.12` (~301 g). Re-set from the bring-up weigh-in
+- IMU mount tilt / servo zero error: `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`
+- Servo torque / speed: Fine: 0.2 N·m vs 0.29 peak; `i` easing (250°/s) is below the P1S (~800°/s)
+- Payload, joint obs, int-degree commands: Already matched
+- Hardware-only: Firmware version vs the traced source (bring-up 8a), roll/pitch sign (13a), low-battery cutoff 7.0 V → `rest`
 
 All knobs default off (older checkpoints replay unchanged) and are exposed as
 `G2E_*` environment variables.
 
 ## Runs
 
-- **`hw1_i` (3M pilot)**: Config: 5 Hz IMU + `i` + 0–4 ms; Result: Real-path decathlon: fastest policy so far (0.073 m/s avg; 0.115 vs scripted 0.101 on flat); falls 162/1048, in line with the ideal-trained 3M `resid30_r1` (149); residual p95 21° of 30
-- **`hw1_20m`**: Config: pilot + `BODY_MASS_SCALE=1.12`, `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`, ±30°; Result: **Promoted — deployed policy (`DEFAULT_POLICY`).** See results below
+- `hw1_i` (3M pilot): Config: 5 Hz IMU + `i` + 0–4 ms; Result: Real-path decathlon: fastest policy so far (0.073 m/s avg; 0.115 vs scripted 0.101 on flat); falls 162/1048, in line with the ideal-trained 3M `resid30_r1` (149); residual p95 21° of 30
+- `hw1_20m`: Config: pilot + `BODY_MASS_SCALE=1.12`, `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`, ±30°; Result: **Promoted — deployed policy (`DEFAULT_POLICY`).** See results below
 
 ### `hw1_20m` results (2026-09-23)
 
@@ -117,9 +117,9 @@ near the limit. Replay reviewed frame by frame: level, full-extension trot.
 
 Real-path decathlon (`--hw i`, 30 cells, 1,048 eps; scripted reused):
 
-- **Scripted (pure `wkF`)**: Falls: 77; Avg speed: 0.0625
-- **`hw1_20m`**: Falls: 161; Avg speed: 0.0707
-- **`run20m_resid30_ppo` (previous base)**: Falls: 94; Avg speed: 0.0720
+- Scripted (pure `wkF`): Falls: 77; Avg speed: 0.0625
+- `hw1_20m`: Falls: 161; Avg speed: 0.0707
+- `run20m_resid30_ppo` (previous base): Falls: 94; Avg speed: 0.0720
 
 - 25 of 30 cells: 0 % falls and faster than scripted in every one — flat
   0.108 vs 0.101, 18° climb 0.104 vs 0.087, 20° descent 0.069 vs 0.022, rough
@@ -140,23 +140,23 @@ Real-path decathlon (`--hw i`, 30 cells, 1,048 eps; scripted reused):
 through the real path, pure slopes — no rough-terrain episodes, no torque cut),
 `hw1_20m`, 20 eps per condition, 0 % falls everywhere:
 
-- **Downhill 4–28°**: hw1_20m m/s: 0.103–0.120; scripted m/s: 0.079–0.106
-- **Uphill 4 / 12 / 16 / 20 / 24 / 28°**: hw1_20m m/s: 0.104 / 0.087 / 0.069 / 0.037 / 0.009 / −0.034; scripted m/s: 0.087 / 0.061 / 0.041 / 0.001 / −0.001 / −0.054
-- **Side-hill 5 / 6 / 7 / 8 / 12–20°**: hw1_20m m/s: 0.088 / 0.073 / 0.048 / 0.020 / ~0.02; scripted m/s: 0.084 / 0.052 / 0.019 / 0.021 / ~0.005
+- Downhill 4–28°: hw1_20m m/s: 0.103–0.120; scripted m/s: 0.079–0.106
+- Uphill 4 / 12 / 16 / 20 / 24 / 28°: hw1_20m m/s: 0.104 / 0.087 / 0.069 / 0.037 / 0.009 / −0.034; scripted m/s: 0.087 / 0.061 / 0.041 / 0.001 / −0.001 / −0.054
+- Side-hill 5 / 6 / 7 / 8 / 12–20°: hw1_20m m/s: 0.088 / 0.073 / 0.048 / 0.020 / ~0.02; scripted m/s: 0.084 / 0.052 / 0.019 / 0.021 / ~0.005
 
-- **Side-hills stall by ~8°.** The gait levels its body (roll 8° → 0° within a
+- Side-hills stall by ~8°: The gait levels its body (roll 8° → 0° within a
   second); with the body level on tilted ground the downhill legs can't reach it
   (FR paw 8 % contact, BR 19 %) and G2 pushes on ~two legs. Bittle has no
   hip-roll joint — only lengthening the downhill legs fixes it.
-- **Climbs stall ~24°** (scripted ~20°). Downhill is fine at any tested angle.
-- **Every learned gait limps**: flat-ground paw contact — scripted wkF 41–61 %
+- Climbs stall ~24°: (scripted ~20°). Downhill is fine at any tested angle.
+- Every learned gait limps: flat-ground paw contact — scripted wkF 41–61 %
   per paw; `hw1_20m` FR 13–16 %; `run20m_resid30` BL 17 %; `run20m_ppo` mildest.
   The model is symmetric (identical paw shapes, friction, heights).
-- **Benchmark fixes (BENCH_VERSION 2):** slope labels corrected (pitch > 0 is
+- Benchmark fixes (BENCH_VERSION 2): slope labels corrected (pitch > 0 is
   downhill — "T6.1 −24° descent" was a 24° climb, T9.1/T9.2 swapped); slope
   cells no longer get rough-terrain episodes (they reset the grade to 0, ~35 %
   of each slope cell). `--scripted-from` refuses to mix versions.
-- **Shaping-penalty ramp capped (`PENALTY_RAMP_CAP = 1.0`).** It was uncapped
+- Shaping-penalty ramp capped (`PENALTY_RAMP_CAP = 1.0`): It was uncapped
   (`penalty_scale = steps / PENALTY_STEPS`, per env) — ~5× by the end of a 20M
   run with 8 envs, though the comment intends full strength and hold, and every
   reward weight was tuned in 2–3M runs that never passed ~0.75×. It caused the
@@ -188,17 +188,17 @@ penalty moved it rather than removing it.
 
 ### The limp: root cause and fix (2026-09-23)
 
-- **Cause: the diagonal partner, not the limping leg.** In `hw1_20m` (FR paw
+- Cause: the diagonal partner, not the limping leg. In `hw1_20m` (FR paw
   down 16 % of steps), zeroing the FR leg's own correction only brings it to
   21 %; zeroing the **BL** correction brings FR to 40 % (scripted 48 %). FR and
   BL are a trot diagonal — the learned BL correction extends that leg so it
   props the body alone and FR never quite lands.
-- **Why training allows it:** the reward is ~blind to it — planting FR changes
+- Why training allows it: the reward is ~blind to it — planting FR changes
   the total by +0.03/step (~0.2 %). The existing diagonal trot term
   (`FAC_FOOT_PHASE`) is ~0.5/step against ~15 for joint imitation. hw2's
   `FAC_LEG_BALANCE` only pushed on the least-used paw, so the policy satisfied
   it by moving the limp to another leg.
-- **Fix candidate: footfall imitation (`FAC_CONTACT_IMITATION`).** Petoi's
+- Fix candidate: footfall imitation (`FAC_CONTACT_IMITATION`): Petoi's
   scripted walk has a clean diagonal schedule (FR+BL down together, then
   FL+BR). `reference_gait/build_contact_ref.py` records it per stride phase
   (through the `i` timing, using the env's own contact readings) into
@@ -227,13 +227,13 @@ gates manufactured regressions — **stopping `hw2` as "mixed" was a wrong call 
 that evidence.** `multi_ckpt_eval.py` now scores 5 checkpoints (2.2–3.0M) per run
 and reports mean ± spread; this is the standard gate from here.
 
-- **least-used paw (scripted 0.41)**: hw1: 0.20 ±0.03; hw2 slopes+leg-balance: 0.22 ±0.03; hw3 slopes: 0.17 ±0.01; hw4 footfalls: 0.16 ±0.08
-- **footfall mismatch (scripted 0.06)**: hw1: 0.41; hw2 slopes+leg-balance: **0.29**; hw3 slopes: 0.45; hw4 footfalls: **0.33**
-- **uphill 16° m/s**: hw1: 0.030 ±0.036; hw2 slopes+leg-balance: **0.065** ±0.004; hw3 slopes: 0.049; hw4 footfalls: 0.014
-- **side-hill 12° m/s**: hw1: 0.011; hw2 slopes+leg-balance: **0.029**; hw3 slopes: 0.024; hw4 footfalls: **0.056**
-- **flat m/s**: hw1: 0.102; hw2 slopes+leg-balance: 0.091; hw3 slopes: 0.100; hw4 footfalls: 0.076
-- **rough ground m/s**: hw1: 0.044; hw2 slopes+leg-balance: 0.031; hw3 slopes: 0.034; hw4 footfalls: 0.024
-- **bare gauntlet falls**: hw1: 74 %; hw2 slopes+leg-balance: **37 %**; hw3 slopes: 63 %; hw4 footfalls: 75 %
+- least-used paw (scripted 0.41): hw1: 0.20 ±0.03; hw2 slopes+leg-balance: 0.22 ±0.03; hw3 slopes: 0.17 ±0.01; hw4 footfalls: 0.16 ±0.08
+- footfall mismatch (scripted 0.06): hw1: 0.41; hw2 slopes+leg-balance: **0.29**; hw3 slopes: 0.45; hw4 footfalls: **0.33**
+- uphill 16° m/s: hw1: 0.030 ±0.036; hw2 slopes+leg-balance: **0.065** ±0.004; hw3 slopes: 0.049; hw4 footfalls: 0.014
+- side-hill 12° m/s: hw1: 0.011; hw2 slopes+leg-balance: **0.029**; hw3 slopes: 0.024; hw4 footfalls: **0.056**
+- flat m/s: hw1: 0.102; hw2 slopes+leg-balance: 0.091; hw3 slopes: 0.100; hw4 footfalls: 0.076
+- rough ground m/s: hw1: 0.044; hw2 slopes+leg-balance: 0.031; hw3 slopes: 0.034; hw4 footfalls: 0.024
+- bare gauntlet falls: hw1: 74 %; hw2 slopes+leg-balance: **37 %**; hw3 slopes: 63 %; hw4 footfalls: 75 %
 
 `hw2` is the best overall; no run fixed the limp; footfall imitation at 8 is
 too strong (slows everything).
@@ -251,7 +251,7 @@ too strong (slows everything).
   the hover distance itself (downward ray from each paw; paws the scripted walk
   has firmly down at this phase; beyond the 6.5 mm resting height, per 5 mm).
   Full strength: scripted −0.08/step, `hw1_20m` −1.3, `hw2`@3M −2.1.
-- **`hw5`** = `hw2` config + `FAC_STANCE_HOVER=3`, running to a 3M averaged gate.
+- `hw5`: = `hw2` config + `FAC_STANCE_HOVER=3`, running to a 3M averaged gate.
   Bar: least-used paw ≥ ~0.35 while keeping `hw2`'s slope/fall gains.
 
 ### The limp was a sim artifact: the payload locked the body's rotation (2026-09-23)
@@ -329,7 +329,7 @@ not ~5.5h). Scored clean: **0% falls, 0.088 m/s** on T1.1.
 Found and fixed a real gap: `CARPET`/`CARPET_SOFT`/etc had no `G2E_`
 override, so a training subprocess could never actually turn carpet on.
 
-**`b1_ledge` gate (3M/20M steps):** T1.1 fell 1.3% (clean), ledges fell
+`b1_ledge` gate (3M/20M steps): T1.1 fell 1.3% (clean), ledges fell
 35.8% (partial-training trend). Contradicts the pre-payload-fix "ledges made
 it worse" finding -- with a body that can actually tilt, ledge training
 doesn't cost the flat gait the way it did before.
@@ -594,7 +594,7 @@ were promoted; `r5_hw_candidate`'s benchmark numbers (tied with V2.1 on
 4/5 categories, lost on ledges, worse yaw/drift) are moot against a
 premise that no longer holds, not a real regression to chase.
 
-**Worth a future check, not urgent:** `hw1_20m` (the currently deployed
+Worth a future check, not urgent: `hw1_20m` (the currently deployed
 policy) has never been re-benchmarked against G2's *current* firmware —
 it was trained and validated under the same 5 Hz assumption, so it's
 very likely still fine, but hasn't been directly reconfirmed since the

@@ -20,7 +20,7 @@ module's language setting, both since redone (see
 below was built and validated software-only or with the hardware mocked,
 ahead of this point.
 
-- **RL locomotion** (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
+- RL locomotion: (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
   pipeline. The gait is a learned *residual* on Bittle's scripted `wkF` walk,
   IMU-corrected every control step, conditioned on speed/heading commands and the
   mounted Pi/camera payload. **Deployed policy (2026-09-23): `hw1_20m`**, trained
@@ -45,25 +45,25 @@ ahead of this point.
   stall. The replacement, Phase E's vision-triggered scripted skill-switching,
   showed real sim gains but is back-burnered until G2 has a real forward
   sensor (the camera is a recognition model, not an obstacle/edge detector).
-  **Exception, decided 2026-09-15:** a discrete climb-a-ledge skill (B13) is
+  Exception, decided 2026-09-15: a discrete climb-a-ledge skill (B13) is
   no longer deferred — Phase F found climbing was a sim-fidelity wall, not a
   real-hardware limit, so it's scheduled once the body arrives, starting
   scripted (no sensor needed for that first step) before exploring a learned
   residual. See [`docs/rl/`](../rl/) and
   [`docs/planned/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md) H7.
-- **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent
+- Companion pipeline: (`pi_pipeline/`) — voice conversation, persistent
   memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
   state machine, the on-robot gait loop, the autonomous behaviour layer
   (explore mode, idle-REST staged descent), a servo thermal guard, a
   black-box diagnostics logger, and Pi power-management helpers — all scaffolded
   and running on a dev machine with the hardware mocked; **the test suite passing**.
-- **On-device vision** — a custom 3-class detection model (household member +
+- On-device vision: a custom 3-class detection model (household member +
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
   export toolchain until `ultralytics==8.2.8` was pinned and a local arm64 export used)
   is in [`docs/vision/custom-model-recipe.md`](../vision/custom-model-recipe.md),
   with tooling in `tools/gv2/`.
-- **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent
+- Pre-hardware prep: a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are
   ready to run the moment the SD adapter and robot arrive:
   [`docs/guides/pi-bring-up.md`](../guides/pi-bring-up.md).

@@ -8,11 +8,11 @@
 Architecture from the ANYmal recovery work (Lee/Hwangbo/Hutter 2019): a **switch
 over separate skills**, not one monolithic policy.
 
-- **walking, upright**: the learned residual gait (Phase 3)
-- **stumbling (tilted, not down)**: the gait's own reactive catch — survive-loop ceiling ~18–25%
-- **fallen on a side / front**: scripted `rc` skill (`krc`)
-- **fallen on its back (supine)**: scripted `rl` then `rc` (`krl` → `krc`)
-- **the switch**: `pi_pipeline/link/recovery.py` — a `RecoveryFSM` on IMU roll/pitch
+- walking, upright: the learned residual gait (Phase 3)
+- stumbling (tilted, not down): the gait's own reactive catch — survive-loop ceiling ~18–25%
+- fallen on a side / front: scripted `rc` skill (`krc`)
+- fallen on its back (supine): scripted `rl` then `rc` (`krl` → `krc`)
+- the switch: `pi_pipeline/link/recovery.py` — a `RecoveryFSM` on IMU roll/pitch
 
 Bittle has no roll-axis joint, so a *learned* self-right is off the table (Run 6).
 The scripted `rc`/`rl` keyframes lever the body over with the legs; the firmware
@@ -42,7 +42,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       Strongest confirmation yet (the project's own hardware, not a video) — updates
       `docs/hardware/self-righting.md`'s "does not self-right from supine"
       caveat, which was sourced from a different community project.
-      **Risk flagged, not yet resolved:** this tested firmware's *own*
+      Risk flagged, not yet resolved: this tested firmware's *own*
       autonomous IMU-flip auto-`rc`, with `RecoveryFSM` not in the loop at
       all. Once the Pi is wired and `RecoveryFSM` starts deciding
       recovery actions too, the two could conflict — that's exactly what

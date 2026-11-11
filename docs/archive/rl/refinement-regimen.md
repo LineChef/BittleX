@@ -8,12 +8,12 @@ keep/revert bar.
 Base: whatever the drift-fix loop lands (`d2_cadence` / `d3_*` on branch
 `drift-fix`).
 
-- **0. drift-fix** *(in progress)*: change: D2 per-episode gait-cadence randomization (`PHASE_RAND`), D3 consolidate; runs: 2; exit condition: gait holds a straight line across cadences 0.6x-1.4x -- prerequisite for command-following
-- **1. action space**: change: check action clip-fraction on the current best; if saturating, raise `RESIDUAL_SCALE_DEG` 11 -> 18 -> 25, paired with a stronger `FAC_IMITATION` anchor so it stays a gait not a crawl (r1's 18 warped wkF); runs: 2-3; exit condition: residual has room to correct (green-light #4); keep the largest value that doesn't warp wkF
-- **2. reward completeness**: change: 2a body-height target `FAC_HEIGHT` (URMA's biggest weight -- kills the crouch/collapse failure); 2b joint-limit-proximity penalty (URMA 10.0); 2c phase-gated foot term (no GRF in swing, no slip in stance, tied to the gait clock -- Bittle_Symmetry_RL); runs: 3; exit condition: reward has no gaps, validated via the per-term `info` breakdown (green-light #1); each additive + isolated, kept on trot-tightness + speed holding
-- **3. domain randomization**: change: 3a actuator delay (randomised 1-3 control-step command lag); 3b joint zero-point offset (+-few deg/episode); 3c PD-gain / motor-strength randomisation + observation dropout; 3d widen friction 0.30->0.5, mass 0.18->0.25, terrain variety; runs: 4; exit condition: DR broad enough to fill 20M steps (green-light #3); narrow a range if it crushes the gait, do not drop the knob (transfer insurance)
-- **4. commanded locomotion**: change: add commanded forward-speed + yaw-rate to the obs; flip `FAC_YAW`/`FAC_HEADING` from "penalise all turning" to "track the command"; sample commands during training (mostly straight), resample every N steps not every step; runs: 1 (3M); exit condition: gives a long run 20M distinct situations; subsumes straight walking (cmd=0); settles the firmware-turn decision gate in the RL-primary direction. Benchmark commanded-vs-achieved tracking
-- **5. freeze + qualify**: change: assemble the winning config, one 3M run of the frozen recipe; runs: 1; exit condition: **the gate:** per-term breakdown clean; `ep_rew_mean` / benchmark score **still climbing at 3M**; clip-fraction healthy; DR + curriculum in place -> alert the user, discuss the 20M run. If plateaued at 3M -> diagnose which term/knob caps it before scaling
+- 0. drift-fix: *(in progress)*: change: D2 per-episode gait-cadence randomization (`PHASE_RAND`), D3 consolidate; runs: 2; exit condition: gait holds a straight line across cadences 0.6x-1.4x -- prerequisite for command-following
+- 1. action space: change: check action clip-fraction on the current best; if saturating, raise `RESIDUAL_SCALE_DEG` 11 -> 18 -> 25, paired with a stronger `FAC_IMITATION` anchor so it stays a gait not a crawl (r1's 18 warped wkF); runs: 2-3; exit condition: residual has room to correct (green-light #4); keep the largest value that doesn't warp wkF
+- 2. reward completeness: change: 2a body-height target `FAC_HEIGHT` (URMA's biggest weight -- kills the crouch/collapse failure); 2b joint-limit-proximity penalty (URMA 10.0); 2c phase-gated foot term (no GRF in swing, no slip in stance, tied to the gait clock -- Bittle_Symmetry_RL); runs: 3; exit condition: reward has no gaps, validated via the per-term `info` breakdown (green-light #1); each additive + isolated, kept on trot-tightness + speed holding
+- 3. domain randomization: change: 3a actuator delay (randomised 1-3 control-step command lag); 3b joint zero-point offset (+-few deg/episode); 3c PD-gain / motor-strength randomisation + observation dropout; 3d widen friction 0.30->0.5, mass 0.18->0.25, terrain variety; runs: 4; exit condition: DR broad enough to fill 20M steps (green-light #3); narrow a range if it crushes the gait, do not drop the knob (transfer insurance)
+- 4. commanded locomotion: change: add commanded forward-speed + yaw-rate to the obs; flip `FAC_YAW`/`FAC_HEADING` from "penalise all turning" to "track the command"; sample commands during training (mostly straight), resample every N steps not every step; runs: 1 (3M); exit condition: gives a long run 20M distinct situations; subsumes straight walking (cmd=0); settles the firmware-turn decision gate in the RL-primary direction. Benchmark commanded-vs-achieved tracking
+- 5. freeze + qualify: change: assemble the winning config, one 3M run of the frozen recipe; runs: 1; exit condition: **the gate:** per-term breakdown clean; `ep_rew_mean` / benchmark score **still climbing at 3M**; clip-fraction healthy; DR + curriculum in place -> alert the user, discuss the 20M run. If plateaued at 3M -> diagnose which term/knob caps it before scaling
 
 ## Sequencing logic
 
@@ -56,34 +56,34 @@ forward plan:
 
 **What Phase 2 showed** (full scorecard: artifact "Phase 2 Gait Scorecard"):
 
-- **The gait is payload-conditioned.** With the 75 g Pi/camera payload on (G3,
+- The gait is payload-conditioned: With the 75 g Pi/camera payload on (G3,
   90% of episodes) `phase2` is flawless: 0% falls on all 15 decathlon cells
   including the compound gauntlet. With the payload *off* it falls 17% on
   average, 68% on the gauntlet, 96% on a bare-robot steep descent -- worse than
   open-loop scripted on the hard cells. It over-fit to the near-constant payload.
-- **Weight-matched, the walk is at parity with scripted.** Learned + payload vs
+- Weight-matched, the walk is at parity with scripted. Learned + payload vs
   scripted `wkF` + payload + balance-assist 0.5, matched seeds: 0% falls each,
   equal average speed. `phase2`'s value is the *command interface* (speed track
   to 0.003 m/s, stand, backward, heading-hold to 0.2 deg) -- things `wkF`
   structurally cannot do -- not a more robust walk.
-- **Turning never trained.** Yaw command has ~zero effect (actual yaw-rate
+- Turning never trained: Yaw command has ~zero effect (actual yaw-rate
   ~-0.006 rad/s regardless of command). Heading-hold, which shares the machinery,
   works well.
-- **Speed modulation collapses at the ends.** creep (0.04) and fast (0.13) both
+- Speed modulation collapses at the ends: creep (0.04) and fast (0.13) both
   regress toward cruise (~0.10); only mid-range tracks.
-- **The decathlon saturates with the payload on.** Both gaits 0% falls even at
+- The decathlon saturates with the payload on: Both gaits 0% falls even at
   -24 deg descent / 20 deg brutal gauntlet. Falls are no longer a discriminating
   metric; commanded progress + speed retention + heading drift are.
 
 **Revised forward plan:**
 
-- **Phase 3** *(running)*: change: `PAYLOAD_PROB` 0.90 -> **1.0** + mass range 60-90 g -> **40-110 g** (payload is bolted on; widen mass instead of ever training a bare robot). Drop turning from the command curriculum (`cmd_yaw` always 0; heading-hold stays). Explicit low/mid/top speed bands, heavy weight on extremes. Proportional speed-track band `max(0.012, 0.15*; type: cmd; gate: )`.
-- **T6 hardened tier** *(done)*: change: `benchmark_decathlon` T6.1-T6.5: -24 deg descent, 85 mm obstacles, 1.0 shoves, 20 deg gauntlet, 60% torque cutback + descent. Scored on **commanded progress / speed / drift**, not falls.; type: eval only; gate: scripted+payload shows a measurable progress/speed gap on T6.1 + T6.5 -> usable as the standing baseline
-- **20M consolidation**: change: freeze the Phase 3 recipe, one ~20M run; type: 1 (20M); gate: green-light checklist (memory `project_longrun_trigger`): reward validated + still climbing at 3M, DR/curriculum in place, residual not saturating, design frozen
-- **Phase 4: stance recovery** *(after 20M)*: change: ledge / step-down terrain primitive (a sharp 10-40 mm rise/drop, not just the smooth bump field); re-enable `PHASE_SLOW_RATE` (~0.25) above `PHASE_SLOW_TILT` with reduced `FAC_IMITATION` while slowed (R2 disabled this because imitation fought the catch); bonus for regaining a diagonal (1,3)/(0,2) stance after a foot-contact anomaly; loosen the residual cap during `_in_recovery`.; type: **continuation** on the 20M policy (obs unchanged), 3-5M, 1-2 iterations; gate: dedicated bare-robot ledge eval cell shows fewer topples + off-rhythm re-plant; **hard capability-bar gate** -- nominal speed / fall / smoothness must not regress or revert to the 20M policy
-- **Hardware tuning**: change: once G2 is built, re-tune Phase 4 against the real failure modes rather than the guessed ones; type: continuation; gate: on-robot
+- Phase 3: *(running)*: change: `PAYLOAD_PROB` 0.90 -> **1.0** + mass range 60-90 g -> **40-110 g** (payload is bolted on; widen mass instead of ever training a bare robot). Drop turning from the command curriculum (`cmd_yaw` always 0; heading-hold stays). Explicit low/mid/top speed bands, heavy weight on extremes. Proportional speed-track band `max(0.012, 0.15*; type: cmd; gate: )`.
+- T6 hardened tier: *(done)*: change: `benchmark_decathlon` T6.1-T6.5: -24 deg descent, 85 mm obstacles, 1.0 shoves, 20 deg gauntlet, 60% torque cutback + descent. Scored on **commanded progress / speed / drift**, not falls.; type: eval only; gate: scripted+payload shows a measurable progress/speed gap on T6.1 + T6.5 -> usable as the standing baseline
+- 20M consolidation: change: freeze the Phase 3 recipe, one ~20M run; type: 1 (20M); gate: green-light checklist (memory `project_longrun_trigger`): reward validated + still climbing at 3M, DR/curriculum in place, residual not saturating, design frozen
+- Phase 4: stance recovery: *(after 20M)*: change: ledge / step-down terrain primitive (a sharp 10-40 mm rise/drop, not just the smooth bump field); re-enable `PHASE_SLOW_RATE` (~0.25) above `PHASE_SLOW_TILT` with reduced `FAC_IMITATION` while slowed (R2 disabled this because imitation fought the catch); bonus for regaining a diagonal (1,3)/(0,2) stance after a foot-contact anomaly; loosen the residual cap during `_in_recovery`.; type: **continuation** on the 20M policy (obs unchanged), 3-5M, 1-2 iterations; gate: dedicated bare-robot ledge eval cell shows fewer topples + off-rhythm re-plant; **hard capability-bar gate** -- nominal speed / fall / smoothness must not regress or revert to the 20M policy
+- Hardware tuning: change: once G2 is built, re-tune Phase 4 against the real failure modes rather than the guessed ones; type: continuation; gate: on-robot
 
-**Why this order:** Phase 3 fixes the two real, payload-independent weaknesses
+Why this order: Phase 3 fixes the two real, payload-independent weaknesses
 (speed modulation, dead turning channel) and removes the payload over-fit. The
 20M run consolidates *robust blind walking + commands* -- the deliverable for the
 hardware head-to-head. Stance recovery is the highest sim-to-real-risk change on
@@ -162,18 +162,18 @@ mounted); near-zero bare-robot margin. Phase 4 to watch it.
 **`run20m_ppo`** (from-scratch 20M, frozen G4b recipe, both bailout gates passed)
 is the base gait for hardware. Final scorecard: artifact "20M Gait Scorecard".
 
-- **Payload-on (deployment): 0% falls on all 20 cells** (15-cell decathlon + 5
+- Payload-on (deployment): 0% falls on all 20 cells (15-cell decathlon + 5
   hardened T6). Beats scripted on speed/distance on nearly every cell. Walks
   *down* a -24 deg slope (+0.058 m/s) where scripted slides back.
-- **Speed commands track to 0.007 m/s** (creep 0.033 / cruise 0.092 / fast 0.137
+- Speed commands track to 0.007 m/s: (creep 0.033 / cruise 0.092 / fast 0.137
   / backward -0.060). 14-cell battery: 0% falls, wins distance on ~10/14, scripted
   wins none outright (reclaimed side-slope-8, which Phase 3b lost).
-- **Bare-robot canary:** the descent cells that regressed in Phase 3b are
+- Bare-robot canary: the descent cells that regressed in Phase 3b are
   RECOVERED -- bare -24 deg descent 100% -> 0% falls (saves 100% of scripted's
   falls), weak-servos+descent 100% -> 0%. Bare shove-recovery still weak (gauntlet
   79%, brutal shoves 100%) -- Phase 4 target.
 
-**Key gotcha:** the shaped `ep_rew_mean` CRASHED in the back half (~1.15k plateau
+Key gotcha: the shaped `ep_rew_mean` CRASHED in the back half (~1.15k plateau
 1-7M -> ~290 at 20M) but this was an artifact -- as the policy refined speed
 tracking it deviated from the raw wkF reference and shed imitation reward. The
 checkpoint sweep proved capability climbed monotonically: speed-track err 3M 0.018
@@ -182,7 +182,7 @@ run.** For future long runs on this recipe: benchmark checkpoints, don't trust
 the reward curve; or shorten the LR schedule so the policy freezes near
 convergence (~3M) instead of drifting for 15M more steps under a still-live LR.
 
-**Next:** Phase 4 stance-recovery as a reversible continuation on `run20m_ppo`
+Next: Phase 4 stance-recovery as a reversible continuation on `run20m_ppo`
 (ledge/step-down terrain, re-enabled phase-slow, diagonal-stance-recovery reward),
 tracking bare-robot shove-recovery margin. Then ONNX export + hardware.
 
@@ -194,9 +194,9 @@ Three continuation rounds on `run20m_ppo`, ~3.5M steps each. None produced a
 keeper. `run20m_ppo` is unchanged and remains the hardware base gait. Full log:
 `docs/archive/rl/phase4-decision-log.md`. Report artifact: "Phase 4 Gait Post-Mortem".
 
-- **4a**: change: ledge terrain in training DR (25 mm, 30% of eps, up/down); outcome: **revert** -- nominal walk ~50% slower, ledge handling worse (G2 backs away from steps)
-- **4b**: change: revive tilt phase-slow + fade imitation reward during a wobble; outcome: **diverged** -- approx_kl 40-670, auto-bailed at 3M (0.018 m/s). 3rd failure of phase-clock surgery; lever retired
-- **4c**: change: diagonal-support catch bonus + widen residual 22->27 deg while tilted; outcome: **no-op** -- first clean continuation, walk fully preserved, zero measurable recovery gain, reverted
+- 4a: change: ledge terrain in training DR (25 mm, 30% of eps, up/down); outcome: **revert** -- nominal walk ~50% slower, ledge handling worse (G2 backs away from steps)
+- 4b: change: revive tilt phase-slow + fade imitation reward during a wobble; outcome: **diverged** -- approx_kl 40-670, auto-bailed at 3M (0.018 m/s). 3rd failure of phase-clock surgery; lever retired
+- 4c: change: diagonal-support catch bonus + widen residual 22->27 deg while tilted; outcome: **no-op** -- first clean continuation, walk fully preserved, zero measurable recovery gain, reverted
 
 ### The finding that mattered: every `--from` continuation was diverging
 
@@ -222,9 +222,9 @@ real instrument. 4c vs run20m on it: fall rate 48% vs 50%, net progress 0.166 vs
 reaches; a real recovery gain needs the shaping in a from-scratch run, or the
 hardware-in-the-loop tuning phase.
 
-**Kept:** the finetune fix, `benchmark_recovery.py`, the ledge primitive + T7
+Kept: the finetune fix, `benchmark_recovery.py`, the ledge primitive + T7
 tier + `render_showcase.py` (all inert in training, used by eval/probes/report).
 
-**Next:** (optional) clean re-run of the 4a ledge test at `--finetune-lr 1e-4`,
+Next: (optional) clean re-run of the 4a ledge test at `--finetune-lr 1e-4`,
 smaller ledge. Otherwise -> ONNX export + hardware bring-up. `run20m_ppo` needs
 no re-validation.

@@ -10,315 +10,315 @@ The small result files that back decisions are tracked under `rl_training/openca
 
 Docs that mention this family: [`vision-in-gait.md`](../archive/rl/vision-in-gait.md), [`adapter-skill-probe-spec.md`](../planned/adapter-skill-probe-spec.md).
 
-- **`abD_blind_deca.json`**: Size: 53 KB; Cited by: not cited
-- **`abD_blind_obs.json`**: Size: 3 KB; Cited by: not cited
-- **`abD_eval.txt`**: Size: 8 KB; Cited by: not cited
-- **`abD_vision_deca.json`**: Size: 53 KB; Cited by: not cited
-- **`abD_vision_obs.json`**: Size: 3 KB; Cited by: not cited
+- `abD_blind_deca.json`: Size: 53 KB; Cited by: not cited
+- `abD_blind_obs.json`: Size: 3 KB; Cited by: not cited
+- `abD_eval.txt`: Size: 8 KB; Cited by: not cited
+- `abD_vision_deca.json`: Size: 53 KB; Cited by: not cited
+- `abD_vision_obs.json`: Size: 3 KB; Cited by: not cited
 
 ## `base`
 
-- **`hs_report/base.json`**: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
-- **`hs_report/old_sweep1/base.json`**: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
-- **`hs_report/old_sweep2/base.json`**: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
-- **`hs_report/old_sweep3/base.json`**: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
+- `hs_report/base.json`: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
+- `hs_report/old_sweep1/base.json`: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
+- `hs_report/old_sweep2/base.json`: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
+- `hs_report/old_sweep3/base.json`: Size: 1 KB; Cited by: [`README.md`](../archive/rl/v3-data/README.md)
 
 ## `c1`
 
-- **`final_exam/c1_2.0M.json`**: Size: 134 KB; Cited by: not cited
-- **`final_exam/c1_2.2M.json`**: Size: 133 KB; Cited by: not cited
+- `final_exam/c1_2.0M.json`: Size: 134 KB; Cited by: not cited
+- `final_exam/c1_2.2M.json`: Size: 133 KB; Cited by: not cited
 
 ## `c2`
 
-- **`final_exam/c2_1.0M.json`**: Size: 132 KB; Cited by: not cited
-- **`final_exam/c2_2.0M.json`**: Size: 136 KB; Cited by: not cited
-- **`final_exam/c2_final.json`**: Size: 136 KB; Cited by: not cited
+- `final_exam/c2_1.0M.json`: Size: 132 KB; Cited by: not cited
+- `final_exam/c2_2.0M.json`: Size: 136 KB; Cited by: not cited
+- `final_exam/c2_final.json`: Size: 136 KB; Cited by: not cited
 
 ## `checkpoints`
 
 Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md) +17.
 
-- **`checkpoints_removed_2026-10-17.txt`**: Size: 7 KB; Cited by: not cited
+- `checkpoints_removed_2026-10-17.txt`: Size: 7 KB; Cited by: not cited
 
 ## `compare`
 
 Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +23.
 
-- **`v6_report/compare.txt`**: Size: 1 KB; Cited by: [`v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md)
+- `v6_report/compare.txt`: Size: 1 KB; Cited by: [`v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md)
 
 ## `control`
 
 Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +55.
 
-- **`v3_report/control.json`**: Size: 46 KB; Cited by: not cited
-- **`v3_report_v3_20m/control.json`**: Size: 46 KB; Cited by: not cited
+- `v3_report/control.json`: Size: 46 KB; Cited by: not cited
+- `v3_report_v3_20m/control.json`: Size: 46 KB; Cited by: not cited
 
 ## `decathlon`
 
 Docs that mention this family: [`history.md`](../archive/history.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md), [`final-synthesis-plan.md`](../archive/rl/final-synthesis-plan.md) +17.
 
-- **`decathlon_hw1_20m_hw.json`**: Size: 53 KB; Cited by: not cited
-- **`decathlon_hw1_i_hw.json`**: Size: 53 KB; Cited by: not cited
-- **`decathlon_resid30_r1_hw.json`**: Size: 53 KB; Cited by: not cited
-- **`decathlon_run20m_ppo_hw.json`**: Size: 53 KB; Cited by: not cited
-- **`decathlon_run20m_ppo_v2.json`**: Size: 53 KB; Cited by: not cited
-- **`decathlon_run20m_resid30_hw.json`**: Size: 53 KB; Cited by: not cited
-- **`decathlon_run20m_resid30_v2.json`**: Size: 53 KB; Cited by: not cited
+- `decathlon_hw1_20m_hw.json`: Size: 53 KB; Cited by: not cited
+- `decathlon_hw1_i_hw.json`: Size: 53 KB; Cited by: not cited
+- `decathlon_resid30_r1_hw.json`: Size: 53 KB; Cited by: not cited
+- `decathlon_run20m_ppo_hw.json`: Size: 53 KB; Cited by: not cited
+- `decathlon_run20m_ppo_v2.json`: Size: 53 KB; Cited by: not cited
+- `decathlon_run20m_resid30_hw.json`: Size: 53 KB; Cited by: not cited
+- `decathlon_run20m_resid30_v2.json`: Size: 53 KB; Cited by: not cited
 
 ## `decisions`
 
 Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +28.
 
-- **`hs_report/decisions.md`**: Size: 11 KB; Cited by: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`README.md`](../hardware/README.md), [`project-plan-detail.md`](../plan-detail/project-plan-detail.md) +1
-- **`v6_report/decisions.md`**: Size: 1 KB; Cited by: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`README.md`](../hardware/README.md), [`project-plan-detail.md`](../plan-detail/project-plan-detail.md) +1
+- `hs_report/decisions.md`: Size: 11 KB; Cited by: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`README.md`](../hardware/README.md), [`project-plan-detail.md`](../plan-detail/project-plan-detail.md) +1
+- `v6_report/decisions.md`: Size: 1 KB; Cited by: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`README.md`](../hardware/README.md), [`project-plan-detail.md`](../plan-detail/project-plan-detail.md) +1
 
 ## `e3`
 
-- **`e3_baseline.json`**: Size: 1 KB; Cited by: not cited
-- **`e3_switch.json`**: Size: 1 KB; Cited by: not cited
+- `e3_baseline.json`: Size: 1 KB; Cited by: not cited
+- `e3_switch.json`: Size: 1 KB; Cited by: not cited
 
 ## `e4c`
 
-- **`e4c_baseline.json`**: Size: 1 KB; Cited by: not cited
-- **`e4c_switch.json`**: Size: 1 KB; Cited by: not cited
+- `e4c_baseline.json`: Size: 1 KB; Cited by: not cited
+- `e4c_switch.json`: Size: 1 KB; Cited by: not cited
 
 ## `e5`
 
-- **`e5_inspect.json`**: Size: 1 KB; Cited by: not cited
-- **`e5_mixed_baseline.json`**: Size: 1 KB; Cited by: not cited
-- **`e5_mixed_switch.json`**: Size: 1 KB; Cited by: not cited
-- **`e5_noinspect.json`**: Size: 1 KB; Cited by: not cited
+- `e5_inspect.json`: Size: 1 KB; Cited by: not cited
+- `e5_mixed_baseline.json`: Size: 1 KB; Cited by: not cited
+- `e5_mixed_switch.json`: Size: 1 KB; Cited by: not cited
+- `e5_noinspect.json`: Size: 1 KB; Cited by: not cited
 
 ## `eskill`
 
-- **`eskill_baseline.json`**: Size: 0 KB; Cited by: not cited
-- **`eskill_seed30.json`**: Size: 0 KB; Cited by: not cited
-- **`eskill_switch.json`**: Size: 0 KB; Cited by: not cited
-- **`eskill_switch_v2.json`**: Size: 0 KB; Cited by: not cited
+- `eskill_baseline.json`: Size: 0 KB; Cited by: not cited
+- `eskill_seed30.json`: Size: 0 KB; Cited by: not cited
+- `eskill_switch.json`: Size: 0 KB; Cited by: not cited
+- `eskill_switch_v2.json`: Size: 0 KB; Cited by: not cited
 
 ## `final`
 
-- **`v3_report_v3_20m/final.json`**: Size: 46 KB; Cited by: not cited
-- **`v4_report_v4_c1_at2p2M/final.json`**: Size: 89 KB; Cited by: not cited
-- **`v4_report_v4_c2_at1M/final.json`**: Size: 88 KB; Cited by: not cited
-- **`v4_report_v4_c2_at1M/final_delay12p5ms.json`**: Size: 22 KB; Cited by: not cited
-- **`v4_report_v4_s1/final.json`**: Size: 90 KB; Cited by: not cited
-- **`v6_report/final.json`**: Size: 323 KB; Cited by: not cited
+- `v3_report_v3_20m/final.json`: Size: 46 KB; Cited by: not cited
+- `v4_report_v4_c1_at2p2M/final.json`: Size: 89 KB; Cited by: not cited
+- `v4_report_v4_c2_at1M/final.json`: Size: 88 KB; Cited by: not cited
+- `v4_report_v4_c2_at1M/final_delay12p5ms.json`: Size: 22 KB; Cited by: not cited
+- `v4_report_v4_s1/final.json`: Size: 90 KB; Cited by: not cited
+- `v6_report/final.json`: Size: 323 KB; Cited by: not cited
 
 ## `hs`
 
-- **`hs_report/hs_s0.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/hs_s1.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/hs_s1r2.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/hs_s2.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/hs_s2r2.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain1/hs_s1.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain1/hs_s2.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain1/hs_s4_curve.jsonl`**: Size: 1 KB; Cited by: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md)
-- **`hs_report/old_chain2/hs_s0.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain2/hs_s1.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain2/hs_s2.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain2/hs_s4_curve.jsonl`**: Size: 2 KB; Cited by: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md)
-- **`hs_report/old_chain3/hs_s0.json`**: Size: 2 KB; Cited by: not cited
-- **`hs_report/old_chain4/hs_s1.json`**: Size: 2 KB; Cited by: not cited
+- `hs_report/hs_s0.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/hs_s1.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/hs_s1r2.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/hs_s2.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/hs_s2r2.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain1/hs_s1.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain1/hs_s2.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain1/hs_s4_curve.jsonl`: Size: 1 KB; Cited by: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md)
+- `hs_report/old_chain2/hs_s0.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain2/hs_s1.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain2/hs_s2.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain2/hs_s4_curve.jsonl`: Size: 2 KB; Cited by: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md)
+- `hs_report/old_chain3/hs_s0.json`: Size: 2 KB; Cited by: not cited
+- `hs_report/old_chain4/hs_s1.json`: Size: 2 KB; Cited by: not cited
 
 ## `hw1`
 
-- **`hw1_20m_ppo.onnx`**: Size: 545 KB; Cited by: [`hw1-log.md`](hw1-log.md)
-- **`hw1_20m_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`hw1_20m_trace.json`**: Size: 21 KB; Cited by: not cited
+- `hw1_20m_ppo.onnx`: Size: 545 KB; Cited by: [`hw1-log.md`](hw1-log.md)
+- `hw1_20m_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `hw1_20m_trace.json`: Size: 21 KB; Cited by: not cited
 
 ## `imu`
 
 Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md), [`resiliency-log.md`](../archive/rl/resiliency-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +16.
 
-- **`imu_rate_run20m.json`**: Size: 278 KB; Cited by: not cited
+- `imu_rate_run20m.json`: Size: 278 KB; Cited by: not cited
 
 ## `joint`
 
 Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +69.
 
-- **`joint_cmd_run20m.json`**: Size: 239 KB; Cited by: not cited
-- **`joint_cmd_scripted.json`**: Size: 25 KB; Cited by: not cited
+- `joint_cmd_run20m.json`: Size: 239 KB; Cited by: not cited
+- `joint_cmd_scripted.json`: Size: 25 KB; Cited by: not cited
 
 ## `k3`
 
-- **`v3_report/k3.json`**: Size: 46 KB; Cited by: not cited
-- **`v3_report_v3_20m/k3.json`**: Size: 46 KB; Cited by: not cited
+- `v3_report/k3.json`: Size: 46 KB; Cited by: not cited
+- `v3_report_v3_20m/k3.json`: Size: 46 KB; Cited by: not cited
 
 ## `ledge`
 
 Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +36.
 
-- **`ledge_bump_study.json`**: Size: 97 KB; Cited by: not cited
+- `ledge_bump_study.json`: Size: 97 KB; Cited by: not cited
 
 ## `limp`
 
 Docs that mention this family: [`STATUS.md`](../STATUS.md), [`history.md`](../archive/history.md), [`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +4.
 
-- **`limp_queue_summary.json`**: Size: 0 KB; Cited by: not cited
+- `limp_queue_summary.json`: Size: 0 KB; Cited by: not cited
 
 ## `mce`
 
-- **`mce_hw1_20m.json`**: Size: 2 KB; Cited by: not cited
-- **`mce_hw2_20m.json`**: Size: 2 KB; Cited by: not cited
-- **`mce_hw3_20m.json`**: Size: 2 KB; Cited by: not cited
-- **`mce_hw4_20m.json`**: Size: 2 KB; Cited by: not cited
-- **`mce_hw6_20m.json`**: Size: 2 KB; Cited by: not cited
-- **`mce_hw8_20m.json`**: Size: 2 KB; Cited by: not cited
-- **`mce_limp_hw2_20m_early.json`**: Size: 1 KB; Cited by: not cited
-- **`mce_limp_hw5_20m_early.json`**: Size: 1 KB; Cited by: not cited
-- **`mce_limp_hw6_20m_early.json`**: Size: 1 KB; Cited by: not cited
-- **`mce_limp_hw7_20m_early.json`**: Size: 1 KB; Cited by: not cited
-- **`mce_limp_hw8_20m_early.json`**: Size: 1 KB; Cited by: not cited
+- `mce_hw1_20m.json`: Size: 2 KB; Cited by: not cited
+- `mce_hw2_20m.json`: Size: 2 KB; Cited by: not cited
+- `mce_hw3_20m.json`: Size: 2 KB; Cited by: not cited
+- `mce_hw4_20m.json`: Size: 2 KB; Cited by: not cited
+- `mce_hw6_20m.json`: Size: 2 KB; Cited by: not cited
+- `mce_hw8_20m.json`: Size: 2 KB; Cited by: not cited
+- `mce_limp_hw2_20m_early.json`: Size: 1 KB; Cited by: not cited
+- `mce_limp_hw5_20m_early.json`: Size: 1 KB; Cited by: not cited
+- `mce_limp_hw6_20m_early.json`: Size: 1 KB; Cited by: not cited
+- `mce_limp_hw7_20m_early.json`: Size: 1 KB; Cited by: not cited
+- `mce_limp_hw8_20m_early.json`: Size: 1 KB; Cited by: not cited
 
 ## `phase0`
 
-- **`phase0_ab.json`**: Size: 3 KB; Cited by: not cited
-- **`phase0_eval.txt`**: Size: 1 KB; Cited by: not cited
-- **`phase0_graft282.json`**: Size: 2 KB; Cited by: not cited
+- `phase0_ab.json`: Size: 3 KB; Cited by: not cited
+- `phase0_eval.txt`: Size: 1 KB; Cited by: not cited
+- `phase0_graft282.json`: Size: 2 KB; Cited by: not cited
 
 ## `phaseA`
 
-- **`phaseA_eval.txt`**: Size: 1 KB; Cited by: not cited
-- **`phaseA_goal.json`**: Size: 1 KB; Cited by: not cited
-- **`phaseA_s2_eval.txt`**: Size: 1 KB; Cited by: not cited
-- **`phaseA_s2_goal.json`**: Size: 1 KB; Cited by: not cited
+- `phaseA_eval.txt`: Size: 1 KB; Cited by: not cited
+- `phaseA_goal.json`: Size: 1 KB; Cited by: not cited
+- `phaseA_s2_eval.txt`: Size: 1 KB; Cited by: not cited
+- `phaseA_s2_goal.json`: Size: 1 KB; Cited by: not cited
 
 ## `phaseC`
 
-- **`phaseC_s1_eval.txt`**: Size: 0 KB; Cited by: not cited
-- **`phaseC_s1_goal.json`**: Size: 1 KB; Cited by: not cited
+- `phaseC_s1_eval.txt`: Size: 0 KB; Cited by: not cited
+- `phaseC_s1_goal.json`: Size: 1 KB; Cited by: not cited
 
 ## `pod`
 
 Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md), [`as-built.md`](../hardware/as-built.md) +15.
 
-- **`pod_report/pod.json`**: Size: 313 KB; Cited by: not cited
+- `pod_report/pod.json`: Size: 313 KB; Cited by: not cited
 
 ## `Release_Candidate`
 
 Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`cheatsheet-advanced.md`](../guides/cheatsheet-advanced.md), [`shell-helpers.md`](../guides/shell-helpers.md), [`training-pipeline.md`](training-pipeline.md).
 
-- **`Release_CandidateARM1R_ppo.onnx`**: Size: 570 KB; Cited by: not cited
-- **`Release_CandidateARM1R_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateARM1X_ppo.onnx`**: Size: 570 KB; Cited by: not cited
-- **`Release_CandidateARM1X_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateARM1_ppo.onnx`**: Size: 570 KB; Cited by: [`arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)
-- **`Release_CandidateARM1_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateARMW_ppo.onnx`**: Size: 570 KB; Cited by: not cited
-- **`Release_CandidateARMW_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateV2.1_ppo.onnx`**: Size: 545 KB; Cited by: [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md)
-- **`Release_CandidateV2.1_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateV3_ppo.onnx`**: Size: 545 KB; Cited by: [`next-20m-plan.md`](../archive/rl/next-20m-plan.md)
-- **`Release_CandidateV3_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateV4_ppo.onnx`**: Size: 568 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`hardware-session-plan-2026-10-09.md`](../plan-detail/hardware-session-plan-2026-10-09.md), [`hw1-log.md`](hw1-log.md), [`README.md`](real-walk-data/2026-10-09/README.md)
-- **`Release_CandidateV4_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateV6_ppo.onnx`**: Size: 570 KB; Cited by: [`hardware-session-plan-2026-10-09.md`](../plan-detail/hardware-session-plan-2026-10-09.md), [`README.md`](real-walk-data/2026-10-10/README.md)
-- **`Release_CandidateV6_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
-- **`Release_CandidateV7_ppo.onnx`**: Size: 570 KB; Cited by: not cited
-- **`Release_CandidateV7_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
+- `Release_CandidateARM1R_ppo.onnx`: Size: 570 KB; Cited by: not cited
+- `Release_CandidateARM1R_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateARM1X_ppo.onnx`: Size: 570 KB; Cited by: not cited
+- `Release_CandidateARM1X_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateARM1_ppo.onnx`: Size: 570 KB; Cited by: [`arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)
+- `Release_CandidateARM1_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateARMW_ppo.onnx`: Size: 570 KB; Cited by: not cited
+- `Release_CandidateARMW_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateV2.1_ppo.onnx`: Size: 545 KB; Cited by: [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md)
+- `Release_CandidateV2.1_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateV3_ppo.onnx`: Size: 545 KB; Cited by: [`next-20m-plan.md`](../archive/rl/next-20m-plan.md)
+- `Release_CandidateV3_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateV4_ppo.onnx`: Size: 568 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`hardware-session-plan-2026-10-09.md`](../plan-detail/hardware-session-plan-2026-10-09.md), [`hw1-log.md`](hw1-log.md), [`README.md`](real-walk-data/2026-10-09/README.md)
+- `Release_CandidateV4_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateV6_ppo.onnx`: Size: 570 KB; Cited by: [`hardware-session-plan-2026-10-09.md`](../plan-detail/hardware-session-plan-2026-10-09.md), [`README.md`](real-walk-data/2026-10-10/README.md)
+- `Release_CandidateV6_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
+- `Release_CandidateV7_ppo.onnx`: Size: 570 KB; Cited by: not cited
+- `Release_CandidateV7_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
 
 ## `report`
 
 Docs that mention this family: [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +52.
 
-- **`v6_report/report_full.html`**: Size: 54 KB; Cited by: [`v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md)
+- `v6_report/report_full.html`: Size: 54 KB; Cited by: [`v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md)
 
 ## `report.html`
 
 Docs that mention this family: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +5.
 
-- **`v6_report/report.html`**: Size: 5 KB; Cited by: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +5
+- `v6_report/report.html`: Size: 5 KB; Cited by: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +5
 
 ## `resp`
 
-- **`resp_3way.json`**: Size: 8 KB; Cited by: not cited
+- `resp_3way.json`: Size: 8 KB; Cited by: not cited
 
 ## `run20m`
 
 Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) +23.
 
-- **`run20m_ppo.onnx`**: Size: 545 KB; Cited by: [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md)
-- **`run20m_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
+- `run20m_ppo.onnx`: Size: 545 KB; Cited by: [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md)
+- `run20m_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
 
 ## `slope`
 
 Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +30.
 
-- **`slope_sweep_hw1_20m.json`**: Size: 27 KB; Cited by: not cited
+- `slope_sweep_hw1_20m.json`: Size: 27 KB; Cited by: not cited
 
 ## `so`
 
-- **`so_highstep.json`**: Size: 1 KB; Cited by: not cited
-- **`so_trot.json`**: Size: 1 KB; Cited by: not cited
+- `so_highstep.json`: Size: 1 KB; Cited by: not cited
+- `so_trot.json`: Size: 1 KB; Cited by: not cited
 
 ## `so2`
 
-- **`so2_highstep_ref.json`**: Size: 1 KB; Cited by: not cited
-- **`so2_tr_ref.json`**: Size: 1 KB; Cited by: not cited
+- `so2_highstep_ref.json`: Size: 1 KB; Cited by: not cited
+- `so2_tr_ref.json`: Size: 1 KB; Cited by: not cited
 
 ## `summary`
 
 Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +36.
 
-- **`final_exam/summary.json`**: Size: 4 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`hw1-log.md`](hw1-log.md)
+- `final_exam/summary.json`: Size: 4 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`hw1-log.md`](hw1-log.md)
 
 ## `summary.html`
 
-- **`v6_report/summary.html`**: Size: 3 KB; Cited by: not cited
+- `v6_report/summary.html`: Size: 3 KB; Cited by: not cited
 
 ## `sweep`
 
-- **`hs_report/old_sweep1/sweep.json`**: Size: 28 KB; Cited by: not cited
-- **`hs_report/old_sweep2/sweep.json`**: Size: 64 KB; Cited by: not cited
-- **`hs_report/old_sweep3/sweep.json`**: Size: 46 KB; Cited by: not cited
-- **`hs_report/sweep.json`**: Size: 37 KB; Cited by: not cited
+- `hs_report/old_sweep1/sweep.json`: Size: 28 KB; Cited by: not cited
+- `hs_report/old_sweep2/sweep.json`: Size: 64 KB; Cited by: not cited
+- `hs_report/old_sweep3/sweep.json`: Size: 46 KB; Cited by: not cited
+- `hs_report/sweep.json`: Size: 37 KB; Cited by: not cited
 
 ## `v21`
 
 Docs that mention this family: [`README.md`](real-walk-data/2026-10-01/README.md), [`real-walk-log.md`](real-walk-log.md).
 
-- **`v3_report/v21.json`**: Size: 46 KB; Cited by: not cited
-- **`v3_report_v3_20m/v21.json`**: Size: 46 KB; Cited by: not cited
-- **`v4_report_v4_c2_at1M/v21.json`**: Size: 89 KB; Cited by: not cited
-- **`v4_report_v4_c2_at1M/v21_delay12p5ms.json`**: Size: 23 KB; Cited by: not cited
+- `v3_report/v21.json`: Size: 46 KB; Cited by: not cited
+- `v3_report_v3_20m/v21.json`: Size: 46 KB; Cited by: not cited
+- `v4_report_v4_c2_at1M/v21.json`: Size: 89 KB; Cited by: not cited
+- `v4_report_v4_c2_at1M/v21_delay12p5ms.json`: Size: 23 KB; Cited by: not cited
 
 ## `V3`
 
-- **`final_exam/V3.json`**: Size: 132 KB; Cited by: not cited
+- `final_exam/V3.json`: Size: 132 KB; Cited by: not cited
 
 ## `v3`
 
-- **`v3_world2`**: Size: 0 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md)
+- `v3_world2`: Size: 0 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md)
 
 ## `v4`
 
-- **`v4_20m_attempt5_curve.jsonl`**: Size: 4 KB; Cited by: not cited
-- **`v4_c1_curve.jsonl`**: Size: 1 KB; Cited by: not cited
-- **`v4_c1_paired.jsonl`**: Size: 10 KB; Cited by: not cited
-- **`v4_c2_curve.jsonl`**: Size: 1 KB; Cited by: not cited
-- **`v4_c2_paired.jsonl`**: Size: 10 KB; Cited by: not cited
-- **`v4_s1_curve.jsonl`**: Size: 2 KB; Cited by: not cited
-- **`v4_s2_curve.jsonl`**: Size: 3 KB; Cited by: not cited
-- **`v4_s2_paired.jsonl`**: Size: 3 KB; Cited by: not cited
+- `v4_20m_attempt5_curve.jsonl`: Size: 4 KB; Cited by: not cited
+- `v4_c1_curve.jsonl`: Size: 1 KB; Cited by: not cited
+- `v4_c1_paired.jsonl`: Size: 10 KB; Cited by: not cited
+- `v4_c2_curve.jsonl`: Size: 1 KB; Cited by: not cited
+- `v4_c2_paired.jsonl`: Size: 10 KB; Cited by: not cited
+- `v4_s1_curve.jsonl`: Size: 2 KB; Cited by: not cited
+- `v4_s2_curve.jsonl`: Size: 3 KB; Cited by: not cited
+- `v4_s2_paired.jsonl`: Size: 3 KB; Cited by: not cited
 
 ## `V4cand`
 
 Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md), [`hw1-log.md`](hw1-log.md).
 
-- **`V4cand_B_c1_2p2M_ppo.onnx`**: Size: 568 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md), [`hw1-log.md`](hw1-log.md)
-- **`V4cand_B_c1_2p2M_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
+- `V4cand_B_c1_2p2M_ppo.onnx`: Size: 568 KB; Cited by: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md), [`hw1-log.md`](hw1-log.md)
+- `V4cand_B_c1_2p2M_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
 
 ## `V5cand`
 
 Docs that mention this family: [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md), [`v5-training-plan.md`](../plan-detail/v5-training-plan.md).
 
-- **`V5cand_ppo.onnx`**: Size: 570 KB; Cited by: [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md), [`v5-training-plan.md`](../plan-detail/v5-training-plan.md)
-- **`V5cand_ppo.onnx.json`**: Size: 0 KB; Cited by: not cited
+- `V5cand_ppo.onnx`: Size: 570 KB; Cited by: [`status-2026-10-detail.md`](../archive/status-2026-10-detail.md), [`v5-training-plan.md`](../plan-detail/v5-training-plan.md)
+- `V5cand_ppo.onnx.json`: Size: 0 KB; Cited by: not cited
 
 ## `v6`
 
-- **`hs_report/v6_baseline.json`**: Size: 2 KB; Cited by: not cited
-- **`pod_report/v6_on_pod.json`**: Size: 327 KB; Cited by: not cited
-- **`v6_report/v6.json`**: Size: 322 KB; Cited by: not cited
+- `hs_report/v6_baseline.json`: Size: 2 KB; Cited by: not cited
+- `pod_report/v6_on_pod.json`: Size: 327 KB; Cited by: not cited
+- `v6_report/v6.json`: Size: 322 KB; Cited by: not cited

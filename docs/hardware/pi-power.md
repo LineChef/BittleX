@@ -2,14 +2,14 @@
 
 ## Status at a glance
 
-**The decision:** the Pi has its own battery (a PiSugar S 1200 mAh), and the BiBoard link is data only (TX, RX and GND). Drawing the Pi from G2's shared pack caused reduced motion and brownout risk. The first half of this page is the research that led there.
+The decision: the Pi has its own battery (a PiSugar S 1200 mAh), and the BiBoard link is data only (TX, RX and GND). Drawing the Pi from G2's shared pack caused reduced motion and brownout risk. The first half of this page is the research that led there.
 
-- **Disable unused peripherals, Wi-Fi power-save when headless, CPU governor `ondemand` (`pi_pipeline.power`)**: **Built and in use**
-- **Idle rest posture and sleep mode (`behavior/idle_posture.py`, `sleep_mode.py`, plus the power-saving sleep in `power/sleep_watch.py`)**: **Built and in use** (sleep after 5 minutes at rest)
-- **Battery watch for G2's pack; Pi runtime measurement and warning; power log**: **Built and in use**
-- **Pi shutdown from a voice command**: Built; the PiSugar S keeps powering the halted Pi, so its switch is flipped by hand
-- **On-demand vision (scale the camera to activity)**: **Not built**: only on or off exists, tied to sleep
-- **A hardware battery readout for the Pi**: Not available on the PiSugar S; the warning counts uptime against a measured runtime
+- Disable unused peripherals, Wi-Fi power-save when headless, CPU governor `ondemand` (`pi_pipeline.power`): **Built and in use**
+- Idle rest posture and sleep mode (`behavior/idle_posture.py`, `sleep_mode.py`, plus the power-saving sleep in `power/sleep_watch.py`): **Built and in use** (sleep after 5 minutes at rest)
+- Battery watch for G2's pack; Pi runtime measurement and warning; power log: **Built and in use**
+- Pi shutdown from a voice command: Built; the PiSugar S keeps powering the halted Pi, so its switch is flipped by hand
+- On-demand vision (scale the camera to activity): **Not built**: only on or off exists, tied to sleep
+- A hardware battery readout for the Pi: Not available on the PiSugar S; the warning counts uptime against a measured runtime
 
 Package overview: [`../../pi_pipeline/power/README.md`](../../pi_pipeline/power/README.md). Operator view: [`../guides/operating-g2.md`](../guides/operating-g2.md).
 
@@ -21,7 +21,7 @@ stock, default way to run a Pi on Bittle: *"All of the robots run on
 NyBoard/BiBoard which can power the Pi and communicate with the Pi through the
 serial port in the 2x5 socket."*
 
-**Correction:** an earlier version of this doc quoted *"Reduced
+Correction: an earlier version of this doc quoted *"Reduced
 motion capability may happen when connected to Pi! A stronger battery is
 needed"* as if it were general Petoi guidance. Re-traced to its source
 (`guide.petoi.com`'s Raspberry-Pi-serial-port page): that warning is on the
@@ -44,7 +44,7 @@ it's untested on this specific hardware, applied to a workload (RL
 training/testing — near-constant servo movement) that's exactly the stress
 case where it would show up if it does.
 
-**Conclusion:** power the Pi independently as the cautious choice for this
+Conclusion: power the Pi independently as the cautious choice for this
 project's workload, not because there's a confirmed Bittle-specific problem —
 sharing BiBoard's battery is a real, commonly-used, simpler option (and avoids
 the PiSugar stack-height case-fit question, since a bare Pi already fits
@@ -55,12 +55,12 @@ the open question entirely rather than fixing a confirmed one.
 
 **Considered and ruled out:**
 
-- **Standard phone-style USB power banks** (Vida IT 5000 mAh, VIYISI, FLEXTAIL) —
+- Standard phone-style USB power banks: (Vida IT 5000 mAh, VIYISI, FLEXTAIL) —
   electrically fine (5V / 2A+, micro-USB or USB-A output) but physically
   bulky / heavy relative to Bittle X's small frame, and optimized for steady
   phone-charging current rather than the "peaky" current draw a moving robot
   creates.
-- **PiSugar S Plus** — looked promising but is explicitly **not** compatible with
+- PiSugar S Plus: looked promising but is explicitly **not** compatible with
   Pi Zero models ("designed for Raspberry Pi 4B, 3B, 3B+ and 2B. Not for Pi
   5 / Zero / Orange Pi" — confirmed on the Amazon listing). Easy to mix up with
   the correctly-matched **PiSugar S** (no "Plus").
@@ -91,7 +91,7 @@ simultaneously.
 Remaining concern: if both PiSugar and Bittle X's board can supply 5V to the Pi at
 the same time, does that create an electrical conflict?
 
-**Resolved, with a practical mitigation:** a Pi's 5V GPIO pins are internally one
+Resolved, with a practical mitigation: a Pi's 5V GPIO pins are internally one
 shared rail, not independent inputs — connecting two same-voltage 5V sources to
 that rail doesn't create damage or "backfeed" the way mismatched voltages would
 (confirmed via Raspberry Pi community electronics discussion). However, rather
@@ -102,13 +102,13 @@ shared-power question entirely.
 
 ## Resolved — data-only wiring confirmed
 
-**2026-09-14:** BiBoard V1's Pi connector is a discrete 5-pin header (TX2,
+2026-09-14: BiBoard V1's Pi connector is a discrete 5-pin header (TX2,
 RX2, GND, +5V, +5V), each pin its own solder pad — not a rigid block that
 forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
 both +5V pins left unconnected) is straightforward. Full pinout, confirmed
 from Petoi's own official board diagram, see
 [`g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos are in
-[`pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md).
+`pi-biboard-build-notes.md`.
 
 ---
 
@@ -116,10 +116,10 @@ from Petoi's own official board diagram, see
 
 Two independent budgets:
 
-- **Robot 2S pack (7.4 V, 1000 mAh, 2 A typ / 5 A peak)** — leg servos + BiBoard.
+- Robot 2S pack (7.4 V, 1000 mAh, 2 A typ / 5 A peak) — leg servos + BiBoard.
   Caps *walking time* (~45–60 min active). Relaxed servos draw ≈ 0; any held
   pose draws continuous holding current.
-- **PiSugar S (1200 mAh)** — Pi Zero 2 W + camera + audio. Runs whether or not
+- PiSugar S (1200 mAh): Pi Zero 2 W + camera + audio. Runs whether or not
   the robot moves; caps *awake time*. No battery telemetry on the S.
 
 Guiding principle: **these are IDLE-STATE optimizations.** Active autonomous
@@ -130,10 +130,10 @@ only levers are the clean set (efficient gait, disabled peripherals).
 ## Rest pose (servo pack)
 
 Power, lowest → highest: **REST (`d`) < sit (`ksit`) < stand (`kup`)**.
-- **REST** — legs folded, body on the frame, servos de-energized, ≈ 0 draw.
-- **sit** — partial; some servos still hold. Middle option if it must stay
+- REST: legs folded, body on the frame, servos de-energized, ≈ 0 draw.
+- sit: partial; some servos still hold. Middle option if it must stay
   "ready".
-- **stand** — all 8 leg servos fighting gravity at a poor mechanical angle;
+- stand: all 8 leg servos fighting gravity at a poor mechanical angle;
   highest continuous draw.
 
 Resume cost: REST → walking is ~1–2 s + a rebalance; stand → walking is instant.
@@ -154,16 +154,16 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
 ## Measures
 
-- **Disable unused peripherals** (onboard LEDs runtime; audio + camera-LED via boot config): Buildable now?: **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`); Autonomy impact: none; Rule: boot lines go in `config.txt` at Pi setup (pi-set-up.md)
-- **Wi-Fi power-save when headless** (`iw dev wlan0 set power_save on`): Buildable now?: **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()`; Autonomy impact: +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).**; Rule: on in autonomous mode; off when a human is actively connected
-- **idle-REST timeout** — send `d` after N s of no command: Buildable now?: **BUILT** — `behavior/idle_posture.py`'s `IdlePosture` (ACTIVE→SIT→RESTING staged descent, mood-scaled timeouts, person-present multiplier, "stay" override, `safe_to_rest` gating, wired into `BehaviorDriver.tick()`, 109 lines of tests); Autonomy impact: Was already behaviour-aware from the start — exploring holds ACTIVE with no descent (`exploring=True` short-circuits it), a conversation holds SIT and never lies down; Rule: done; see `docs/guides/voice-commands.md` / `capabilities.md`
-- **On-demand vision** — gate the Grove Vision AI V2: Buildable now?: **Not built — only a binary on/off exists**, tied to sleep-mode entry/exit (`EffectKind.CAPTURE`). The rate-scaling ambition below has zero implementation, not even stubbed — just an unused `kind` param on the `CAPTURE` effect anticipating it; Autonomy impact: **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move; Rule: "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep. **This is the one remaining open design question.**
-- **Sleep / idle mode** — servos REST, vision off, governor down, Wi-Fi power-save on: Buildable now?: **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake (see below); Autonomy impact: Wake triggers already cover the risk noted here — IMU tap / loud sound / wake word all wake it; Rule: done
-- **CPU governor → `ondemand`**: Buildable now?: **BUILT** — `pi_pipeline.power.set_cpu_governor()` (refuses `powersave`); Autonomy impact: Ramp latency could cause one late 80 Hz control tick after idle; Rule: use `ondemand` (fast ramp), **not** `powersave`; verify with `benchmark_pi.py` loop-jitter
-- **Camera resolution / fps down**: Buildable now?: with hardware; Autonomy impact: detection may degrade; Rule: drop only if detection still passes
-- **PiSugar low-power mode**: Buildable now?: with hardware; Autonomy impact: —; Rule: check if it exists and whether the Pi can trigger it
+- Disable unused peripherals: (onboard LEDs runtime; audio + camera-LED via boot config): Buildable now?: **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`); Autonomy impact: none; Rule: boot lines go in `config.txt` at Pi setup (pi-set-up.md)
+- Wi-Fi power-save when headless: (`iw dev wlan0 set power_save on`): Buildable now?: **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()`; Autonomy impact: +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).**; Rule: on in autonomous mode; off when a human is actively connected
+- idle-REST timeout: send `d` after N s of no command: Buildable now?: **BUILT** — `behavior/idle_posture.py`'s `IdlePosture` (ACTIVE→SIT→RESTING staged descent, mood-scaled timeouts, person-present multiplier, "stay" override, `safe_to_rest` gating, wired into `BehaviorDriver.tick()`, 109 lines of tests); Autonomy impact: Was already behaviour-aware from the start — exploring holds ACTIVE with no descent (`exploring=True` short-circuits it), a conversation holds SIT and never lies down; Rule: done; see `docs/guides/voice-commands.md` / `capabilities.md`
+- On-demand vision: gate the Grove Vision AI V2: Buildable now?: **Not built — only a binary on/off exists**, tied to sleep-mode entry/exit (`EffectKind.CAPTURE`). The rate-scaling ambition below has zero implementation, not even stubbed — just an unused `kind` param on the `CAPTURE` effect anticipating it; Autonomy impact: **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move; Rule: "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep. **This is the one remaining open design question.**
+- Sleep / idle mode: servos REST, vision off, governor down, Wi-Fi power-save on: Buildable now?: **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake (see below); Autonomy impact: Wake triggers already cover the risk noted here — IMU tap / loud sound / wake word all wake it; Rule: done
+- CPU governor → `ondemand`: Buildable now?: **BUILT** — `pi_pipeline.power.set_cpu_governor()` (refuses `powersave`); Autonomy impact: Ramp latency could cause one late 80 Hz control tick after idle; Rule: use `ondemand` (fast ramp), **not** `powersave`; verify with `benchmark_pi.py` loop-jitter
+- Camera resolution / fps down: Buildable now?: with hardware; Autonomy impact: detection may degrade; Rule: drop only if detection still passes
+- PiSugar low-power mode: Buildable now?: with hardware; Autonomy impact: —; Rule: check if it exists and whether the Pi can trigger it
 
-- **Sleep / idle mode — servos REST, vision off, governor down, Wi-Fi power-save on:** **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake word, anti-thrash min-sleep hold), wired into `BehaviorDriver.tick()` with real effect dispatch (power-profile switch + camera off in `bindings.py`), 146 lines of tests
+- Sleep / idle mode — servos REST, vision off, governor down, Wi-Fi power-save on: **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake word, anti-thrash min-sleep hold), wired into `BehaviorDriver.tick()` with real effect dispatch (power-profile switch + camera off in `bindings.py`), 146 lines of tests
 
 
 ## NOT "no performance impact" — real tradeoffs (flagged, not recommended as free)
@@ -178,16 +178,16 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
 ## Next
 
-- **DONE:** disable-unused (`pi_pipeline.power`), Wi-Fi power-save toggle,
+- DONE: disable-unused (`pi_pipeline.power`), Wi-Fi power-save toggle,
   CPU-governor helper — `python -m pi_pipeline.power status|headless|interactive`
   — **and** idle-REST staged descent (`IdlePosture`) and the sleep-mode state
   machine (`SleepMode`), both fully built + wired + tested (corrected 2026-09-16;
   an earlier version of this doc listed these as still needing a focused
   design session — they don't, that work already landed).
-- **Focused-session TODO:** on-demand vision rate-scaling only — the camera
+- Focused-session TODO: on-demand vision rate-scaling only — the camera
   currently just goes on/off with sleep mode, not scaled to activity level as
   originally scoped above.
-- **Hardware-gated:** a real power budget from an inline current meter (the
+- Hardware-gated: a real power budget from an inline current meter (the
   PiSugar S has no telemetry) — active walking, idle-stand, sit, REST, Pi under
   vision load, Pi asleep. Feeds the sleep-mode timeout tuning.
 - **Forward-looking caution, found on Petoi's community forum archive,

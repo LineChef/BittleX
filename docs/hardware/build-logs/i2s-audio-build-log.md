@@ -19,11 +19,11 @@ at once), so a USB sound card (the simpler option otherwise) was ruled
 out. Two boards ordered, both wiring directly onto the Pi's bare 40-pin
 header, no adapter needed:
 
-- **Speaker**: [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5)
+- Speaker: [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5)
   — amp + matched speaker sold together, MAX98357A-compatible pinout
   (`VIN`, `GND`, `BCLK`, `LRCLK`, `DIN`, plus the speaker's own leads into
   the amp board's output terminals, not the Pi).
-- **Microphone**: [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62)
+- Microphone: [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62)
   — the SPH0645LM4H MEMS mic chip itself, on a small breakout (`VIN`,
   `GND`, `BCLK`, `LRCLK`, `DOUT`). **Runs at 1.6&ndash;3.6V only** (confirmed
   against Adafruit's own guide for the same chip) — its `VIN` must go to
@@ -32,16 +32,16 @@ header, no adapter needed:
 **Full pinout, confirmed no conflicts with each other or with BiBoard's
 existing wiring above:**
 
-- **BiBoard GND**: Pi pin: 6; Used by: already wired
-- **BiBoard RX2**: Pi pin: 8 (GPIO14/TXD); Used by: already wired
-- **BiBoard TX2**: Pi pin: 10 (GPIO15/RXD); Used by: already wired
-- **Mic `VIN`**: Pi pin: 1 or 17 (3.3V); Used by: mic only — **not the amp's 5V pin**
-- **Amp `VIN`**: Pi pin: 2 (5V); Used by: amp only
-- **Amp/Mic `GND`**: Pi pin: 9 (or any other free ground pin); Used by: shared — all Pi ground pins are one common net
-- **Amp/Mic `BCLK`**: Pi pin: 12 (GPIO18); Used by: shared **by design** — one I2S clock line, both boards listen to it
-- **Amp/Mic `LRCLK`**: Pi pin: 35 (GPIO19); Used by: shared **by design**, same reasoning
-- **Mic `DOUT`**: Pi pin: 38 (GPIO20); Used by: mic only, audio data mic → Pi
-- **Amp `DIN`**: Pi pin: 40 (GPIO21); Used by: amp only, audio data Pi → amp
+- BiBoard GND: Pi pin: 6; Used by: already wired
+- BiBoard RX2: Pi pin: 8 (GPIO14/TXD); Used by: already wired
+- BiBoard TX2: Pi pin: 10 (GPIO15/RXD); Used by: already wired
+- Mic `VIN`: Pi pin: 1 or 17 (3.3V); Used by: mic only — **not the amp's 5V pin**
+- Amp `VIN`: Pi pin: 2 (5V); Used by: amp only
+- Amp/Mic `GND`: Pi pin: 9 (or any other free ground pin); Used by: shared — all Pi ground pins are one common net
+- Amp/Mic `BCLK`: Pi pin: 12 (GPIO18); Used by: shared **by design** — one I2S clock line, both boards listen to it
+- Amp/Mic `LRCLK`: Pi pin: 35 (GPIO19); Used by: shared **by design**, same reasoning
+- Mic `DOUT`: Pi pin: 38 (GPIO20); Used by: mic only, audio data mic → Pi
+- Amp `DIN`: Pi pin: 40 (GPIO21); Used by: amp only, audio data Pi → amp
 
 ### Connectors, header pins, and the BCLK/LRCLK splice — confirmed 2026-09-30
 
@@ -152,7 +152,7 @@ LRCL → pin 35, DOUT → pin 38, SEL → pin 39); the amp was connected on 2026
    `dtoverlay=googlevoicehat-soundcard` (original saved alongside as
    `config.txt.bak-pre-i2s`), then a reboot. `arecord -l` listed the
    `googlevoicehat` capture card.
-2. **First captures were a flat constant** (every sample identical on both
+2. First captures were a flat constant: (every sample identical on both
    channels), meaning no data reached the Pi. Diagnosis: with GPIO20
    (pin 38, `PCM_DIN`) switched to a plain input with the pull-down on
    (`pinctrl set 20 ip pd`, then `pinctrl get 20`), it stayed **high**, while every
@@ -160,14 +160,14 @@ LRCL → pin 35, DOUT → pin 38, SEL → pin 39); the amp was connected on 2026
    pull-down, so something was driving the line high — a **solder bridge
    between two pads on the mic's new header** (the first header soldered
    on this project). Reflowing/removing the bridge fixed it.
-3. **After the fix:** GPIO20 reads low under the pull-down, and
+3. After the fix: GPIO20 reads low under the pull-down, and
    `arecord -D plughw:0,0 -f S32_LE -r 48000 -c 2 -d 8` captured clear
    speech on channel 0 (about 15,000 distinct sample values, peak roughly a
    quarter of full scale); channel 1 is silent as expected from `SEL` → GND.
    Played back on the Mac (left channel, DC offset removed, gain applied):
    loud and clear.
 
-**Signature to remember:** a capture where every sample on both channels is
+Signature to remember: a capture where every sample on both channels is
 the same value means the data line isn't being driven (no mic power, `SEL`
 floating, `DOUT` open or shorted, or a solder bridge). The pull-down test in
 step 2 separates "open" (reads low) from "shorted/driven" (stays high).
@@ -232,7 +232,7 @@ debug all at once:**
    amp+speaker actually produces sound.
 3. `arecord -D plughw:0,0 -f cd -d 5 test.wav` then play it back to
    confirm the mic captures real audio, not silence/noise.
-4. **Only then** point `pi_pipeline` at it. Its code
+4. Only then: point `pi_pipeline` at it. Its code
    (`voice/stt.py`/`voice/tts.py`) uses `sounddevice`'s *default* device,
    not an explicit device name — with the Pi Zero having no other audio
    hardware, this new I2S card should become the sole/default ALSA device
@@ -248,11 +248,11 @@ own case doesn't fit inside it either, see below) — resolved: the header
 pins are exposed at the case's top cap, so both boards can be wired out
 and mounted elsewhere on the frame entirely, same as any other external
 accessory. Two open questions, not yet decided:
-- **Where**: somewhere away from the head (matches the existing
+- Where: somewhere away from the head (matches the existing
   `HEAD_MASS_NOM` balance budget reasoning used for Pi/PiSugar placement
   above), close enough to the Pi's header to keep the 5 signal wires per
   board short.
-- **How**: **amp — resolved, M4 mounting holes confirmed from its own
+- How: **amp — resolved, M4 mounting holes confirmed from its own
   product photos, Lego-compatible.** A real screw mount, not a fallback —
   use it rather than adhesive. **Mic — still open**, no equivalent
   confirmation of mounting holes yet; if it turns out to have none, foam

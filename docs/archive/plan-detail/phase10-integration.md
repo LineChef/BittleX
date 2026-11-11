@@ -52,7 +52,7 @@ that ties everything together with hardware:
   disk); non-zero exit on any hard FAIL so it drops into a bring-up script.
 
 **Deployment-easing batch — built 2026-09-10** (agreed earlier, executed now):
-- **Black-box logging in `pi_pipeline.app`** — `diag.start_session("app", ...)` +
+- Black-box logging in `pi_pipeline.app`: `diag.start_session("app", ...)` +
   `install_excepthook()` + `bridge_stdlib_logging()` at startup, `diag.close()`
   in the shutdown path — the first real hardware session is now recorded like
   any gait run, not silently unlogged. **Extended 2026-09-10 to every CLI
@@ -68,7 +68,7 @@ that ties everything together with hardware:
   run as a bare script). `pi_pipeline/tests/conftest.py` gained an autouse
   fixture pointing `G2_LOG_DIR` at a tmp dir, so the test suite no longer
   writes real session logs to the developer's `~/g2_logs`.
-- **The voice actuator shares the real serial link** — `voice/actuator.py`
+- The voice actuator shares the real serial link — `voice/actuator.py`
   `SerialActuator(port, baud, *, link=None)` accepts an existing link (the
   app's `LockedLink`) instead of always opening its own on the same port, and
   only closes a link it opened itself (`_owns_link`). `make_actuator(..., link=)`
@@ -78,15 +78,15 @@ that ties everything together with hardware:
   `--serial`, because `_build_voice` hardcoded a mock actuator. (Also fixed in
   passing: `make_tts("mac")` was missing the now-required `piper_model_path`
   kwarg — `python -m pi_pipeline.app` would have crashed on its first TTS call.)
-- **`doctor --serial` deeper handshake** — beyond the port existing, sends the
+- `doctor --serial` deeper handshake: beyond the port existing, sends the
   firmware `?` query and reads the `P` battery-voltage reply (both passive,
   nothing moves) so "the board actually speaks OpenCat" is verified, not just
   "the port opened."
-- **`pre-hardware` git tag** — a rollback point on `development` before
+- `pre-hardware` git tag: a rollback point on `development` before
   bring-up churn starts.
 
 **The three bigger deployment-easing items — built 2026-09-10:**
-- **`pi_pipeline/bringup.py`** — `python -m pi_pipeline.bringup`: the (now
+- `pi_pipeline/bringup.py`: `python -m pi_pipeline.bringup`: the (now
   17-step, after splitting step 12 into 12a/12b and adding 7c below;
   **renumbered again 2026-09-20 to a 20-step Phase 0/Phase 1 split matching
   the "When the hardware arrives" section below exactly** — see that
@@ -101,14 +101,14 @@ that ties everything together with hardware:
   calibration, `kbalance`, `kwkF`, `--probe-imu`, `bench_real.py`) are always
   shown as text, never auto-run** — anything that moves a joint needs your
   hands free to catch it, not a confirm prompt inside this script.
-- **`check_serial firstmove`** — a guided, confirmed first movement: one joint
+- `check_serial firstmove`: a guided, confirmed first movement: one joint
   at a time (head, then the 8 leg servos by the confirmed Petoi map from
   `gait/deploy_map.py` — FL/FR/BR/BL shoulder then knee), each nudged by
   `--deg` (default 15°) with an explicit confirm before AND after, then (only
   if you keep saying yes) `kbalance`, then a single timed `wkF` burst
   (`--walk-s`) that **always ends at `d` (rest)** — including on `q` or
   Ctrl-C at any point, via a `finally`.
-- **`pi_pipeline/link/trace.py`** — `TracingLink` wraps any link and appends
+- `pi_pipeline/link/trace.py`: `TracingLink` wraps any link and appends
   every outbound command to a timestamped JSONL file
   (`{"t", "cmd", "reply"}`); `python -m pi_pipeline.app --trace <path>` wires
   it in transparently (both the voice actuator and the behaviour runtime's
@@ -164,13 +164,13 @@ repo onto the Pi. Fixed to deploy only what actually runs there:
   self-contained (builds its own synthetic ONNX stub in-line just to
   benchmark inference speed) — so that's now `scp` of the one script file,
   fixed in both the doc and the script's own header comment.
-- **`docs/` is never deployed at all**, by construction — the `rsync` source
+- `docs/` is never deployed at all: , by construction — the `rsync` source
   is `pi_pipeline/` specifically, not the repo root, so nothing outside that
   directory (`docs/`, `rl_training/`'s checkpoints/logs/GIFs, the RL
   toolchain) ever reaches the Pi. The only markdown that does ride along is
   `pi_pipeline/`'s own handful of small per-module `README.md` files (code
   documentation living next to the code it documents), not the `docs/` tree.
-- **Why it matters, concretely:** `rl_training/` alone was ~4.7 GB the day
+- Why it matters, concretely: `rl_training/` alone was ~4.7 GB the day
   this was caught (and only grows with every training run on `development`)
   — zero benefit to a Pi that never executes any of it, on a 32 GB card.
 
@@ -209,7 +209,7 @@ requiring a manual capture session, landed the mechanism itself, behind new
   client-side-only "download labels.json" button, no server; `apply` writes
   it back into the gallery and deletes discarded crop files). Nothing
   published or uploaded, matching the `training_data/` privacy rule.
-- **Still hardware-gated, deliberately not built:** the localizer (what
+- Still hardware-gated, deliberately not built: the localizer (what
   decides "something's here" — motion/frame-diff or a generic saliency
   model) and the embedding model (what fingerprints a crop). Both need the
   real camera to tune/choose, but **both are also independently testable
@@ -239,14 +239,14 @@ nothing autonomous competing.
 
 **Explore mode — two-tier redesign, built 2026-09-10** (user design session).
 The single time-based `EXPLORE` mode is split:
-- **Tier 0 "attentive"** (`behavior/attentive.py`, `AttentiveLook`) — stationary,
+- Tier 0 "attentive": (`behavior/attentive.py`, `AttentiveLook`) — stationary,
   *always active* as a life-signs layer the driver runs in the IDLE branch while
   a posture holds steady: gaze-follow the nearest person (`HEAD` bearing),
   react to a novel object (look → `kbuttUp` peer bow → QUESTION chirp), a
   periodic head pan-scan (`scan_every_s`), and greets known people via the
   existing recognition hop. Never emits `WALK`/`TURN`. `vision_available=False`
   → periodic scan only. G2 still settles (sit → rest → sleep) underneath.
-- **Tier 1 "roam"** — `Mode.EXPLORE` is now **voice-armed only**:
+- Tier 1 "roam": `Mode.EXPLORE` is now **voice-armed only**:
   `ModeController.arm_explore()` / `disarm_explore()`, entered solely when armed
   (+ the post-conversation `settle_secs` grace); **no time-based entry**. Ends on
   any activity, `explore_max_secs`, the new `Explorer` leg budget
@@ -259,23 +259,23 @@ The single time-based `EXPLORE` mode is split:
   always supervised, and the operator only arms Tier 1 when G2 is on the floor.
 
 **Explore polish, built 2026-09-10** (follow-up pass):
-- **Tier 0 sound reaction** — `AttentiveLook.decide()` takes `sound` / `loud` /
+- Tier 0 sound reaction: `AttentiveLook.decide()` takes `sound` / `loud` /
   `sound_bearing`; turns the head toward a sound (or a quick scan if the bearing
   is unknown). A loud sound interrupts a gaze-follow. No camera needed.
-- **Gaze-follow satiation** — after `follow_satiate_s` of continuous follow it
+- Gaze-follow satiation: after `follow_satiate_s` of continuous follow it
   drops to `follow_glance_cooldown_s` glances so it doesn't stare; a big bearing
   change or the person leaving view re-engages.
-- **"Come here"** — `behavior/approach.py` (`ApproachTarget`), voice command
+- "Come here": `behavior/approach.py` (`ApproachTarget`), voice command
   `"come"` ("come here" / "come to me" — *not* "come back", which is
   `"unexplore"`). `DriverInputs.come_here` → `Mode.APPROACH`: a one-shot directed
   walk toward the largest person detection, `STOP` + happy chirp on arrival
   (`close_area`), `STOP` + confused chirp on give-up (`give_up_s`). Preempts
   IDLE / EXPLORE / CONVERSE; enrollment / choreography / safety / sleep still
   win. Cancelled by `told_stop` / pickup / wake word; needs `_vision`.
-- **Audible roam state** — the driver emits a `GREETING` chirp on entering
+- Audible roam state: the driver emits a `GREETING` chirp on entering
   EXPLORE and a `QUESTION` chirp every `ExploreConfig.roam_chirp_s` while
   roaming, so autonomous movement is never a surprise.
-- **Place memory (B11 start)** — `behavior/place_memory.py` (`PlaceMemory`):
+- Place memory (B11 start): `behavior/place_memory.py` (`PlaceMemory`):
   `observe(label, bearing)` on each Tier-1 investigate/approach; once a label
   repeats in the same 4-way direction `min_sightings` times it emits a durable
   sentence ("The dog is often to the left…"), surfaced as
@@ -292,7 +292,7 @@ curl and just does POWER headless + camera off + a sleepy chirp. Any activity /
 wake word cancels a pending shutdown or rouses from it. Not an OS power-off;
 "go to sleep" stays the lighter curl variant.
 
-**Left for hardware:** plumb a real `SerialDetectionFeed` into `SensorHub` +
+Left for hardware: plumb a real `SerialDetectionFeed` into `SensorHub` +
 `BehaviorRuntime.frame_source`; tune the `SensorConfig` IMU thresholds against
 `--probe-imu`; confirm the head-pan joint index + range; the `WalkerSink` is
 firmware-gait only (the RL gait is `gait/run_gait.py`, run separately).
@@ -315,7 +315,7 @@ call so the whole loop is exercised end-to-end (idle descent → `ksit` → `d`,
 wake choreography → head/skill) in 7 tests. Still needs, on hardware: the real
 sink implementations (some exist — `voice/actuator.py`, `voice/cues.py`,
 `voice/tts.py`) and the input plumbing (vision frame, IMU state, mic events).
-**Behavior-audit finding, 2026-09-16 — Enrollment specifically:** `app/sinks.py`'s
+Behavior-audit finding, 2026-09-16 — Enrollment specifically: `app/sinks.py`'s
 `build_bindings()` hardcodes `tts=None, cue=None` (comment: "the voice loop
 owns TTS; SPEAK effects are rare here") — true for most of the driver, but
 **`Enrollment`'s entire interaction is SPEAK effects** ("What's your name?",
@@ -337,21 +337,21 @@ breathing-bob motion and LED life-signs, are still caller-side).
       `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested): commanded vs.
       measured forward speed → `NORMAL` / `BOOST_CMD` (raise the speed command
       to punch through pile) / `CARPET_GAIT` (hand off to firmware `kcarpetF`).
-  - **Forward-speed estimate — BUILT:** `pi_pipeline/gait/speed_estimate.py`
+  - Forward-speed estimate — BUILT: `pi_pipeline/gait/speed_estimate.py`
     `ZuptSpeedEstimator` — integrates body-X accel with a per-gait-cycle ZUPT
     bias correction + a leak (steady walking ⇒ ∫accel over a cycle ≈ 0). Pure
     logic, 6 tests. **Accel not plumbed yet:** `parse_imu_line` returns
     ypr+gyro only; body-X accel needs the `--imu-format 6axis` stream. Passing
     `accel_fwd=None` makes it inert, so `--carpet` is safe to leave off.
-  - **Runtime wiring — DONE:** `run_gait.py --carpet` (default off) runs the
+  - Runtime wiring — DONE: `run_gait.py --carpet` (default off) runs the
     estimator + detector each tick; `BOOST_CMD` → `pol.set_command(cmd_with_boost)`,
     `CARPET_GAIT` → send `opencat.CARPET_WALK` and skip the policy send, re-anchor
     the policy (`STAND` + `pol.reset`) on return to `NORMAL`. `carpet.mode` diag
     events on transitions.
-  - **Still hardware-gated:** plumb body-X accel through `parse_imu_line`; tune
+  - Still hardware-gated: plumb body-X accel through `parse_imu_line`; tune
     `boost_below` / `carpet_below` / `enter_s` / `boost` on real carpet; tune
     `ZuptSpeedEstimator`'s `leak_hz` / `bias_lerp`.
-  - **Optional, better:** retrain the walk with `CARPET` domain-randomisation so
+  - Optional, better: retrain the walk with `CARPET` domain-randomisation so
     the RL policy itself handles pile (backlog H10 covers the carpet sysid);
     then `CARPET_GAIT` hand-off is only for deep pile.
 - [x] **Personality gestures** — `GesturePicker` is now driven by

@@ -64,10 +64,10 @@ corner clip is needed (no separate notch screw — see
 2026-09-16 that hardware in this exact spec is real and purchasable — not
 just assumed to exist:
 
-- **[800pc M2 Pan Head Self-Tapping Assortment (Amazon, `B0GV338JJK`)](https://www.amazon.com/800pcs-Self-Tapping-Head-Screws-Assortment/dp/B0GV338JJK)**: What it is: 100 pcs each of M2×4/5/6/8/10/12/16/20, carbon steel, nickel-plated; Covers the range?: **Best pick** — every length from 4–20mm in one kit, no guessing needed before test-fit
-- **[1200pc M2 Phillips Pan Head Self-Tapping Kit (Amazon, `B0146E9ZAQ`)](https://www.amazon.com/1200pcs-Phillips-Head-Tapping-Screws/dp/B0146E9ZAQ)**: What it is: Larger mixed-length box kit, same head/drive/thread type; Covers the range?: Alternative to the above if it's unavailable or a bigger box is wanted
-- **[uxcell 50pc M2×6mm Self-Tapping (Amazon, `B01M0DCPQ5`)](https://www.amazon.com/uxcell-Stainless-Phillips-Tapping-Screws/dp/B01M0DCPQ5)**: What it is: Single length only (M2×6), stainless; Covers the range?: Cheap way to test the shortest plausible length first, before committing to a full assortment
-- **[Misumi self-tapping pan-head line, part `CSPPNH02B-STN-M2-6`](https://us.misumi-ec.com/vona2/detail/221005018379/?HissuCode=CSPPNH02B-STN-M2-6)**: What it is: Individual/bulk order by exact part number, industrial supplier; Covers the range?: Useful if buying a precise single length later once test-fit confirms it, rather than a mixed assortment
+- [800pc M2 Pan Head Self-Tapping Assortment (Amazon, `B0GV338JJK`)](https://www.amazon.com/800pcs-Self-Tapping-Head-Screws-Assortment/dp/B0GV338JJK): What it is: 100 pcs each of M2×4/5/6/8/10/12/16/20, carbon steel, nickel-plated; Covers the range?: **Best pick** — every length from 4–20mm in one kit, no guessing needed before test-fit
+- [1200pc M2 Phillips Pan Head Self-Tapping Kit (Amazon, `B0146E9ZAQ`)](https://www.amazon.com/1200pcs-Phillips-Head-Tapping-Screws/dp/B0146E9ZAQ): What it is: Larger mixed-length box kit, same head/drive/thread type; Covers the range?: Alternative to the above if it's unavailable or a bigger box is wanted
+- [uxcell 50pc M2×6mm Self-Tapping (Amazon, `B01M0DCPQ5`)](https://www.amazon.com/uxcell-Stainless-Phillips-Tapping-Screws/dp/B01M0DCPQ5): What it is: Single length only (M2×6), stainless; Covers the range?: Cheap way to test the shortest plausible length first, before committing to a full assortment
+- [Misumi self-tapping pan-head line, part `CSPPNH02B-STN-M2-6`](https://us.misumi-ec.com/vona2/detail/221005018379/?HissuCode=CSPPNH02B-STN-M2-6): What it is: Individual/bulk order by exact part number, industrial supplier; Covers the range?: Useful if buying a precise single length later once test-fit confirms it, rather than a mixed assortment
 
 **Recommendation: buy the 800pc assortment kit first.** It's the only option
 that removes the length guess entirely — every candidate length (6, 8, 10,
@@ -90,7 +90,7 @@ boss pocket once the part is printed, before assuming pan-head is correct.
 replacement is designed yet.** Two things changed since "The mount,
 decided" (kept below, collapsed, for the record):
 
-1. **No corner of the Pi Zero 2W's top side is actually chip-free.** The
+1. No corner of the Pi Zero 2W's top side is actually chip-free. The
    back-edge-vs-header-edge debate below assumed the two short edges
    (microSD side, camera-connector side) were clear for a clip's edge-grip
    notch. A full top-down photo of the real board
@@ -178,12 +178,12 @@ at these lengths/speeds (UART over 20&ndash;30cm is no less reliable than
 over 5cm). Two real reasons to prefer the back edge over the near-header
 one, not just tidiness:
 
-1. **Head clearance.** Petoi's official BiBoard V1 wiring diagram confirms
+1. Head clearance: Petoi's official BiBoard V1 wiring diagram confirms
    the head-pan servo (joint 0) sits directly against BiBoard's header-side
    edge — mounting the clip + Pi/PiSugar stack there means building right
    next to an active servo and its own wiring. The back edge has no such
    neighbor.
-2. **Balance.** The RL sim (`opencat_gym_env.py`) already treats
+2. Balance: The RL sim (`opencat_gym_env.py`) already treats
    head-mounted mass as a separate, deliberately small budget —
    `HEAD_MASS_NOM` = 15g, vs. 61g for spine/body payload — because mass out
    at the head has an outsized effect on pitch inertia. Pi Zero 2W +
@@ -193,25 +193,25 @@ one, not just tidiness:
    a real outlier against it.
 
 **Preferred: the back edge** (away from the head, longer jumper wire).
-**Alternate:** the edge nearest BiBoard's header, with the standard-length
+Alternate: the edge nearest BiBoard's header, with the standard-length
 jumper, if the back edge doesn't fit the real corner spacing at test-fit.
 
 **How each clip attaches — settled model:**
-- **One screw (B) per corner**, running from the clip's boss down through
+- One screw (B) per corner: , running from the clip's boss down through
   the clip's base, through BiBoard, into the frame — reusing BiBoard's own
   corner screw point rather than an independent hole. Secures clip + BiBoard
   + frame together in one fastener. The clip's base isn't a passive
   registration surface — it's clamped down by this screw.
-- **No screw at the notch at all.** The Pi board is retained by the
+- No screw at the notch at all: The Pi board is retained by the
   combined inward clamp of the corner clips once each is screwed down —
   pressure from multiple directions, not friction from one notch and not a
   dedicated fastener.
-- **2 clips, not 4** — working theory, not yet confirmed. Given the Pi
+- 2 clips, not 4: working theory, not yet confirmed. Given the Pi
   Zero's small footprint against BiBoard's corner spacing, this setup may
   only need clips at 2 corners (the back edge above), not all 4 — the other
   2 of BiBoard's corners keep their normal screw with no clip at all.
 
-**Not yet decided:** whether the short-side spacing (30mm) actually matches
+Not yet decided: whether the short-side spacing (30mm) actually matches
 BiBoard's real corner-to-corner distance in either direction, any offset
 from the corner screw to better center the Pi, or whether 2-point clamping
 holds the board securely — all pending physically test-fitting the real
@@ -240,7 +240,7 @@ undecided.)
 
 Researched against the real board photos already in this doc, not just
 reasoned abstractly:
-- **Pi Zero 2 W** (the vendor's picture (pizero-overview, not included)/the vendor's picture (pizero-detail, not included) above): the
+- Pi Zero 2 W: (the vendor's picture (pizero-overview, not included)/the vendor's picture (pizero-detail, not included) above): the
   40-pin GPIO header runs along one **long edge**, spanning nearly the full
   65mm width — pins 6/8/10 (the ones wired) sit at that header's left
   end, next to the microSD slot. The **opposite long edge** is fully
@@ -250,7 +250,7 @@ reasoned abstractly:
   a clip's edge-grip slot. Both long edges have connectors in the way; the
   short-side pair is the one that's actually viable, not an open 50/50
   between short and long.
-- **BiBoard** (the vendor's picture (board-overview, not included)/the vendor's picture (header-detail, not included) above): the 5-pin
+- BiBoard: (the vendor's picture (board-overview, not included)/the vendor's picture (header-detail, not included) above): the 5-pin
   Pi header sits at BiBoard's top edge, and — from the zoomed photo —
   directly next to BiBoard's top-right corner mounting hole.
 - Combining both: the natural, shortest-wire layout (if mounting near the
@@ -271,7 +271,7 @@ yellow/blue frame). This directly overturned an earlier read in this doc:
 the clip is **not** pure snap-fit — one clip corner clearly shows a real
 chrome/silver screw head seated in a recessed pocket.
 
-- **Where the screw sits, geometrically confirmed:** the pocket is the
+- Where the screw sits, geometrically confirmed: the pocket is the
   rounded "bulge" feature between the clip's two surface grooves (previously
   read as a stress-relief fillet — it's doing double duty as a self-tapping
   screw boss, which is why the reference STL has **zero pre-drilled holes
@@ -279,7 +279,7 @@ chrome/silver screw head seated in a recessed pocket.
   original clip's geometry pins this boss to **z≈2.1–4.9 mm, peak at z≈3.5 mm**
   — the lower-middle of the clip's 7 mm height, not the base and not the top
   grip notch.
-- **Correction, same day: there are TWO of these bosses, not one.** The clip
+- Correction, same day: there are TWO of these bosses, not one. The clip
   has 3 comb-like fingers separated by 2 grooves — re-checking the geometry
   (cross-sectioning the actual mesh at fine z-steps, not just eyeballing a
   render) shows **both** grooves bulge into a boss at the same height
@@ -308,7 +308,7 @@ chrome/silver screw head seated in a recessed pocket.
   (0–0.9 mm) and very top (6.1–7 mm) caps. It's a sideways-opening (Y-axis)
   slot running nearly the part's whole height that the Pi board's edge
   slides into — not a small notch the board merely rests in near the top.
-- **Not a through-hole to the frame.** The clip's true bottom face (z=0) was
+- Not a through-hole to the frame: The clip's true bottom face (z=0) was
   separately confirmed flat and featureless across its entire footprint —
   nothing pokes below it anywhere in the mesh. So the boss screw doesn't
   reach the frame *through* the base — but it doesn't need to: the photo
@@ -330,7 +330,7 @@ chrome/silver screw head seated in a recessed pocket.
      so the boss sits close to the base again). But Screw C was never
      found: no photo evidence, no geometric feature at the notch, in either
      the original or rebuilt part.
-  3. **Current: one shared screw (B) + no screw at the notch.** Once the
+  3. Current: one shared screw (B) + no screw at the notch. Once the
      clip was rebuilt with the boss close to the base again, a screw running
      boss → base → BiBoard → frame is short again (no longer the ~20–24 mm
      problem — that was specific to the old, wrong bridge placement). This
@@ -341,11 +341,11 @@ chrome/silver screw head seated in a recessed pocket.
      the corner clips are screwed down, they squeeze the board inward from
      multiple sides simultaneously — the retention is distributed across
      the assembly, not concentrated at one point.
-  - **Still unconfirmed either way:** whether BiBoard's corner screw hole and
+  - Still unconfirmed either way: whether BiBoard's corner screw hole and
     the clip's boss are actually at the same X/Y position on the frame.
     Every argument above is about screw *length*, not physical *alignment* —
     that part is only settled by disassembling the real hardware.
-- **Size, measured from the same photo:** scaled against the clip's own
+- Size, measured from the same photo: scaled against the clip's own
   known width (9.0 mm, confirmed from the STL) as the reference, the screw
   head works out to **~3.3–3.8 mm diameter** — consistent with **M2**
   hardware (head ~3.5–4 mm), which also matches every other screw size
@@ -354,13 +354,13 @@ chrome/silver screw head seated in a recessed pocket.
   [Bittle Final Assembly manual](https://bittle.petoi.com/7-final-assembly)).
   Petoi's official docs don't cover this specific accessory's screw at all,
   so this is a photo-based estimate, not a published spec.
-  - **Length:** unpublished, still an estimate. **Screw B** now reaches
+  - Length: unpublished, still an estimate. **Screw B** now reaches
     boss → clip base → BiBoard PCB (~1.6 mm) → frame — short, roughly
     **M2×8–M2×10**, not the ~20–24 mm an earlier (superseded) model implied.
     No separate screw exists for the notch — there's no second length to
     estimate. Buy a small assortment (M2×6 through M2×12) rather than
     committing to one length until the real parts are in hand to test-fit.
-- **Practical recommendation:** determine the real length/function by
+- Practical recommendation: determine the real length/function by
   test-fit rather than by further photo analysis — this is the kind of
   thing that resolves itself in minutes once the physical clip and screw
   are in hand.
@@ -384,13 +384,13 @@ Standoff height and exact mounting-hole positions aren't published anywhere
 found, so the clearance and footprint alignment discussed here are the most
 defensible reading of the confirmed facts, not a measurement.
 
-**Geometric check:** downloaded and measured `Pi_StandOffRegular.stl`
+Geometric check: downloaded and measured `Pi_StandOffRegular.stl`
 directly. It's not one platform — it's **four identical small corner
 clips**, each only **~5-7 mm tall**. That's the confirmed stock standoff
 height. Confirmed identical, not just visually similar: split the mesh by
 connected component and got exactly 4 separate watertight solids, same
 vertex/face count, same 17.70×9.00×7.00 mm bounding box, same volume each.
-**Important caveat on their arrangement:** the 4 clips' relative positions
+Important caveat on their arrangement: the 4 clips' relative positions
 *inside the STL file* are almost certainly just a print-bed layout (4
 copies grouped for efficient printing), **not their real installed spacing
 on the frame** — there's no way to read "does this reach all 4 corners of a
@@ -408,13 +408,13 @@ spec anywhere found, and 5-7 mm reads as shallow for a slim UPS board plus a
 stacked LiPo pouch cell. Four mitigations were on the table, before option 3
 was chosen and built:
 
-1. **Stack a second set of the same printed clips** to roughly double the
+1. Stack a second set of the same printed clips to roughly double the
    standoff height (~10-14 mm instead of ~5-7 mm). Plausible, cheapest to
    try (just print two sets instead of one), but unconfirmed whether the
    clips are actually designed to stack — would need inspecting whether a
    clip's top surface is a valid mounting face for a second one's base
    before assuming it works.
-2. **Relocate PiSugar off to the side** instead of directly under the Pi,
+2. Relocate PiSugar off to the side: instead of directly under the Pi,
    connected by extending its two pogo pins with soldered wire leads (a
    documented general pogo-pin technique — pogo pins have a solder cup on
    the back for exactly this) rather than direct stacked contact. Fully
@@ -430,7 +430,7 @@ was chosen and built:
    the mount ends up on only 2 of the 4 header holes rather than 4 — a
    real, independently reported instance of the "does the Zero's hole
    pattern actually work here" concern this doc already carries elsewhere.
-3. **Get the clip itself redesigned** with more built-in clearance for
+3. Get the clip itself redesigned: with more built-in clearance for
    PiSugar — the path actually taken, detailed below.
 4. **Fallback, not pursued unless option 3 fails at test-fit: swap to a
    generic Pi Zero adapter plate instead of Petoi's edge-grip clip design.**
@@ -509,11 +509,11 @@ measurement.** The agreed steps:
    against real PiSugar hardware yet.
 
 **Build history:**
-- **v1 (superseded same day it was built):** spliced the bridge at
+- v1 (superseded same day it was built): spliced the bridge at
   z≈1.2–2.2 mm, below the screw boss. Wrong — this shifted the boss ~13 mm
   away from the frame along with everything above the cut, and the boss's
   job is to anchor to the frame, so its reach can't change.
-- **v2:** splices at z≈5.1 mm instead — just above where the boss's bulge
+- v2: splices at z≈5.1 mm instead — just above where the boss's bulge
   fully subsides and clearly below the top notch/cap — verified by
   re-measuring the rebuilt mesh directly: the boss peaks at z≈3.5 mm in the
   new file too, i.e. unshifted, at its original distance from the base. The
@@ -522,13 +522,13 @@ measurement.** The agreed steps:
   moves up with it. Built with N=13mm at this stage — PiSugar was measured
   alone at 5/8&Prime; (15.875 mm) and 13mm was picked as a round working
   margin, but never actually checked against that number.
-- **N=13mm found undersized:** doing that check, PiSugar's own thickness
+- N=13mm found undersized: doing that check, PiSugar's own thickness
   (15.875 mm) already exceeded the 13 mm bridge by itself, before the Pi
   board (~1.5 mm typical PCB thickness, unconfirmed for this unit) or the
   TX/RX/GND wiring clearance were even added. Corrected budget: 15.875 +
   1.5 + ~2mm wiring/fit allowance = ~19.4mm needed above the base+boss,
   minus the 1.9mm the notch/cap already contributes → **~17.5mm bridge**.
-- **v3 built — `Pi_StandOffRegular_extended17.5mm.stl`, N=17.5mm.** Built by
+- v3 built — `Pi_StandOffRegular_extended17.5mm.stl`, N=17.5mm: Built by
   extending v2 rather than rebuilding from scratch — same pipeline, spliced
   4.5mm additional material at z≈18.0mm (safely inside the
   confirmed-constant bridge cross-section, before the notch/cap transition
@@ -554,7 +554,7 @@ measurement.** The agreed steps:
   (matches the copy on the user's Desktop, checksums verified identical).
   v3, v2, and v1 all stay in the repo too, marked superseded, not deleted —
   kept for the record now that a confirmed version exists.
-- **This is the version to print.** The cover file is still **not
+- This is the version to print: The cover file is still **not
   started** — the user also measured the full stack including the header
   (1″/25.4mm), which is the number the cover needs (it has to enclose
   everything, not just grip the board edge like the clip does) — but the
@@ -605,7 +605,7 @@ reasoned as follows:
 - PiSugar's own documentation confirms it mounts **under** the Pi and contacts
   two dedicated pads, never the GPIO header — so the header stays free on top,
   the Pi doesn't need to be flipped.
-- **Pi Zero 2 W and PiSugar S are both a confirmed 65 × 30 mm** — identical
+- Pi Zero 2 W and PiSugar S are both a confirmed 65 × 30 mm — identical
   footprints, which is why they're drawn as one overlaid shape below.
   **BiBoard measures ~68 × 59 mm**, estimated from its photo using the USB-C
   connector's standardized shell width (~8.7 mm) as a scale reference — Petoi

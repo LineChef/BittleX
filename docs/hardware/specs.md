@@ -8,15 +8,15 @@ open items on the bench once the parts are in hand.
 
 ## BiBoard V1 (the controller in Bittle X V2)
 
-- **MCU**: ESP32-U4WDH (Xtensa dual-core LX6), via an ESP32-MINI-1 module
-- **SRAM / ROM / Flash**: 520 KB / 448 KB / **4 MB**
-- **IMU**: **6-axis ICM42670 on G2's board** (the firmware supports the MPU6050 too; confirmed `ICM:` on G2, 2026-09-20) — 3-axis gyro + 3-axis accel
-- **Servo drive**: 12 PWM channels (position PWM)
-- **Grove sockets**: 4, typed: G1 = UART2, G2 = I²C, G3/G4 = analog in
-- **Input / operating voltage**: 7–9 V in, 5 V operating, 0.1–0.2 A board draw
-- **Radios**: Wi-Fi 802.11 b/g/n, Bluetooth 4.2 BR/EDR + BLE
-- **Pi port**: 5-pin socket, officially "Raspberry Pi 3A+, 4, 5"
-- **Extras**: onboard **offline voice-recognition module** (bilingual, multi-word), onboard **speaker**, capacitive touch socket, CH343P USB-serial, BOOT/Reset buttons
+- MCU: ESP32-U4WDH (Xtensa dual-core LX6), via an ESP32-MINI-1 module
+- SRAM / ROM / Flash: 520 KB / 448 KB / **4 MB**
+- IMU: **6-axis ICM42670 on G2's board** (the firmware supports the MPU6050 too; confirmed `ICM:` on G2, 2026-09-20) — 3-axis gyro + 3-axis accel
+- Servo drive: 12 PWM channels (position PWM)
+- Grove sockets: 4, typed: G1 = UART2, G2 = I²C, G3/G4 = analog in
+- Input / operating voltage: 7–9 V in, 5 V operating, 0.1–0.2 A board draw
+- Radios: Wi-Fi 802.11 b/g/n, Bluetooth 4.2 BR/EDR + BLE
+- Pi port: 5-pin socket, officially "Raspberry Pi 3A+, 4, 5"
+- Extras: onboard **offline voice-recognition module** (bilingual, multi-word), onboard **speaker**, capacitive touch socket, CH343P USB-serial, BOOT/Reset buttons
 
 - → **The IMU has no magnetometer.** There is no absolute heading reference on the
   real robot — yaw is integrated from the gyro and drifts over
@@ -38,12 +38,12 @@ open items on the bench once the parts are in hand.
 
 ## P1S alloy servos (×9: 8 legs + 1 neck)
 
-- **Torque**: ~3 kg·cm (~0.29 N·m) peak
-- **Speed**: ~0.07 s / 60° (~14 rad/s no-load)
-- **Range**: 270° controllable
-- **Voltage**: 8.4 V compatible
-- **Build**: coreless motor, alloy gears, ball bearing; "100+ h" life
-- **Protection**: electronic overheat cutback
+- Torque: ~3 kg·cm (~0.29 N·m) peak
+- Speed: ~0.07 s / 60° (~14 rad/s no-load)
+- Range: 270° controllable
+- Voltage: 8.4 V compatible
+- Build: coreless motor, alloy gears, ball bearing; "100+ h" life
+- Protection: electronic overheat cutback
 
 - → Sim uses ~0.2 N·m effective — reasonable vs the 0.29 N·m peak (peak ≠
   continuous).
@@ -129,19 +129,19 @@ these parts, so figures are: measured reference weights where known, LiPo mass
 from energy density, bare-PCB mass from board area. **Re-weigh the real stack on
 assembly and set the sim to that.**
 
-- **Raspberry Pi Zero 2 W (bare)**: Est.: 10 g; Confidence: high; Basis: RPi / vendor listings, 65×30 mm
-- **40-pin header (WH variant)**: Est.: 4 g; Confidence: med; Basis: 2×20 male header stock weight
-- **~~Heatsink (WH kit)~~**: Est.: 0 g; Confidence: —; Basis: NOT fitted — see pi-set-up.md §6b; install only if the Pi throttles (likely Phase 8, not the gait loop)
-- **microSD**: Est.: 0.4 g; Confidence: high; Basis: —
-- **PiSugar S board (PCB only)**: Est.: 10 g; Confidence: low; Basis: 65×30 mm 2-layer + pogo pins + charge IC
-- **PiSugar S 1200 mAh LiPo cell**: Est.: 23 g; Confidence: med; Basis: 4.44 Wh ÷ ~190 Wh/kg
-- **Serial wiring (RX/TX/GND, data-only)**: Est.: 4 g; Confidence: low; Basis: 3 short Dupont jumpers
-- **Mount — Petoi back-cover-with-Pi-hole (PLA)**: Est.: 10 g; Confidence: low; Basis: standard Bittle cover mass; design-dependent
-- **Config A — gait bring-up, no camera**: Est.: **~61 g**; Basis: Phase 6, the next hardware milestone
-- **Petoi AI Vision module (Grove Vision AI V2)**: Est.: 5 g; Confidence: med; Basis: Grove-sized MCU board
-- **OV5647 CSI camera + FPC ribbon**: Est.: 4 g; Confidence: high; Basis: known RPi-cam-clone weight
-- **Petoi camera case + Grove cable**: Est.: 6 g; Confidence: low; Basis: 47×31×15 mm ABS shell + cable
-- **Config B — full companion, camera on**: Est.: **~78 g**; Basis: Phase 8+
+- Raspberry Pi Zero 2 W (bare): Est.: 10 g; Confidence: high; Basis: RPi / vendor listings, 65×30 mm
+- 40-pin header (WH variant): Est.: 4 g; Confidence: med; Basis: 2×20 male header stock weight
+- ~~Heatsink (WH kit)~~: Est.: 0 g; Confidence: —; Basis: NOT fitted — see pi-set-up.md §6b; install only if the Pi throttles (likely Phase 8, not the gait loop)
+- microSD: Est.: 0.4 g; Confidence: high; Basis: —
+- PiSugar S board (PCB only): Est.: 10 g; Confidence: low; Basis: 65×30 mm 2-layer + pogo pins + charge IC
+- PiSugar S 1200 mAh LiPo cell: Est.: 23 g; Confidence: med; Basis: 4.44 Wh ÷ ~190 Wh/kg
+- Serial wiring (RX/TX/GND, data-only): Est.: 4 g; Confidence: low; Basis: 3 short Dupont jumpers
+- Mount — Petoi back-cover-with-Pi-hole (PLA): Est.: 10 g; Confidence: low; Basis: standard Bittle cover mass; design-dependent
+- Config A — gait bring-up, no camera: Est.: **~61 g**; Basis: Phase 6, the next hardware milestone
+- Petoi AI Vision module (Grove Vision AI V2): Est.: 5 g; Confidence: med; Basis: Grove-sized MCU board
+- OV5647 CSI camera + FPC ribbon: Est.: 4 g; Confidence: high; Basis: known RPi-cam-clone weight
+- Petoi camera case + Grove cable: Est.: 6 g; Confidence: low; Basis: 47×31×15 mm ABS shell + cable
+- Config B — full companion, camera on: Est.: **~78 g**; Basis: Phase 8+
 
 Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
 
@@ -170,15 +170,15 @@ Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
 
 One measurement, the rest assumed. **Do not look these up again; re-weigh and edit this table if anything changes.**
 
-- **Whole G2** with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
-- **Base robot (Bittle X V2, alloy servos, battery)**: Mass: about 301 g (superseded: 254 g, see the 2026-10-15 section below); Basis: assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare.; In the sim (`PAYLOAD_PROFILE=case`): URDF links
-- **Camera cluster (Grove Vision AI V2 + OV5647 + case + cable)**: Mass: 15 g; Basis: estimate; Seeed publishes no weight for the module; In the sim (`PAYLOAD_PROFILE=case`): front body at (0.055, 0, 0.020) m, 15 +/- 5 g
-- **Speaker + amp (NS4168 kit)**: Mass: 20 g; Basis: estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit; In the sim (`PAYLOAD_PROFILE=case`): rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g
-- **Spine block: Pi Zero 2 W, PiSugar S + cell, case, microphone (on the lid), wiring**: Mass: 86 g; Basis: derived: 422 - 301 - 15 - 20; In the sim (`PAYLOAD_PROFILE=case`): spine body at (-0.022, 0, 0.025) m, 86 +/- 20 g
+- Whole G2: with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
+- Base robot (Bittle X V2, alloy servos, battery): Mass: about 301 g (superseded: 254 g, see the 2026-10-15 section below); Basis: assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare.; In the sim (`PAYLOAD_PROFILE=case`): URDF links
+- Camera cluster (Grove Vision AI V2 + OV5647 + case + cable): Mass: 15 g; Basis: estimate; Seeed publishes no weight for the module; In the sim (`PAYLOAD_PROFILE=case`): front body at (0.055, 0, 0.020) m, 15 +/- 5 g
+- Speaker + amp (NS4168 kit): Mass: 20 g; Basis: estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit; In the sim (`PAYLOAD_PROFILE=case`): rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g
+- Spine block: Pi Zero 2 W, PiSugar S + cell, case, microphone (on the lid), wiring: Mass: 86 g; Basis: derived: 422 - 301 - 15 - 20; In the sim (`PAYLOAD_PROFILE=case`): spine body at (-0.022, 0, 0.025) m, 86 +/- 20 g
 
 All of it is attached to the case, which sits on the middle of the spine: camera at the front, speaker at the very back, microphone on top of the lid.
 
-**Superseded mount:** the weights and positions in this section and the one above were measured with the previous case (PiSugar's case velcroed on a modified cover).
+Superseded mount: the weights and positions in this section and the one above were measured with the previous case (PiSugar's case velcroed on a modified cover).
 
 G2 now carries the Bittle X Pi add-on, whose design figure is 135 g with the electronics and a center of mass 9.0 mm from the robot center ([`../../blueprints/mounting.md`](../../blueprints/mounting.md)). The camera is now on top of the pod, the microphone on its right wall near the front, the speaker at the rear. The payload was weighed at 185 g (was 168 g, +17 g or about 10%).
 
@@ -201,14 +201,14 @@ weights. The base robot is **254 g**, from the weighed total (422 g) minus the
 weighed payload (168 g). This supersedes the 301 g base assumed in the table
 above.
 
-- **Printed (PLA, about 50% of solid volume)**: Parts: cover 5.5 g, body 16.0 g, panel 6.7 g, switch 0.1 g; Mass: 28.3 g; Confidence: low (solid would be 56.6 g)
-- **Pi and PiSugar**: Parts: Pi Zero 2 W 10.0 g, header, pins and housings 5.0 g, microSD 0.4 g, PiSugar board 10.0 g, 1200 mAh cell with seal and leads 23.5 g; Mass: 48.9 g; Confidence: medium
-- **Audio**: Parts: speaker 14.0 g, amp 5.0 g, mic 1.3 g; Mass: 20.3 g; Confidence: low
-- **Wires**: Parts: UART 2.4 g, amp 4.0 g, mic 4.8 g, speaker 1.0 g, splices and BiBoard header plug 1.0 g; Mass: 13.2 g; Confidence: low
-- **Add-on from the viewer model**: Mass: **110.7 g**
-- **Camera (not in the viewer model; G2's current mast)**: Mass: 15.0 g; Confidence: estimate
-- **Stock robot**: Mass: 254.0 g; Confidence: weighed
-- **Proposed total**: Mass: **379.7 g** (current G2: 422 g)
+- Printed (PLA, about 50% of solid volume): Parts: cover 5.5 g, body 16.0 g, panel 6.7 g, switch 0.1 g; Mass: 28.3 g; Confidence: low (solid would be 56.6 g)
+- Pi and PiSugar: Parts: Pi Zero 2 W 10.0 g, header, pins and housings 5.0 g, microSD 0.4 g, PiSugar board 10.0 g, 1200 mAh cell with seal and leads 23.5 g; Mass: 48.9 g; Confidence: medium
+- Audio: Parts: speaker 14.0 g, amp 5.0 g, mic 1.3 g; Mass: 20.3 g; Confidence: low
+- Wires: Parts: UART 2.4 g, amp 4.0 g, mic 4.8 g, speaker 1.0 g, splices and BiBoard header plug 1.0 g; Mass: 13.2 g; Confidence: low
+- Add-on from the viewer model: Mass: **110.7 g**
+- Camera (not in the viewer model; G2's current mast): Mass: 15.0 g; Confidence: estimate
+- Stock robot: Mass: 254.0 g; Confidence: weighed
+- Proposed total: Mass: **379.7 g** (current G2: 422 g)
 
 The heatsink drawn in the viewer is left out (not fitted on G2).
 
@@ -218,10 +218,10 @@ The heatsink drawn in the viewer is left out (not fitted on G2).
 masses over the paw positions at the reset stance, as in
 `test_v3_levers.py::test_the_sim_carries_the_weighed_mass_and_front_rear_balance`):
 
-- **Bare robot**: Front share: 44.2%; Total: 254 g
-- **Current G2**: Front share: 46.6% (real weighings: 44.9% and 47.3%); Total: 422 g
-- **Proposed with camera**: Front share: **46.4%**; Total: 380 g
-- **Proposed without camera**: Front share: 44.1%; Total: 365 g
+- Bare robot: Front share: 44.2%; Total: 254 g
+- Current G2: Front share: 46.6% (real weighings: 44.9% and 47.3%); Total: 422 g
+- Proposed with camera: Front share: **46.4%**; Total: 380 g
+- Proposed without camera: Front share: 44.1%; Total: 365 g
 
 Best estimate for the proposed build: about 46% on the front paws, plausible
 range 44 to 49%, center of mass about 0.16 in (4 mm) behind the paw midpoint,
@@ -231,7 +231,7 @@ the AI head (42 g) in place of the camera gives 51.1%; 10 g more at the nose
 gives 49.0%; 20 g more printed mass gives 46.5%; the spine block 0.4 in (10 mm)
 further forward gives 48.7%.
 
-**Sim blocks used:** spine 96.7 g at 0.15 in (3.9 mm) behind, 0.03 in (0.7 mm)
+Sim blocks used: spine 96.7 g at 0.15 in (3.9 mm) behind, 0.03 in (0.7 mm)
 left of and 1.65 in (41.8 mm) above the hip midpoint; speaker 14 g at 1.8 in
 (45.6 mm) behind and 1.7 in (43 mm) above; camera 15 g at 2.2 in (55 mm) ahead
 and 0.8 in (20 mm) above.
@@ -246,16 +246,16 @@ proposed with camera 32 and 33, proposed without camera 28 and 26. The paired
 difference between proposed and current is not significant (McNemar p about
 0.33 and 0.71). All sim; no real-robot comparison.
 
-**To tighten it:** weigh G2 again on a level scale, balance the bare robot on
+To tighten it: weigh G2 again on a level scale, balance the bare robot on
 an edge, and weigh the printed parts and the cell once they exist.
 
 ## Bittle X body + battery
 
-- **Joints**: 9 servo DOF (2/leg + 1 neck); **no roll-axis joint**
-- **Size / weight**: 190 × 153 × 107 mm standing / 269–353 g
-- **Battery**: 7.4 V 1000 mAh 2S Li-ion, 2 A typ. / **5 A peak** draw
-- **Runtime / charge**: ~1 h walking / 1.5 h charge; **charger not included** (USB 5 V 1 A)
-- **Top speed**: ~2 body lengths/s (~0.38 m/s)
+- Joints: 9 servo DOF (2/leg + 1 neck); **no roll-axis joint**
+- Size / weight: 190 × 153 × 107 mm standing / 269–353 g
+- Battery: 7.4 V 1000 mAh 2S Li-ion, 2 A typ. / **5 A peak** draw
+- Runtime / charge: ~1 h walking / 1.5 h charge; **charger not included** (USB 5 V 1 A)
+- Top speed: ~2 body lengths/s (~0.38 m/s)
 
 - → The **5 A peak** servo-stall spike is exactly what the separate-Pi-power
   decision protects against (see [`pi-power.md`](pi-power.md)).
@@ -266,15 +266,15 @@ an edge, and weigh the printed parts and the cell once they exist.
 
 ## Petoi AI Vision Camera Module (Seeed Grove Vision AI V2)
 
-- **Processor**: Himax WiseEye2 HX6538 — dual-core Arm Cortex-M55 + Ethos-U55 NPU (64–512 GOP/s)
-- **Camera**: OV5647 CSI (Raspberry Pi cam), 62° FOV recommended; other CSI cams may render green-only
-- **Model input**: **192 × 192**
-- **Object detection**: ~10–30 FPS (~76 ms YOLOv8n); ~0.35 W
-- **On-device models**: YOLOv8, YOLOv5, MobileNet V1/V2, EfficientNet-lite
-- **Host link**: I²C (addr `0x62`) or UART for results; **raw images over USB-serial only**
-- **Outputs**: `boxes` (x,y,w,h,score,target — centre + size in model px), `classes` (target+score), `points` (x,y + **relative** z, score, target), `perf` (pre/inference/post ms)
-- **Extras**: onboard PDM microphone, SD-card slot
-- **Camera mode toggle (BiBoard)**: serial `XC` on / `Xc` off (mobile-app codes `X67` / `X99`)
+- Processor: Himax WiseEye2 HX6538 — dual-core Arm Cortex-M55 + Ethos-U55 NPU (64–512 GOP/s)
+- Camera: OV5647 CSI (Raspberry Pi cam), 62° FOV recommended; other CSI cams may render green-only
+- Model input: **192 × 192**
+- Object detection: ~10–30 FPS (~76 ms YOLOv8n); ~0.35 W
+- On-device models: YOLOv8, YOLOv5, MobileNet V1/V2, EfficientNet-lite
+- Host link: I²C (addr `0x62`) or UART for results; **raw images over USB-serial only**
+- Outputs: `boxes` (x,y,w,h,score,target — centre + size in model px), `classes` (target+score), `points` (x,y + **relative** z, score, target), `perf` (pre/inference/post ms)
+- Extras: onboard PDM microphone, SD-card slot
+- Camera mode toggle (BiBoard): serial `XC` on / `Xc` off (mobile-app codes `X67` / `X99`)
 
 - → **Detections OR the live frame — never both at once** (Seeed's own FAQ). A
   host consuming the detection stream cannot also pull raw frames. This affects
@@ -302,11 +302,11 @@ an edge, and weigh the printed parts and the cell once they exist.
 
 ## Raspberry Pi Zero 2 W
 
-- **SoC**: RP3A0 SiP — quad-core Arm Cortex-A53 @ 1 GHz (64-bit)
-- **RAM**: **512 MB** LPDDR2
-- **Radios**: 2.4 GHz Wi-Fi b/g/n, BT 4.2 + BLE
-- **I/O**: microSD, mini-HDMI, micro-USB OTG, CSI-2 camera, unpopulated 40-pin header
-- **Lifecycle**: in production until at least Jan 2030
+- SoC: RP3A0 SiP — quad-core Arm Cortex-A53 @ 1 GHz (64-bit)
+- RAM: **512 MB** LPDDR2
+- Radios: 2.4 GHz Wi-Fi b/g/n, BT 4.2 + BLE
+- I/O: microSD, mini-HDMI, micro-USB OTG, CSI-2 camera, unpopulated 40-pin header
+- Lifecycle: in production until at least Jan 2030
 
 - → **512 MB RAM is the hard ceiling** for anything on-Pi — local Whisper/VLM are
   borderline-to-infeasible (matches the pidog-embodiment benchmarks noted in
@@ -341,11 +341,11 @@ open-Q answers in [`pi-bring-up.md`](../guides/pi-bring-up.md)):**
 
 ## PiSugar S 1200 mAh
 
-- **Output**: 5 V / 2 A max
-- **Battery**: 1200 mAh single-cell (4.2 V max), USB-C charge
-- **Mode**: true pass-through (charge + discharge together), physical disconnect switch
-- **Pi support**: Pi Zero 2 (W/WH) officially listed
-- **Comms**: **none — hardware only**
+- Output: 5 V / 2 A max
+- Battery: 1200 mAh single-cell (4.2 V max), USB-C charge
+- Mode: true pass-through (charge + discharge together), physical disconnect switch
+- Pi support: Pi Zero 2 (W/WH) officially listed
+- Comms: **none — hardware only**
 
 - → **No I²C, no battery-percentage readout, no power query.** Per PiSugar's own
   docs the **S** series "does not support I²C communication... can only detect

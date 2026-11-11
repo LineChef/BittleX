@@ -1,25 +1,25 @@
 # Self-righting after a fall
 
-**Status:** G2 can flip himself back over from fully on his back. This was confirmed on G2 on 2026-09-28, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for the hardware.
+Status: G2 can flip himself back over from fully on his back. This was confirmed on G2 on 2026-09-28, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for the hardware.
 
 ## How it works (firmware)
 
 Read from the OpenCat source (`PetoiCamp/OpenCat` `InstinctBittle.h`, `OpenCatEsp32` `reaction.h`):
 
-- **`rc`** is the recover skill: a 4-frame keyframe skill that drives the shoulders to about −88° and the knees to about +100° to throw the body over, then settles to a low crouch. Serial token `krc`.
-- **`rl`** is a roll-over maneuver (back to belly): 6 frames. Serial token `krl`.
+- `rc`: is the recover skill: a 4-frame keyframe skill that drives the shoulders to about −88° and the knees to about +100° to throw the body over, then settles to a low crouch. Serial token `krc`.
+- `rl`: is a roll-over maneuver (back to belly): 6 frames. Serial token `krl`.
 - Other stock recovery poses: `lnd` (landing), `knock`, `dropRec`, `lifted` and `dropped`.
-- **The trigger is the IMU, not the infrared remote** (which Bittle X V2 does not support). While gyro balance is on, `dealWithExceptions()` watches for `IMU_EXCEPTION_FLIPPED` (past about 85° of tilt), plays a fall sound and loads `rc`.
+- The trigger is the IMU, not the infrared remote (which Bittle X V2 does not support). While gyro balance is on, `dealWithExceptions()` watches for `IMU_EXCEPTION_FLIPPED` (past about 85° of tilt), plays a fall sound and loads `rc`.
 - A scripted **push reflex** (`IMU_EXCEPTION_PUSHED`) sidesteps or steps back after a shove, and `IMU_EXCEPTION_OFFDIRECTION` turns in place to correct heading drift.
 
 More detail on the firmware path: [`petoi-firmware-reference.md`](petoi-firmware-reference.md).
 
 ## Limits
 
-- **Speed:** self-righting is disabled for fast gaits such as trot, because the robot no longer knows it is flipped, so a fall at speed may not trigger it.
-- **The push reflex only fires while standing**, not during a walking gait. A stumble mid-walk is not covered by the firmware; the learned mid-gait catch is complementary.
-- **With the Pi in the loop:** `pi_pipeline`'s `RecoveryFSM` (`link/recovery.py`) has flags marked hardware-gated for a possible conflict with the firmware's own flip-triggered `rc`. It is built and tested but not wired in, so today the firmware handles recovery on its own. Retest self-righting with the Pi connected before wiring the FSM in.
-- **The simulation cannot show it.** Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model). Judge self-righting on the robot, not in the sim.
+- Speed: self-righting is disabled for fast gaits such as trot, because the robot no longer knows it is flipped, so a fall at speed may not trigger it.
+- The push reflex only fires while standing: , not during a walking gait. A stumble mid-walk is not covered by the firmware; the learned mid-gait catch is complementary.
+- With the Pi in the loop: `pi_pipeline`'s `RecoveryFSM` (`link/recovery.py`) has flags marked hardware-gated for a possible conflict with the firmware's own flip-triggered `rc`. It is built and tested but not wired in, so today the firmware handles recovery on its own. Retest self-righting with the Pi connected before wiring the FSM in.
+- The simulation cannot show it: Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model). Judge self-righting on the robot, not in the sim.
 
 ## Testing the get-up moves on the pod payload
 
@@ -37,8 +37,8 @@ Place him on his side by hand first, on the floor, hands near; never on his back
 
 **Results (pod + AI head payload, paused; resume later):**
 
-- **1**: Move: `rc` (firmware); Side: right (roll about 108 deg); Balance: on; Result: not up: the body rose about 20 deg toward vertical for under a second, then fell back
-- **2**: Move: `s_rl_rc` (streamed, head pinned, 1 s per keyframe); Side: left (roll about -99 deg); Balance: off; Result: not up: roll did not change at all in 21 s (not yet known whether the legs moved)
+- 1: Move: `rc` (firmware); Side: right (roll about 108 deg); Balance: on; Result: not up: the body rose about 20 deg toward vertical for under a second, then fell back
+- 2: Move: `s_rl_rc` (streamed, head pinned, 1 s per keyframe); Side: left (roll about -99 deg); Balance: off; Result: not up: roll did not change at all in 21 s (not yet known whether the legs moved)
 
 Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg and tilt 40 deg, into the legs' path with the AI head on; `rc` keeps the head straight for its flipping frames. Next when testing resumes: confirm whether the legs moved in test 2; then `s_rc --frame-s 0.4` (momentum), the firmware `rc` from the left side, and if none works, hand-guided teaching of a side roll (`gait/teach.py`).
 
@@ -50,11 +50,11 @@ Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg a
 
 ## History of this page
 
-- **Early research:** the stock self-right was believed to be narrow: disabled for fast gaits, and one community project reported it does not self-right from a supine fall.
-- **Simulation (Run 6):** an RL policy that drives only the 8 walking joints did not learn to right the robot from a full tip-over (0% recovered). That is a simulation result: episodes ended at about 74° of tilt, below the firmware's 85° flip line, so the policy never saw the flipped state, and the scripted keyframes were not available as an action.
-- **Correction:** a real Bittle X was observed flipping itself back over from its back, so the earlier framing was a simulation gap, not a physical limit.
-- **Confirmation on G2:** done on the project's own unit, as above.
-- **Literature:** most learned fall-recovery work is on robots with hip abduction (a roll joint), which Bittle lacks, so the self-righting half does not transfer. What does transfer is treating recovery as a separate skill with a switch, trained against harsh disturbances.
+- Early research: the stock self-right was believed to be narrow: disabled for fast gaits, and one community project reported it does not self-right from a supine fall.
+- Simulation (Run 6): an RL policy that drives only the 8 walking joints did not learn to right the robot from a full tip-over (0% recovered). That is a simulation result: episodes ended at about 74° of tilt, below the firmware's 85° flip line, so the policy never saw the flipped state, and the scripted keyframes were not available as an action.
+- Correction: a real Bittle X was observed flipping itself back over from its back, so the earlier framing was a simulation gap, not a physical limit.
+- Confirmation on G2: done on the project's own unit, as above.
+- Literature: most learned fall-recovery work is on robots with hip abduction (a roll joint), which Bittle lacks, so the self-righting half does not transfer. What does transfer is treating recovery as a separate skill with a switch, trained against harsh disturbances.
 
 ## Sources
 - Petoi Bittle product page and Doc Center (remote controller, balance and recovery behavior, the BiBoard V1 remote incompatibility).

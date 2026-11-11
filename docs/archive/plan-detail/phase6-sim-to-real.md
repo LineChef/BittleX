@@ -25,7 +25,7 @@ remaining work is hardware-gated.** Full plan + state: `docs/guides/gait-deploym
       hardware-validation pending:**
   - `pi_pipeline/gait/thermal_guard.py` — servo thermal guard on `run_gait.py`.
     Estimates per-joint heat from commanded motion (no P1S sensor).
-    **Layer 1+2 done 2026-09-10:** 3-tier per-joint indicator (`ThermalTier`
+    Layer 1+2 done 2026-09-10: 3-tier per-joint indicator (`ThermalTier`
     GREEN/AMBER/RED at 50/85 % of trip) + per-joint spoken warning; new
     `behavior/thermal_governor.py` (`ThermalGovernor`) — AMBER throttles
     speed + softens gait, RED holds a folded cooldown pose. All constants
@@ -62,7 +62,7 @@ remaining work is hardware-gated.** Full plan + state: `docs/guides/gait-deploym
       signs) → `--cmd` (learned gait) → the H1 head-to-head vs firmware `kwkF`.
 - The older `ger01d/opencat-gym-sim2real` firmware path is **not used** — the
   stock OpenCat `i` command + `gP` IMU stream carry the loop; no firmware flash.
-- **No firmware fork (decided 2026-09-10).** `pi_pipeline` stays an application
+- No firmware fork (decided 2026-09-10): `pi_pipeline` stays an application
   layer on **stock** OpenCatEsp32 over serial — that already exposes the
   keyframe library, gyro-balance, IMU exception reflexes, and calibration. New
   skills go via Skill Composer ("Newbility" slots), not a rebuild. Fork only

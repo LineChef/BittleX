@@ -37,12 +37,12 @@ Robots manufactured after 2022 (which covers Bittle X V2) will boot
 directly into calibration mode if powered on while tilted onto one side.
 This is one of five ways into calibration mode:
 
-1. **Boot gesture** — long-press the battery button while the robot is
+1. Boot gesture: long-press the battery button while the robot is
    tilted "one side up."
-2. **Petoi mobile app** — calibration panel, needs the app paired first.
-3. **Petoi Desktop App** — "Joint Calibrator" button.
-4. **Arduino IDE serial monitor** — type `c` and send.
-5. **IR remote** — row 3, column 3 (Bittle X V2 / BiBoard V1 has **no** IR
+2. Petoi mobile app: calibration panel, needs the app paired first.
+3. Petoi Desktop App: "Joint Calibrator" button.
+4. Arduino IDE serial monitor: type `c` and send.
+5. IR remote: row 3, column 3 (Bittle X V2 / BiBoard V1 has **no** IR
    receiver per `hardware/self-righting.md`, so this one's not available to
    this project).
 
@@ -88,10 +88,10 @@ before touching wiring, serial config, or firmware.
 
 ## 6. Two small mechanical notes worth having on hand at assembly time
 
-- **Neck cable routing**: route the neck cable from the knee side toward
+- Neck cable routing: route the neck cable from the knee side toward
   the shoulder side when reassembling/servicing — routing it the other way
   risks pinching against the frame during head movement.
-- **Silicone toe covers**: leave them off for normal indoor walking/testing
+- Silicone toe covers: leave them off for normal indoor walking/testing
   — they're for extra grip on specific slick-surface tasks, and otherwise
   amplify surface irregularities (more stumbles on uneven carpet, not
   fewer). Relevant directly to the still-open carpet-mode work

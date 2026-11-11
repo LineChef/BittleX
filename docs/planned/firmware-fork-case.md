@@ -7,30 +7,30 @@ the walk log ([`../rl/real-walk-log.md`](../rl/real-walk-log.md)) and a read of 
 
 ## Which fork
 
-- **OpenCatEsp32** — the BiBoard firmware that runs G2's servos, IMU and serial protocol: Licence: MIT; Status: public; Petoi ships frequent releases (G2 runs B10_260527)
-- **The AI Head's firmware** — XiaoZhi-based, on the head's ESP32-C3: Licence: upstream xiaozhi-esp32 is MIT; Petoi's head build is not released yet; Status: a separate project from the BiBoard firmware (different chip and toolchain). Upstream has no Petoi board in `main/boards`; where Petoi will publish is unconfirmed. Review: [`xiaozhi-esp32-review.md`](../research/xiaozhi-esp32-review.md)
+- OpenCatEsp32: the BiBoard firmware that runs G2's servos, IMU and serial protocol: Licence: MIT; Status: public; Petoi ships frequent releases (G2 runs B10_260527)
+- The AI Head's firmware: XiaoZhi-based, on the head's ESP32-C3: Licence: upstream xiaozhi-esp32 is MIT; Petoi's head build is not released yet; Status: a separate project from the BiBoard firmware (different chip and toolchain). Upstream has no Petoi board in `main/boards`; where Petoi will publish is unconfirmed. Review: [`xiaozhi-esp32-review.md`](../research/xiaozhi-esp32-review.md)
 
 Both are separable decisions. Most of the list below needs only the first.
 
 ## What a BiBoard fork could fix or unblock
 
-- **1**: Problem today: **Camera mode deletes the IMU task** (`groveVisionSetup()`), persists across reboots; `Xc` does not restore it; Today's workaround: Camera stays on the Pi's USB; only an erase + reflash recovers a camera-mode BiBoard; What a patch would do: Recreate the IMU task when the camera is disabled (and optionally don't persist the flag); Expected value: High if the Pi goes away or the camera moves to the BiBoard; none while the camera stays on the Pi. Small patch
-- **2**: Problem today: **Reflexes only fire while standing.** Push/lift/knock are scripted for a stationary robot; none fire mid-walk; Today's workaround: None; the Pi's fall guard and thermal guard sit above the firmware; What a patch would do: Allow the push reflex during gaits, or expose a hook; Expected value: Medium. Pi-side reimplementation is possible but only at the 5 Hz IMU rate
-- **3**: Problem today: **Firmware auto-recover vs the Pi's `RecoveryFSM`.** Flip → `rc` runs once and repeats with no retry/give-up logic; Today's workaround: Keep the Pi's recovery off or accept both acting; What a patch would do: A flag or handshake to hand recovery to the Pi, plus a retry limit; Expected value: Medium. Removes a known conflict (flagged 2026-09-28)
-- **4**: Problem today: **IMU is capped at 5 Hz and carries no angular rate.** `print6Axis()` returns early inside `PRINT6AXIS_MIN_INTERVAL` (200 ms); the raw-gyro print is dead code; Today's workaround: The Pi differences consecutive frames; the policy is trained to expect 5 Hz; What a patch would do: Print faster and add gyro rates; Expected value: **Lower than it looks.** Sim says 5 Hz costs about nothing, and the earlier "80 Hz" lineage came from a stale-firmware misreading. Would force a retrain, and 115200 baud limits the stream. *Unverified on hardware*
-- **5**: Problem today: **Servo position feedback only works over USB**, stops on any other command, ~112 ms per read (~9 Hz), `f` echoed only on one build; Today's workaround: Foot-probing ideas (B13) done slowly over a cable; What a patch would do: Expose feedback on the Pi's UART and faster or batched; Expected value: Medium for the climb/probe skills and servo-fault diagnosis (e.g. the FL shoulder). Rate may be a servo-bus limit; *unverified*
-- **6**: Problem today: **Joint-command timing.** `i` walks with ~55 ms lag; `m` doesn't walk; Today's workaround: The sim models the lag; the policy sends every 3rd tick; What a patch would do: A batched, fixed-latency joint-target command; Expected value: Medium: narrows the sim-to-real gap for any learned gait
-- **7**: Problem today: **Camera behaviors are generic.** The Grove Vision path in `camera.h` has no per-class logic; Today's workaround: Pi-side detection handling; What a patch would do: Class-aware reactions on the BiBoard; Expected value: Low if the Pi stays
-- **8**: Problem today: **UART2 is shared** by the Pi header, the voice module's socket and the head; Today's workaround: Single master (the Pi); What a patch would do: A second command port, or arbitration for two masters; Expected value: Only matters if the head controls motion
-- **9**: Problem today: **Module state persists in NVS.** An erase resets the voice module to Chinese, camera mode re-enables on boot; Today's workaround: Documented post-reflash steps (`XAa/XAb/XAc`); What a patch would do: Build correct defaults in; Expected value: Low, convenience
-- **10**: Problem today: **Demo reactions** (ultrasonic/IR modules) are random wander-style behaviors; Today's workaround: Not installed; What a patch would do: Replace with ledge/leash aware logic; Expected value: Low; no sensors owned
+- 1: Problem today: **Camera mode deletes the IMU task** (`groveVisionSetup()`), persists across reboots; `Xc` does not restore it; Today's workaround: Camera stays on the Pi's USB; only an erase + reflash recovers a camera-mode BiBoard; What a patch would do: Recreate the IMU task when the camera is disabled (and optionally don't persist the flag); Expected value: High if the Pi goes away or the camera moves to the BiBoard; none while the camera stays on the Pi. Small patch
+- 2: Problem today: **Reflexes only fire while standing.** Push/lift/knock are scripted for a stationary robot; none fire mid-walk; Today's workaround: None; the Pi's fall guard and thermal guard sit above the firmware; What a patch would do: Allow the push reflex during gaits, or expose a hook; Expected value: Medium. Pi-side reimplementation is possible but only at the 5 Hz IMU rate
+- 3: Problem today: **Firmware auto-recover vs the Pi's `RecoveryFSM`.** Flip → `rc` runs once and repeats with no retry/give-up logic; Today's workaround: Keep the Pi's recovery off or accept both acting; What a patch would do: A flag or handshake to hand recovery to the Pi, plus a retry limit; Expected value: Medium. Removes a known conflict (flagged 2026-09-28)
+- 4: Problem today: **IMU is capped at 5 Hz and carries no angular rate.** `print6Axis()` returns early inside `PRINT6AXIS_MIN_INTERVAL` (200 ms); the raw-gyro print is dead code; Today's workaround: The Pi differences consecutive frames; the policy is trained to expect 5 Hz; What a patch would do: Print faster and add gyro rates; Expected value: **Lower than it looks.** Sim says 5 Hz costs about nothing, and the earlier "80 Hz" lineage came from a stale-firmware misreading. Would force a retrain, and 115200 baud limits the stream. *Unverified on hardware*
+- 5: Problem today: **Servo position feedback only works over USB**, stops on any other command, ~112 ms per read (~9 Hz), `f` echoed only on one build; Today's workaround: Foot-probing ideas (B13) done slowly over a cable; What a patch would do: Expose feedback on the Pi's UART and faster or batched; Expected value: Medium for the climb/probe skills and servo-fault diagnosis (e.g. the FL shoulder). Rate may be a servo-bus limit; *unverified*
+- 6: Problem today: **Joint-command timing.** `i` walks with ~55 ms lag; `m` doesn't walk; Today's workaround: The sim models the lag; the policy sends every 3rd tick; What a patch would do: A batched, fixed-latency joint-target command; Expected value: Medium: narrows the sim-to-real gap for any learned gait
+- 7: Problem today: **Camera behaviors are generic.** The Grove Vision path in `camera.h` has no per-class logic; Today's workaround: Pi-side detection handling; What a patch would do: Class-aware reactions on the BiBoard; Expected value: Low if the Pi stays
+- 8: Problem today: **UART2 is shared** by the Pi header, the voice module's socket and the head; Today's workaround: Single master (the Pi); What a patch would do: A second command port, or arbitration for two masters; Expected value: Only matters if the head controls motion
+- 9: Problem today: **Module state persists in NVS.** An erase resets the voice module to Chinese, camera mode re-enables on boot; Today's workaround: Documented post-reflash steps (`XAa/XAb/XAc`); What a patch would do: Build correct defaults in; Expected value: Low, convenience
+- 10: Problem today: **Demo reactions** (ultrasonic/IR modules) are random wander-style behaviors; Today's workaround: Not installed; What a patch would do: Replace with ledge/leash aware logic; Expected value: Low; no sensors owned
 
 ## What a head-firmware fork could fix (after Petoi releases it)
 
-- **The Pi can't use the head's mic or speaker**: Expose audio to the Pi (stream or I2S), so the head replaces the external mic and speaker
-- **Cloud backend is Petoi's/XiaoZhi's**: Point the head at a project-controlled backend (Claude, the memory and personality)
-- **"What do you see?" has no data**: Add a tool that returns the Vision Module's detections
-- **UART conflict with the Pi**: Move motion commands to a different port, or turn them off
+- The Pi can't use the head's mic or speaker: Expose audio to the Pi (stream or I2S), so the head replaces the external mic and speaker
+- Cloud backend is Petoi's/XiaoZhi's: Point the head at a project-controlled backend (Claude, the memory and personality)
+- "What do you see?" has no data: Add a tool that returns the Vision Module's detections
+- UART conflict with the Pi: Move motion commands to a different port, or turn them off
 
 ## What a fork would not fix
 
@@ -39,24 +39,24 @@ model's frozen-firmware limits, and any sim-to-real gap not caused by the firmwa
 
 ## Pros
 
-- **Removes real firmware ceilings** (items 1–6) that no Pi-side code can get around.
-- **MIT licence;** the code is public and already read (reaction thresholds, camera and module code are all understood).
-- **Removes one blocker for a Pi-less build** (item 1 lets the camera and IMU coexist). The rest of a Pi-less build is still a large downgrade: no learned gait,
+- Removes real firmware ceilings: (items 1–6) that no Pi-side code can get around.
+- MIT licence: the code is public and already read (reaction thresholds, camera and module code are all understood).
+- Removes one blocker for a Pi-less build: (item 1 lets the camera and IMU coexist). The rest of a Pi-less build is still a large downgrade: no learned gait,
   no behavior runtime, no memory design of the project's own, and no known way yet for the head to read the camera.
-- **Narrow patches are small:** most items are a few functions, and Petoi's own bugs (camera/IMU, buggy IR module) can be fixed rather than worked around.
-- **Opens head integration** if Petoi's firmware ships: a project-controlled backend instead of a cloud the project does not control.
+- Narrow patches are small: most items are a few functions, and Petoi's own bugs (camera/IMU, buggy IR module) can be fixed rather than worked around.
+- Opens head integration: if Petoi's firmware ships: a project-controlled backend instead of a cloud the project does not control.
 
 ## Cons
 
-- **Maintenance:** Petoi releases often (the firmware has already gone from B10_251121 to B10_260527). Every upstream release means a rebase, retest and reflash.
-- **Tooling:** Petoi's Desktop App uploads only official builds with the right partition layout. A fork needs an Arduino/PlatformIO or esptool toolchain
+- Maintenance: Petoi releases often (the firmware has already gone from B10_251121 to B10_260527). Every upstream release means a rebase, retest and reflash.
+- Tooling: Petoi's Desktop App uploads only official builds with the right partition layout. A fork needs an Arduino/PlatformIO or esptool toolchain
   not yet set up, plus a repeatable way to reproduce Petoi's four-file flash. *Unverified: build time and effort.*
-- **Risk to the robot:** firmware controls the servos and balance. A bad patch can break gyro balance, calibration or the reflexes G2 relies on today.
+- Risk to the robot: firmware controls the servos and balance. A bad patch can break gyro balance, calibration or the reflexes G2 relies on today.
   BOOT-button recovery exists, but an erase wipes calibration and module flags (recalibrate, `gc`, voice fix).
-- **Coupling:** IMU or timing changes invalidate the deployed policy and force another sim retrain and hardware validation cycle.
-- **Many wins are unproven:** e.g. a faster IMU has no hardware evidence of helping; the policy comparison (H1) is still open. Forking before that adds work on a guess.
-- **Solo upkeep:** every patch is the project's to own, document and keep current, on a project that already has an open servo fault and untested pipeline.
-- **Public repo rules** still apply: no personal data, no attribution, clean history.
+- Coupling: IMU or timing changes invalidate the deployed policy and force another sim retrain and hardware validation cycle.
+- Many wins are unproven: e.g. a faster IMU has no hardware evidence of helping; the policy comparison (H1) is still open. Forking before that adds work on a guess.
+- Solo upkeep: every patch is the project's to own, document and keep current, on a project that already has an open servo fault and untested pipeline.
+- Public repo rules: still apply: no personal data, no attribution, clean history.
 
 ## How to keep it cheap if it is done
 

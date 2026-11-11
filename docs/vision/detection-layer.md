@@ -55,8 +55,8 @@ noisy), 0 false positives on a clean scene, 240 px frame, centre-format boxes.
 Classes from several domains in a single model: `person`, `dad`, `mom`, `dog`,
 `mug`, `keyboard`, … all scored every frame.
 
-- **Pro:** everything available simultaneously; no swap logic.
-- **Con:** shared capacity — realistically **~10–20 classes** before per-class
+- Pro: everything available simultaneously; no swap logic.
+- Con: shared capacity — realistically **~10–20 classes** before per-class
   accuracy on a 192–240 px nano detector degrades badly. Adding any class means
   retraining the whole model. Mixing a safety class (`edge`) with recognition
   classes is architecturally wrong: different cadence, different
@@ -64,8 +64,8 @@ Classes from several domains in a single model: `person`, `dad`, `mom`, `dog`,
 
 ## Option B — specialized models, swapped by mode
 
-- **Pro:** each model tuned for its job; small and fast.
-- **Con:** ~1–2 min swap → **mode-gated, not reactive**; needs a model-manager.
+- Pro: each model tuned for its job; small and fast.
+- Con: ~1–2 min swap → **mode-gated, not reactive**; needs a model-manager.
 
 ---
 
@@ -73,9 +73,9 @@ Classes from several domains in a single model: `person`, `dad`, `mom`, `dog`,
 
 Three models, selected by `ModeController`:
 
-- **safety**: Loaded when: G2 moving autonomously (EXPLORE, any commanded walk); Classes: `edge` / `dropoff` / `obstacle`; Notes: small, fast, **biased hard to false-positives**; never diluted with other classes. This is B16 `CliffGuard` + obstacle.
-- **interaction**: Loaded when: CONVERSE, idle, stationary-with-person; Classes: `person` + household individuals + pets; Notes: this is B15. See `person-recognition.md`.
-- **objects/scene**: Loaded when: on demand — "what's on my desk / in this room"; Classes: COCO-80, or a curated subset; Notes: mostly free (pretrained COCO). Lowest priority.
+- safety: Loaded when: G2 moving autonomously (EXPLORE, any commanded walk); Classes: `edge` / `dropoff` / `obstacle`; Notes: small, fast, **biased hard to false-positives**; never diluted with other classes. This is B16 `CliffGuard` + obstacle.
+- interaction: Loaded when: CONVERSE, idle, stationary-with-person; Classes: `person` + household individuals + pets; Notes: this is B15. See `person-recognition.md`.
+- objects/scene: Loaded when: on demand — "what's on my desk / in this room"; Classes: COCO-80, or a curated subset; Notes: mostly free (pretrained COCO). Lowest priority.
 
 If swap latency proves annoying in practice, **fold a few key objects
 (`mug`, `phone`, `ball`) into the interaction model** and keep only `safety`
@@ -126,14 +126,14 @@ overlay + a capture button, pulls JPEGs over serial via `AT+INVOKE=-1,0,0`).
 
 ## Build order
 
-1. **Dataset-quality experiment** (above) — cheap, unblocks all estimates.
-2. **Interaction model** (B15) — core to personality/bonds/memory; see
+1. Dataset-quality experiment: (above) — cheap, unblocks all estimates.
+2. Interaction model: (B15) — core to personality/bonds/memory; see
    `person-recognition.md`.
-3. **Headless-flash research** — required before any model-swapping.
-4. **Model-manager** — once headless flash works.
-5. **Safety model** (B16) — gated on camera-mounted-on-frame (POV-specific
+3. Headless-flash research: required before any model-swapping.
+4. Model-manager: once headless flash works.
+5. Safety model: (B16) — gated on camera-mounted-on-frame (POV-specific
    training data); highest priority the moment the body exists.
-6. **Objects model** — COCO-80 deploy, lowest effort; wire `scene.narrate`.
+6. Objects model: COCO-80 deploy, lowest effort; wire `scene.narrate`.
 
 Priority if forced to choose: **safety > recognition > objects.**
 
@@ -141,12 +141,12 @@ Priority if forced to choose: **safety > recognition > objects.**
 
 ## Consumers (mostly built)
 
-- **`vision/feed.py` `SerialDetectionFeed`**: Uses: parses INVOKE → `Detection`; State: built; auto-starts inference; `VISION_LABELS` names classes
-- **`vision/avoidance.py` `Avoider`**: Uses: box area → closeness, `center_x` → bearing; State: built; thresholds need real-detection + stopping-distance calibration
-- **`vision/scene.py`**: Uses: detections → text → Claude narration; State: built
-- **`vision/terrain_feature.py`**: Uses: box → (dist, bearing, tall_flag) for the gait obs; State: removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d)
-- **`personality/bonds.py`**: Uses: detection label → disposition / closeness; State: built (API only)
-- **`memory` + B11 place memory**: Uses: accumulate "kitchen has a table", "dog near couch"; State: memory built; place-graph not
+- `vision/feed.py` `SerialDetectionFeed`: Uses: parses INVOKE → `Detection`; State: built; auto-starts inference; `VISION_LABELS` names classes
+- `vision/avoidance.py` `Avoider`: Uses: box area → closeness, `center_x` → bearing; State: built; thresholds need real-detection + stopping-distance calibration
+- `vision/scene.py`: Uses: detections → text → Claude narration; State: built
+- `vision/terrain_feature.py`: Uses: box → (dist, bearing, tall_flag) for the gait obs; State: removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d)
+- `personality/bonds.py`: Uses: detection label → disposition / closeness; State: built (API only)
+- `memory` + B11 place memory: Uses: accumulate "kitchen has a table", "dog near couch"; State: memory built; place-graph not
 
 ---
 

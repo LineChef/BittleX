@@ -10,8 +10,8 @@ Script: `rl_training/opencat-gym/reference_gait/verify_getup_reference.py`
 
 ## What was replayed
 
-- **`rc`** ("recover") — the firmware self-right for a side / front fall.
-- **`rl`** ("roll") — flips a supine robot onto its side; firmware then chains
+- `rc`: ("recover") — the firmware self-right for a side / front fall.
+- `rl`: ("roll") — flips a supine robot onto its side; firmware then chains
   `rc`. So supine = `rl` → `rc`.
 
 Both decoded from `InstinctBittleESP.h` by `build_skill_reference.py rc rl` →
@@ -21,29 +21,29 @@ through the 8 leg joints via `POSITION_CONTROL` (`FORCE = 0.40` N·m/joint, abov
 
 ## Result — 0 / 2 recovered
 
-- **prone, belly-down flat**: start |roll|/|pitch|: 0.00 / 0.00; end |roll|/|pitch|: 0.00 / 0.00; end z: 0.022 m; verdict: **no** — `rc` reaches a transient 4-leg crouch mid-play (tilt-sum hits 0.0) then collapses flat again
-- **supine, on its back**: start |roll|/|pitch|: 3.14 / 0.00; end |roll|/|pitch|: 3.02 / 0.07; end z: 0.030 m; verdict: **no** — `rl` → `rc` flails the legs; the roll-over never happens, ends still on its back
+- prone, belly-down flat: start |roll|/|pitch|: 0.00 / 0.00; end |roll|/|pitch|: 0.00 / 0.00; end z: 0.022 m; verdict: **no** — `rc` reaches a transient 4-leg crouch mid-play (tilt-sum hits 0.0) then collapses flat again
+- supine, on its back: start |roll|/|pitch|: 3.14 / 0.00; end |roll|/|pitch|: 3.02 / 0.07; end z: 0.030 m; verdict: **no** — `rl` → `rc` flails the legs; the roll-over never happens, ends still on its back
 
 ## Why this is expected, and what it does / doesn't show
 
 The replay is a **crude lower bound**, and a poor result was the predicted
 outcome, not a surprise:
 
-1. **The refs are approximate.** `rc`/`rl` decode as *behaviours* — 5–6 keyframes
+1. The refs are approximate: `rc`/`rl` decode as *behaviours* — 5–6 keyframes
    resampled to 100, with the per-frame timing params dropped and the
    **IMU-triggered mid-sequence waits removed** (`skill.h` `imuException`
    checks). The real skill is not a smooth 100-step interpolation.
-2. **Open-loop.** On the real robot `rc` runs *with the gyro-balance layer
+2. Open-loop: On the real robot `rc` runs *with the gyro-balance layer
    active* (`gyroBalanceQ`), which is exactly what would hold the transient
    stand that `rc` reaches in the prone case. The sim replay has no such loop.
-3. **No stable side-lie or nose-down rest in this URDF** (measured: a mild tip
+3. No stable side-lie or nose-down rest in this URDF (measured: a mild tip
    flops back belly-down; anything past ~1.1 rad roll goes fully supine). The
    real Bittle rests stably on its flank / face — the poses firmware `rc` is
    actually designed for. The sim can only present "belly-flat" and "supine".
-4. **Bare `plane.urdf`** — no carpet-like friction/compliance for the feet to
+4. Bare `plane.urdf`: no carpet-like friction/compliance for the feet to
    push against.
 
-**Takeaway for the hardware plan (H9 / project-plan.md "Recovery"):** the sim
+Takeaway for the hardware plan (H9 / project-plan.md "Recovery"): the sim
 cannot validate the firmware get-up — it neither confirms nor rules it out.
 Treat `krc` / `krl` as *unverified* on arrival:
 
@@ -82,17 +82,17 @@ poses, doesn't complete the transition to standing" (a different, more
 credible kind of gap).
 
 **Speculation on what's still missing (2026-09-24, not verified):**
-1. **No active balance correction.** The real `rc`/`rl` runs with the
+1. No active balance correction: The real `rc`/`rl` runs with the
    firmware's gyro-balance layer (`gyroBalanceQ`) active throughout; this
    replay is fully open-loop. The transient poses reached (prone crouch,
    supine mid-roll) both look like genuinely unstable balancing acts — the
    balance loop is plausibly what holds them long enough to continue on
    real hardware.
-2. **Removed IMU-triggered mid-sequence waits.** The real skill pauses until
+2. Removed IMU-triggered mid-sequence waits: The real skill pauses until
    the IMU confirms a target orientation before advancing; this replay plays
    through at a fixed cadence regardless of actual state, which could start
    later phases from the wrong pose if timing drifts.
-3. **This script still doesn't use `SERVO_RATE_LIMIT_DEG_S`** — it kept its
+3. This script still doesn't use `SERVO_RATE_LIMIT_DEG_S`: it kept its
    own unconstrained `maxJointVelocity` (~1800°/s pre-existing value, not
    the 137°/s ceiling now in `opencat_gym_env.py`). The new supine result
    could be partly relying on unrealistically fast joint response; adding a
@@ -114,23 +114,23 @@ that's the change most likely to address the failure mode actually observed.
 Exploratory edits to `verify_getup_reference.py` in the working tree only —
 **nothing from this section was committed.**
 
-- **1**: Intervention: Balance correction (`--balance K`, same shape as `BalancedLearned`), swept k=0.3/0.6/1.0, plus a pitch-only variant; Result: No improvement; higher k actively worse (broke `supine`'s previously-clean roll). A tilt correction nudges toward *level*, which lying flat already satisfies — no mechanism to push toward *height*.
-- **2**: Intervention: Wait for joint convergence before advancing each keyframe (proxy for the dropped IMU-triggered waits); Result: Identical to baseline — the robot was already converging fine within the original timing; never lagging.
-- **3**: Intervention: Torque budget, `FORCE`=0.4/0.6/0.9/1.2 N·m (up to 3x); Result: No change at all.
-- **4**: Intervention: Ground friction, 1.0/2.0/4.0; Result: No meaningful change — max height reached is friction-insensitive.
-- **5**: Intervention: `PLAY_CYCLES`=1/2/3, and holding the final pose 200 extra steps; Result: No change — rules out "the loop drags it back down."
-- **6**: Intervention: Slowdown (HumanUP-style 2x/4x/8x), same path played slower; Result: No change — that technique fixes a *policy-discovered* trajectory that's unstable at speed; the project's is a hand-decoded reference that doesn't trace a "stay standing" path regardless of speed.
+- 1: Intervention: Balance correction (`--balance K`, same shape as `BalancedLearned`), swept k=0.3/0.6/1.0, plus a pitch-only variant; Result: No improvement; higher k actively worse (broke `supine`'s previously-clean roll). A tilt correction nudges toward *level*, which lying flat already satisfies — no mechanism to push toward *height*.
+- 2: Intervention: Wait for joint convergence before advancing each keyframe (proxy for the dropped IMU-triggered waits); Result: Identical to baseline — the robot was already converging fine within the original timing; never lagging.
+- 3: Intervention: Torque budget, `FORCE`=0.4/0.6/0.9/1.2 N·m (up to 3x); Result: No change at all.
+- 4: Intervention: Ground friction, 1.0/2.0/4.0; Result: No meaningful change — max height reached is friction-insensitive.
+- 5: Intervention: `PLAY_CYCLES`=1/2/3, and holding the final pose 200 extra steps; Result: No change — rules out "the loop drags it back down."
+- 6: Intervention: Slowdown (HumanUP-style 2x/4x/8x), same path played slower; Result: No change — that technique fixes a *policy-discovered* trajectory that's unstable at speed; the project's is a hand-decoded reference that doesn't trace a "stay standing" path regardless of speed.
 
 **Root cause, found via a frame-by-frame trace of `supine`** (`rl` = frames
 0-99, `rc` = frames 100-199, chained): the reference *can* reach a genuinely
 good near-standing pose — twice, independently — and loses it at two
 specific points, not from any variable above:
-- **The `rl`→`rc` handoff (frame ~90→120):** `rl` alone climbs `z` from 0.03
+- The `rl`→`rc` handoff (frame ~90→120): `rl` alone climbs `z` from 0.03
   to 0.088m with roll/pitch near zero by frame ~85. `rc`'s opening frames
   assume their own starting pose (a fresh fall) and drag the robot back
   down to `z≈0.022` by frame ~120 — the decode chains the two skills'
   frames without reconciling their assumed start/end states.
-- **`rc`'s own tail:** independently climbs back to `z≈0.088` by frame
+- `rc`'s own tail: independently climbs back to `z≈0.088` by frame
   ~180, then collapses by its own final frames (~185-195) — not a looping
   artifact (ruled out by #5), `rc`'s decoded sequence just doesn't end
   standing.
@@ -148,7 +148,7 @@ get-up motion, and what let them succeed. Nothing Bittle/Petoi-specific
 BittleJuice/bittle-mujoco never covered get-up validation). Four findings,
 ranked by relevance to the specific failure mode found here:
 
-1. **Reference State Initialization (RSI)** — Yang et al., "Learning Complex
+1. Reference State Initialization (RSI): Yang et al., "Learning Complex
    Motor Skills for Legged Robot Fall Recovery," IEEE RA-L 2023 (UCL).
    Builds a graph of key postures along the recovery sequence and
    initializes *training* episodes starting from those intermediate
@@ -156,10 +156,10 @@ ranked by relevance to the specific failure mode found here:
    symptom (losing progress at a handoff/tail) -- but it's a technique for
    training a policy, not for open-loop replay; doesn't apply until/unless
    this moves to option 3 or 4 below.
-2. **HumanUP's 8x slowdown** — "Learning Getting-Up Policies for Real-World
+2. HumanUP's 8x slowdown: "Learning Getting-Up Policies for Real-World
    Humanoid Robots" (arXiv 2502.12152). Tested directly above (test 6);
    didn't transfer to the case, for the reason given there.
-3. **DeepMimic-style motion imitation** — the standard technique for making
+3. DeepMimic-style motion imitation: the standard technique for making
    a fragile reference execute robustly: train a policy with a reward
    tracking pose/velocity/root-pose error against the reference, instead of
    commanding it open-loop. `erwincoumans/motion_imitation` on GitHub is
@@ -167,14 +167,14 @@ ranked by relevance to the specific failure mode found here:
    arbitrary reference motions, not just mocap -- directly reusable with
    the existing `rc_ref.npy`/`rl_ref.npy`. Real lift: a genuine PPO training
    loop, not a script tweak.
-4. **From-scratch fall-recovery RL** (no reference trajectory -- reward-
+4. From-scratch fall-recovery RL: (no reference trajectory -- reward-
    shaped exploration from domain-randomized fallen starting poses; never
    terminate the episode on falling, corroborated across multiple 2024-2025
    papers). The field's most independently-corroborated *actually working*
    approach, but abandons the decoded keyframes entirely and is the biggest
    lift of the four.
 
-**Where this leaves H9:** open-loop replay is now conclusively exhausted as
+Where this leaves H9: open-loop replay is now conclusively exhausted as
 an approach -- six tested variables, zero improvement, root cause
 identified and specific. Getting an actual sim validation of self-righting
 would require real RL training (imitation-style or from-scratch), which is

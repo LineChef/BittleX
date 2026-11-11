@@ -2,20 +2,20 @@
 
 Every model G2 uses, where it lives, where it came from and under what terms. Models are never committed to the repository. Downloads follow the project's security protocol: an official source over HTTPS, a pinned version, ONNX or plain weight formats only (no pickle files), its own folder outside the repo, a recorded SHA-256, and explicit approval before anything is fetched.
 
-- **Speech recognition and wake word (Vosk), text-to-speech voices (Piper)**: Lives in: `models/` in the repo checkout (gitignored), on the Mac and on the Pi; Fetched by: `bash pi_pipeline/fetch_models.sh`
-- **Vision models used on the Mac (embedder, person detector)**: Lives in: `~/g2_data/models/`; Fetched by: by hand, with approval: [`../vision/downloaded-models.md`](../vision/downloaded-models.md)
-- **The detector on the camera**: Lives in: the camera module's flash; Fetched by: trained in this project: [`../vision/custom-model-recipe.md`](../vision/custom-model-recipe.md)
-- **The walking policy**: Lives in: `rl_training/opencat-gym/trained/` (exported `.onnx` plus sidecar), deployed to the Pi; Fetched by: [`gait-deployment.md`](gait-deployment.md)
+- Speech recognition and wake word (Vosk), text-to-speech voices (Piper): Lives in: `models/` in the repo checkout (gitignored), on the Mac and on the Pi; Fetched by: `bash pi_pipeline/fetch_models.sh`
+- Vision models used on the Mac (embedder, person detector): Lives in: `~/g2_data/models/`; Fetched by: by hand, with approval: [`../vision/downloaded-models.md`](../vision/downloaded-models.md)
+- The detector on the camera: Lives in: the camera module's flash; Fetched by: trained in this project: [`../vision/custom-model-recipe.md`](../vision/custom-model-recipe.md)
+- The walking policy: Lives in: `rl_training/opencat-gym/trained/` (exported `.onnx` plus sidecar), deployed to the Pi; Fetched by: [`gait-deployment.md`](gait-deployment.md)
 
 ## Voice models (`models/`)
 
-- **`vosk/` (`vosk-model-small-en-us-0.15`)**: Role: Speech recognition and the wake-word grammar; one model shared by both; Source: [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models); Size (bytes): about 40 MB zip; SHA-256: `am/final.mdl`: `75370a0137f9daf8f469dedd7daa4513ae7a621f03240c6e512e2b50b656a7b6`; Verified against: the host lists no checksum, so this is a local record only; License: Apache 2.0, per the host's model list
-- **`piper/en_US-ryan-low.onnx` (+ `.onnx.json`)**: Role: G2's default voice; 16 kHz, light enough for the Pi Zero 2 W. The robot effect is applied on top; Source: [`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/ryan/low); Size (bytes): 63,104,526; SHA-256: `8d21a085cc4c0010f1f3e91d5008c8691277ccfa744eb0d747becd33a3444baf`; Verified against: the Git LFS pointer on the host (oid and size), checked at download; License: CC BY-NC-SA 4.0 (dataset: RyanSpeech)
-- **`piper/en_US-ryan-medium.onnx` (+ `.onnx.json`)**: Role: The documented upgrade: same voice, 22 kHz, cleaner; only if the Pi synthesises in real time with memory to spare; Source: [`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/ryan/medium); Size (bytes): 63,201,294; SHA-256: `abf4c274862564ed647ba0d2c47f8ee7c9b717d27bdad9219100eb310db4047a`; Verified against: the Git LFS pointer on the host, checked at download; License: CC BY-NC-SA 4.0 (dataset: RyanSpeech)
+- `vosk/` (`vosk-model-small-en-us-0.15`): Role: Speech recognition and the wake-word grammar; one model shared by both; Source: [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models); Size (bytes): about 40 MB zip; SHA-256: `am/final.mdl`: `75370a0137f9daf8f469dedd7daa4513ae7a621f03240c6e512e2b50b656a7b6`; Verified against: the host lists no checksum, so this is a local record only; License: Apache 2.0, per the host's model list
+- `piper/en_US-ryan-low.onnx` (+ `.onnx.json`): Role: G2's default voice; 16 kHz, light enough for the Pi Zero 2 W. The robot effect is applied on top; Source: [`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/ryan/low); Size (bytes): 63,104,526; SHA-256: `8d21a085cc4c0010f1f3e91d5008c8691277ccfa744eb0d747becd33a3444baf`; Verified against: the Git LFS pointer on the host (oid and size), checked at download; License: CC BY-NC-SA 4.0 (dataset: RyanSpeech)
+- `piper/en_US-ryan-medium.onnx` (+ `.onnx.json`): Role: The documented upgrade: same voice, 22 kHz, cleaner; only if the Pi synthesises in real time with memory to spare; Source: [`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/ryan/medium); Size (bytes): 63,201,294; SHA-256: `abf4c274862564ed647ba0d2c47f8ee7c9b717d27bdad9219100eb310db4047a`; Verified against: the Git LFS pointer on the host, checked at download; License: CC BY-NC-SA 4.0 (dataset: RyanSpeech)
 
 What the checks show: the hash proves the file is the one the host serves for that name, and an ONNX graph runs only mathematical operations in `onnxruntime`, so it cannot execute code the way a pickle file can. They do not prove the publisher's account is trustworthy. The Vosk acoustic model is a Kaldi model directory (plain data files); its README says it is from Alpha Cephei Inc.
 
-**License note:** the RyanSpeech voice data is licensed CC BY-NC-SA 4.0: attribution, non-commercial use only, share-alike for derivatives. That is fine for a personal project. It would matter if G2's voice were ever shipped in a commercial product, or if the model files were redistributed from this repository (they are not: the repo carries only the fetch script).
+License note: the RyanSpeech voice data is licensed CC BY-NC-SA 4.0: attribution, non-commercial use only, share-alike for derivatives. That is fine for a personal project. It would matter if G2's voice were ever shipped in a commercial product, or if the model files were redistributed from this repository (they are not: the repo carries only the fetch script).
 
 The Pi's models are fetched on the Pi by the same script ([`../../pi_pipeline/voice/README.md`](../../pi_pipeline/voice/README.md) "Models for voice mode"); the deploy script copies only `pi_pipeline/` and the policy files, never `models/`.
 
@@ -25,8 +25,8 @@ The Pi's models are fetched on the Pi by the same script ([`../../pi_pipeline/vo
 
 ## If a model is missing
 
-- **Voice mode fails to start, "model not found"**: `bash pi_pipeline/fetch_models.sh` (idempotent: skips what exists)
-- **`models/` looks empty after a fresh clone**: Expected: it is gitignored. Run the script
-- **A new voice sounds wrong or runs slower than real time**: Switch back to `en_US-ryan-low` and run the benchmark
+- Voice mode fails to start, "model not found": `bash pi_pipeline/fetch_models.sh` (idempotent: skips what exists)
+- `models/` looks empty after a fresh clone: Expected: it is gitignored. Run the script
+- A new voice sounds wrong or runs slower than real time: Switch back to `en_US-ryan-low` and run the benchmark
 
 A model that is not in the fetch script, or any new download, needs explicit approval first and an entry in the table above (or in [`../vision/downloaded-models.md`](../vision/downloaded-models.md) for vision models).

@@ -19,11 +19,11 @@ new test infrastructure — should have been the first thing checked, not
 the last. A 300+ rollout probe batch against the frozen base (`run20m_ppo`)
 found **1 fall**. Everywhere else, the robot didn't tumble — it stopped:
 
-- **Carpet, 90s episode**: speed decayed to 0.00 m/s by 60s
-- **Side-hill, 10-15deg sustained tilt (R12a)**: -73% speed
-- **Stepped split, one side raised 15-25mm (R12b)**: -92% speed (under left feet specifically -- a real left/right handedness asymmetry)
-- **Thin raised lip, 15mm (R4)**: 0/16 crossed, just recoils
-- **Pick-up/set-down (R3)**: 31/32 re-acquire fine -- no problem here
+- Carpet, 90s episode: speed decayed to 0.00 m/s by 60s
+- Side-hill, 10-15deg sustained tilt (R12a): -73% speed
+- Stepped split, one side raised 15-25mm (R12b): -92% speed (under left feet specifically -- a real left/right handedness asymmetry)
+- Thin raised lip, 15mm (R4): 0/16 crossed, just recoils
+- Pick-up/set-down (R3): 31/32 re-acquire fine -- no problem here
 
 This matches everything found independently this session too (lateral
 pushes, terrain roughness, one-sided steps -- none produced falls) from the
@@ -66,17 +66,17 @@ so nothing gets rebuilt from scratch:
   re-opening without a specific reason to.
 
 **Flagged for reopening, status changed since the original triage:**
-- **R2 (IMU bias & mount tilt)** -- was `DEFERRED` pending "how solid is
+- R2 (IMU bias & mount tilt): -- was `DEFERRED` pending "how solid is
   the real Pi<->PiSugar connection." That's now answered: confirmed solid
   tonight (correct pogo-pin orientation found and verified). Worth
   reopening.
-- **R9 (within-episode degradation -- latency ramp, thermal/battery sag)**
+- R9 (within-episode degradation -- latency ramp, thermal/battery sag)
   -- already flagged "revisit after the 20M run," which is what's
   in-flight right now (Stage 3). Directly covers this session's
   latency/servo-miscalibration priority, but frames it as *ramping during
   an episode* rather than fixed-per-episode -- more realistic than a
   static offset, worth using this framing instead of a simpler static test.
-- **R8 (aggressive command dynamics)** -- explicitly `DROPPED` in the
+- R8 (aggressive command dynamics): -- explicitly `DROPPED` in the
   original triage (no detailed reasoning recorded in the log for why,
   unlike some other drops). This session's #4 priority matches R8
   directly. Flagging the conflict rather than silently overriding the
@@ -86,19 +86,19 @@ so nothing gets rebuilt from scratch:
   triage bandwidth.
 
 **Already-built mechanisms to reuse instead of building new ones:**
-- **`RUBBLE`** (not `RANDOM_TERRAIN`, which this session tested and found
+- `RUBBLE`: (not `RANDOM_TERRAIN`, which this session tested and found
   nothing) is the actual primary discrete-obstacle hazard, `RUBBLE_N`
   up to 560 / `RUBBLE_MAX_H` up to 0.020 already used in the hardest
   existing gauntlet cells. Use this, swept past those values, for "dense
   obstacle field" testing instead of building something new.
-- **`LEDGE_HEIGHT`/`LEDGE_PROB`/`LEDGE_DIR`** (`LEDGE_DIR=-1` = step-down
+- `LEDGE_HEIGHT`/`LEDGE_PROB`/`LEDGE_DIR`: (`LEDGE_DIR=-1` = step-down
   only) is literally the drop/pit mechanism from this session's list --
   already built, currently retired/inert. Real history worth knowing:
   Phase 4a tried training on it at 25mm/30% DR and made ledge handling
   *worse* ("robot backs away from steps") while halving nominal walk speed
   -- a documented negative result for training on it carelessly, still
   fine to use for held-out eval/characterization.
-- **`STUCK_FOOT_PROB`** -- confirmed still just a knob in the `_ZERO`
+- `STUCK_FOOT_PROB`: -- confirmed still just a knob in the `_ZERO`
   reset list, matches this session's stuck-foot idea, still untested.
 
 **Genuinely new, not covered by prior work:**
@@ -131,12 +131,12 @@ had it right.
 
 ## Revised plan
 
-1. **Re-verify R10/R12/R4 against the current checkpoints** (run20m_ppo,
+1. Re-verify R10/R12/R4 against the current checkpoints: (run20m_ppo,
    then whichever wins resid30) -- cheap, the test methodology already
    exists, just needs re-running. Confirms the stalling problem is still
    present in the current frontier, not just the older checkpoint it was
    originally found on.
-2. **Re-instate `FAC_NOSTALL`** -- confirmed priority (user, 2026-09-18),
+2. Re-instate `FAC_NOSTALL`: -- confirmed priority (user, 2026-09-18),
    not just a "try it" item. Deliberately **not** touching the in-flight
    Stage 3 run for this (too far in -- 11M+/20M steps -- to change the
    recipe mid-run); this is queued as the first real reward change in the
@@ -146,17 +146,17 @@ had it right.
    resistance, e.g. an obstacle), higher leverage than inventing new
    stressor axes blind. Check whether it needs the terrain-feature
    dependency it was originally scoped with, or works standalone.
-3. **Reopen R2 (IMU bias)** now that the hardware precondition is met.
-4. **Run R9 properly** (within-episode latency/thermal/battery ramp) --
+3. Reopen R2 (IMU bias): now that the hardware precondition is met.
+4. Run R9 properly: (within-episode latency/thermal/battery ramp) --
    covers this session's latency + servo-miscalibration priorities in a
    more realistic form than a static test.
-5. **Check R8's drop reasoning** before deciding whether to re-run
+5. Check R8's drop reasoning: before deciding whether to re-run
    aggressive command transitions as originally proposed or in some
    modified form.
-6. **Characterize `RUBBLE` and `LEDGE_DIR=-1`** properly (dose-response
+6. Characterize `RUBBLE` and `LEDGE_DIR=-1`: properly (dose-response
    sweep, past the values already used in existing gauntlet cells) --
    reusing existing mechanisms, not building new ones.
-7. **`STUCK_FOOT`**, static `JOINT_OFFSET_DEG`, and the combined gnarly
+7. `STUCK_FOOT`: , static `JOINT_OFFSET_DEG`, and the combined gnarly
    course last, as originally planned -- these remain genuinely new.
 8. Build `benchmark_resiliency.py` (dose-response sweep tool, composite
    score, as originally planned) once the above informs what it actually
@@ -168,12 +168,12 @@ had it right.
 Went through the whole plan item by item with the user once tooling was
 built and the ledge investigation was done. Final scope:
 
-- **R10 (item 1, carpet half)** -- **deferred to hardware**, not re-run in
+- R10 (item 1, carpet half): -- **deferred to hardware**, not re-run in
   sim. Sim carpet is an unvalidated guess (see `hardware-gated-backlog.md`
   H10) -- a sim-only re-verification of a carpet-stalling finding would
   carry the same fidelity risk the original result did. Bundled into H10's
   existing hardware-gated sysid work instead of a separate sim test.
-- **R12 (item 1, uneven-terrain half)** -- kept, but reframed: no separate
+- R12 (item 1, uneven-terrain half): -- kept, but reframed: no separate
   slope-specific incentive gets built. `FAC_NOSTALL`'s mechanism (penalize
   insufficient net progress in the commanded direction, regardless of
   cause) is direction- and terrain-agnostic, and R12a/R12b's stalling
@@ -182,12 +182,12 @@ built and the ledge investigation was done. Final scope:
   the cells that confirms whether `FAC_NOSTALL`'s round actually worked,
   not a separate reward-design task. Only build something slope-specific
   if R12 *still* fails after `FAC_NOSTALL` clears its bar.
-- **R4** -- unchanged, still queued as cheap re-verification.
-- **R2 (IMU bias)** -- **dropped.** Script stays built (smoke-tested,
+- R4: -- unchanged, still queued as cheap re-verification.
+- R2 (IMU bias): -- **dropped.** Script stays built (smoke-tested,
   ready if reopened later) but not run this pass.
-- **R9 (episode ramp)** -- **dropped**, same as R2.
-- **R8 (command dynamics)** -- unchanged, still queued.
-- **Dose-response sweep (`resilience_dose_response.py`), trimmed:**
+- R9 (episode ramp): -- **dropped**, same as R2.
+- R8 (command dynamics): -- unchanged, still queued.
+- Dose-response sweep (`resilience_dose_response.py`), trimmed:
   - `LEDGE` cells -- **dropped**, redundant now. Today's direct
     investigation (contact-point check + visual GIF review, the 24-27mm
     recoverable band) already covers this more thoroughly than the
@@ -214,14 +214,14 @@ built and the ledge investigation was done. Final scope:
   - `JOINT_OFFSET_DEG` -- check `robustness_sweep.py` (existing tool)
     before building anything new; it already sweeps `joint_offset_deg` as
     one of its axes and may already cover this.
-- **`benchmark_resiliency.py`** -- **moved to backlog, not built this
+- `benchmark_resiliency.py`: -- **moved to backlog, not built this
   pass** (2026-09-18). With `RUBBLE`/`LEDGE`/`STUCK_FOOT`/R2/R9 all cut,
   what's actually left to synthesize (`FAC_NOSTALL`'s result, the
   flooring-transition/ledge result, R4, R8) is small enough to write up
   directly in the final synthesis doc rather than justify a dedicated
   composite-scoring tool. May revisit if a later campaign's scope grows
   back into something that actually needs it.
-- **`jam_guard.py` (behaviour-ideas B9a)** -- checked its actual state
+- `jam_guard.py` (behaviour-ideas B9a): -- checked its actual state
   before assuming it needed new testing: **the decision logic is already
   fully built and tested** (`pi_pipeline/gait/jam_guard.py`, 181 lines,
   pure logic/no I/O; `pi_pipeline/tests/test_jam_guard.py`, 12/12 passing,
@@ -248,7 +248,7 @@ Full-run estimates below are extrapolated from smoke-test wall-clock while
 CPU-contended with the in-flight training round -- real numbers once run
 standalone will likely be faster, not slower.
 
-- **`resilience_imu_bias.py`** (R2) -- sweeps a new `IMU_BIAS_DEG` env
+- `resilience_imu_bias.py`: (R2) -- sweeps a new `IMU_BIAS_DEG` env
   constant (persistent per-episode roll/pitch bias, observation-only,
   reward stays clean -- distinct from `RANDOM_GYRO`'s existing zero-mean
   per-step noise). Required an `opencat_gym_env.py` change: the existing
@@ -258,7 +258,7 @@ standalone will likely be faster, not slower.
   no behavior change for any existing script. Smoke test (2 eps x 2
   levels) ran clean in ~4s contended -- **est. ~10-15 min/checkpoint** for
   a real sweep (20 eps x 6 levels).
-- **`resilience_episode_ramp.py`** (R9) -- reframed from a static offset to
+- `resilience_episode_ramp.py`: (R9) -- reframed from a static offset to
   an actual within-episode ramp per the plan's own note ("more realistic").
   Ramps `env._torque_scale` (battery/thermal sag proxy) and `env._act_buf`
   length (latency) linearly over one long (800-step) episode, entirely from
@@ -268,7 +268,7 @@ standalone will likely be faster, not slower.
   at n=2: severe-level speed goes from +0.053 m/s (Q1) to -0.004 m/s (Q4,
   net backward drift) vs the no-ramp baseline's -18% Q4-vs-Q1 (ordinary
   noise). **Est. ~2 min/checkpoint** for a real run (12 eps x 4 levels).
-- **`resilience_dose_response.py`** -- dose-response sweep for `RUBBLE`
+- `resilience_dose_response.py`: -- dose-response sweep for `RUBBLE`
   (past the existing gauntlet's max severity), `LEDGE_DIR=-1` (step-down
   only), `STUCK_FOOT_PROB`, and static `JOINT_OFFSET_DEG`, plus a combined
   "gnarly course" cell stacking all four. Reuses
@@ -283,7 +283,7 @@ standalone will likely be faster, not slower.
   confirm it's not a seed artifact, but a clean 100/100 split at the first
   check is a strong signal either way. **Est. ~3.5 min/checkpoint** for a
   real run (20 eps x 9 cells).
-- **`resilience_command_dynamics.py`** (R8) -- reopened; checked git
+- `resilience_command_dynamics.py`: (R8) -- reopened; checked git
   history first (`git log`, `robustness-backlog.md`'s 2026-09-03 triage
   commit) and found no specific technical objection survived the doc's
   later restructure, just terse `DROPPED` with a knob sketch -- reopening
@@ -299,7 +299,7 @@ standalone will likely be faster, not slower.
   drifts ~0.56 rad off the commanded heading even at n=2 -- not a bug,
   confirms known behavior. **Est. <1 min/checkpoint** for a real run
   (12 eps x 4 modes).
-- **Not built, deliberately:** `benchmark_resiliency.py` (the composite
+- Not built, deliberately: `benchmark_resiliency.py` (the composite
   dose-response tool) stays deferred until these four scripts' real
   findings inform its shape, per the plan's own reasoning. R10/R12/R4
   re-verification doesn't need new tooling -- `robustness_sweep.py`
@@ -323,11 +323,11 @@ sudden one-sided-drop destabilization, not a stuck-foot problem.
 
 **Finer sweep (15 episodes/level, `run20m_resid30_ppo`, bare robot):**
 
-- **20mm**: Learned falls: 0%; Scripted falls: 0%
-- **24mm**: Learned falls: 67%; Scripted falls: 100%
-- **27mm**: Learned falls: 47%; Scripted falls: 100%
-- **30mm**: Learned falls: 100%; Scripted falls: 100%
-- **33mm**: Learned falls: 100%; Scripted falls: 100%
+- 20mm: Learned falls: 0%; Scripted falls: 0%
+- 24mm: Learned falls: 67%; Scripted falls: 100%
+- 27mm: Learned falls: 47%; Scripted falls: 100%
+- 30mm: Learned falls: 100%; Scripted falls: 100%
+- 33mm: Learned falls: 100%; Scripted falls: 100%
 
 24-27mm is a genuine partially-recoverable band -- the learned policy
 already beats scripted here (incidentally, not by design). 30mm+ is
@@ -355,7 +355,7 @@ closed learned vision-in-the-policy, if not checked first).
 **Decision: option 1 only, reactive-based recovery training.** Contact
 sensing tabled as a real future option, not pursued now.
 
-**Sequencing, given the Phase 4a precedent:** Phase 4a (25mm/30% DR) already
+Sequencing, given the Phase 4a precedent: Phase 4a (25mm/30% DR) already
 tried almost exactly this and made ledge handling *worse* -- "robot backs
 away from steps" while halving nominal walk speed -- the textbook stalling
 failure `FAC_NOSTALL` exists to fix. Training ledge exposure before
@@ -364,7 +364,7 @@ round runs **after** `FAC_NOSTALL`'s round, not before it or bundled with
 it, same isolation reasoning as the gaitfriction_r1/FAC_NOSTALL sequencing
 decision earlier today.
 
-**Planned config, when this round comes up:** `LEDGE_HEIGHT=0.027`,
+Planned config, when this round comes up: `LEDGE_HEIGHT=0.027`,
 `LEDGE_RANDOMIZE=True` (trains across the whole 8-27mm range each episode,
 not a single fixed depth -- a natural curriculum from trivial to the
 genuinely-challenging point found above), `LEDGE_DIR=0` (**updated
@@ -406,7 +406,7 @@ with `B16` (`CliffGuard`, ledge/desk-edge avoidance, highest priority in
 the behavior backlog) already the planned answer for dangerous drops via
 avoidance rather than survival.
 
-**The reframe that changes this:** the target isn't "survive a dangerous
+The reframe that changes this: the target isn't "survive a dangerous
 drop" at all -- it's routine flooring-transition traversal (rug edges,
 doorway sills, tile-to-hardwood lips), which a home robot crosses dozens
 of times a day, not occasionally, and which mostly falls in exactly the
@@ -428,16 +428,16 @@ without the anti-stall fix in place).
 
 ### Round 1 — nostall_r1
 
-- **Started:** 2026-09-18, 3M steps, PID 87446. Base: clean resid30
+- Started: 2026-09-18, 3M steps, PID 87446. Base: clean resid30
   recipe -- gait-friction campaign's cadence-recalibration attempt
   (`PHASE_RATE_CORRECTION_ENABLED`) reverted to off first (also
   regressed, see `gait-friction-log.md`), so this round starts from the
   unmodified resid30 baseline, not a carryover experimental change.
-- **`FAC_NOSTALL=22.0`** (re-enabled from 0/off) -- not a fresh guess,
+- `FAC_NOSTALL=22.0`: (re-enabled from 0/off) -- not a fresh guess,
   the one real validated precedent (`G2E_FAC_NOSTALL=22`, Phase D
   vision-vs-blind A/B, 2026-09-07). `FAC_NOSTALL_BONUS=8.0` unchanged
   (already matched that precedent).
-- **Fixed before launch, not after:** the breakthrough-bonus half of the
+- Fixed before launch, not after: the breakthrough-bonus half of the
   mechanism only armed off a recent `TERRAIN_FEATURE` obstacle sighting --
   inert under the current recipe (`TERRAIN_FEATURE=False` project-wide,
   vision-in-gait closed), which would have silently dropped the bonus,
@@ -445,20 +445,20 @@ without the anti-stall fix in place).
   the same proprioceptive signal that drives the penalty) so the full
   mechanism actually fires without vision. Vision trigger kept, not
   replaced, for if `TERRAIN_FEATURE` is ever re-enabled.
-- **Smoke test:** passed clean before launch.
-- **What this round verifies:** the stalling-reduction bar (rubble,
+- Smoke test: passed clean before launch.
+- What this round verifies: the stalling-reduction bar (rubble,
   shoves, low-speed cells) that gates ledge-recovery training, *and*
   R12 (uneven terrain / stepped split) re-verification, folded in here
   rather than as a separate reward-design task -- `FAC_NOSTALL`'s
   mechanism is exactly the "gives up under resistance" fix R12's
   stalling pattern needs, direction- and terrain-agnostic.
-- **Completed:** 3,014,656 steps, converged (`approx_kl` ~0.0003).
+- Completed: 3,014,656 steps, converged (`approx_kl` ~0.0003).
   Checkpoint: `trained/nostall_r1_ppo.zip`.
 - **R12 re-check (side-hill, 12deg sustained cross-slope, 12 episodes,
   payload off) -- serious red flag, not a pass:**
 
-  - **`run20m_resid30_ppo` (baseline)**: Falls: 5/12 (42%); Mean speed: 0.061 m/s
-  - **`nostall_r1`**: Falls: **12/12 (100%)**; Mean speed: 0.072 m/s
+  - `run20m_resid30_ppo` (baseline): Falls: 5/12 (42%); Mean speed: 0.061 m/s
+  - `nostall_r1`: Falls: **12/12 (100%)**; Mean speed: 0.072 m/s
 
   Fall rate jumped from 42% to 100% under sustained lateral tilt -- a
   large, clear regression, not noise (n=12, both checkpoints tested on
@@ -484,7 +484,7 @@ localized side-hill issue (20 eps/cell, matched seeds):**
   the true stability picture lives (bare-robot, past-training-envelope
   cells).
 
-**Diagnosis before deciding round 2:** the likely culprit is the fix
+Diagnosis before deciding round 2: the likely culprit is the fix
 built for the `TERRAIN_FEATURE` dependency, not `FAC_NOSTALL`'s core
 mechanism. The one validated precedent (Phase D) had the breakthrough
 bonus firing only on a *vision-confirmed* obstacle -- rare, specific. The
@@ -508,9 +508,9 @@ either way until this resolves.
 Completed 2026-09-18, 3,014,656 steps, converged (`approx_kl` ~0.0007).
 Side-hill re-check (12deg sustained cross-slope, 12 episodes, matched seeds):
 
-- **`run20m_resid30_ppo` (baseline)**: 5/12 (42%)
-- **`nostall_r1` (penalty + bonus)**: 12/12 (100%)
-- **`nostall_r2` (penalty only, bonus=0)**: 12/12 (100%)
+- `run20m_resid30_ppo` (baseline): 5/12 (42%)
+- `nostall_r1` (penalty + bonus): 12/12 (100%)
+- `nostall_r2` (penalty only, bonus=0): 12/12 (100%)
 
 Identical failure with the bonus fully removed -- round 1's diagnosis (the
 standalone-trigger fix on the bonus was the culprit) is refuted. Didn't
@@ -520,7 +520,7 @@ confirmed the same broad pattern (fall rate nearly doubled, T9.1 undone)
 -- re-confirming that again wasn't going to change the decision, so
 skipped the ~20-25 min it would have cost.
 
-**Real mechanism, on reflection:** `FAC_NOSTALL`'s dense bleed penalty
+Real mechanism, on reflection: `FAC_NOSTALL`'s dense bleed penalty
 applies constant pressure against dropping below a speed floor, with no
 way to distinguish "giving up unnecessarily" (the actual target failure
 mode) from "correctly slowing down to stay balanced under sustained
@@ -548,7 +548,7 @@ queued but un-launched, pending either a genuinely different anti-stall
 approach in a future campaign, or a decision to attempt it without one
 and accept the Phase 4a risk knowingly.
 
-**Remaining resiliency queue, updated:** R8 (command dynamics) and
+Remaining resiliency queue, updated: R8 (command dynamics) and
 `JOINT_OFFSET_DEG` (check `robustness_sweep.py` coverage first) are both
 still live -- neither depends on `FAC_NOSTALL`. Moving to those next.
 

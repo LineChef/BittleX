@@ -10,7 +10,7 @@ B10_260527); bench results below ([confirmed on G2](#confirmed-on-g2-2026-10-24)
 An add-on gripper ("claw") for Bittle, sold as the **Bittle X+Arm** model. It lets the robot grab an object, carry it, show it off
 or throw it. It has its own firmware build, so the Desktop App model is **Bittle X+Arm**, not plain Bittle X.
 
-**Safety (from the page):** keep hands out of the claws while the arm moves (pinch hazard).
+Safety (from the page): keep hands out of the claws while the arm moves (pinch hazard).
 
 ## Install
 
@@ -33,13 +33,13 @@ The page shows calibration screenshots for **BiBoard_V0 and BiBoard_V1** (G2 has
 
 Send with a lowercase `k` prefix (e.g. `kpickF`), like any OpenCat skill.
 
-- **`pickD` `pickF` `pickL` `pickR`**: pick up an object below / in front / left / right
-- **`putD` `putF` `putL` `putR`**: put the grasped object below / in front / left / right
-- **`launch`**: launch the grasped object forward (same as "toss down")
-- **`tossF` `tossL` `tossR`**: throw the grasped object forward / left / right
-- **`hunt`**: quickly grasp the object in front
-- **`showOff`**: show the grasped object
-- **`clap`**: clap with the gripper
+- `pickD` `pickF` `pickL` `pickR`: pick up an object below / in front / left / right
+- `putD` `putF` `putL` `putR`: put the grasped object below / in front / left / right
+- `launch`: launch the grasped object forward (same as "toss down")
+- `tossF` `tossL` `tossR`: throw the grasped object forward / left / right
+- `hunt`: quickly grasp the object in front
+- `showOff`: show the grasped object
+- `clap`: clap with the gripper
 
 A token without a direction suffix (`kpick`, `kput`, `ktoss`) picks one of the directions at random. `hunt`, `showOff` and `clap`
 have no directional variants.
@@ -67,13 +67,13 @@ Never send `Xa`/`XAd` to the voice module (see the project rule in the repo CLAU
 
 ## Other control surfaces
 
-- **Mobile app:** download the arm's command config file attached to the Petoi page and batch-import the buttons
+- Mobile app: download the arm's command config file attached to the Petoi page and batch-import the buttons
   ([import steps](https://docs.petoi.com/mobile-app/controller.md#import-commands-in-batches)).
-- **Mind+ / Petoi Coding Blocks:** the **Perform robot arm skill** block runs the predefined skills.
-- **Skill Composer** (Desktop App): author new arm skills and export them to the mobile app, a Mind+ program or source code
+- Mind+ / Petoi Coding Blocks: the **Perform robot arm skill** block runs the predefined skills.
+- Skill Composer: (Desktop App): author new arm skills and export them to the mobile app, a Mind+ program or source code
   ([Skill Composer](https://docs.petoi.com/desktop-app/skill-composer),
   [source-code skill creation](https://docs.petoi.com/applications/skill-creation)).
-- **Sensors:** the page says the arm can be combined with other sensors, with the Grove Vision AI V2 as the example
+- Sensors: the page says the arm can be combined with other sensors, with the Grove Vision AI V2 as the example
   ([page](https://docs.petoi.com/extensible-modules/advanced-development-and-application-of-ai-vision-modules)). Adding sensors
   needs source-code changes; the page says a sample demo is "in progress" and gives none.
 
@@ -106,10 +106,10 @@ they can be decoded from the vendored file. `carpetF`, `jpF` and the others have
 What the arm gaits change, against the stock gait (decoded from the vendored table; foot positions from the sim URDF at the keyframe
 angles, approximate: lower-leg centre, not the foot tip):
 
-- **walk `wkF` → `wkArmF`**: Frames per cycle (stock → arm): 116 → 43; Mean front shoulder: 47° → 29°; Front feet, average position: +0.65 in further forward; front stride 2.1 → 1.8 in; Rear: unchanged position; rear shoulder sweep 53° → 38°
-- **trot `trF` → `trArmF`**: Frames per cycle (stock → arm): 48 → 56; Mean front shoulder: 30° → 25°; Front feet, average position: +0.17 in forward; stride 2.0 → 2.4 in; Rear: about unchanged
-- **crawl `crF` → `crArmF`**: Frames per cycle (stock → arm): 103 → 67; Mean front shoulder: 64° → 56°; Front feet, average position: +0.1 in forward; stride 1.6 → 1.2 in; Rear: unchanged
-- **vault `vtF` → `vtArmF`**: Frames per cycle (stock → arm): 37 → 24; Mean front shoulder: 43° → 36°; Front feet, average position: +0.17 in forward; Rear: rear shoulders 57° → 50°
+- walk `wkF` → `wkArmF`: Frames per cycle (stock → arm): 116 → 43; Mean front shoulder: 47° → 29°; Front feet, average position: +0.65 in further forward; front stride 2.1 → 1.8 in; Rear: unchanged position; rear shoulder sweep 53° → 38°
+- trot `trF` → `trArmF`: Frames per cycle (stock → arm): 48 → 56; Mean front shoulder: 30° → 25°; Front feet, average position: +0.17 in forward; stride 2.0 → 2.4 in; Rear: about unchanged
+- crawl `crF` → `crArmF`: Frames per cycle (stock → arm): 103 → 67; Mean front shoulder: 64° → 56°; Front feet, average position: +0.1 in forward; stride 1.6 → 1.2 in; Rear: unchanged
+- vault `vtF` → `vtArmF`: Frames per cycle (stock → arm): 37 → 24; Mean front shoulder: 43° → 36°; Front feet, average position: +0.17 in forward; Rear: rear shoulders 57° → 50°
 
 The leg timing (which legs move together) is the same in each pair; `wkArmF` keeps `wkF`'s phase offsets within 0.02 of a cycle. The
 pattern: a smaller front shoulder angle places the front feet further forward, under the claw's weight, and the walk cycle is shorter
@@ -129,32 +129,32 @@ shift that becomes front shoulders 15, rear 20, front knees 56, rear 50: a stanc
 
 ### 3. Other arm-build differences
 
-- **Servo model:** all 16 joints are set to `P1S` (angle range 290°) instead of the stock Bittle X build's `P1L` (270°) (`OpenCat.h`,
+- Servo model: all 16 joints are set to `P1S` (angle range 290°) instead of the stock Bittle X build's `P1L` (270°) (`OpenCat.h`,
   `espServo.h`). Pulse range (500–2500 µs) is the same, so one degree is 6.9 µs instead of 7.4 µs. If G2's leg servos are the same
   physical servos the stock build drives as P1L, every commanded angle (firmware skills and the Pi's `i` stream from the policy alike)
   would move about 7% less, and calibration offsets scale the same way. Which is true is not stated anywhere found; measure it on the
   bench after the flash (command a known angle and compare).
-- **Joint 1** (the arm's lift) is limited to −10..180° instead of ±85°. During gaits it is held at 0, or 50 for any `bk` gait; the stock
+- Joint 1: (the arm's lift) is limited to −10..180° instead of ±85°. During gaits it is held at 0, or 50 for any `bk` gait; the stock
   build's small head sway during gaits is off.
-- **The claw** is joint 2 ("assigned to the tail joint"). It is left out of the ±3° random posture shift and is not mirrored in mirrored
+- The claw: is joint 2 ("assigned to the tail joint"). It is left out of the ±3° random posture shift and is not mirrored in mirrored
   behaviours. Calibration `c-2` finds its closed point by vibration, using the IMU.
-- **Lifted recovery:** the automatic `dropRec` when G2 is picked up is disabled (the skill itself is still in the table).
-- **Skill table:** 85 skills instead of 93. Not checked: which eight were dropped, and what the `R` serial token (`T_ROBOT_ARM`) does.
+- Lifted recovery: the automatic `dropRec` when G2 is picked up is disabled (the skill itself is still in the table).
+- Skill table: 85 skills instead of 93. Not checked: which eight were dropped, and what the `R` serial token (`T_ROBOT_ARM`) does.
 
 ### Rest and recovery poses in the arm build
 
 Joint 1 (the arm's lift) per pose, arm build against stock (stock joint 1 is the head tilt). Legs are the same as stock unless noted, and
 postures then get the −10 shift from 2.
 
-- **`rest`**: Arm build: joint 1 at 60, pan and claw 0; Stock: head −30 / −80 (tilted down), tail −45; Note: the stock rest dips the head down; the arm build holds the arm at 60 instead
-- **`sit`**: Arm build: 0; Stock: 0, tail −45; Note: same legs
-- **`balance` / `up`**: Arm build: 0; Stock: 0; Note: legs differ (see 2)
-- **`dropped`**: Arm build: 101; Stock: 30
-- **`str` (stretch)**: Arm build: 100; Stock: 30; Note: legs −60 front shoulders (stock −75)
-- **`buttUp` (bow)**: Arm build: 95; Stock: 40; Note: a much shallower bow: front shoulders 40 (stock 90), rear 18 (stock 45)
-- **`lifted`**: Arm build: −20; Stock: −20; Note: identical
-- **`dropRec`**: Arm build: 40; Stock: 40; Note: identical first frames
-- **`rc` (self-right)**: Arm build: 7 frames; Stock: 5 frames; Note: two new opening frames hold the arm at 25 with the legs tucked (35 / −28), then the stock flip sequence with the arm at 30
+- `rest`: Arm build: joint 1 at 60, pan and claw 0; Stock: head −30 / −80 (tilted down), tail −45; Note: the stock rest dips the head down; the arm build holds the arm at 60 instead
+- `sit`: Arm build: 0; Stock: 0, tail −45; Note: same legs
+- `balance` / `up`: Arm build: 0; Stock: 0; Note: legs differ (see 2)
+- `dropped`: Arm build: 101; Stock: 30
+- `str` (stretch): Arm build: 100; Stock: 30; Note: legs −60 front shoulders (stock −75)
+- `buttUp` (bow): Arm build: 95; Stock: 40; Note: a much shallower bow: front shoulders 40 (stock 90), rear 18 (stock 45)
+- `lifted`: Arm build: −20; Stock: −20; Note: identical
+- `dropRec`: Arm build: 40; Stock: 40; Note: identical first frames
+- `rc` (self-right): Arm build: 7 frames; Stock: 5 frames; Note: two new opening frames hold the arm at 25 with the legs tucked (35 / −28), then the stock flip sequence with the arm at 30
 
 The nose-down poses (`dropped`, `str`, `buttUp`) and `rest` put joint 1 highest, which suggests positive joint 1 lifts the arm clear of
 the floor. The source does not say so; check the direction on the bench before relying on it. `rc` and `dropRec` are behaviours, so the
@@ -163,11 +163,11 @@ walk (`i` commands), so the arm stays where the last firmware posture put it.
 
 ### Timing and gyro balance
 
-- **Frame rate.** A firmware gait advances one frame per pass of the main loop, with no delay in the gait branch (`skill.h`), so its cycle
+- Frame rate: A firmware gait advances one frame per pass of the main loop, with no delay in the gait branch (`skill.h`), so its cycle
   time is set by the loop speed and is not in the source. `wkArmF` has 43 frames against `wkF`'s 116, so at the same loop speed it cycles
   about 2.7 times faster. Measure it on G2 (`fw_skill_log.py kwkF` under the arm build) before matching it in the sim, where the base is
   played at `PHASE_RATE_NOM_CMD` (today 1.25 s per cycle at the nominal command).
-- **Gyro balance** (`motion.h` `adjust()`, applied in `perform()` only while `gyroBalanceQ` is on, firmware default on): every few frames
+- Gyro balance: (`motion.h` `adjust()`, applied in `perform()` only while `gyroBalanceQ` is on, firmware default on): every few frames
   it takes roll and pitch minus the skill's expected roll and pitch, ignores a dead band (5 deg roll, 3 deg pitch), and adds a
   proportional per-joint correction (pitch pushes front and rear legs opposite ways, roll left and right). The change per update is capped
   by `ADJUSTMENT_DAMPER` and the total is clamped. The source shown does not say whether it also acts on angles streamed with `i`. G2 keeps
@@ -179,12 +179,12 @@ walk (`i` commands), so the arm stays where the last firmware posture put it.
 `gait_probe.py wkf wkArm` (no policy, no gyro balance, the 481 g `pod` payload with the AI head, no claw mass; both walks at the same
 1.25 s cycle; 40 episodes per cell, 20 per ladder rung). Reference file: `reference_gait/wkArm_ref.npy` (`build_skill_reference.py wkArmF`).
 
-- **Falls, six cells (flat, downhill, cross-slope, rubble, boxes, ledge)**: `wkF`: 0 to 10%; `wkArmF`: 0% in every cell
-- **Calm walk speed**: `wkF`: 3.6 in/s; `wkArmF`: 2.6 in/s (shorter stride at the same cycle)
-- **Roll spread / heading after 12.5 s**: `wkF`: 2.2 deg / −4 deg; `wkArmF`: 1.6 deg / −1 deg
-- **Foot clearance (90th percentile)**: `wkF`: 0.53 in; `wkArmF`: 0.38 in
-- **Step up 0.3 in: success**: `wkF`: 40%; `wkArmF`: 0% (no step-up rung cleared)
-- **Step down 0.9 in: falls / success**: `wkF`: 95% / 5%; `wkArmF`: 25% / 20%
+- Falls, six cells (flat, downhill, cross-slope, rubble, boxes, ledge): `wkF`: 0 to 10%; `wkArmF`: 0% in every cell
+- Calm walk speed: `wkF`: 3.6 in/s; `wkArmF`: 2.6 in/s (shorter stride at the same cycle)
+- Roll spread / heading after 12.5 s: `wkF`: 2.2 deg / −4 deg; `wkArmF`: 1.6 deg / −1 deg
+- Foot clearance (90th percentile): `wkF`: 0.53 in; `wkArmF`: 0.38 in
+- Step up 0.3 in: success: `wkF`: 40%; `wkArmF`: 0% (no step-up rung cleared)
+- Step down 0.9 in: falls / success: `wkF`: 95% / 5%; `wkArmF`: 25% / 20%
 
 Open loop, the arm walk is steadier than `wkF` on today's payload and cannot step up at all. Not yet tested: the claw's mass and position,
 and Petoi's faster cycle.
@@ -196,35 +196,35 @@ arm build, and ARM1 trains on `wkArmF` with the claw in the sim ([`../guides/att
 [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). The analysis as written before the install:
 
 
-- **The learned walk is not affected by 1 or 2.** The Pi computes the walk from `wkf_ref.npy` (stock `wkF`) and streams joint angles,
+- The learned walk is not affected by 1 or 2. The Pi computes the walk from `wkf_ref.npy` (stock `wkF`) and streams joint angles,
   so the firmware's gait swap and the shift never apply to it. Only the servo-model scaling would.
-- **Firmware skills G2 plays are affected:** `kcarpetF` (carpet mode) gets the −10 shift; `kwkL` (turn) becomes `wkArmL`, and `kwkR` its mirror if `R`
+- Firmware skills G2 plays are affected: `kcarpetF` (carpet mode) gets the −10 shift; `kwkL` (turn) becomes `wkArmL`, and `kwkR` its mirror if `R`
   resolves as it does for stock skills (not checked).
-- **The eased stand-up and transitions would land wrong.** `pi_pipeline/gait/standup.py` and `link/transitions.py` assume the stock
+- The eased stand-up and transitions would land wrong. `pi_pipeline/gait/standup.py` and `link/transitions.py` assume the stock
   poses (`REST_URDF_DEG` 75 / −55, `BALANCE_URDF_DEG` 30 / 30, `SIT_URDF_DEG`). Under the arm build, `kbalance` is front shoulders
   15 / knees 56, rear 20 / 50, and rest is shifted too, so the ramp's end and the firmware's pose would disagree and G2 would jump at the
   hand-over. These tables need arm-build values, chosen from the fitted attachment.
-- **The `head` attachment's firmware check accepts `Bittle X+Arm`** ([`../guides/attachments.md`](../guides/attachments.md)). Given all
+- The `head` attachment's firmware check accepts `Bittle X+Arm` ([`../guides/attachments.md`](../guides/attachments.md)). Given all
   of the above, the arm build is not a neutral superset; leaving it on for the head or no attachment changes every posture.
-- **For a new policy:** the arm build's own answer to the claw's weight is front feet forward plus a faster, shorter walk. In sim terms that
+- For a new policy: the arm build's own answer to the claw's weight is front feet forward plus a faster, shorter walk. In sim terms that
   points to a payload profile with the claw's measured mass and position, and either the stock `wkF` reference with the policy left to
   learn the shift, or `wkArmF` decoded as the imitation reference (`build_skill_reference.py wkArmF`). Both are open choices, not decisions.
 
 ## Confirmed on G2 (2026-10-24)
 
-- **Flashing:** the Desktop App's Firmware Uploader could not select the BiBoard: its port dropdown draws three rows, and the BiBoard's `cu.usbmodem` port
+- Flashing: the Desktop App's Firmware Uploader could not select the BiBoard: its port dropdown draws three rows, and the BiBoard's `cu.usbmodem` port
   was the fourth (after `cu.debug-console` and two Bluetooth ports), so every try went to `cu.debug-console` ("No serial data received"). The flash ran from
   the terminal with the app's own command and files (`FirmwareUploader.py`; `Contents/Resources/resources/esptoolMac/esptool --chip esp32 --port
   /dev/cu.usbmodem... --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 4MB 0x1000
   bootloader 0x8000 partitions 0xe000 boot_app0 0x10000 app`, from `release/2.0/BittleX+Arm/BiBoard_V1_0/`). The app reports a `usbmodem` port as
   "non-preferred" (it prefers `wchusbserial`, the name with WCH's own driver); that is harmless.
-- **The stored calibration survived the flash** (no first-boot questions); the calibrator names joints 0 to 2 Claw Pan, Claw Lift and Claw Open.
-- **Boot:** the firmware ends its start-up with `rest` then `d`, so the servos are off until a pose: an `i` command then updates the board's record but
+- The stored calibration survived the flash: (no first-boot questions); the calibrator names joints 0 to 2 Claw Pan, Claw Lift and Claw Open.
+- Boot: the firmware ends its start-up with `rest` then `d`, so the servos are off until a pose: an `i` command then updates the board's record but
   does not move anything.
-- **Arm lift (joint 1):** higher values swing the claw forward and out; 0 is the walking pose (the arm hanging down in front of the chest, the claw level and
+- Arm lift (joint 1): higher values swing the claw forward and out; 0 is the walking pose (the arm hanging down in front of the chest, the claw level and
   forward: a reverse L). **Claw (joint 2):** positive opens it, 0 closes it fully.
-- **Poses:** stand stable with the claw about 1 in off the floor; sit clear; at rest (lift 59) the claw rests against the floor.
-- **The voice module came back in Chinese**, as after every reflash; the Pi's start-up sets it to English.
+- Poses: stand stable with the claw about 1 in off the floor; sit clear; at rest (lift 59) the claw rests against the floor.
+- The voice module came back in Chinese: , as after every reflash; the Pi's start-up sets it to English.
 
 ## What the page does not say
 

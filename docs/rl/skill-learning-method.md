@@ -32,10 +32,10 @@ scaffold that gets the robot into the configurations from which the hard part is
 
 `joint_target = base(phase) + policy_action · RES_DEG`, position-controlled.
 
-- **`RES_DEG` small** — 20–30°. The base does most of the motion; the policy
+- `RES_DEG` small: 20–30°. The base does most of the motion; the policy
   nudges and balances. Too large and an untrained policy overrides the base into
   chaos ("looks frozen / falls over").
-- **Small initial action std** — `log_std_init ≈ −1.4` (std ~0.25). Early in
+- Small initial action std: `log_std_init ≈ −1.4` (std ~0.25). Early in
   training the residual is near-zero, so the base executes cleanly and the policy
   learns gentle corrections from a good starting point instead of thrashing.
 - The policy's real value is **closed-loop balance** — it takes the IMU every
@@ -46,10 +46,10 @@ scaffold that gets the robot into the configurations from which the hard part is
 A narrow task env (standalone PyBullet — do **not** subclass the walk env).
 
 - Domain-randomise the thing that matters (ledge height, obstacle type/shape).
-- **Curriculum**: start easy enough that there's positive signal, ramp difficulty
+- Curriculum: start easy enough that there's positive signal, ramp difficulty
   over the first ~half of training (a `BaseCallback` that calls an env setter).
 - Spawn in the pose/velocity the walk actually hands off in.
-- **Don't stack two unsolved problems.** If the skill needs perception, feed it
+- Don't stack two unsolved problems: If the skill needs perception, feed it
   **ground-truth** from the sim for the first runs. Prove the motion is
   learnable, *then* wire the real detector.
 
@@ -58,20 +58,20 @@ A narrow task env (standalone PyBullet — do **not** subclass the walk env).
 Watch what the policy actually does, name the failure mode, change one thing,
 rerun, write a one-line update. Hard-won rules:
 
-- **Don't penalise per-step the thing the skill needs.** A heavy per-tick body-
+- Don't penalise per-step the thing the skill needs. A heavy per-tick body-
   pitch penalty made the climb policy refuse to lean → it did nothing. Make
   aversive states **terminal-only** (big penalty for an actual flip) or gate
   them (free up to a threshold).
-- **Kill the do-nothing optimum.** "Stand still and stay safe" will win if it
+- Kill the do-nothing optimum: "Stand still and stay safe" will win if it
   can. Add an anti-stall penalty / require forward progress / end the episode on
   a long stall.
-- **Intermediate rewards get hacked.** Examples encountered: a "front feet on the
+- Intermediate rewards get hacked: Examples encountered: a "front feet on the
   ledge" bonus → policy parks there; an asymmetric-clipped "height-gain" term →
   policy oscillates the feet to farm it. Prefer **potential-based shaping**:
   `R += SCALE · (Φ(s′) − Φ(s))` where `Φ` is negative distance-to-goal. It
   telescopes over the episode, so per-step up/down gaming cancels — only net
   progress toward the goal pays.
-- **Trust the eval, not the training curve.** If `ep_rew_mean` rises while a
+- Trust the eval, not the training curve: If `ep_rew_mean` rises while a
   deterministic eval gets *worse*, that's reward hacking. Every iteration: run
   `eval_climb.py`-style N-episode deterministic eval + render the best episode.
 - Big **terminal bonus** for the true success state; big **terminal penalty**

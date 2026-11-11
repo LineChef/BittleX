@@ -5,7 +5,7 @@
 
 ## Phase 7 — Voice + Claude integration
 
-**Status:** the pipeline runs end-to-end on a dev machine in text mode —
+Status: the pipeline runs end-to-end on a dev machine in text mode —
 `pi_pipeline/voice/` (own venv). `wake → STT → Claude → TTS → skill`, every
 hardware-specific stage behind an interface (`MockActuator`/`SerialActuator`,
 `MacTTS`/`PiperTTS`, `TextSTT`/`VoskSTT`, `AlwaysAwake`/`VoskWakeWord`). Claude
@@ -77,31 +77,31 @@ echo $! > ~/voice.pid          # stop it with: kill $(cat ~/voice.pid)
 
 What was learned:
 
-- **Speech recognition is the weak link.** The small Vosk model mishears short phrases: "command mode off" came out as "man mode off",
+- Speech recognition is the weak link: The small Vosk model mishears short phrases: "command mode off" came out as "man mode off",
   "the man load off". "walk forward", "stand up" and the wake word "gee two" were all heard correctly. A second recognition pass
   limited to a few phrases fixed the mishearing on synthesized speech, but it was removed along with the command-mode feature.
   Measured on the Pi: Vosk runs 2.22x slower than real time on a whole file and Piper 1.72x ([`guides/pi-bring-up.md`](../guides/pi-bring-up.md) §8);
   live streaming latency after you stop speaking is still unmeasured.
-- **Timing, from the logs:** wake word heard, then the utterance, then about 2 s from "heard" to the walk starting (Claude 2.6 s). A first
+- Timing, from the logs: wake word heard, then the utterance, then about 2 s from "heard" to the walk starting (Claude 2.6 s). A first
   63 s gap in a mock run was just the speaker waiting to talk.
-- **Set `G2_FOLLOW_UP_S=0` on the robot (done 2026-10-04).** With the follow-up window open, a basic command meant for G2's own voice module (e.g. "stand up") that
+- Set `G2_FOLLOW_UP_S=0` on the robot (done 2026-10-04): With the follow-up window open, a basic command meant for G2's own voice module (e.g. "stand up") that
   is said within the window is also heard by the Pi, sent to Claude and acknowledged with the Claude beep. At 0, Claude only ever hears speech that begins
   with "gee two", and the beep means a command went to Claude. The cost is saying "gee two" for every turn.
-- **A conversation stays open for ~60 s** (the default when `G2_FOLLOW_UP_S` is unset) after any exchange (the follow-up window), so the next thing you say needs no wake word and goes
+- A conversation stays open for ~60 s: (the default when `G2_FOLLOW_UP_S` is unset) after any exchange (the follow-up window), so the next thing you say needs no wake word and goes
   straight to Claude. That is why "stand up" said right after another command still made G2 stand.
-- **Claude cannot count steps, but it can now set a duration (added 2026-10-03).** `perform_skill` takes an optional `seconds`
+- Claude cannot count steps, but it can now set a duration (added 2026-10-03). `perform_skill` takes an optional `seconds`
   for looping gaits (walk, trot, crawl): "walk forward for eight seconds" sends `kwkF` and the actuator sends the stop 8 s later. Without
   `seconds` the walk runs until stopped, as before. Values are clamped to 60 s (`skills.MAX_GAIT_SECONDS`); a standing gait cap
   (`G2_MAX_GAIT_S`), if set, is a hard ceiling over any requested duration; one-shot skills ignore it. Checked with the live API and the mock
   actuator only, not yet on G2. Distances are not calibrated: asked to "walk about two metres", Claude guessed 8 s. A real distance needs G2's
   measured walking speed (tape-measured runs at a few durations), then a metres → seconds conversion.
-- **The gait cap is an optional switch, off by default.** It makes the serial actuator send the stop after N seconds unless another skill
+- The gait cap is an optional switch, off by default. It makes the serial actuator send the stop after N seconds unless another skill
   or `stop()` arrives first (the stop token is `d`, rest posture, servos off). Turn it on per run with `--max-gait-s 5`, or for every
   run (voice loop and the full app) with `G2_MAX_GAIT_S=5` in `.env`; the flag overrides the setting, and `0` means off. Keep it on while
   testing walks by voice; whether to keep it long term is undecided.
-- **Logging the heard transcript is opt-in.** `G2_LOG_HEARD=1` writes each recognised utterance to the log at INFO; without it the
+- Logging the heard transcript is opt-in: `G2_LOG_HEARD=1` writes each recognised utterance to the log at INFO; without it the
   transcript is not logged (a debug-level line is filtered out by the diag logger's INFO floor).
-- **Buzzer cues (added 2026-10-04).** With the real actuator, the voice loop beeps G2's buzzer when a command is on its way to Claude (stage `thinking`), so you
+- Buzzer cues (added 2026-10-04): With the real actuator, the voice loop beeps G2's buzzer when a command is on its way to Claude (stage `thinking`), so you
   can tell it heard you with no speaker. The sound is a low rising two-note blip (note 4 then 9, `LOW_CUES` in
   `voice/cues.py`); a longer whistle-style cue was drafted and set aside for now. **Update 2026-10-04: with the speaker working, the acknowledgement for a Claude-bound command is now a continuous whistle played through the speaker (`ack_whistle`, `voice/ack_whistle.py`, `G2_ACK_TONE`, level `G2_ACK_PEAK`, default 0.0225) **Sound library (all play through the speaker):** `short_tone` (the acknowledgement, one short blip at 5%; `voice/short_tone.py`), `ack_whistle` (G2's battery alert, 10%; `voice/ack_whistle.py`) and `red_alert_siren` (a siren whose fundamental climbs ~390 to ~875 Hz with strong harmonics, fitted to a reference clip's measured pitch path, harmonic weights and loudness, and played twice; `voice/red_alert_siren.py`; a plain single sweep and lower copies of it were tried first and were too high and too narrow), which is the Pi's battery alert (10%)., because the buzzer can only beep in separate notes.** **Only Claude-bound commands beep by default** (`G2_CUE_STAGES=thinking`); the wake word and local commands like "chirps on" are silent, and
   `listening` / `heard` can be switched back on in that setting. The buzzer volume is set at start from the one global volume (`G2_VOLUME`, `sound_levels.buzzer_level`; 2026-11-02). Notes are semitone numbers
@@ -109,22 +109,22 @@ What was learned:
   divisor of one second, so a longer note is a *smaller* number. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token
   interrupts the gait. More background and a plan for a larger sound set: [`research/buzzer-sounds.md`](../research/buzzer-sounds.md).
   The end-of-speech window `G2_STT_SILENCE_S` (default 0.5 s) is counted in 0.25 s blocks.
-- **Spoken replies on (2026-10-04).** The amp and speaker work (a spoken test phrase and a 440 Hz tone both played through card 0, the voiceHAT/I2S card, which is also the
+- Spoken replies on (2026-10-04): The amp and speaker work (a spoken test phrase and a 440 Hz tone both played through card 0, the voiceHAT/I2S card, which is also the
   ALSA default). Set `G2_TTS=piper` in the Pi's `.env` for spoken replies. The voice is streamed: each finished sentence is synthesised by Piper on one thread while the
   previous one plays on another (`_SpeechWorker`, `PiperTTS.prepare/play`), so a long answer starts after the first sentence and then runs without gaps. The first
   sentence still waits for its own synthesis (Piper is ~1.7x slower than speech on this Pi). While G2 speaks, the BiBoard's own voice module can hear it, so a
   reply containing one of its command words could trigger it; say "be quiet" to G2 first to switch the module off for a session.
-- **Question window (2026-10-04).** With the general follow-up window off, G2 listens on without the wake word only after it asks a question, for `G2_QUESTION_WINDOW_S` (default 8 s),
+- Question window (2026-10-04): With the general follow-up window off, G2 listens on without the wake word only after it asks a question, for `G2_QUESTION_WINDOW_S` (default 8 s),
   starting when it finishes speaking, for that one turn. It counts as a question when the reply ends in a "?", or when Claude calls the new `await_reply` tool (for
   questions without a "?" such as "let me know what you think"). Checked against the live API: "how are you feeling today?" and "I'm bored" opened the window, "wave hello" did not.
   A basic G2 command said inside that window would still go to Claude, which is acceptable mid-conversation.
-- **Robot voice (2026-10-04).** G2's replies use a robot voice chosen by listening to seven candidates on the real speaker: `metal` (the winner) is the speech flattened to a
+- Robot voice (2026-10-04): G2's replies use a robot voice chosen by listening to seven candidates on the real speaker: `metal` (the winner) is the speech flattened to a
   steady ~125 Hz buzz (each frame's phase is discarded and the frames are laid down at a fixed period, so the words survive but the melody does not) plus a short metallic
   feedback ring. Runners-up: `deep` (lower and slower, a bigger robot, harder to follow). `G2_VOICE_STYLE` picks any of `plain | current | dalek | monotone | metal | retro | deep`
   (`voice/effects.py` `VOICES`); the old `G2_VOICE_ROBOT_EFFECT=0` still means plain. The effect runs on each sentence after Piper synthesises it.
-- **One shared Vosk model (2026-10-04).** The wake-word detector and the speech-to-text recogniser each used to load their own copy of the acoustic model, the biggest
+- One shared Vosk model (2026-10-04): The wake-word detector and the speech-to-text recogniser each used to load their own copy of the acoustic model, the biggest
   thing in the Pi's 416 MB. They now share one (`voice/vosk_model.py`). Before: ~296 MB used, 119 MB available, 308 MB of swap in use with the voice service, Piper and Vosk loaded.
-- **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
+- Two listeners: G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it
   (module said "ok" but the body ignored commands) until an uppercase `XA` restored it; details in
@@ -133,19 +133,19 @@ What was learned:
 
 Open / next:
 
-- **Paused 2026-10-03 night: G2 ran out of power; resume after a recharge.** State when it stopped:
+- Paused 2026-10-03 night: G2 ran out of power; resume after a recharge. State when it stopped:
   - The boot service is **installed and enabled** on the Pi (`pi_pipeline/install_voice_service.sh`, unit `g2-voice`; speech output set
     to print via `G2_TTS=print` in the Pi's `.env`; no gait cap set). It had been stopped by hand for the pause, but it is enabled, so
     **it will start by itself on the next boot and G2 will act on "gee two" commands** (watch logs: `journalctl -u g2-voice -f`; stop:
     `sudo systemctl stop g2-voice`). Not yet verified that it comes up on its own after a power cycle.
-  - **The BiBoard's own basic voice commands stopped responding** late in the session (after working earlier), and G2 then lost power.
+  - The BiBoard's own basic voice commands stopped responding late in the session (after working earlier), and G2 then lost power.
     Not diagnosed: it may simply have been low battery. After recharging, first say "play sound" (tone = module on); if there is no
     tone, say it again closer, then power-cycle the whole body, then check the dial on the hat ("Voice Command"). Idea not yet tried: unplug
     the Pi's TX2/RX2 jumpers to see if the shared serial line interferes. Never send `X` tokens for this (see the warning in the
     firmware reference).
   - Still to do, in order: confirm the module works after the recharge; the "rest" interrupt test above; verify the service starts on boot;
     decide on the gait cap; speaker and amp, then `G2_TTS=piper`.
-- **Resume here (paused 2026-10-03): the "rest" interrupt test.** Goal: confirm G2's own voice module can stop a walk that Claude started.
+- Resume here (paused 2026-10-03): the "rest" interrupt test. Goal: confirm G2's own voice module can stop a walk that Claude started.
   Clean version, so the Pi can't also act: (1) the BiBoard module is on (say "play sound", hear the tone); (2) start the Pi loop with
   `--actuator serial --max-gait-s 20` as a backstop; (3) say "gee two", pause, "walk forward"; (4) the moment `walk_forward` is logged,
   kill the Pi loop; (5) say "rest" and note how fast G2 stops; if it doesn't, send `d` over serial. A first attempt with the Pi still

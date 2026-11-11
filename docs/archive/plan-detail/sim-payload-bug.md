@@ -41,7 +41,7 @@
 >    its own documented approximations (open-loop, no IMU-triggered waits, no
 >    gyro-balance layer, decoded keyframes). For all that is known, the real get-up
 >    commands do work; don't treat the old sim result as final.
->    **2026-09-24 addition:** `models/bittle_esp32.urdf`'s joint limits are
+>    2026-09-24 addition: `models/bittle_esp32.urdf`'s joint limits are
 >    ±90° (±1.57 rad) across every joint — confirmed by inspection. A related
 >    open-source Bittle X MuJoCo model (`MarcHesse/bittle-mujoco`, found
 >    researching community Bittle projects) widened its own limits to ±149°

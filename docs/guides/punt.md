@@ -18,7 +18,7 @@ Everything needed to dial in the punt is on this page.
 
 ## 2. Run one attempt
 
-**By voice (G2 must be listening):** say **"G2, punt"**. He says "Punting.", the voice service steps aside, and one attempt runs. He rests at the end and the voice service comes back.
+By voice (G2 must be listening): say **"G2, punt"**. He says "Punting.", the voice service steps aside, and one attempt runs. He rests at the end and the voice service comes back.
 Other phrases that work: "punt it", "punt the ball", "go punt", "do a punt", "punt test".
 
 **From the Mac, no voice (same thing):**
@@ -68,41 +68,41 @@ What is heard: **"target acquired"** when he sees the ball (again), **"searching
 
 ## 4. The settings: what they are, where they live, how to change them
 
-**The file:** `~/.local/share/g2/punt_settings.json` on the Pi. A missing file, or a missing line in it, means the default. It lives outside the repo, so **a deploy does not overwrite it**.
+The file: `~/.local/share/g2/punt_settings.json` on the Pi. A missing file, or a missing line in it, means the default. It lives outside the repo, so **a deploy does not overwrite it**.
 It is read at the **start of every run** (voice or not), so a change takes effect on the next attempt.
 
-- **`punt_max_in`**: Default: 4.0; Allowed: 1 to 10; What it does and which way to change it: **The main one.** He punches when the ball is this close or closer. Punch too early (ball out of reach, claw misses): **lower** it. Walks into the ball before punching: **raise** it.
-- **`nudge_max_in`**: Default: 7.0; Allowed: 1 to 12; What it does and which way to change it: From `punt_max_in` out to this distance he takes small steps closer before punching. Set it **equal to `punt_max_in`** for no small steps.
-- **`nudges_before_punt`**: Default: 3; Allowed: 0 to 10; What it does and which way to change it: After this many small steps that did not get him in range he punches anyway.
-- **`nudge_step_s`**: Default: 0.9; Allowed: 0.3 to 2.5; What it does and which way to change it: Length of one small step closer. Shorter = finer, but a walk covers nothing in its first 0.7 s or so.
-- **`nudge_gait`**: Default: scripted; Allowed: scripted, policy; What it does and which way to change it: How the small steps closer (and the step closer after a punt) are walked
-- **`walk_aim_in`**: Default: 4.0; Allowed: 1.5 to 8; What it does and which way to change it: The long walk steps are timed to leave the ball about this far away. Overshoots into the ball: **raise** it. Stops far away: **lower** it.
-- **`punt_align_deg`**: Default: 12; Allowed: 2 to 30; What it does and which way to change it: The ball must be within this many degrees of straight ahead before the punch. Ball goes crooked: **lower**. He turns and turns and never punches: **raise**.
-- **`punch_lunge_s`**: Default: 0.12; Allowed: 0.05 to 0.6; What it does and which way to change it: Seconds the lunge takes. Smaller = harder and faster.
-- **`punch_hold_s`**: Default: 0.25; Allowed: 0 to 1; What it does and which way to change it: Seconds the lunge is held before he comes back.
-- **`lost_looks`**: Default: 3; Allowed: 1 to 8; What it does and which way to change it: Looks in a row without the ball before he starts searching. He searches although the ball is there: **raise** it.
-- **`search_walk`**: Default: false; Allowed: true / false; What it does and which way to change it: After a full search circle, walk on blind. **Leave false on a desk.**
-- **`max_seconds`**: Default: 75; Allowed: 10 to 600; What it does and which way to change it: The attempt ends, and he rests, after this long.
-- **`search_order`**: Default: claw_scan; Allowed: turn, claw_then_turn, claw_scan, back_claw_scan, claw_back_scan, back_turn, back_and_turn, three_point_turn, claw_three_point, full_circle, claw_full_circle; What it does and which way to change it: How he looks for the ball: claw looks (the arm points the camera, the legs stay), turn steps, back-ups, in that order
-- **`claw_look_pan_deg`**: Default: 35; Allowed: 10 to 45; What it does and which way to change it: How far to each side a claw look points the camera
-- **`claw_look_lift_deg`**: Default: 15; Allowed: 0 to 35; What it does and which way to change it: How high a claw look lifts the arm (higher sees farther; 0 = level).
-- **`claw_pan_sign`**: Default: right; Allowed: right / left; What it does and which way to change it: Which way a positive arm pan turns the camera: right on G2 (from sweeps: pan +35 barely turns it, pan -35 about 39 deg left: `CLAW_PAN_SHARE`). Re-measure with `python -m pi_pipeline.behavior.claw_look --calibrate` ([`goals.md`](goals.md)).
-- **`scan_turn_deg`**: Default: 60; Allowed: 20 to 90; What it does and which way to change it: One turn between two claw looks.
-- **`search_step_deg`**: Default: 20; Allowed: 10 to 60; What it does and which way to change it: One turn step of a search without claw looks.
-- **`back_up_s`**: Default: 2.0; Allowed: 0.5 to 4; What it does and which way to change it: One back-up (after stuck punts, and as a search move).
-- **`back_up_budget_s`**: Default: 6.0; Allowed: 0 to 20; What it does and which way to change it: The most backing up in one attempt. **Keep it small, or 0, on a desk.**
-- **`stuck_punts`**: Default: 3; Allowed: 1 to 6; What it does and which way to change it: Punts with the ball still in range before he backs up.
-- **`when_vanished`**: Default: punt; Allowed: punt / back_up; What it does and which way to change it: The ball vanished up close: punch (it is at the claw) or back off a little to see it.
-- **`align_pulse_min_s`**: Default: 1.0; Allowed: 0.3 to 1.6; What it does and which way to change it: Within 7 in and off line he lines the claw up with small turns, a picture after each: the shortest pulse
-- **`align_tries`**: Default: 3; Allowed: 1 to 8; What it does and which way to change it: Small turns to line up before `when_misaligned`.
-- **`when_misaligned`**: Default: punch; Allowed: punch / back_up; What it does and which way to change it: Still off line after `align_tries`: punch anyway or back up and line up again.
-- **`between_moves`**: Default: stand; Allowed: stand / attention; What it does and which way to change it: While not moving: stand (the original flow), or wait in the attention pose (legs straight, the picture taken there) and stand up (see below)
+- `punt_max_in`: Default: 4.0; Allowed: 1 to 10; What it does and which way to change it: **The main one.** He punches when the ball is this close or closer. Punch too early (ball out of reach, claw misses): **lower** it. Walks into the ball before punching: **raise** it.
+- `nudge_max_in`: Default: 7.0; Allowed: 1 to 12; What it does and which way to change it: From `punt_max_in` out to this distance he takes small steps closer before punching. Set it **equal to `punt_max_in`** for no small steps.
+- `nudges_before_punt`: Default: 3; Allowed: 0 to 10; What it does and which way to change it: After this many small steps that did not get him in range he punches anyway.
+- `nudge_step_s`: Default: 0.9; Allowed: 0.3 to 2.5; What it does and which way to change it: Length of one small step closer. Shorter = finer, but a walk covers nothing in its first 0.7 s or so.
+- `nudge_gait`: Default: scripted; Allowed: scripted, policy; What it does and which way to change it: How the small steps closer (and the step closer after a punt) are walked
+- `walk_aim_in`: Default: 4.0; Allowed: 1.5 to 8; What it does and which way to change it: The long walk steps are timed to leave the ball about this far away. Overshoots into the ball: **raise** it. Stops far away: **lower** it.
+- `punt_align_deg`: Default: 12; Allowed: 2 to 30; What it does and which way to change it: The ball must be within this many degrees of straight ahead before the punch. Ball goes crooked: **lower**. He turns and turns and never punches: **raise**.
+- `punch_lunge_s`: Default: 0.12; Allowed: 0.05 to 0.6; What it does and which way to change it: Seconds the lunge takes. Smaller = harder and faster.
+- `punch_hold_s`: Default: 0.25; Allowed: 0 to 1; What it does and which way to change it: Seconds the lunge is held before he comes back.
+- `lost_looks`: Default: 3; Allowed: 1 to 8; What it does and which way to change it: Looks in a row without the ball before he starts searching. He searches although the ball is there: **raise** it.
+- `search_walk`: Default: false; Allowed: true / false; What it does and which way to change it: After a full search circle, walk on blind. **Leave false on a desk.**
+- `max_seconds`: Default: 75; Allowed: 10 to 600; What it does and which way to change it: The attempt ends, and he rests, after this long.
+- `search_order`: Default: claw_scan; Allowed: turn, claw_then_turn, claw_scan, back_claw_scan, claw_back_scan, back_turn, back_and_turn, three_point_turn, claw_three_point, full_circle, claw_full_circle; What it does and which way to change it: How he looks for the ball: claw looks (the arm points the camera, the legs stay), turn steps, back-ups, in that order
+- `claw_look_pan_deg`: Default: 35; Allowed: 10 to 45; What it does and which way to change it: How far to each side a claw look points the camera
+- `claw_look_lift_deg`: Default: 15; Allowed: 0 to 35; What it does and which way to change it: How high a claw look lifts the arm (higher sees farther; 0 = level).
+- `claw_pan_sign`: Default: right; Allowed: right / left; What it does and which way to change it: Which way a positive arm pan turns the camera: right on G2 (from sweeps: pan +35 barely turns it, pan -35 about 39 deg left: `CLAW_PAN_SHARE`). Re-measure with `python -m pi_pipeline.behavior.claw_look --calibrate` ([`goals.md`](goals.md)).
+- `scan_turn_deg`: Default: 60; Allowed: 20 to 90; What it does and which way to change it: One turn between two claw looks.
+- `search_step_deg`: Default: 20; Allowed: 10 to 60; What it does and which way to change it: One turn step of a search without claw looks.
+- `back_up_s`: Default: 2.0; Allowed: 0.5 to 4; What it does and which way to change it: One back-up (after stuck punts, and as a search move).
+- `back_up_budget_s`: Default: 6.0; Allowed: 0 to 20; What it does and which way to change it: The most backing up in one attempt. **Keep it small, or 0, on a desk.**
+- `stuck_punts`: Default: 3; Allowed: 1 to 6; What it does and which way to change it: Punts with the ball still in range before he backs up.
+- `when_vanished`: Default: punt; Allowed: punt / back_up; What it does and which way to change it: The ball vanished up close: punch (it is at the claw) or back off a little to see it.
+- `align_pulse_min_s`: Default: 1.0; Allowed: 0.3 to 1.6; What it does and which way to change it: Within 7 in and off line he lines the claw up with small turns, a picture after each: the shortest pulse
+- `align_tries`: Default: 3; Allowed: 1 to 8; What it does and which way to change it: Small turns to line up before `when_misaligned`.
+- `when_misaligned`: Default: punch; Allowed: punch / back_up; What it does and which way to change it: Still off line after `align_tries`: punch anyway or back up and line up again.
+- `between_moves`: Default: stand; Allowed: stand / attention; What it does and which way to change it: While not moving: stand (the original flow), or wait in the attention pose (legs straight, the picture taken there) and stand up (see below)
 
-- **nudge_gait:** `scripted` is Petoi's own forward walk (`kwkF`) for `nudge_step_s`, steadier than the learned policy for setting the distance; `policy` is the learned gait. The line-up turns are always Petoi's turns (`kwkL`/`kwkR`). The long walk toward a far ball stays the learned policy. A fixed setting: G2 never changes it. A scripted step is not used to measure the learned walk's pace. `nudge_step_s` values learned with the policy walk do not carry over, so they are checked after a switch.
-- **search_order:** `claw_scan` = a claw look first, then a turn and a claw look, repeated. `full_circle` = turn steps counted up to one whole turn, then a back-up for a wider view if the back-up budget allows (`claw_full_circle` adds a claw look between the steps); in the simulator it scored the same as plain `turn`, and `claw_full_circle` among the worst. Every move he chooses, with the reason, what he saw, the planner state and the options passed over, is a line in `~/.local/share/g2/decision_log.jsonl` (`G2_DECISION_LOG`; stops growing at 50 MB).
-- **claw_look_pan_deg:** A claw look is done from a sit: sit, arm left, picture, arm right, picture, arm to centre, stand up slowly with the back legs. It is only used while he has not seen the ball this attempt; once he has seen it he only takes straight pictures. Only the ball's direction is used from it (the sitting camera is lower), and a ball only the loose dim pass found must show again in a second picture.
-- **align_pulse_min_s:** Each turn is stopped on the gyro once he has turned the planned 3 to 6 deg (40% of the bearing, `ALIGN_GAIN`); this time is only the fallback when no IMU frames arrive, and the cap is 2.5 s (a 1 s pulse turned G2 25 to 70 deg).
-- **between_moves:** While not moving: stand (the original flow), or wait in the attention pose (legs straight, the picture taken there) and stand up back legs first to move (an alternative against the legs letting go after 7 to 10 s still; the standing flow is the default because it is more fluid). A fixed goal knob: G2 never changes it.
+- nudge_gait: `scripted` is Petoi's own forward walk (`kwkF`) for `nudge_step_s`, steadier than the learned policy for setting the distance; `policy` is the learned gait. The line-up turns are always Petoi's turns (`kwkL`/`kwkR`). The long walk toward a far ball stays the learned policy. A fixed setting: G2 never changes it. A scripted step is not used to measure the learned walk's pace. `nudge_step_s` values learned with the policy walk do not carry over, so they are checked after a switch.
+- search_order: `claw_scan` = a claw look first, then a turn and a claw look, repeated. `full_circle` = turn steps counted up to one whole turn, then a back-up for a wider view if the back-up budget allows (`claw_full_circle` adds a claw look between the steps); in the simulator it scored the same as plain `turn`, and `claw_full_circle` among the worst. Every move he chooses, with the reason, what he saw, the planner state and the options passed over, is a line in `~/.local/share/g2/decision_log.jsonl` (`G2_DECISION_LOG`; stops growing at 50 MB).
+- claw_look_pan_deg: A claw look is done from a sit: sit, arm left, picture, arm right, picture, arm to centre, stand up slowly with the back legs. It is only used while he has not seen the ball this attempt; once he has seen it he only takes straight pictures. Only the ball's direction is used from it (the sitting camera is lower), and a ball only the loose dim pass found must show again in a second picture.
+- align_pulse_min_s: Each turn is stopped on the gyro once he has turned the planned 3 to 6 deg (40% of the bearing, `ALIGN_GAIN`); this time is only the fallback when no IMU frames arrive, and the cap is 2.5 s (a 1 s pulse turned G2 25 to 70 deg).
+- between_moves: While not moving: stand (the original flow), or wait in the attention pose (legs straight, the picture taken there) and stand up back legs first to move (an alternative against the legs letting go after 7 to 10 s still; the standing flow is the default because it is more fluid). A fixed goal knob: G2 never changes it.
 
 
 **Walls come first**: the chase never walks closer than `chase_wall_in` to a wall (10 in to start, learned by the walls goal, never below 4 in), turns away
@@ -121,9 +121,9 @@ g2puntset punt_max_in 3.5           # change one value (checked first; a bad val
 g2puntset init                      # create the file with every setting at its default (never overwrites)
 ```
 
-**Or edit it by hand on the Pi:** `ssh "$G2_PI"`, then `nano ~/.local/share/g2/punt_settings.json`, change the number, save. The file is plain JSON (one `"name": value,` per line; keep the commas).
+Or edit it by hand on the Pi: `ssh "$G2_PI"`, then `nano ~/.local/share/g2/punt_settings.json`, change the number, save. The file is plain JSON (one `"name": value,` per line; keep the commas).
 `cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings` prints what the next run will use and reports any line it did not accept (an unknown name or a value out of range is ignored and reported at the start of the run, never used silently).
-**Back to the defaults:** delete the file (`rm ~/.local/share/g2/punt_settings.json`) or set a value back.
+Back to the defaults: delete the file (`rm ~/.local/share/g2/punt_settings.json`) or set a value back.
 
 **Where the defaults are in the code** (only to change what "default" means): `pi_pipeline/behavior/ball_chase.py`, the constants near the top: `PUNT_MAX_IN`, `NUDGE_MAX_IN`, `NUDGES_BEFORE_PUNT`, `NUDGE_S`, `WALK_AIM_IN`, `PUNT_ALIGN_DEG`, `PUNCH_LUNGE_S`, `PUNCH_HOLD_S`, `LOST_LOOKS`, `SEARCH_WALK`, and the search, claw-look and alignment constants below them.
 The list of settings, their limits and their descriptions is `SPEC` in `pi_pipeline/behavior/punt_settings.py`. The punch's own key poses (the shape of the lunge) are `punch_keys()` in `ball_chase.py`.
@@ -141,7 +141,7 @@ ATTEMPT: punted at (2.7, 6.7) (in, deg) after 4 looks; walk steps (ball in, seco
 - `walk steps`: for each long walk, how far away the ball was when he started it and how long he walked. If the ball distance is the same before and after a walk, that walk did not move him (known issue: the first walk after a stand-up sometimes covers nothing).
 - If the run was started by voice, read it with `ssh "$G2_PI" journalctl -u g2-punt --no-pager -n 60`.
 
-**Measured so far:** a ball 2.6 in from the camera threw 18 in straight ahead (claw hits it first); 4.5 to 5 in was just out of reach; 6 to 7 in too far; the first desk attempt punched at 2.7 in. The finder is only accurate to about 1 in at close range.
+Measured so far: a ball 2.6 in from the camera threw 18 in straight ahead (claw hits it first); 4.5 to 5 in was just out of reach; 6 to 7 in too far; the first desk attempt punched at 2.7 in. The finder is only accurate to about 1 in at close range.
 
 ## 6. A way to dial it in
 
@@ -151,21 +151,21 @@ ATTEMPT: punted at (2.7, 6.7) (in, deg) after 4 looks; walk steps (ball in, seco
 4. Once the distance is right, tune the side effects: `punt_align_deg` for crooked punches, `walk_aim_in` for overshooting, `punch_lunge_s` for how hard.
 5. For a clean table of distance against result, use `punt_test` (section 2): one punch at each fixed distance, the results in a CSV.
 
-- **He punches but the claw misses or barely touches the ball**: lower `punt_max_in`
-- **He walks into the ball and pushes it before punching**: raise `walk_aim_in`; raise `punt_max_in`
-- **He punches from far away and the ball does not move**: lower `punt_max_in`
-- **Right in front of the ball and no punch**: the ball is more than `punt_align_deg` off straight (raise it), or the finder lost it; run `--dry-run` and read what it says
-- **The ball goes sideways**: lower `punt_align_deg`; check he was lined up
-- **He searches although the ball is in front of him**: raise `lost_looks`; a ball in direct sun goes pale and the finder misses it (shade it or move it)
-- **The punch is weak or slow**: lower `punch_lunge_s`
-- **He turns away from the ball**: the ball is out of his view or too far to the side: start it straight ahead
+- He punches but the claw misses or barely touches the ball: lower `punt_max_in`
+- He walks into the ball and pushes it before punching: raise `walk_aim_in`; raise `punt_max_in`
+- He punches from far away and the ball does not move: lower `punt_max_in`
+- Right in front of the ball and no punch: the ball is more than `punt_align_deg` off straight (raise it), or the finder lost it; run `--dry-run` and read what it says
+- The ball goes sideways: lower `punt_align_deg`; check he was lined up
+- He searches although the ball is in front of him: raise `lost_looks`; a ball in direct sun goes pale and the finder misses it (shade it or move it)
+- The punch is weak or slow: lower `punch_lunge_s`
+- He turns away from the ball: the ball is out of his view or too far to the side: start it straight ahead
 
 ## 7. If something does not work
 
-- **The board does not answer / G2 goes limp:** check the plug between the Pi and the BiBoard first (it comes undone in falls), then the pack.
-- **"G2, punt" does nothing:** the speech recognizer may not have heard the word; run `g2punt` from the Mac instead. The voice service's log: `ssh "$G2_PI" journalctl -u g2-voice -n 40`.
-- **After a run the voice service is not back:** `ssh "$G2_PI" sudo systemctl start g2-voice` (or `g2reset`).
-- **Pictures:** every picture with the ball found is saved with its box for the future ball detector (`g2pics`, Named: greenball).
+- The board does not answer / G2 goes limp: check the plug between the Pi and the BiBoard first (it comes undone in falls), then the pack.
+- "G2, punt" does nothing: the speech recognizer may not have heard the word; run `g2punt` from the Mac instead. The voice service's log: `ssh "$G2_PI" journalctl -u g2-voice -n 40`.
+- After a run the voice service is not back: `ssh "$G2_PI" sudo systemctl start g2-voice` (or `g2reset`).
+- Pictures: every picture with the ball found is saved with its box for the future ball detector (`g2pics`, Named: greenball).
 
 ## 8. Deploying a code change to the Pi
 

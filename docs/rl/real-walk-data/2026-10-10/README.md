@@ -5,10 +5,10 @@ Procedure used (replaces timed intervals between runs): Claude runs one walk and
 
 ## Trim sweep (12.5 s, cmd 0.10, front-left foot trim `--foot-trim fl=X`)
 
-- **off (`v6_nat01..03`, plus `v6_first` 6 s)**: Log yaw (deg, per run): +71, +89, +87; Tape sideways (in): 10 R, 12.5 R, 16 R
-- **fl=-0.2 (`v6_trim20_01b, 02, 03`)**: Log yaw (deg, per run): +80, +73, +86; Tape sideways (in): 8 R, 15 R, 14 R
-- **fl=-0.5 (`v6_trim50_01, 02b, 03`)**: Log yaw (deg, per run): +51, +36, +44; Tape sideways (in): 6 R, 6 L, 1.5 R
-- **fl=-0.5 confirm (`v6_confirm50_01, 02b, 03`)**: Log yaw (deg, per run): +44, +19, +25; Tape sideways (in): 0.5 L, 2 L, 0
+- off (`v6_nat01..03`, plus `v6_first` 6 s): Log yaw (deg, per run): +71, +89, +87; Tape sideways (in): 10 R, 12.5 R, 16 R
+- fl=-0.2 (`v6_trim20_01b, 02, 03`): Log yaw (deg, per run): +80, +73, +86; Tape sideways (in): 8 R, 15 R, 14 R
+- fl=-0.5 (`v6_trim50_01, 02b, 03`): Log yaw (deg, per run): +51, +36, +44; Tape sideways (in): 6 R, 6 L, 1.5 R
+- fl=-0.5 confirm (`v6_confirm50_01, 02b, 03`): Log yaw (deg, per run): +44, +19, +25; Tape sideways (in): 0.5 L, 2 L, 0
 
 **Result of the short-walk sweep: fl=-0.5 (superseded by fl=-0.3 after the 20 s walks, see below)** (`DEFAULT_TRIMS` in `gait/heading_hold.py`, keyed to the file name). Roll/pitch sway 3-4 deg and 2-3 deg, no falls. Not re-tuned for tile or carpet.
 Redone and discarded: `v6_trim20_01` (user not ready), `v6_trim50_02` (measurement missed), `v6_confirm50_02` (user touched G2; a 34 s run).
@@ -19,12 +19,12 @@ Redone and discarded: `v6_trim20_01` (user not ready), `v6_trim50_02` (measureme
 
 ## Stand-up (isolated tests, `standup_*.csv`, `gait/standup_test.py`, IMU at 5 Hz)
 
-- **original single `i` command, 3 tries**: Peak roll: 3.7 / 16.1 / 4.1 deg; Peak pitch: 4.1 / 7.3 / 2.6 deg; Heading change: 11.9 / 10.1 / 0.0 deg; User verdict: much too fast, jostles the heading
-- **`kbalance` then `i` (first eased try, inside a walk)**: Peak roll: not logged; Peak pitch: not logged; Heading change: not logged; User verdict: stood up faster, almost fell
-- **ramp 8 s**: Peak roll: 2.6, 3.7; Peak pitch: 3.0, 3.6; Heading change: 0.5, 0.8; User verdict: far too slow
-- **`kup` (scripted skill)**: Peak roll: 3.6; Peak pitch: 2.5; Heading change: 1.8; User verdict: a bit fast
-- **ramp 1.6 s, 1.2 s**: Peak roll: 1.3, 1.5; Peak pitch: 2.8, 2.0; Heading change: 0.0, 0.0; User verdict: too slow
-- **ramp 0.8 s, 5 tries**: Peak roll: 1.9-2.8; Peak pitch: 2.2-3.1; Heading change: 0.1-0.3; User verdict: right; smooth; back legs even with the front; no beeping; start heading no longer disturbed
+- original single `i` command, 3 tries: Peak roll: 3.7 / 16.1 / 4.1 deg; Peak pitch: 4.1 / 7.3 / 2.6 deg; Heading change: 11.9 / 10.1 / 0.0 deg; User verdict: much too fast, jostles the heading
+- `kbalance` then `i` (first eased try, inside a walk): Peak roll: not logged; Peak pitch: not logged; Heading change: not logged; User verdict: stood up faster, almost fell
+- ramp 8 s: Peak roll: 2.6, 3.7; Peak pitch: 3.0, 3.6; Heading change: 0.5, 0.8; User verdict: far too slow
+- `kup` (scripted skill): Peak roll: 3.6; Peak pitch: 2.5; Heading change: 1.8; User verdict: a bit fast
+- ramp 1.6 s, 1.2 s: Peak roll: 1.3, 1.5; Peak pitch: 2.8, 2.0; Heading change: 0.0, 0.0; User verdict: too slow
+- ramp 0.8 s, 5 tries: Peak roll: 1.9-2.8; Peak pitch: 2.2-3.1; Heading change: 0.1-0.3; User verdict: right; smooth; back legs even with the front; no beeping; start heading no longer disturbed
 
 Per-step beeping seen with the first ramps was not heard at 0.8-1.2 s. The board echoes every `i` command; no error lines.
 
@@ -32,13 +32,13 @@ Per-step beeping seen with the first ramps was not heard at 0.8-1.2 s. The board
 
 The auto-captured logs are on the Pi in `~/g2_runs/auto/20261010/` (CSV + sidecar with the trim and surface). Tape by the user; "loc" = left of center.
 
-- **fl=-0.5**: Forward: 6 ft; Sideways: 29 in left; Facing: 10:00; Log yaw (deg): -46
-- **fl=-0.4**: Forward: 6 ft 7 in; Sideways: 14 in left; Facing: not recorded; Log yaw (deg): -8
-- **fl=-0.3**: Forward: 6 ft 10 in; Sideways: 3.5 in left; Facing: 11:30; Log yaw (deg): +24
-- **fl=-0.25**: Forward: 7 ft; Sideways: 2.5 in left; Facing: 11:30; Log yaw (deg): +26
-- **fl=-0.3, 24 s, old start (lane 1)**: Forward: 6 ft 8 in; Sideways: wall contact for the last 3 s (not a measurement); Facing: n/a; Log yaw (deg): -18
-- **fl=-0.3, 24 s, start moved right (lane 2)**: Forward: 7 ft 6 in; Sideways: 19 in left (no wall); Facing: 10:00; Log yaw (deg): +37
-- **fl=-0.3, 20 s, new start**: Forward: 7 ft; Sideways: 2 in right; Facing: 11:45; Log yaw (deg): +62
+- fl=-0.5: Forward: 6 ft; Sideways: 29 in left; Facing: 10:00; Log yaw (deg): -46
+- fl=-0.4: Forward: 6 ft 7 in; Sideways: 14 in left; Facing: not recorded; Log yaw (deg): -8
+- fl=-0.3: Forward: 6 ft 10 in; Sideways: 3.5 in left; Facing: 11:30; Log yaw (deg): +24
+- fl=-0.25: Forward: 7 ft; Sideways: 2.5 in left; Facing: 11:30; Log yaw (deg): +26
+- fl=-0.3, 24 s, old start (lane 1): Forward: 6 ft 8 in; Sideways: wall contact for the last 3 s (not a measurement); Facing: n/a; Log yaw (deg): -18
+- fl=-0.3, 24 s, start moved right (lane 2): Forward: 7 ft 6 in; Sideways: 19 in left (no wall); Facing: 10:00; Log yaw (deg): +37
+- fl=-0.3, 20 s, new start: Forward: 7 ft; Sideways: 2 in right; Facing: 11:45; Log yaw (deg): +62
 
 The 27-29 in left readings of the first two rows of this table were open floor (only the 24 s lane 1 run touched the wall). **V6 default trim is now fl=-0.3** (`DEFAULT_TRIMS`; the 12.5 s trim of -0.5 above was fit on short walks and drifts left on 20 s walks). Every 20 s walk at -0.3 / -0.25 ended within 3.5 in of the line, both 24 s walks curved left: a length effect past about 20 s (open: a third 24 s run). Speed measured about 4.2 in/s (7 ft in 20 s), 3.65 in/s on the first 20 s run (the stand-up jerk); use about 0.107 m/s for "walk for x distance / seconds" estimates, tape-checked. The servo heat estimate stayed at 1% in every run, so it is not heat.
 
@@ -54,8 +54,8 @@ The first lane runs with the eased stand-up stood G2 up, laid him down, and stoo
 
 Same strip and layout as the V4 session (2026-10-09): start on tile 4.5 in before the threshold, 4 ft of runway beyond it; V6 at the default trim fl=-0.3, 11 s, hold off, pack 7.82-7.85 V. Logs are the auto-captured `policy_walk_*` runs of 1:22, 1:24 and 1:26 AM on the Pi.
 
-- **1**: Cleared: clean; Forward: 3 ft 3 in; Sideways: 0; Facing: 11:45; Roll / pitch sway (deg): 3.5 / 2.5
-- **2**: Cleared: clean; Forward: 3 ft 3 in; Sideways: 1 in left; Facing: 12:00; Roll / pitch sway (deg): 3.5 / 2.5
-- **3**: Cleared: clean; Forward: 3 ft 3 in; Sideways: 0; Facing: 12:00; Roll / pitch sway (deg): 3.6 / 2.6
+- 1: Cleared: clean; Forward: 3 ft 3 in; Sideways: 0; Facing: 11:45; Roll / pitch sway (deg): 3.5 / 2.5
+- 2: Cleared: clean; Forward: 3 ft 3 in; Sideways: 1 in left; Facing: 12:00; Roll / pitch sway (deg): 3.5 / 2.5
+- 3: Cleared: clean; Forward: 3 ft 3 in; Sideways: 0; Facing: 12:00; Roll / pitch sway (deg): 3.6 / 2.6
 
 All three clear the 6.4 mm threshold with no snag and no speed cost (V4: about 3 ft 6 in, sway 3.5-4.0 / flat-lane sway), and heading stayed within 15 deg of straight. No taller strip available yet.

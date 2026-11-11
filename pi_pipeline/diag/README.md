@@ -2,10 +2,10 @@
 
 Diagnostics: leave enough behind that a hardware failure can be explained afterwards. Design and phases: [`../../docs/hardware/diagnostics.md`](../../docs/hardware/diagnostics.md).
 
-- **`core.py`**: A structured per-session event log (`diag.event(...)`) plus a black-box ring buffer (`diag.attach_ring(RingBuffer(...))`); `summarize_session()` and `last_failure()`
-- **`watchdog.py`**: The control-loop heartbeat: the loop calls `wd.beat()` each tick; a stall past `stall_after_s` is logged and calls `on_stall()`, wired to a safe stop
-- **`sysmon.py`**: Battery and Pi-thermal sampling; degrades to `None` off the Pi
-- **`crashwatch.py`**: Heartbeat file, `faulthandler` output and a "clean exit" marker, read back at the next start, so a native crash (Vosk, PortAudio, onnxruntime) leaves a report in `crashes.jsonl`
+- `core.py`: A structured per-session event log (`diag.event(...)`) plus a black-box ring buffer (`diag.attach_ring(RingBuffer(...))`); `summarize_session()` and `last_failure()`
+- `watchdog.py`: The control-loop heartbeat: the loop calls `wd.beat()` each tick; a stall past `stall_after_s` is logged and calls `on_stall()`, wired to a safe stop
+- `sysmon.py`: Battery and Pi-thermal sampling; degrades to `None` off the Pi
+- `crashwatch.py`: Heartbeat file, `faulthandler` output and a "clean exit" marker, read back at the next start, so a native crash (Vosk, PortAudio, onnxruntime) leaves a report in `crashes.jsonl`
 
 ```bash
 python -m pi_pipeline.diag list

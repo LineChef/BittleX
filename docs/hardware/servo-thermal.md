@@ -6,10 +6,10 @@ limit under sustained load.
 
 ## Status at a glance
 
-- **0**: What: `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed; State: In place
-- **1**: What: `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop; State: **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos
-- **2**: What: `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED; State: Built and tested, **not wired in** (planned)
-- **3**: What: A thermal-aware residual policy (the literature blueprint); State: Designed, not built; needs training
+- 0: What: `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed; State: In place
+- 1: What: `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop; State: **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos
+- 2: What: `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED; State: Built and tested, **not wired in** (planned)
+- 3: What: A thermal-aware residual policy (the literature blueprint); State: Designed, not built; needs training
 
 **The estimator is unvalidated.** G2's servos report no temperature or current, so heat is estimated from commanded motion. Until it is checked against the real servos, treat the thresholds as guesses that err toward safety.
 
@@ -27,14 +27,14 @@ limit under sustained load.
 
 ### The P1S servo (×8 legs + 1 neck)
 
-- **Peak torque**: Value: ~3 kg·cm (~0.29 N·m); Source: Petoi listing / `hardware-specs.md`
-- **No-load speed**: Value: ~0.07 s/60° (~14 rad/s); Source: Petoi listing
-- **Motor**: Value: coreless DC, alloy gears, ball bearing; Source: Petoi listing
-- **Rated life**: Value: "100+ h continuous walking"; Source: Petoi listing
-- **Voltage**: Value: 8.4 V compatible (2S Li-ion, 7.4 V nominal); Source: Petoi
-- **Protection**: Value: "electronic overheat cutback"; Source: Petoi (no detail published)
-- **Winding temp sensor**: Value: **none**; Source: coreless micro servos don't have one
-- **Datasheet**: Value: **not published** by Petoi (forum requests unanswered); Source: petoi.camp
+- Peak torque: Value: ~3 kg·cm (~0.29 N·m); Source: Petoi listing / `hardware-specs.md`
+- No-load speed: Value: ~0.07 s/60° (~14 rad/s); Source: Petoi listing
+- Motor: Value: coreless DC, alloy gears, ball bearing; Source: Petoi listing
+- Rated life: Value: "100+ h continuous walking"; Source: Petoi listing
+- Voltage: Value: 8.4 V compatible (2S Li-ion, 7.4 V nominal); Source: Petoi
+- Protection: Value: "electronic overheat cutback"; Source: Petoi (no detail published)
+- Winding temp sensor: Value: **none**; Source: coreless micro servos don't have one
+- Datasheet: Value: **not published** by Petoi (forum requests unanswered); Source: petoi.camp
 
 ### How the "cliff" actually works here
 
@@ -62,14 +62,14 @@ So the failure chain on G2 is:
 
 ### Permanent-damage risks (why this matters beyond a fall)
 
-- **Coreless brush wear** accelerates sharply under continuous load — coreless
+- Coreless brush wear: accelerates sharply under continuous load — coreless
   brushes are thinner than cored. This is cumulative, not recoverable.
-- **Gear-train stress**: alloy gears here (not the worst case), but sustained
+- Gear-train stress: alloy gears here (not the worst case), but sustained
   near-stall torque still fatigues them; plastic idler/output stages on some
   units act as a mechanical fuse and strip.
-- **Driver IC**: sustained over-current cooks the servo's onboard H-bridge —
+- Driver IC: sustained over-current cooks the servo's onboard H-bridge —
   "melted gears and a shorted driver IC" is the classic coreless-servo autopsy.
-- **Magnet**: at extreme temps, partial demagnetisation of the rotor magnet =
+- Magnet: at extreme temps, partial demagnetisation of the rotor magnet =
   permanent torque loss even after cooling. Unlikely at the loads but the
   end-stop of the cliff.
 
@@ -90,7 +90,7 @@ a servo from cold — the risk window is *sustained hard work within* that hour
   torque ~0.2 N·m of 0.29 peak keep the *average* joint well out of the stall
   regime. The risk is **individual joints intermittently near stall** under
   slopes / shoves / payload, integrated over a long session.
-- **There is no hardware data on trip time or cooldown rate.** Getting that (one
+- There is no hardware data on trip time or cooldown rate. Getting that (one
   bench test, §4) is the single biggest unknown.
 
 ---
@@ -99,15 +99,15 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 
 ### Layer 0 — already in place
 
-- **`FAC_POWER` penalty** (`0.05 · Σ|τ·ω|`, ramped) — trains toward a
+- `FAC_POWER` penalty: (`0.05 · Σ|τ·ω|`, ramped) — trains toward a
   low-current gait. Already thermal-adjacent work.
-- **`TORQUE_CUTBACK` domain randomisation** — 40 % of training episodes weaken
+- `TORQUE_CUTBACK` domain randomisation: 40 % of training episodes weaken
   1–3 random joints by a random fraction. Trains robustness to *a* weak joint,
   but it's a **static per-episode draw**, not a joint that fades *during* the
   episode as it heats.
-- **`d` (REST)** — de-energises all servos. The fundamental cooldown; already
+- `d` (REST): de-energises all servos. The fundamental cooldown; already
   wired in `pi_pipeline` (`REST = "d"`, sent on every gait-loop exit).
-- **Low `TARGET_SPEED`** keeps the mean well clear of stall.
+- Low `TARGET_SPEED`: keeps the mean well clear of stall.
 
 ### Layer 1 — sensorless estimator + indicator (no new hardware, no retraining)
 
@@ -136,9 +136,9 @@ joint target vs the wkF reference, (c) total pack current from the board
 
 **Indicator** — 3-tier per-joint state:
 
-- **GREEN**: H_j vs estimated trip: < 50 %; Action: normal
-- **AMBER**: H_j vs estimated trip: 50–85 %; Action: governor throttles (Layer 2)
-- **RED**: H_j vs estimated trip: > 85 %; Action: forced cooldown (Layer 2)
+- GREEN: H_j vs estimated trip: < 50 %; Action: normal
+- AMBER: H_j vs estimated trip: 50–85 %; Action: governor throttles (Layer 2)
+- RED: H_j vs estimated trip: > 85 %; Action: forced cooldown (Layer 2)
 
 Surface it: LED pattern, the Pi status channel, and — since G2 has the voice
 pipeline — a spoken heads-up ("my left-front leg is getting warm"). Always log
@@ -158,9 +158,9 @@ per-joint `H_j` so the model can be tuned from real runs.
 
 In `pi_pipeline/behavior/` (same pattern as explore mode):
 
-- **AMBER on any joint** → cap commanded speed, soften gait aggressiveness,
+- AMBER on any joint: → cap commanded speed, soften gait aggressiveness,
   bias path planning away from sustained uphill.
-- **RED** → force a **cooldown pose** for N seconds: a folded low-torque stance
+- RED: → force a **cooldown pose** for N seconds: a folded low-torque stance
   where the frame/elbows carry the weight, not the shoulder servos (keeps
   IMU/vision alive and resumes faster than full `d`). Fall back to `d` if it
   can't reach the pose.
@@ -173,19 +173,19 @@ In `pi_pipeline/behavior/` (same pattern as explore mode):
 Motor Thermal Safety and Quadrupedal Locomotion Performance with Residual
 Policy"* (Unitree A1):
 
-- **Two-stage**: frozen nominal policy (= the `run20m_ppo`), then a **residual
+- Two-stage: frozen nominal policy (= the `run20m_ppo`), then a **residual
   policy** on top that receives **per-motor temperatures** in its observation
   and a **thermal-safety reward**. Nominal policy is untouched.
-- **Thermal reward**:
+- Thermal reward:
   `R_th = ω_th · Σ_i Ṫ_i · exp(−min(σ_th·(T_max − T_i), 0))`
   with `ω_th = −1000`, `σ_th = 0.35`, `T_max = 60 °C`. ≈ zero when cool;
   exponential ramp above ~50 °C. Penalises **heating rate**, weighted by
   proximity to the limit — not temperature itself, so a cool robot pays
   nothing.
-- **Residual regularisation**: `−0.1 · ‖a_res‖²` — keep it a small correction.
-- **Stage-2 training**: nominal frozen; motor temps randomly initialised
+- Residual regularisation: `−0.1 · ‖a_res‖²` — keep it a small correction.
+- Stage-2 training: nominal frozen; motor temps randomly initialised
   `[T_max−25, T_max+10] °C`; ambient `[0, 35] °C`; payload `[0, 5] kg`.
-- **Results**: A1 + 3 kg payload, overheat in ~5 min → **13+ min**, peak
+- Results: A1 + 3 kg payload, overheat in ~5 min → **13+ min**, peak
   < 50 °C. From a hot 58 °C start on stairs/slopes, overheat rate **70 % →
   < 10 %**.
 
@@ -200,23 +200,23 @@ been structured.
 
 ## 3. Sim testing plan
 
-1. **Dynamic per-joint thermal model in the env** (8 leg joints). Lumped
+1. Dynamic per-joint thermal model in the env: (8 leg joints). Lumped
    1-node: `T_j += dt·(k_gen·τ_j² − k_diss·(T_j − T_amb))`, `T_amb` randomised
    15–40 °C. When `T_j > T_trip`, drive the **existing `TORQUE_CUTBACK`
    mechanism** for that joint (reuse it — just switch the trigger from a random
    per-episode draw to the live thermal state). Start with a placeholder
    `k_gen`/`k_diss` tuned so a hard stance-hold trips in ~60–120 s; replace
    with bench-fitted values from §4.
-2. **Thermal observation**: append normalised `T_j` (8) to the obs, plus a
+2. Thermal observation: append normalised `T_j` (8) to the obs, plus a
    `hottest_joint` scalar + its rate. Behind a flag so the base policy's obs
    shape is unchanged until the approach is committed.
-3. **Long-episode eval** (this is deferred eval item 5, now with a purpose):
+3. Long-episode eval: (this is deferred eval item 5, now with a purpose):
    2 000–4 000-step episodes, thermal model live. Metrics: time-to-first-trip,
    whether the policy sheds effort as joints warm, distance before a trip.
    Compare `run20m_ppo` (no thermal obs) vs a thermal-aware residual.
-4. **Sustained-hold variant** (`robustness_sweep.py` was removed 2026-10-17; write a new probe or recover it from the tag): hold a hard stance /
+4. Sustained-hold variant: (`robustness_sweep.py` was removed 2026-10-17; write a new probe or recover it from the tag): hold a hard stance /
    slow uphill with the thermal model on, report trip time per policy.
-5. **Hardware validation** (hardware-gated): once bring-up allows, run the
+5. Hardware validation: (hardware-gated): once bring-up allows, run the
    robot in a fixed hard stance (or one leg against a stop) until protection
    trips — log the time and the cooldown curve. Fit `k_gen`, `k_diss`,
    `T_trip`. This is the one measurement that turns the whole model from
@@ -226,16 +226,16 @@ been structured.
 
 ## 4. Shortcuts / what to skip
 
-- **Skip real thermistors.** No spare ADC channels, no room, coreless servos
+- Skip real thermistors: No spare ADC channels, no room, coreless servos
   don't have them. I²t estimation is the standard sensorless substitute and is
   good enough for a governor.
-- **Skip the full 14-node thermal network** from the paper. Start 1 node per
+- Skip the full 14-node thermal network: from the paper. Start 1 node per
   joint; add case↔ambient coupling only if the sim-vs-bench fit is poor.
-- **Reuse, don't rebuild**: the `TORQUE_CUTBACK` mechanism (re-trigger from live
+- Reuse, don't rebuild: the `TORQUE_CUTBACK` mechanism (re-trigger from live
   `T`), the `FAC_POWER` penalty (already pushing the right way), the behaviour
   layer (governor), the residual architecture (Stage-2 finetune, base frozen),
   a robustness sweep (add the sustained-hold variant).
-- **Fastest usable mitigation with zero training**: Layer 1 (I²t estimator +
+- Fastest usable mitigation with zero training: Layer 1 (I²t estimator +
   indicator) + Layer 2 (behaviour-layer governor + cooldown pose). Ship that
   first. Layer 3 (thermal-aware residual) is the "do it properly" follow-up and
   needs the sim model + bench data first.
@@ -252,17 +252,17 @@ backstop forces a lie-down on a long run. It has never seen real hardware.
 
 **Retune once the bench test (§3.5 / §5.1) gives real numbers:**
 
-- **`_K_GEN`**: Now (placeholder): 4e-3; Calibrate from: bench trip time — scale so `H` reaches `_H_TRIP` at the measured time-to-protection under a hard hold
-- **`_K_DISS`**: Now (placeholder): 0.010 (~100 s τ); Calibrate from: measured cooldown curve after releasing a hot servo
-- **`_H_TRIP`**: Now (placeholder): 60 (unitless); Calibrate from: rescale `H` to estimated °C once `_K_GEN`/`_K_DISS` are fit; set at the real protection threshold
-- **`_WARN_FRAC` / `_COOLDOWN_FRAC`**: Now (placeholder): 0.45 / 0.85; Calibrate from: how much margin the operator wants before the spoken warning / auto lie-down
-- **`_MAX_CONTINUOUS_S`**: Now (placeholder): 480 s; Calibrate from: **NOT a thermal estimate** — a blind "take a break" floor in case the estimator is miscalibrated
-- **`_STALL_ERR_DEG` / `_STALL_SOFT_S` / `_STALL_HOLD_S`**: Now (placeholder): 18° / 0.4 s / 1.5 s; Calibrate from: real feedback-servo tracking error under a normal hard push vs an actual stall — set the threshold above the former, below the latter
-- **`_SOFT_JOINT_SCALE`**: Now (placeholder): 0.35; Calibrate from: how hard to ease a stalling joint toward neutral before giving up on it
-- **`_STAND_DEG`**: Now (placeholder): ±35°; Calibrate from: replace with the actual `wkf_ref.npy` mean pose
-- **effort proxy (`_K_VEL`, `_K_DEV`, `_GRAV_BOOST`)**: Now (placeholder): 0.010 / 0.004 / 1.6; Calibrate from: if the feedback servos expose position readback, cross-check the proxy against measured tracking error; re-weight if a term is dead
+- `_K_GEN`: Now (placeholder): 4e-3; Calibrate from: bench trip time — scale so `H` reaches `_H_TRIP` at the measured time-to-protection under a hard hold
+- `_K_DISS`: Now (placeholder): 0.010 (~100 s τ); Calibrate from: measured cooldown curve after releasing a hot servo
+- `_H_TRIP`: Now (placeholder): 60 (unitless); Calibrate from: rescale `H` to estimated °C once `_K_GEN`/`_K_DISS` are fit; set at the real protection threshold
+- `_WARN_FRAC` / `_COOLDOWN_FRAC`: Now (placeholder): 0.45 / 0.85; Calibrate from: how much margin the operator wants before the spoken warning / auto lie-down
+- `_MAX_CONTINUOUS_S`: Now (placeholder): 480 s; Calibrate from: **NOT a thermal estimate** — a blind "take a break" floor in case the estimator is miscalibrated
+- `_STALL_ERR_DEG` / `_STALL_SOFT_S` / `_STALL_HOLD_S`: Now (placeholder): 18° / 0.4 s / 1.5 s; Calibrate from: real feedback-servo tracking error under a normal hard push vs an actual stall — set the threshold above the former, below the latter
+- `_SOFT_JOINT_SCALE`: Now (placeholder): 0.35; Calibrate from: how hard to ease a stalling joint toward neutral before giving up on it
+- `_STAND_DEG`: Now (placeholder): ±35°; Calibrate from: replace with the actual `wkf_ref.npy` mean pose
+- effort proxy (`_K_VEL`, `_K_DEV`, `_GRAV_BOOST`): Now (placeholder): 0.010 / 0.004 / 1.6; Calibrate from: if the feedback servos expose position readback, cross-check the proxy against measured tracking error; re-weight if a term is dead
 
-- **_MAX_CONTINUOUS_S:** **First-class action: once the estimator is bench-calibrated, evaluate raising this a lot or removing it (set to 0 to disable).** If the calibrated heat estimate alone reliably catches the danger case, this rule is redundant and should go.
+- _MAX_CONTINUOUS_S: **First-class action: once the estimator is bench-calibrated, evaluate raising this a lot or removing it (set to 0 to disable).** If the calibrated heat estimate alone reliably catches the danger case, this rule is redundant and should go.
 
 
 **Expected direction of the retune is DOWN (less aggressive).** The placeholders
@@ -277,7 +277,7 @@ line, or the WARN speech firing on ordinary walks — dial it back:
 The `guard_state` / `hottest_frac` columns in the diag black box and the
 per-session thermal summary are the evidence for which knob and how far.
 
-**Also:** `_speak_best_effort()` in `run_gait.py` currently prints and tries
+Also: `_speak_best_effort()` in `run_gait.py` currently prints and tries
 `pi_pipeline.voice.tts.speak` — wire it to the real TTS path once the voice
 stack import is settled. And `set_feedback()` is dormant until `run_gait.py`
 actually reads `readAllFeedbackFast()` — the stall detector and the Petoi-style
@@ -285,14 +285,14 @@ soft cutback have no teeth until then.
 
 ## 5. Priority / sequencing
 
-1. **Bench test on hardware** (when bring-up allows) → real trip time +
+1. Bench test on hardware: (when bring-up allows) → real trip time +
    cooldown constants. The one missing number.
-2. **Layer 1 + 2** (I²t estimator, indicator, behaviour governor, cooldown
+2. Layer 1 + 2: (I²t estimator, indicator, behaviour governor, cooldown
    pose) — no training, biggest risk reduction per unit effort, deployable
    without a policy change.
-3. **Sim dynamic thermal model + long-episode eval** — validates and allows
+3. Sim dynamic thermal model + long-episode eval: validates and allows
    iteration; feeds Layer 3.
-4. **Layer 3 thermal-aware residual finetune** — the arXiv approach; best final
+4. Layer 3 thermal-aware residual finetune: the arXiv approach; best final
    result; needs 2 + 3 first.
 
 Hardware-gated. Sits alongside Phase 8 / the pre-hardware backlog — not blocking

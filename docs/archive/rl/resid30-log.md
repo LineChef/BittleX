@@ -1,6 +1,6 @@
 # resid30 campaign log
 
-> **Note (2026-09-23):** the "scripted" baseline in these benchmark runs was not
+> Note (2026-09-23): the "scripted" baseline in these benchmark runs was not
 > the pure `wkF` walk (a residual-mode bug commanded it ~7.5° off), and cells
 > after the bare-robot ones silently ran without the payload. Both are fixed and
 > rescored in [`hw1-log.md`](../../rl/hw1-log.md); treat the learned-vs-scripted numbers
@@ -14,38 +14,38 @@ baseline on the standard benchmark. Plan:
 
 ## Round 1 — resid30_r1
 
-- **Started:** 2026-09-18 02:06 EDT, 3M steps, PID 41481.
-- **Config:** `RESIDUAL_SCALE_DEG=30`, `FAC_IMITATION=16.0` (starting
+- Started: 2026-09-18 02:06 EDT, 3M steps, PID 41481.
+- Config: `RESIDUAL_SCALE_DEG=30`, `FAC_IMITATION=16.0` (starting
   hypothesis, up from the current 11.0 -- matching G1's historically-validated
   pairing strength for this exact crawl-regression risk), `FAC_RESIDUAL_COST=2.8`,
   `FAC_RESID_SMOOTH=8.2` (both scaled proportionally to RESIDUAL_SCALE_DEG,
   since they act on the normalized action not raw degrees). All other reward
   terms unchanged from `run20m_ppo`'s recipe.
-- **Smoke test:** passed clean (20k steps, `ep_rew_mean` ~700, no NaN/crash).
-- **Purpose:** rule out the known crawl-regression failure mode (r1's 18-degree
+- Smoke test: passed clean (20k steps, `ep_rew_mean` ~700, no NaN/crash).
+- Purpose: rule out the known crawl-regression failure mode (r1's 18-degree
   attempt with a too-weak imitation anchor) before committing more compute --
   not a head-to-head vs run20m_ppo yet.
-- **Result:** pending.
+- Result: pending.
 
 ### Issue hit + fixed: TensorBoard logging crashed every run at startup
 
-- **Symptom:** `train.py` crashed immediately (before any training steps) with
+- Symptom: `train.py` crashed immediately (before any training steps) with
   `ImportError: Trying to log data to tensorboard but tensorboard is not
   installed.` -- reproduced twice, not transient.
-- **Root cause:** not actually a missing package (`import tensorboard` alone
+- Root cause: not actually a missing package (`import tensorboard` alone
   works fine) -- the real failure is inside `torch.utils.tensorboard`'s own
   import chain: `tensorboard.compat.proto.event_pb2` needs a newer
   `google.protobuf` (specifically `runtime_version`) than what's installed in
   this venv. SB3 catches the failed `SummaryWriter` import and raises the
   generic "not installed" error, which is why it looked like a missing
   package.
-- **Decision:** per the user's call ("we don't ever need to pop the
+- Decision: per the user's call ("we don't ever need to pop the
   tensorboard for me anymore"), disabled TensorBoard logging entirely rather
   than chasing the protobuf pin (which risked its own ripple effects on other
   packages) -- `train.py`'s two `tensorboard_log=` args set to `None`, and
   `start_run.sh`'s TensorBoard auto-start/browser-open step removed. Verified
   fix with a clean smoke test (20k steps, no errors).
-- **Consequence for this plan:** the Stage 1 verification step ("watch
+- Consequence for this plan: the Stage 1 verification step ("watch
   `r_imitation`/`r_joint_limit` trends in TensorBoard") needs a different
   mechanism now, since there's no live scalar dashboard. Will write a small
   standalone script to pull the per-term reward breakdown from the env's
@@ -64,22 +64,22 @@ against run20m_ppo.
 
 ### Issue hit + fixed: RESIDUAL_SCALE_DEG had no per-checkpoint override
 
-- **Symptom:** while building an action-magnitude visualization for the user,
+- Symptom: while building an action-magnitude visualization for the user,
   a run20m_ppo trace showed implausible values (action magnitude reading up
   to 27.9 degrees against what should be a 22-degree ceiling for that
   checkpoint).
-- **Root cause:** `RESIDUAL_SCALE_DEG` is a plain module constant, unlike
+- Root cause: `RESIDUAL_SCALE_DEG` is a plain module constant, unlike
   most other reward/config constants in this file which go through the
   `_g2e()` env-var override helper. Since the module now defaults to 30
   (for this campaign), evaluating run20m_ppo (trained at 22) applied its
   actions at the wrong physical scale -- silently invalid, not just
   cosmetically wrong, since it changes what joint angles actually get
   commanded. This tainted the earlier `run20m_ppo_baseline_eval.json` too.
-- **Fix:** added the same `_g2e()` override pattern already used for
+- Fix: added the same `_g2e()` override pattern already used for
   `FAC_IMITATION` etc. `G2E_RESIDUAL_SCALE_DEG=22` now correctly evaluates
   old checkpoints regardless of the module's current default. Regenerated
   the baseline eval and action traces with the fix in place.
-- **Consequence for Stage 3:** every future evaluation/benchmark of
+- Consequence for Stage 3: every future evaluation/benchmark of
   `run20m_ppo` needs `G2E_RESIDUAL_SCALE_DEG=22` set explicitly (evaluating
   the new resid30 checkpoint needs no override, since 30 is now the
   module default). Noting this here so it isn't missed during the Stage 3
@@ -99,10 +99,10 @@ future benchmark report from this project, not just this campaign.
 
 ### Round 1 result: clean, no retuning needed
 
-- **Finished:** 2026-09-18 03:17 EDT, 3,014,656 total steps, `ep_rew_mean`
+- Finished: 2026-09-18 03:17 EDT, 3,014,656 total steps, `ep_rew_mean`
   climbed 700 -> ~2700, `approx_kl` settled near zero (converged, not
   diverged). Checkpoint: `trained/resid30_r1_ppo.zip`.
-- **evaluate_policy.py (12 episodes)** vs the corrected `run20m_ppo`
+- evaluate_policy.py (12 episodes): vs the corrected `run20m_ppo`
   baseline (`G2E_RESIDUAL_SCALE_DEG=22`):
   - `fell_fraction`: 0.0 both.
   - `r_imitation` raw match ratio: 0.955 (resid30) vs 0.915 (base) -- no
@@ -123,19 +123,19 @@ future benchmark report from this project, not just this campaign.
     pinned, matched 0.10 m/s command, 8 seeds each: 0.85 (base) vs 0.83
     (resid30) -- statistically identical, both show the same occasional
     per-seed startup stutter. Not a regression.
-- **Decision: clean pass, no Round 2 needed.** Moving directly to Stage 2
+- Decision: clean pass, no Round 2 needed: Moving directly to Stage 2
   (10M validation run w/ bailout gates), per the plan's decision gate.
 
 ### Stage 2: 10M validation run, clean pass
 
-- **Completed:** 2026-09-18 07:01 EDT, 10,010,624 total steps, both
+- Completed: 2026-09-18 07:01 EDT, 10,010,624 total steps, both
   bailout gates passed (1M gross sanity, 3M on-track), no BAILOUT file.
   `ep_rew_mean` ~2800, `approx_kl` settled low (0.0026-0.0035). Paused via
   SIGSTOP partway through for a disturbance-mechanism investigation
   (see below), resumed via SIGCONT -- confirmed safe since the bailout
   wrapper's gate check is purely checkpoint-file-based with no wall-clock
   stall detection. Checkpoint: `trained/resid30_val10m_ppo.zip`.
-- **evaluate_policy.py (12 episodes)** vs run20m_ppo baseline and the 3M
+- evaluate_policy.py (12 episodes): vs run20m_ppo baseline and the 3M
   Round-1 checkpoint:
   - `fell_fraction`: 0.0 across all three.
   - `diagonal_trot_corr_mean`: -0.523 (base) -> -0.557 (3M) -> -0.584 (10M)
@@ -145,7 +145,7 @@ future benchmark report from this project, not just this campaign.
   - `r_imitation` raw match ratio: 0.955 (10M) -- stable, no crawl
     regression at 10M either.
   - `r_joint_limit`: 0.0 -- still no saturation pressure even at 10M steps.
-- **Decision: clean pass, proceeding directly to Stage 3** (fresh 20M run),
+- Decision: clean pass, proceeding directly to Stage 3 (fresh 20M run),
   per the plan's decision gate.
 
 ### Aside: extensive disturbance-mechanism investigation (see also
@@ -165,9 +165,9 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
 
 ### Issue hit + fixed: Stage 1/Stage 2 verdicts were flat-ground-only, not full-DR
 
-- **Symptom:** user asked, correctly, whether testing had actually covered
+- Symptom: user asked, correctly, whether testing had actually covered
   anything beyond flat ground despite being halfway through Stage 3.
-- **Root cause:** `evaluate_policy.py` calls without any `--dr-*` flag
+- Root cause: `evaluate_policy.py` calls without any `--dr-*` flag
   don't force `DR_EVAL_FULL` -- domain-randomization strength (`self._dr`)
   instead ramps as `min(1.0, step_counter_session / DR_RAMP_STEPS)`
   (`DR_RAMP_STEPS=500,000`). A fresh evaluation session only runs ~3,000
@@ -176,7 +176,7 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
   slopes, pushes, roughness were all scaled to near-zero. Every "clean
   pass" verdict logged for Stage 1 and Stage 2 was genuinely flat-ground
   only, not a real read on training-distribution behavior.
-- **A second near-miss while fixing this:** first attempt used
+- A second near-miss while fixing this: first attempt used
   `--dr-friction 0.30` to force full DR strength -- but `evaluate_policy.py`'s
   own `--dr-*` handling zeroes every *other* DR knob first (by design, for
   isolated held-out tests), so that call tested friction alone with
@@ -185,7 +185,7 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
   before creating the env, leaving every other knob at its real trained
   default -- the same approach `benchmark_decathlon.py`/`benchmark_gaits.py`
   already use.
-- **Reassurance:** the actual benchmark tools that will produce Stage 3's
+- Reassurance: the actual benchmark tools that will produce Stage 3's
   real keep/revert verdict (`benchmark_decathlon.py`, `benchmark_gaits.py`)
   already set `DR_EVAL_FULL = True` correctly -- this bug only affected the
   supplementary spot-checks, not the pipeline that actually decides
@@ -193,9 +193,9 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
 - **Corrected Stage 1/Stage 2 numbers, full DR, 12 episodes each, matched
   seeds:**
 
-  - **`run20m_ppo` (22deg)**: Falls: 0/12; Speed (m/s): 0.027; Trot correlation: -0.24
-  - **`resid30_r1` (30deg, 3M)**: Falls: 0/12; Speed (m/s): 0.025; Trot correlation: -0.38
-  - **`resid30_val10m` (30deg, 10M)**: Falls: 0/12; Speed (m/s): 0.030; Trot correlation: -0.46
+  - `run20m_ppo` (22deg): Falls: 0/12; Speed (m/s): 0.027; Trot correlation: -0.24
+  - `resid30_r1` (30deg, 3M): Falls: 0/12; Speed (m/s): 0.025; Trot correlation: -0.38
+  - `resid30_val10m` (30deg, 10M): Falls: 0/12; Speed (m/s): 0.030; Trot correlation: -0.46
 
   No falls for any checkpoint under real conditions -- the earlier "no
   falls" verdict holds. What's new: the resid30 checkpoints hold a
@@ -210,9 +210,9 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
 
 ## Stage 3: full 20M run + head-to-head benchmark suite
 
-- **Completed:** 2026-09-18, 20,004,864 total steps, `approx_kl=0.0039`
+- Completed: 2026-09-18, 20,004,864 total steps, `approx_kl=0.0039`
   converged. Checkpoint: `trained/run20m_resid30_ppo.zip`.
-- **Benchmark suite run:** `benchmark_decathlon.py` (28-60 eps/cell, 30
+- Benchmark suite run: `benchmark_decathlon.py` (28-60 eps/cell, 30
   cells) and `benchmark_gaits.py` (12 eps/cell, 14 cells) for both
   checkpoints in parallel, plus `benchmark_recovery.py` (64-episode bare-robot
   shove probe) and `action_trace.py` (obstacle course + flat) for both.
@@ -232,10 +232,10 @@ a bit higher, trot correlation is consistently tighter. The aggregate
 fall-rate regression is driven almost entirely by four cells at or beyond
 the training envelope's edge:
 
-- **T9.1**: What: 18deg slope up (beyond the 14deg training ceiling); 22deg falls: **62%**; 30deg falls: **0%**
-- **T9.2**: What: 20deg slope down (beyond training; descent is harder); 22deg falls: **0%**; 30deg falls: **68%**
-- **T8.2**: What: Rough/uneven: dense bumps + rolling swell; 22deg falls: 4%; 30deg falls: 25%
-- **T9.3**: What: Rubble denser/taller than anything in training; 22deg falls: 22%; 30deg falls: 32%
+- T9.1: What: 18deg slope up (beyond the 14deg training ceiling); 22deg falls: **62%**; 30deg falls: **0%**
+- T9.2: What: 20deg slope down (beyond training; descent is harder); 22deg falls: **0%**; 30deg falls: **68%**
+- T8.2: What: Rough/uneven: dense bumps + rolling swell; 22deg falls: 4%; 30deg falls: 25%
+- T9.3: What: Rubble denser/taller than anything in training; 22deg falls: 22%; 30deg falls: 32%
 
 T9.1 is the exact failure mode `docs/archive/rl/slope-ceiling-log.md` was queued
 to fix by raising `SLOPE_MAX_DEG` -- resid30 fixes it completely with zero
@@ -273,8 +273,8 @@ isn't.
 fresh this pass after the original run's JSON was lost to a stale
 scratchpad path -- see fix below)
 
-- **`run20m_ppo` (22deg)**: Falls: 55%; Recover rate: 7%; Resettle steps (mean): 17.7
-- **`run20m_resid30_ppo` (30deg)**: Falls: 50%; Recover rate: 9%; Resettle steps (mean): 21.0
+- `run20m_ppo` (22deg): Falls: 55%; Recover rate: 7%; Resettle steps (mean): 17.7
+- `run20m_resid30_ppo` (30deg): Falls: 50%; Recover rate: 9%; Resettle steps (mean): 21.0
 
 resid30 falls slightly less and recovers slightly more often, but takes
 ~19% longer to resettle when it does. Only 3 (22deg) and 4 (30deg) actual

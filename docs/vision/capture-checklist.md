@@ -49,16 +49,16 @@ Same poses every time; the *variation* comes from a different room / lighting /
 clothes / hair per session, not different poses. Hit **Start**, hold, **Stop**,
 reposition, repeat. ~4 frames/sec.
 
-- **1**: Pose: **Close** (~1.5 ft), straight on, neutral; Hold: ~8 s; Notes: small natural head movement
-- **2**: Pose: Close, talking + a smile; Hold: ~6 s
-- **3**: Pose: **Mid** (~3 ft), straight on, neutral; Hold: ~8 s
-- **4**: Pose: Mid — slow head turn: full left → full right → back; Hold: ~10 s; Notes: both 3/4 profiles
-- **5**: Pose: Mid — chin up (hold), then chin down (hold); Hold: ~8 s
-- **6**: Pose: Mid — look away: left, right, up (not at the lens); Hold: ~6 s
-- **7**: Pose: Mid — hand near face / push hair back; Hold: ~6 s; Notes: a little natural occlusion
-- **8**: Pose: **Far** (~5–6 ft), straight on; Hold: ~6 s
-- **9**: Pose: **Second spot / different light** — repeat 1 + 3 (close + mid, straight on); Hold: ~10 s; Notes: move near a window, or change which lamps are on
-- **N**: Pose: **Negatives** — step fully out of frame / point at an empty wall; Hold: ~12 s; Notes: ~50 empty frames
+- 1: Pose: **Close** (~1.5 ft), straight on, neutral; Hold: ~8 s; Notes: small natural head movement
+- 2: Pose: Close, talking + a smile; Hold: ~6 s
+- 3: Pose: **Mid** (~3 ft), straight on, neutral; Hold: ~8 s
+- 4: Pose: Mid — slow head turn: full left → full right → back; Hold: ~10 s; Notes: both 3/4 profiles
+- 5: Pose: Mid — chin up (hold), then chin down (hold); Hold: ~8 s
+- 6: Pose: Mid — look away: left, right, up (not at the lens); Hold: ~6 s
+- 7: Pose: Mid — hand near face / push hair back; Hold: ~6 s; Notes: a little natural occlusion
+- 8: Pose: **Far** (~5–6 ft), straight on; Hold: ~6 s
+- 9: Pose: **Second spot / different light** — repeat 1 + 3 (close + mid, straight on); Hold: ~10 s; Notes: move near a window, or change which lamps are on
+- N: Pose: **Negatives** — step fully out of frame / point at an empty wall; Hold: ~12 s; Notes: ~50 empty frames
 
 `camera_preview.py` saves **motion-gated** — a held pose is ~1 frame, moving
 resumes capture — so leave "Start capturing" on and move slowly through the
@@ -68,7 +68,7 @@ person across the 3 sessions**. (`G2_CAP_GATE=0` for the old save-every-Nth
 behaviour; raise `G2_CAP_GATE` if held poses still repeat, lower it if slow
 sweeps get skipped.)
 
-**Per-session variation:** session 1 can be one look (e.g. hair up); sessions
+Per-session variation: session 1 can be one look (e.g. hair up); sessions
 2–3 the person's normal look. Each session in a different room / lighting if you
 can.
 
@@ -83,7 +83,7 @@ python tools/curate_captures.py <session_dir> <session_dir>/curated \
   hints. If good frames are tossed as "blurry", lower `--min-sharpness`.
 - Check `_contact_sheet.png`: faces **upright**? if not, re-run with a different
   `--rotate` (0/90/180/270). Poses/lighting varied, not clumped?
-- **Report the count:** curate prints *usable positives + negatives this session* and the *running total toward ~100* across the person's curated sessions -- always call that out so the current standing is known.
+- Report the count: curate prints *usable positives + negatives this session* and the *running total toward ~100* across the person's curated sessions -- always call that out so the current standing is known.
 - Re-run with tweaked flags as needed — it's non-destructive (raw frames kept).
 
 ## 5 · Iterate / accumulate
@@ -102,5 +102,5 @@ you mostly assign the class name → train → deploy → add to `VISION_LABELS`
 
 ## Notes
 
-- **Pre-label region:** `--label-region face` tightens the YOLO pre-label box to the face (from the Person box) -- the *image stays full-frame*. Do NOT crop the training images: an object detector must see faces *within* a scene to learn to localise them. `--face-crops` writes face crops to `crops/` only for a possible future classifier/embedder.
-- **Resolution ceiling:** frames pulled over serial (`AT+INVOKE`) are the model-input frame, ~240 px max -- no raw high-res JPEG this way. Set sensor capture to 480 (`G2_CAM_RES=1` for `face_preview.py`) for a cleaner 240 downscale. Graininess past that is low light, not resolution; the detector runs at 192 px regardless.
+- Pre-label region: `--label-region face` tightens the YOLO pre-label box to the face (from the Person box) -- the *image stays full-frame*. Do NOT crop the training images: an object detector must see faces *within* a scene to learn to localise them. `--face-crops` writes face crops to `crops/` only for a possible future classifier/embedder.
+- Resolution ceiling: frames pulled over serial (`AT+INVOKE`) are the model-input frame, ~240 px max -- no raw high-res JPEG this way. Set sensor capture to 480 (`G2_CAM_RES=1` for `face_preview.py`) for a cleaner 240 downscale. Graininess past that is low light, not resolution; the detector runs at 192 px regardless.

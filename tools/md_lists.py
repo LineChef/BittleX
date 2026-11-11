@@ -1,6 +1,6 @@
 """Markdown pipe tables are not used in this project's documentation (owner, 2026-11-11): every table is a bulleted list, one bullet per row.
 
-`convert(text)` turns the pipe tables in markdown text into lists (code fences are left alone) and returns (new_text, tables_converted). A row's first cell is the bold lead of its bullet; with two
+`convert(text)` turns the pipe tables in markdown text into lists (code fences are left alone) and returns (new_text, tables_converted). A row's first cell is the lead of its bullet (plain text, no bold); with two
 columns the second follows after a colon; with more, each further cell follows as `Header: value`, separated by semicolons; empty cells are left out. The doc generators in tools/ pass their output through it,
 so a regenerated page never brings a table back; `tools/check_docs.py` flags any table that is written by hand. `python tools/md_lists.py FILE...` converts files in place.
 """
@@ -26,7 +26,7 @@ def bullet(prefix, head, row):
     first = row[0]
     if len(head) == 1:
         return f"{prefix}- {first}"
-    lead = first if (not first or first.startswith('**')) else f"**{first}**"
+    lead = first
     rest = [(h, c) for h, c in zip(head[1:], row[1:]) if c]
     if not rest:
         return f"{prefix}- {lead}"

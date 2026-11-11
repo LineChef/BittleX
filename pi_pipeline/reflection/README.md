@@ -2,10 +2,10 @@
 
 G2 reflecting on his own experience. The notes are stored as ordinary memory facts: [`../memory/README.md`](../memory/README.md).
 
-- **`recap.py`**: Level: 1; What it does: A recap of each exploration session, counted from events the behavior layer already emits (turns away from a wall, hits, survey stops). No picture, no API call. The recap is appended to `experiences.jsonl` when a session ends
-- **`reflect.py`**: Level: 2; What it does: While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep (see below)
+- `recap.py`: Level: 1; What it does: A recap of each exploration session, counted from events the behavior layer already emits (turns away from a wall, hits, survey stops). No picture, no API call. The recap is appended to `experiences.jsonl` when a session ends
+- `reflect.py`: Level: 2; What it does: While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep (see below)
 
-- **reflect.py:** While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep turning away from walls in the kitchen"). Saved as facts with source `experience`, importance 1 or 2, never core; guarded so a note is never about a person or about where or when anyone was
+- reflect.py: While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep turning away from walls in the kitchen"). Saved as facts with source `experience`, importance 1 or 2, never core; guarded so a note is never about a person or about where or when anyone was
 
 
 `G2_REFLECT` sets the mode: `off`; `dry` (the default: the call is made and the notes it would save go to `reflections_dry.jsonl` for you to read; nothing is saved); `on` (saved). One memory-processing call per session is shared with the memory tidy-up, and every attempt is recorded (`python -m pi_pipeline.memory calls`).

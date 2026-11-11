@@ -15,7 +15,7 @@ Related: `vision/capture-checklist.md` (the capture routine),
 
 - Grove Vision AI V2 + its camera, USB-C cable (data, not charge-only).
 - A **SenseCraft AI** account (`sensecraft.seeed.cc`) — free.
-- **Chrome or Edge** (SenseCraft needs WebSerial; Safari won't work).
+- Chrome or Edge: (SenseCraft needs WebSerial; Safari won't work).
 - The repo, with the venv: `source pi_pipeline/.venv/bin/activate`.
 - Camera plugged into the Mac. Confirm: `ls /dev/cu.usbmodem*`.
 
@@ -55,10 +55,10 @@ PY
 
 The sensor outputs its native orientation — often **90° rotated**. That matters:
 
-- **Person Detection is trained on *upright* people.** On a sideways feed it
+- Person Detection is trained on *upright* people: On a sideways feed it
   misses the subject in most frames → few pre-labels. (Session-1 test: 46 boxes / 342
   frames sideways.)
-- **Rotating on the module is not possible** — no AT command, and camera sensors can't do
+- Rotating on the module is not possible: no AT command, and camera sensors can't do
   a 90° transpose (only H/V flip).
 
 So **physically rotate the camera module 90°** until its raw feed is upright
@@ -95,11 +95,11 @@ Full detail incl. the **standard pose set** (run it every session): `vision/capt
    pose and it captures the whole arc; freeze and it stops. `G2_CAP_GATE=0`
    restores the old "save every 4th frame" behaviour.
 4. Pose sequence — capturing can stay ON the whole time; the subject moves slowly:
-   - **distance:** close (~1.5 ft) → mid (~3 ft) → far (~5–6 ft), straight on
-   - **head:** slow full turn L↔R; chin up; chin down; look away L/R/up
-   - **expression:** talking, smile, neutral, surprised
-   - **occlusion:** hand near face, push hair back
-   - **second spot / light:** repeat close + mid
+   - distance: close (~1.5 ft) → mid (~3 ft) → far (~5–6 ft), straight on
+   - head: slow full turn L↔R; chin up; chin down; look away L/R/up
+   - expression: talking, smile, neutral, surprised
+   - occlusion: hand near face, push hair back
+   - second spot / light: repeat close + mid
    - Aim for **~90–120 saved** (motion-gated, so most are distinct), then ~12 s
      **negatives** (step out of frame / point at a wall).
 5. Stop the preview: `pkill -f camera_preview.py`.
@@ -129,7 +129,7 @@ python tools/curate_captures.py \
   `--dup-thresh` (global pass, default 4); `--no-dedup` keeps everything.
 - Outputs `pos_NNNN.jpg` (+ `.txt`), `neg_NNNN.jpg`, `_contact_sheet.png`,
   `_summary.txt`.
-- **Read the printout**: it reports **usable positives + negatives this
+- Read the printout: it reports **usable positives + negatives this
   session** and the **running total toward ~100** across all curated sessions
   for that person.
 - Open `_contact_sheet.png`: images upright? (else change `--rotate`.) Poses
@@ -176,19 +176,19 @@ root (`<class>/session_*/curated/…`) if the library is skipped.
 
 ## 6 · Train in SenseCraft
 
-1. **Models → Training → Image Object Detection** tab → **Image Collection
+1. Models → Training → Image Object Detection: tab → **Image Collection
    Training** (NOT "Quick Training" — that has no upload).
-2. **Step 1** — object name: `alex`.
-3. **Step 2** — skip the "Connect" (that is live capture; files already exist).
-4. **Step 3** — **Import Dataset** → the `upload/` folder. The `.txt` files are
+2. Step 1: object name: `alex`.
+3. Step 2: skip the "Connect" (that is live capture; files already exist).
+4. Step 3: **Import Dataset** → the `upload/` folder. The `.txt` files are
    YOLO pre-labels; images land under **Labeled** with boxes **already drawn**.
-   - **Do NOT run SenseCraft's auto-label** — it single-classes everything. The
+   - Do NOT run SenseCraft's auto-label: it single-classes everything. The
      `.txt` files already carry the right class per image.
    - Review the boxes; assign each class-id to its name (`0`→`person`, …).
    - Unlabeled (no-box) frames: box them by hand, or delete.
    - Negatives: leave unlabeled. Delete any that actually show a class.
    - Need ≥10 labeled; aim for all.
-5. **Step 4** — target device **Grove Vision AI V2** → **Start Training**
+5. Step 4: target device **Grove Vision AI V2** → **Start Training**
    (~10–30 min, cloud).
 
 ### Where the labels come from — almost nothing is labelled by hand
@@ -201,21 +201,21 @@ jointly. `combine_for_upload.py --classes a,b,c` builds that folder and writes
 
 The boxes are made **at capture time**, not by hand:
 
-- **`person`**: box source: Person-Detection base model → `.json` sidecar → `curate` writes the `.txt`; manual effort: **none** — already labelled in the library
-- **`dog`, `cat`**: box source: capture with a **COCO-80** model loaded → sidecar has dog/cat boxes → `curate` writes `.txt`; manual effort: none for frames it caught; hand-box the misses
-- **`ledge`**: box source: nothing auto-detects it; manual effort: **box it** — see below
+- `person`: box source: Person-Detection base model → `.json` sidecar → `curate` writes the `.txt`; manual effort: **none** — already labelled in the library
+- `dog`, `cat`: box source: capture with a **COCO-80** model loaded → sidecar has dog/cat boxes → `curate` writes `.txt`; manual effort: none for frames it caught; hand-box the misses
+- `ledge`: box source: nothing auto-detects it; manual effort: **box it** — see below
 
 **Labelling `ledge`** (the only real work): it's one repeated object on a slow
 pan, so —
-- **Roboflow** is fastest: upload just the `ledge` images, use *Label Assist* /
+- Roboflow: is fastest: upload just the `ledge` images, use *Label Assist* /
   "repeat previous box", export **YOLO v8**, drop the `.txt` files next to the
   jpgs, `g2promote ledge`. ~20-30 min for ~200 frames.
-- **Or** box ~1 frame in 10 in any labeller, then
+- Or: box ~1 frame in 10 in any labeller, then
   `python tools/interp_labels.py <curated_dir> --class-id 3` interpolates a box
   onto every frame between the keyframes; spot-check the ones it flags as far
   from a keyframe, then promote.
 
-> **Architecture lock:** whatever path is taken, the model has to be
+> Architecture lock: whatever path is taken, the model has to be
 > **Swift-YOLO** — the GV2 firmware's box decoder understands nothing else. A
 > standard Ultralytics YOLOv8 model (e.g. from an Ultralytics Colab) will flash,
 > run on the NPU, and return `boxes:[]` forever. SenseCraft **web** training is
@@ -228,21 +228,21 @@ To get one model that does person detection AND recognises individuals
 (`person` + `alex` + household + pets), instead of a single-class model that
 replaces it:
 
-1. **Try "Retrain" on the library person model first.** Model Library ->
+1. Try "Retrain" on the library person model first. Model Library ->
    "Person Detection--Swift YOLO" -> look for **Retrain / Train your own /
    Clone to project / Edit dataset**. If present, it opens that model's dataset
    (thousands of person images) in Training -- add a class `alex`, import the
    `alex/upload/`, assign the boxes to `alex`, train. That's literally on top of
    it: keeps the big `person` class and adds a new one.
-2. **No retrain option -> a 2-class project.** Training -> a project / multi-class
+2. No retrain option -> a 2-class project: Training -> a project / multi-class
    object-detection flow (NOT the single-object "Image Collection Training").
    Classes `person` + `alex`. Import `alex/upload/` as `alex`; add a few hundred
    varied generic-person images (Roboflow Universe "person detection" dataset, or
    the COCO `person` subset) as `person` so it still detects strangers. Train.
-3. **Class ids:** curate writes class `0`. For `[person=0, alex=1]` re-run
+3. Class ids: curate writes class `0`. For `[person=0, alex=1]` re-run
    `curate_captures.py <session> --class-id 1 ...`, or just pick the class in
    SenseCraft's labeller (box already drawn).
-4. **`.env`:** `VISION_LABELS=person,alex` (class-id order) +
+4. `.env`: `VISION_LABELS=person,alex` (class-id order) +
    `G2_BONDS=alex:1.0:affectionate`.
 
 This is the "interaction model" in `vision/detection-layer.md` -- add each
@@ -255,7 +255,7 @@ household member / pet as another class in the same project over time.
 1. Training done → **Deploy to device** → connect module → flash (~1–2 min).
    (SenseCraft's "please flash first" on the preview after a dropped tab is a UI
    glitch — the flash usually succeeded; verify below.)
-2. **Close the SenseCraft tab** (frees the port).
+2. Close the SenseCraft tab: (frees the port).
 3. Check what's on the module (the `AT+INFO?` snippet from step 1) — expect
    `"classes":["alex"]`, `"isCustom":true`.
 4. Run it through the pipeline:
@@ -282,14 +282,14 @@ unrecognised person defaulted to `curious`.
 
 ## Troubleshooting
 
-- **"Resource busy" opening the serial port**: SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB).
-- **Few pre-labels (`raw pos` low in curate)**: Feed is sideways → Person Detection misses the subject. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those.
-- **Curated images upside-down / sideways**: Wrong `--rotate` — try 90 / 180 / 270; the contact sheet shows it.
-- **Dark / grainy frames**: `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses.
-- **Only a handful of positives after curate**: De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames.
-- **Trained model detects nothing**: Dataset below the floor — dark, too few (<~40 varied), one lighting/background. Recapture in daylight, 3 varied sessions, retrain.
-- **Model flashes + runs (`inference: ~90ms` in Device Logger) but `boxes:[]` on every frame, any threshold**: **Wrong architecture.** GV2 firmware only decodes the **Swift-YOLO** head. A standard Ultralytics YOLOv8 export runs but its detection tensor is unreadable → permanent empty boxes. Must train/export via SSCMA. See [Capture progress](../vision/capture-progress.md).
-- **Model confuses two people**: Coarse at 192 px — more data per person, or move to face-embedding recognition (`vision/person-recognition.md` "upgrade path").
+- "Resource busy" opening the serial port: SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB).
+- Few pre-labels (`raw pos` low in curate): Feed is sideways → Person Detection misses the subject. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those.
+- Curated images upside-down / sideways: Wrong `--rotate` — try 90 / 180 / 270; the contact sheet shows it.
+- Dark / grainy frames: `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses.
+- Only a handful of positives after curate: De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames.
+- Trained model detects nothing: Dataset below the floor — dark, too few (<~40 varied), one lighting/background. Recapture in daylight, 3 varied sessions, retrain.
+- Model flashes + runs (`inference: ~90ms` in Device Logger) but `boxes:[]` on every frame, any threshold: **Wrong architecture.** GV2 firmware only decodes the **Swift-YOLO** head. A standard Ultralytics YOLOv8 export runs but its detection tensor is unreadable → permanent empty boxes. Must train/export via SSCMA. See Capture progress.
+- Model confuses two people: Coarse at 192 px — more data per person, or move to face-embedding recognition (`vision/person-recognition.md` "upgrade path").
 
 ## What lives where
 

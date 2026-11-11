@@ -10,29 +10,29 @@ order), the same format the RL env / SkillSwitch consume.
 
 ## High value for this project
 
-- **`rc`** (recover): what it is: scripted self-right, slow falls; use for G2: already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch.
-- **`balance`**: what it is: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below)
-- **`bx` / `showOff` / `chr` / `lucky`**: what it is: **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned (see below)
-- **`buttUp`** (play-bow / downward-dog): what it is: posture, nose-down pitch +15°; use for G2: the **INSPECT peer-pose** the sim couldn't hold — Petoi already tuned it. Port as the INSPECT scaffold (tilt camera down at a near obstacle).
-- **`carpetF` / `carpetL`**: what it is: walk gait tuned for **carpet**; use for G2: directly targets the known "G2 stalls on carpet" problem. Decode + A/B vs `wkF` on the carpet cell.
-- **`str`** (stretch): what it is: "just woke up" stretch posture; use for G2: idle / wake behaviour for the autonomous layer.
-- **`snf`** (sniff): what it is: head-down sniffing loop; use for G2: **explore mode** — G2 sniffs around a new spot.
-- **`scrh`** (scratch): what it is: dog scratching, nose-down; use for G2: idle personality behaviour.
-- **`zz`** (zzz): what it is: curl up to sleep; use for G2: **sleep mode / idle-REST** (the user's power priority).
-- **`nd`** (nod): what it is: head nod; use for G2: acknowledgement / "yes" in the voice + personality loop.
-- **`sit`**: what it is: sit posture; use for G2: idle, "stay", greeting.
-- **`gdb`** (give paw / shake): what it is: offer a paw, nose-down; use for G2: **"G2, meet X"** enrollment + bonds; social greeting.
-- **`fiv`** (high-five) / **`hi`** (wave): what it is: social gesture; use for G2: personality / interaction.
-- **`jpF`** (jump forward): what it is: genuine dynamic crouch-load-then-hop; use for G2: (a) an "excited" expressive move; (b) the *untested* dynamic path for clearing an obstacle on hardware, where static climb failed.
-- **`phF`** (pounce forward): what it is: pounce; use for G2: play behaviour; could pair with vision ball/target tracking.
-- **`hunt`**: what it is: seeking / hunting routine; use for G2: tie into vision tracking / the avoider.
+- `rc`: (recover): what it is: scripted self-right, slow falls; use for G2: already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch.
+- `balance`: what it is: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below)
+- `bx` / `showOff` / `chr` / `lucky`: what it is: **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned (see below)
+- `buttUp`: (play-bow / downward-dog): what it is: posture, nose-down pitch +15°; use for G2: the **INSPECT peer-pose** the sim couldn't hold — Petoi already tuned it. Port as the INSPECT scaffold (tilt camera down at a near obstacle).
+- `carpetF` / `carpetL`: what it is: walk gait tuned for **carpet**; use for G2: directly targets the known "G2 stalls on carpet" problem. Decode + A/B vs `wkF` on the carpet cell.
+- `str`: (stretch): what it is: "just woke up" stretch posture; use for G2: idle / wake behaviour for the autonomous layer.
+- `snf`: (sniff): what it is: head-down sniffing loop; use for G2: **explore mode** — G2 sniffs around a new spot.
+- `scrh`: (scratch): what it is: dog scratching, nose-down; use for G2: idle personality behaviour.
+- `zz`: (zzz): what it is: curl up to sleep; use for G2: **sleep mode / idle-REST** (the user's power priority).
+- `nd`: (nod): what it is: head nod; use for G2: acknowledgement / "yes" in the voice + personality loop.
+- `sit`: what it is: sit posture; use for G2: idle, "stay", greeting.
+- `gdb`: (give paw / shake): what it is: offer a paw, nose-down; use for G2: **"G2, meet X"** enrollment + bonds; social greeting.
+- `fiv`: (high-five) / **`hi`** (wave): what it is: social gesture; use for G2: personality / interaction.
+- `jpF`: (jump forward): what it is: genuine dynamic crouch-load-then-hop; use for G2: (a) an "excited" expressive move; (b) the *untested* dynamic path for clearing an obstacle on hardware, where static climb failed.
+- `phF`: (pounce forward): what it is: pounce; use for G2: play behaviour; could pair with vision ball/target tracking.
+- `hunt`: what it is: seeking / hunting routine; use for G2: tie into vision tracking / the avoider.
 
-- **balance:** **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 leg joints to 30° — **byte-identical to `up`** (the neutral-stand pose). In sim the body drops *lower* and all 4 legs splay out/up, not a dynamic balancing act.
+- balance: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 leg joints to 30° — **byte-identical to `up`** (the neutral-stand pose). In sim the body drops *lower* and all 4 legs splay out/up, not a dynamic balancing act.
 
   Matches the community description of `kbalance` as a **calibration-check pose** (moves limbs symmetrically to verify servo calibration), not a trick. Already correctly used in code as the emergency-freeze/post-recovery settle token (`pi_pipeline/link/opencat.py` `BALANCE`, `pi_pipeline/behavior/emergency.py`) — that usage was already accurate.
 
   Only `pi_pipeline/voice/skills.py`'s Claude-facing description was wrong ("stand and actively balance") — corrected 2026-09-15 to "settle into a low, stable stand (same pose as 'stand')". **Does not produce the hind-leg-rearing "stand up" motion** seen in Petoi's `stand.gif` demo. See the `bx`/`showOff`/`chr`/`lucky` row below for the actual candidate check.
-- **bx / showOff / chr / lucky:** **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned out not to be the trick, decoded + replayed each in PyBullet (spawn standing, play the keyframes, check final body height/pitch/roll): `showOff` and `chr` stand **taller and stiffer-legged but still on all 4 feet** (body height 0.087 m vs ~0.04 m normal stand) — not bipedal.
+- bx / showOff / chr / lucky: **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned out not to be the trick, decoded + replayed each in PyBullet (spawn standing, play the keyframes, check final body height/pitch/roll): `showOff` and `chr` stand **taller and stiffer-legged but still on all 4 feet** (body height 0.087 m vs ~0.04 m normal stand) — not bipedal.
 
   `bx` and `lucky` both **tip the robot onto its back** in sim (roll → 180°) rather than settling into a balanced pose.
 
@@ -69,14 +69,14 @@ order), the same format the RL env / SkillSwitch consume.
 
 - ~~`rl` (roll), `tbl` (tumble)~~ — **excluded, see note above.** `lnd` (land), `dropRec` (drop-recover) — recovery variants; useful if get-up work widens beyond `rc`.
 - ~~`bf` / `flip`~~ — **excluded, see note above.** `ff` / `showOff` / `pu` / `pu1` / `clap` — acrobatic tricks / demos. Personality "do a trick" commands.
-- **`mw` / `wh`** — the OpenCat sound-emote skills: a short body motion paired with a vocalisation. The voice layer already does TTS; these add body language.
-- **`dg` (dig), `pee`** — comedic dog behaviours; explore/personality flavour.
-- **`gpF/gpL` (gallop), `vtF` (vault), `bk*` (backward)** — extra locomotion; `bk_ref` already decoded. Gallop = a faster gait if top speed ever matters.
-- **`kc` (kick), ~~`bx` (box)~~ (excluded, see note above), `toss`/`ts`** — object interaction; relevant only if a manipulation/play feature is added.
+- `mw` / `wh`: the OpenCat sound-emote skills: a short body motion paired with a vocalisation. The voice layer already does TTS; these add body language.
+- `dg` (dig), `pee`: comedic dog behaviours; explore/personality flavour.
+- `gpF/gpL` (gallop), `vtF` (vault), `bk*` (backward): extra locomotion; `bk_ref` already decoded. Gallop = a faster gait if top speed ever matters.
+- `kc` (kick), ~~`bx` (box)~~ (excluded, see note above), `toss`/`ts` — object interaction; relevant only if a manipulation/play feature is added.
 
 ## Not relevant
 
-- **`*ArmF` / `*ArmL`** (wkArmF, trArmF, crArmF, vtArmF, bkArmF), **`pick*` / `put*` / `gdb` arm variants**, **`lftF/lftL`, `hg` (hang), `hds`, `hsk`, `hu`, `knock`, `launch`, `lpov`, `lucky`, `ang`, `pd`, `ck`** — arm-equipped Bittle or unclear/one-off. G2 has no arm.
+- `*ArmF` / `*ArmL`: (wkArmF, trArmF, crArmF, vtArmF, bkArmF), **`pick*` / `put*` / `gdb` arm variants**, **`lftF/lftL`, `hg` (hang), `hds`, `hsk`, `hu`, `knock`, `launch`, `lpov`, `lucky`, `ang`, `pd`, `ck`** — arm-equipped Bittle or unclear/one-off. G2 has no arm.
 
 ## How to bring one in
 

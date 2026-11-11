@@ -17,10 +17,10 @@ process changes.
 
 The goal is set per loop at kickoff. Historically:
 
-- **Loop 1:** an efficient, stable level-ground walk close to OpenCat's built-in
+- Loop 1: an efficient, stable level-ground walk close to OpenCat's built-in
   `wkF` gait — straight line, real diagonal trot, no falling. Pure reward-shaping,
   measured by metrics.
-- **Runs 5–7:** robustness to obstacles and disturbances, fall/stumble recovery,
+- Runs 5–7: robustness to obstacles and disturbances, fall/stumble recovery,
   and a deliberate target walk speed.
 
 ---
@@ -29,7 +29,7 @@ The goal is set per loop at kickoff. Historically:
 
 - All automated-iteration work happens on **`auto-gait-iteration`**, branched from
   `development`.
-- **At the start of every run, sync `development` first:**
+- At the start of every run, sync `development` first:
   ```bash
   git checkout development
   git pull --ff-only origin development
@@ -38,7 +38,7 @@ The goal is set per loop at kickoff. Historically:
   ```
   If the merge conflicts, stop and hand back — do not resolve conflicts inside
   the loop.
-- **One commit per round** on the branch — the reward/env change plus its
+- One commit per round: on the branch — the reward/env change plus its
   `docs/rl/<campaign>-log.md` entry (one file per campaign, not per round) — so any round is individually
   recoverable.
 - The loop never merges to `development` itself. After the results are reviewed,
@@ -52,14 +52,14 @@ The goal is set per loop at kickoff. Historically:
 
 The loop must never be an unstoppable long process.
 
-- **Longest uninterruptible unit = one training run** (~35–40 min for 2M steps).
-- **Session interrupt** stops work between or during steps. A training run keeps
+- Longest uninterruptible unit = one training run: (~35–40 min for 2M steps).
+- Session interrupt: stops work between or during steps. A training run keeps
   writing checkpoints; `pkill -f train.py` ends it losing nothing past the last
   checkpoint.
-- **`STOP` sentinel file** — before each round, check for
+- `STOP` sentinel file: before each round, check for
   `rl_training/opencat-gym/STOP`. If present, finish the current round (or stop
   immediately if between rounds), write the report, and hand back.
-- **Hard caps** — stop at a wall-clock limit or a round count, whichever comes
+- Hard caps: stop at a wall-clock limit or a round count, whichever comes
   first. Confirm the caps at kickoff.
 - Stop early if targets are met. If the cap is hit without meeting them, stop
   anyway — keep the best checkpoint and report what's blocking plus recommended
@@ -70,27 +70,27 @@ The loop must never be an unstoppable long process.
 ## Per-round procedure
 
 1. Check `STOP` and the caps. If either says stop, go to **Wrap-up**.
-2. **Evaluate the current best policy** headlessly (see Evaluation). Round 0 is
+2. Evaluate the current best policy: headlessly (see Evaluation). Round 0 is
    whatever checkpoint exists at kickoff.
-3. **Diagnose** the single biggest gap between current behavior and the goal.
-4. **Make one change** — a reward constant or a reward-term formula in
+3. Diagnose: the single biggest gap between current behavior and the goal.
+4. Make one change: a reward constant or a reward-term formula in
    `opencat_gym_env.py`. One variable per round so cause and effect stay legible.
    Structural changes (observation/action space, PPO hyperparameters, a new
    reward mechanism) are bigger bets — describe the plan and get a go-ahead
    before spending a round on one, rather than deciding unilaterally inside the
    loop.
-5. **Smoke test**: `../../.venv/bin/python smoke_train.py` — reward in the
+5. Smoke test: `../../.venv/bin/python smoke_train.py` — reward in the
    expected range for the current reward config, no NaN.
-6. **Train**: `./start_run.sh <tag> --steps 2000000`. Tag scheme:
+6. Train: `./start_run.sh <tag> --steps 2000000`. Tag scheme:
    `<loop>_r<N>` (e.g. `walk_r1`). Every run needs a unique tag.
-7. **Re-evaluate** the new checkpoint against the current best.
-8. **Score** with the loop's composite metric. Promote the round if it beats the
+7. Re-evaluate: the new checkpoint against the current best.
+8. Score: with the loop's composite metric. Promote the round if it beats the
    best by a margin; on two non-improving rounds in a row, revert to the
    last-good config and change levers.
-9. **Log** a round entry in `docs/rl/<campaign>-log.md` (one file per campaign): what changed, why,
+9. Log: a round entry in `docs/rl/<campaign>-log.md` (one file per campaign): what changed, why,
    before/after metrics, diagnosis, keep/revert decision.
-10. **Commit** to `auto-gait-iteration`.
-11. **Post an update** — this round's result vs. the previous, the diagnosis, and
+10. Commit: to `auto-gait-iteration`.
+11. Post an update: this round's result vs. the previous, the diagnosis, and
     the next change — then launch the next run immediately. Don't wait for a
     reply.
 
@@ -110,16 +110,16 @@ options and waiting. Record the choice and its reasoning in the log.
 deterministic episodes, and emits JSON metrics. Core metrics and the failure mode
 each targets:
 
-- **Forward distance, mean forward speed**: progress / efficiency
-- **Speed error vs. `TARGET_SPEED`**: holding the walk set-point (Run 7+)
-- **Yaw drift / heading deviation**: curving off a straight line
-- **Per-foot peak swing height, stride length**: shuffling vs. real steps
-- **Foot-slip distance while in contact**: dragging feet
-- **Diagonal-trot phase correlation**: wrong / no gait pattern
-- **Joint direction-reversal count**: jitter
-- **Fell fraction, time-to-fall**: stability
-- **Big-stumble recovery rate**: catching a stumble before a fall (Run 7+)
-- **Roll & pitch variance**: body stability
+- Forward distance, mean forward speed: progress / efficiency
+- Speed error vs. `TARGET_SPEED`: holding the walk set-point (Run 7+)
+- Yaw drift / heading deviation: curving off a straight line
+- Per-foot peak swing height, stride length: shuffling vs. real steps
+- Foot-slip distance while in contact: dragging feet
+- Diagonal-trot phase correlation: wrong / no gait pattern
+- Joint direction-reversal count: jitter
+- Fell fraction, time-to-fall: stability
+- Big-stumble recovery rate: catching a stumble before a fall (Run 7+)
+- Roll & pitch variance: body stability
 
 `--dr-*` flags (`--dr-terrain`, `--dr-push`, …) force full-strength domain
 randomization for a held-out scenario the policy never trained on. Any flag
@@ -137,22 +137,22 @@ waiting for pre-approval.
 
 1. Optionally run a full-length confirming run on the best config (skip on an
    immediate stop).
-2. **Write the report** — `docs/rl/<campaign>-report.md`:
+2. Write the report: `docs/rl/<campaign>-report.md`:
    - every change across all rounds, in order, with reasoning
    - a before/after metrics table per round
    - final policy metrics vs. targets
    - what improved, what's still short, recommended next moves
-3. **Queue the review artifacts:**
+3. Queue the review artifacts:
    - TensorBoard running and open, showing the loop's `PPO_N` runs next to the
      earlier ones
    - `g2watch` on the best checkpoint ready to run (launch it or leave the exact
      command)
    - Render the candidate policies to GIFs (`render_gif.py`).
-   - **Only when working from mobile (or when a page view is requested):** also
+   - Only when working from mobile (or when a page view is requested): also
      publish an HTML review Artifact with each gait GIF + metrics + the
      recommendation. At a desk this is skipped — TensorBoard + `g2watch` are the
      review.
-4. **Ask whether to merge** `auto-gait-iteration` → `development`. Merge only on
+4. Ask whether to merge: `auto-gait-iteration` → `development`. Merge only on
    an explicit yes.
 
 ---
@@ -169,13 +169,13 @@ waiting for pre-approval.
 
 A short block right before launching any training run:
 
-- **ETA** — wall-clock, with basis. ~35–40 min per 2M steps on this machine. For
+- ETA: wall-clock, with basis. ~35–40 min per 2M steps on this machine. For
   a loop: `(rounds planned × ~50 min incl. eval) + current time`.
-- **This run** — one line: what's changing and the hypothesis.
-- **Scope** — steps per run; for a loop, rounds planned and the caps.
-- **Stop** — `touch rl_training/opencat-gym/STOP` (clean stop after the current
+- This run: one line: what's changing and the hypothesis.
+- Scope: steps per run; for a loop, rounds planned and the caps.
+- Stop: `touch rl_training/opencat-gym/STOP` (clean stop after the current
   round) or interrupt.
-- **On completion** — what's delivered: notification, and for a loop the report,
+- On completion: what's delivered: notification, and for a loop the report,
   TensorBoard, `g2watch` replay, and the merge question.
 
 **Every status update** leads with **percent done** and an **estimated finish

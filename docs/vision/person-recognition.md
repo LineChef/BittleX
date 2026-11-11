@@ -23,18 +23,18 @@ detection labels.
 
 ## Which kind of recognition
 
-- **Person detection (deployed now)**: Output: box around any human; Feasible on Grove Vision AI V2: ✅ one model, frame rate
-- **Face detection**: Output: box around any face; Feasible on Grove Vision AI V2: ✅ — but *less* useful than person detection for "someone's here" (a face only shows close + facing)
-- **Per-individual detection** (the near-term plan): Output: `dad`, box, 0.7; Feasible on Grove Vision AI V2: ✅ one model, frame rate — **coarse** at 192–240 px, confuses similar faces, retrain to add anyone
-- **True face recognition (detect → embedding → gallery match)**: Output: vector per face, match against a few enrolled photos, **no retrain to add people**; Feasible on Grove Vision AI V2: ⚠️ two models — module runs one at a time → face-detect on module + embed on the **Pi**, event-driven (module can't stream a frame *and* detections)
+- Person detection (deployed now): Output: box around any human; Feasible on Grove Vision AI V2: ✅ one model, frame rate
+- Face detection: Output: box around any face; Feasible on Grove Vision AI V2: ✅ — but *less* useful than person detection for "someone's here" (a face only shows close + facing)
+- Per-individual detection: (the near-term plan): Output: `dad`, box, 0.7; Feasible on Grove Vision AI V2: ✅ one model, frame rate — **coarse** at 192–240 px, confuses similar faces, retrain to add anyone
+- True face recognition (detect → embedding → gallery match): Output: vector per face, match against a few enrolled photos, **no retrain to add people**; Feasible on Grove Vision AI V2: ⚠️ two models — module runs one at a time → face-detect on module + embed on the **Pi**, event-driven (module can't stream a frame *and* detections)
 
-**Near-term:** per-individual detection. One `interaction` model with classes
+Near-term: per-individual detection. One `interaction` model with classes
 `person` + `dad` + `mom` + `dog` + …, trained via SenseCraft (multi-class
 project) or the SSCMA/Colab path (fine-tune from a person-aware Swift-YOLO
 checkpoint). Include a generic `person` class so unknown people still register
 (feeds Bonds' "new person → curious" default).
 
-**Upgrade path if per-individual proves too confusable:** face-detect on the
+Upgrade path if per-individual proves too confusable: face-detect on the
 module → Pi crops the face box → Pi runs a small face-embedding model →
 match against a per-person gallery of a few reference crops. Add a person by
 adding crops, no retrain. Costs: the module can't give detections + a raw frame
@@ -66,24 +66,24 @@ frames the whole time, across **3 separate sessions** for lighting/pose variety.
 
 ### Flow
 
-1. **Greeting** — G2: *"Nice to meet you, Alex. I need 3 sets of photos to get
+1. Greeting: G2: *"Nice to meet you, Alex. I need 3 sets of photos to get
    to know you. This is session 2 of 3, one more after this. Stay in front of me
    and follow along."* (Session count comes from how many completed sessions the
    person already has.)
-2. **Scripted pose steps**, each = a spoken prompt + a capture window:
+2. Scripted pose steps: , each = a spoken prompt + a capture window:
    - session 1 — basics: look at me / face close / back up / turn head / step out
    - session 2 — angles + light: face me (different light) / look left-right /
      chin up-down / step left / step right / step out
    - session 3 — movement: look at me / walk toward me / walk back / turn while
      moving / step out
    Scripts differ per session so 3 sessions aren't identical.
-3. **Quality gating** — the driver scores each frame (`face_quality` 0–1 ≈
+3. Quality gating: the driver scores each frame (`face_quality` 0–1 ≈
    brightness × face-box fraction); frames only count when good, and a sustained
    bad stretch earns one spoken hint (*"come a little closer"* / *"a bit more
    light on your face"*).
-4. **Interruptions** — person walks off → G2 pauses (*"come back in front of
+4. Interruptions: person walks off → G2 pauses (*"come back in front of
    me"*); gone too long → abort with a friendly close.
-5. **Completion** — G2: *"Got it — that's set 2. Find me one more time later to
+5. Completion: G2: *"Got it — that's set 2. Find me one more time later to
    finish."* or, on the last: *"That's all 3 sets, Alex. Ask my humans to train
    me on you now."*
 
@@ -117,18 +117,18 @@ Pure logic + injectable clock, same pattern as `link/recovery.py` /
 `pi_pipeline/behavior/enrollment_driver.py` (or fold into the voice loop's
 command handling). Per tick it must:
 
-- **`person_present`**: the `interaction`/`person` model via `SerialDetectionFeed` — any `person`/individual box this frame
-- **`face_quality`**: brightness of the face-box crop × (box area / frame) — needs the JPEG (`AT+INVOKE=-1,0,0` carries one per frame; reuse `scratchpad/face_preview.py`'s grab path)
-- **`good_frames_this_step`**: count of frames it accepted+saved since the last `CAPTURE_ON`
+- `person_present`: the `interaction`/`person` model via `SerialDetectionFeed` — any `person`/individual box this frame
+- `face_quality`: brightness of the face-box crop × (box area / frame) — needs the JPEG (`AT+INVOKE=-1,0,0` carries one per frame; reuse `scratchpad/face_preview.py`'s grab path)
+- `good_frames_this_step`: count of frames it accepted+saved since the last `CAPTURE_ON`
 
 And it must act on `EnrollTick`:
 
-- **`SPEAK`**: `voice.tts.speak(tick.speak)`
-- **`CAPTURE_ON`**: `new_session_dir(...)` once per session; start saving accepted frames, tagged with `step_kind`; also save the detection box as a pre-label (YOLO txt) so upload is ~90 % labelled
-- **`CAPTURE_OFF`**: stop saving
-- **`ORIENT`**: turn body toward `tick.bearing` (only if a body/link is present)
-- **`COMPLETE`**: `mark_session_done(session_dir)`; tell the user; if `sessions_left == 0`, surface "ready to train"
-- **`ABORT`**: discard or keep partial (config); tell the user
+- `SPEAK`: `voice.tts.speak(tick.speak)`
+- `CAPTURE_ON`: `new_session_dir(...)` once per session; start saving accepted frames, tagged with `step_kind`; also save the detection box as a pre-label (YOLO txt) so upload is ~90 % labelled
+- `CAPTURE_OFF`: stop saving
+- `ORIENT`: turn body toward `tick.bearing` (only if a body/link is present)
+- `COMPLETE`: `mark_session_done(session_dir)`; tell the user; if `sessions_left == 0`, surface "ready to train"
+- `ABORT`: discard or keep partial (config); tell the user
 
 Trigger: voice command `"(hey )?g2,? meet (<name>)"` in the voice loop's local
 command matcher (sibling of `voice/commands.py` "forget that" / "go to sleep").
@@ -151,7 +151,7 @@ picks a few clean negatives, rotates everything upright (`--rotate`, default
 270° CW), and writes a contact sheet + a summary with balance hints
 ("narrow brightness range", "all faces the same size — vary distance").
 
-**Pre-labels:** if the capture ran with a detection model loaded, each frame has
+Pre-labels: if the capture ran with a detection model loaded, each frame has
 a `<name>.json` sidecar with the module's boxes (`face_preview.py` writes these).
 `curate` then splits positives (box present) from negatives (none) automatically
 and writes a **YOLO `.txt` per positive** (`<class_id> cx cy w h` normalised,
@@ -181,12 +181,12 @@ should *ask* ("I don't know you yet — can I take some photos?") before capturi
 
 ### Testing plan (once the body is built)
 
-1. **Mock driver** — feed the FSM synthetic `person_present` / `face_quality` /
+1. Mock driver: feed the FSM synthetic `person_present` / `face_quality` /
    frame counts; assert the prompt sequence, pause/resume, abort, 3-session
    accounting (covered by `test_enrollment.py`; extend for the driver).
-2. **Bench, camera only** — real `person_present` + `face_quality` from the
+2. Bench, camera only: real `person_present` + `face_quality` from the
    feed, real frame saves, `SPEAK` to stdout/TTS, no body. Run a full 3-session
    enrollment on one person; inspect the saved sets for variety and quality.
-3. **Full robot** — add `ORIENT`; test that G2 keeps the person framed as they
+3. Full robot: add `ORIENT`; test that G2 keeps the person framed as they
    move; tune `EnrollmentConfig` timings against real human pacing.
 4. Then run the training-path comparison on the enrolled data.

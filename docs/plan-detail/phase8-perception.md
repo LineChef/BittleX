@@ -58,7 +58,7 @@ by the reactive-recovery ceiling established in Runs 6–7.
 > Still sim-only; on-hardware `cmh` port is unblocked by this but not yet
 > started.
 
-**Status:** `pi_pipeline/vision/` is scaffolded and testable against a mock
+Status: `pi_pipeline/vision/` is scaffolded and testable against a mock
 detection feed — same mock-interface pattern as voice/memory. `DetectionFeed`
 (`MockDetectionFeed` / `SerialDetectionFeed`), a local `Avoider` reflex
 (debounced, urgent hazards preempt the cooldown; `none → turn → stop → back up`),
@@ -78,15 +78,15 @@ tuning, and the Phase 10 wiring — all hardware-gated.
 > `G2_FEATURES="+vision"` once a real detector is deployed. Nothing deleted.
 > Rationale + the multi-class model options: `docs/vision/detection-layer.md`.
 
-- **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
+- Hardware constraint: Bittle X has one module slot, taken by the AI Vision
   Camera. A separate proximity/distance sensor is not an option alongside it — so
   cliff/edge detection, if pursued, must be a camera-based visual classifier
   (SenseCraft-trained "floor" vs. "edge ahead"), not a dedicated sensor. Use the
   module's `classes()` output for that — a boxless classification path, lighter
   than object detection.
-- **Vision module limits** (vendor docs — full detail in
+- Vision module limits: (vendor docs — full detail in
   [`docs/hardware/specs.md`](../hardware/specs.md)):
-  - **Detections *or* a raw frame, never both at once.** The `Avoider` reflex
+  - Detections *or* a raw frame, never both at once. The `Avoider` reflex
     (needs the detection stream) and `scene.narrate` (needs a frame for Claude)
     must timeshare or mode-switch, not run concurrently. Results and frames use
     different links (UART vs USB), which helps.
@@ -148,7 +148,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       sensing either) — a zero-debounce local reflex that preempts every other
       behavior, using the light `classes()` floor-vs-edge path, custom-trained
       on the real desk, biased hard toward false-stops over a missed edge.
-      **Behavior-audit finding, 2026-09-16:** on top of needing the trained
+      Behavior-audit finding, 2026-09-16: on top of needing the trained
       desk-edge classifier + mounted camera, the wiring itself is incomplete —
       `app/__main__.py`'s `_build_runtime()` never constructs a `CliffGuard` or
       passes `cliff=` to `BehaviorDriver`, so the reflex has zero live effect
@@ -179,19 +179,19 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       foot-slip + the firmware gyro turn-assist the sim doesn't model). No 20M
       ever ran; `run20m_ppo` untouched.
       **New plan:**
-      - **Turning → firmware.** Heading changes use the scripted `kbk`/`wkL`
+      - Turning → firmware: Heading changes use the scripted `kbk`/`wkL`
         turn gaits (they work on the real robot), triggered by the behaviour
         layer. `AvoidanceAction.TURN_*` map to these.
-      - **Vision-while-walking → the `Avoider` reflex** (`pi_pipeline/vision/
+      - Vision-while-walking → the `Avoider` reflex: (`pi_pipeline/vision/
         avoidance.py`), which sets the *speed command* the RL walk policy already
         tracks. Added 2026-09-07: `AvoidanceAction.SLOW` (obstacle ahead but not
         near → `ACTION_SPEED_SCALE` 0.4) for anticipatory slowing. Sequence as an
         obstacle nears: NONE → SLOW → STOP / BACK_UP (dead ahead) or TURN
         (firmware, to a side). Calibrate the area→speed thresholds on hardware.
-      - **Cliff/edge stop** — the `CLIFF` sim feature is built; the real-robot
+      - Cliff/edge stop: the `CLIFF` sim feature is built; the real-robot
         path needs the vision model trained to detect a desk edge (hardware-
         gated). Until then `CliffGuard` stays a hard reflex spec (B16).
-      - **Tier B (a fresh vision-baked ~20M) is reserved** for *if* hardware
+      - Tier B (a fresh vision-baked ~20M) is reserved for *if* hardware
         shows the command-level reflex isn't fine enough — i.e. the robot still
         clips cables it can see, or the decel is too abrupt (within-stride,
         sub-command-timescale things a speed command can't express). Not
@@ -231,7 +231,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       *after* a foot hits it (2026-09-03 probe batch: never falls but *stalls*
       against curbs / lips / on carpet, blind forward).
 
-      **DECIDED ARCHITECTURE (2026-09-03) — NOT ADOPTED:** the walk policy gets **its own
+      DECIDED ARCHITECTURE (2026-09-03) — NOT ADOPTED: the walk policy gets **its own
       low-bandwidth forward terrain feature, fed directly into its 278-d
       observation at control rate**, *separate from* the vision→Claude /
       vision→`Avoider` command-setting path. Not "vision biases the command" —
@@ -253,7 +253,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       - Claude stays *above* this loop (navigation goals, narration); the
         `Avoider` reflex may still set coarse speed/yaw commands in parallel.
         The terrain feature and the command path are independent inputs.
-      - **Sim training:** synthesize that same feature from PyBullet ground-truth
+      - Sim training: synthesize that same feature from PyBullet ground-truth
         obstacle geometry, with realistic detector noise / miss-rate / latency
         (tuned to the real model's measured stats, `sysid`-style), add it to the
         observation, and retrain. **Claude does not need to be in the sim** — it

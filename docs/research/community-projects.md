@@ -10,15 +10,15 @@ reviewed at all.
 
 ## Sources
 
-- **BittleJuice** — RL walking policy, MuJoCo→real, patched firmware: How reviewed: Reddit post pasted by user + `mike-grayhat.github.io/bittlejuice` + `github.com/mike-grayhat/bittlejuice` fetched directly; Reviewable?: Yes
-- **bittle-mujoco** — Bittle X V1 MuJoCo model, measured mass/CoM/joints: How reviewed: Found via background research (linked from the BittleJuice ecosystem); Reviewable?: Yes
-- **MH-FLOCKE** — spiking-neural-network self-taught walking: How reviewed: Reddit post pasted by user; `github.com/MarcHesse/mhflocke` and `github.com/MarcHesse/bittle-mujoco` linked but not independently fetched; Reviewable?: Partial (post text only)
-- **TypeFly** — LLM-driven robot task planning, Petoi HTTP support: How reviewed: `github.com/typefly/TypeFly` fetched directly; Reviewable?: Yes
-- **Classroom Bittle V2 session**: How reviewed: One-line gist only, via a third-party blog mention; Reviewable?: No — not project-relevant regardless
-- **"I used an LLM to control the Petoi..."**: How reviewed: Reddit — blocked, not pasted; Reviewable?: No
-- **"Tutorial to use Claude Code to develop Bittle's..."**: How reviewed: Reddit — blocked, never revisited; Reviewable?: No
-- **`ocolakoglu/PetoiBittleChatGPT` + Petoi's official ChatGPT blog post**: How reviewed: `Text2SpeechEn.py` fetched directly (2026-09-29, researching voice output); Reviewable?: Yes
-- **FinoBot (Bittle X + Pi + ROS2, person-following)**: How reviewed: Petoi blog post fetched directly; Reviewable?: Yes
+- BittleJuice: RL walking policy, MuJoCo→real, patched firmware: How reviewed: Reddit post pasted by user + `mike-grayhat.github.io/bittlejuice` + `github.com/mike-grayhat/bittlejuice` fetched directly; Reviewable?: Yes
+- bittle-mujoco: Bittle X V1 MuJoCo model, measured mass/CoM/joints: How reviewed: Found via background research (linked from the BittleJuice ecosystem); Reviewable?: Yes
+- MH-FLOCKE: spiking-neural-network self-taught walking: How reviewed: Reddit post pasted by user; `github.com/MarcHesse/mhflocke` and `github.com/MarcHesse/bittle-mujoco` linked but not independently fetched; Reviewable?: Partial (post text only)
+- TypeFly: LLM-driven robot task planning, Petoi HTTP support: How reviewed: `github.com/typefly/TypeFly` fetched directly; Reviewable?: Yes
+- Classroom Bittle V2 session: How reviewed: One-line gist only, via a third-party blog mention; Reviewable?: No — not project-relevant regardless
+- "I used an LLM to control the Petoi...": How reviewed: Reddit — blocked, not pasted; Reviewable?: No
+- "Tutorial to use Claude Code to develop Bittle's...": How reviewed: Reddit — blocked, never revisited; Reviewable?: No
+- `ocolakoglu/PetoiBittleChatGPT` + Petoi's official ChatGPT blog post: How reviewed: `Text2SpeechEn.py` fetched directly (2026-09-29, researching voice output); Reviewable?: Yes
+- FinoBot (Bittle X + Pi + ROS2, person-following): How reviewed: Petoi blog post fetched directly; Reviewable?: Yes
 
 ---
 
@@ -61,11 +61,11 @@ Separate from the speed question above — this is about *range*, not *rate*.
 `petoi-firmware-reference.md`'s documented "knees to 200°, shoulders to
 −176°" exactly). Compared against the URDF's own limits (±1.57 rad / ±90°
 general, 2.00 rad / 114.6° for hips):
-- **Shoulders** swing from **−176° to +36°** — the URDF caps these at ±90°.
+- Shoulders: swing from **−176° to +36°** — the URDF caps these at ±90°.
   Massively outside range.
-- **Rear hips** swing from **30° to 200°** — the URDF's own extended hip
+- Rear hips: swing from **30° to 200°** — the URDF's own extended hip
   limit only reaches 114.6°. Also massively outside range.
-- **Knees** mostly stay within roughly −70° to +100° — close to or just
+- Knees: mostly stay within roughly −70° to +100° — close to or just
   slightly past ±90°, not dramatically outside.
 
 So it's specifically the shoulder and hip joints where the real `rc`
@@ -183,7 +183,7 @@ finding is.
    revisited without the range mismatch as a confound, whenever that
    workstream is picked back up (still not in scope for the current
    campaign).
-2. **DONE (2026-09-24) — servo speed saturation (Finding 1).** Built
+2. DONE (2026-09-24) — servo speed saturation (Finding 1). Built
    `servo_saturation_check.py` and ran it against `base1_20m`: 26.33% of
    commanded joint-steps exceed an assumed 137°/s ceiling (mean 98.9°/s,
    p95 261.2°/s, max 514.3°/s). A real measured number now, not the earlier
@@ -191,27 +191,27 @@ finding is.
    to know if 137°/s is even the right number to gate against (H13).
 
 ### Hardware-gated (needs a real G2 to measure against)
-3. **Characterize G2's actual servo step response** (τ, speed ceiling) once
+3. Characterize G2's actual servo step response: (τ, speed ceiling) once
    hardware arrives, the same way BittleJuice's `deploy/bittle_io/`
    measurement suite does — servo type may differ (alloy vs. plastic gears
    per both BittleJuice's and bittle-mujoco's explicit caveats that this
    changes the numbers), so their 33ms/137°/s can't be assumed for G2
    without checking. Add to `docs/planned/hardware-gated-backlog.md` as a new
    H-item once this doc is reviewed.
-4. **If #3 shows a real mismatch**, model servo response lag properly (fit
+4. If #3 shows a real mismatch: , model servo response lag properly (fit
    filter + actuator together, per their explicit warning against
    double-counting) rather than just clamping velocity — this needs real
    measurement data to fit against, so it can't happen before hardware.
 
 ### Strategic / needs the user's explicit decision, not Claude's to make
-5. **Firmware-fork reconsideration.** Not urgent, and not to be raised
+5. Firmware-fork reconsideration: Not urgent, and not to be raised
    again unless the user brings it up, but the option is now demonstrated
    working elsewhere with concrete wins (54ms vs the ~198ms-modeled stock
    latency, 250Hz vs the accepted 5Hz IMU) against an explicit standing
    decision not to fork. Worth one deliberate conversation at some point,
    ideally after hardware arrives and it is known what the workarounds actually
    cost in practice.
-6. **HTTP JSON API as a supplementary control channel** (TypeFly's finding)
+6. HTTP JSON API as a supplementary control channel (TypeFly's finding)
    — not something to switch to, `pi_pipeline`'s whole architecture is
    built around serial, but worth knowing it exists on stock firmware in
    case a future tool (external diagnostics, a non-Pi client) wants a

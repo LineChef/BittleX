@@ -4,7 +4,7 @@ Queued to run immediately after the resid30 campaign's Stage 3 benchmark
 report is generated (`docs/archive/rl/resid30-log.md`), same branch
 (`auto-gait-iteration`), same automated-testing-loop.md methodology.
 
-**Reprioritized 2026-09-18:** the primary target is now friction in
+Reprioritized 2026-09-18: the primary target is now friction in
 *normal, everyday walking* (flat ground, ordinary cruise speeds) — not just
 the extreme creep-speed case. The creep-band fix below is still worth
 doing, but as a secondary, lower-effort piece, not the main event.
@@ -26,11 +26,11 @@ by for emergencies.
 Measured the *pure open-loop scripted gait* (`wkF`, action forced to 0)
 against its commanded speed across the full command range:
 
-- **0.02 m/s (creep-low)**: Actual speed: 0.001 m/s; Error: -93%
-- **0.04 m/s (creep-mid)**: Actual speed: 0.040 m/s; Error: 0%
-- **0.10 m/s (cruise, the phase-rate calibration point)**: Actual speed: 0.095 m/s; Error: -4.6%
-- **0.115 m/s (fast-low)**: Actual speed: 0.109 m/s; Error: -5.0%
-- **0.15 m/s (fast-high, max)**: Actual speed: 0.139 m/s; Error: -7.5%
+- 0.02 m/s (creep-low): Actual speed: 0.001 m/s; Error: -93%
+- 0.04 m/s (creep-mid): Actual speed: 0.040 m/s; Error: 0%
+- 0.10 m/s (cruise, the phase-rate calibration point): Actual speed: 0.095 m/s; Error: -4.6%
+- 0.115 m/s (fast-low): Actual speed: 0.109 m/s; Error: -5.0%
+- 0.15 m/s (fast-high, max): Actual speed: 0.139 m/s; Error: -7.5%
 
 **The shared root cause, relevant to both the creep case and the general
 case:** `wkF`'s phase-rate scaling (`PHASE_RATE_NOM_CMD`,
@@ -54,7 +54,7 @@ point.
 
 ### Primary: scale stride amplitude with commanded speed, not just cadence
 
-**Hypothesis:** if the scripted reference's per-joint amplitude (not just
+Hypothesis: if the scripted reference's per-joint amplitude (not just
 its phase-advance rate) scales with `_cmd_fwd`, the reference itself would
 track the commanded speed much more closely across the *whole* range
 (cruise and fast included, not just creep), reducing how much the residual
@@ -83,7 +83,7 @@ specific implementation:
 - Whether amplitude scaling should be linear in the speed ratio or
   something gentler (e.g. sqrt) — needs a quick sweep, not a guess.
 
-**Direct success metric, not just aggregate reward:** does mean residual
+Direct success metric, not just aggregate reward: does mean residual
 usage at cruise speeds (measured via `action_trace.py`-style traces, pinned
 commands across the speed range) actually drop after the fix, compared to
 today's ~7-8 degree baseline — not just "did fall rate stay flat," since
@@ -107,25 +107,25 @@ above is a more complete answer to the same underlying limitation.
 
 ## Testing plan
 
-1. **Baseline measurement** (done above) — pure open-loop speed-tracking
+1. Baseline measurement: (done above) — pure open-loop speed-tracking
    error across the command range, and the 7-8 degree cruise-speed residual
    baseline from the action-trace work.
-2. **Primary change**: implement amplitude scaling on the reference pose,
+2. Primary change: implement amplitude scaling on the reference pose,
    tied to `_cmd_fwd / PHASE_RATE_NOM_CMD`. Retune `FAC_IMITATION` alongside
    it if the crawl-regression signature (from the resid30 campaign)
    reappears — expect this may need its own short sub-round to land.
-3. **Secondary change**: narrow the creep band (independent, can go in the
+3. Secondary change: narrow the creep band (independent, can go in the
    same or a separate round — low interaction risk with the amplitude
    change).
-4. **Short diagnostic round(s)**, 2-3M steps each, fresh run off whichever
+4. Short diagnostic round(s): , 2-3M steps each, fresh run off whichever
    recipe wins the resid30 campaign — matching `automated-testing-loop.md`'s
    standard round size.
-5. **Evaluate**: `evaluate_policy.py` fall/speed metrics, plus
+5. Evaluate: `evaluate_policy.py` fall/speed metrics, plus
    `action_trace.py` runs pinned across the full speed range (creep,
    cruise, fast), comparing mean residual usage before vs. after — cruise-speed
    reduction is the primary pass/fail signal, creep-band reduction is
    secondary confirmation.
-6. **Decision gate**: promote if cruise-speed residual usage drops
+6. Decision gate: promote if cruise-speed residual usage drops
    meaningfully without regressing fall rate, speed tracking, or the
    imitation-match quality; revert after two non-improving rounds, per
    standard loop discipline.
@@ -136,12 +136,12 @@ above is a more complete answer to the same underlying limitation.
 
 ### Round 1 — gaitfriction_r1
 
-- **Started:** 2026-09-18, 3M steps, PID 73506. Base: `run20m_resid30_ppo`'s
+- Started: 2026-09-18, 3M steps, PID 73506. Base: `run20m_resid30_ppo`'s
   recipe (30deg ceiling, `FAC_IMITATION=16`, `FAC_RESIDUAL_COST=2.8`,
   `FAC_RESID_SMOOTH=8.2`), promoted to the frozen base same day -- see
   `docs/archive/rl/resid30-log.md`'s promotion entry. Fresh run, not a continuation.
-- **Changes this round:**
-  - **Primary:** `_ref_pose` now amplitude-scales the reference pose's swing
+- Changes this round:
+  - Primary: `_ref_pose` now amplitude-scales the reference pose's swing
     around `STAND_POSE` by `clip(cmd_fwd / PHASE_RATE_NOM_CMD, AMP_SCALE_MIN,
     AMP_SCALE_MAX)` (new constants, `0.35`/`1.60` -- reusing the exact ratio
     and clip range `PHASE_RATE_*` already uses, as the round-1 hypothesis
@@ -151,16 +151,16 @@ above is a more complete answer to the same underlying limitation.
     `_ref_pose`, so "matching wkF" now means matching the speed-scaled
     reference, not the fixed one -- consistent with the hypothesis, not an
     oversight.
-  - **Secondary:** creep command band narrowed `uniform(0.02, 0.055)` ->
+  - Secondary: creep command band narrowed `uniform(0.02, 0.055)` ->
     `uniform(0.04, 0.055)`. Below ~0.035 the ratio to `PHASE_RATE_NOM_CMD` is
     under the 0.35 floor for *both* `PHASE_RATE_MIN` and the new
     `AMP_SCALE_MIN`, so those commands keep a built-in ~90%+ open-loop
     mismatch no reference scaling can close regardless -- confirmed this
     doesn't overlap with what the primary fix already covers before doing
     both in the same round.
-- **Smoke test:** passed clean (20k steps, `ep_rew_mean` ~715, no
+- Smoke test: passed clean (20k steps, `ep_rew_mean` ~715, no
   NaN/crash) before launch.
-- **What to check at completion:** mean residual usage at cruise speeds
+- What to check at completion: mean residual usage at cruise speeds
   (`action_trace.py`, pinned commands across creep/cruise/fast) vs the
   ~7-8deg baseline this campaign is trying to reduce; fall rate and
   `r_imitation` match quality shouldn't regress; watch for the
@@ -170,30 +170,30 @@ above is a more complete answer to the same underlying limitation.
 
 ### Result: clear regression, not the anticipated failure mode
 
-- **Completed:** 2026-09-18, 3,014,656 steps, `approx_kl` settled near 0
+- Completed: 2026-09-18, 3,014,656 steps, `approx_kl` settled near 0
   (0.00016), `ep_rew_mean` ~2260. Checkpoint: `trained/gaitfriction_r1_ppo.zip`.
 - Built a dedicated pinned-command speed sweep (`gaitfriction_speed_sweep.py`,
   since `action_trace.py` doesn't pin commands) -- flat, calm ground, no
   disturbance, matching this campaign's actual reprioritized target.
-- **Residual usage roughly doubled at every band, not reduced:**
+- Residual usage roughly doubled at every band, not reduced:
 
-  - **creep**: Baseline RMS: 3.69deg; r1 RMS: 10.85deg; Baseline speed err: -0.024; r1 speed err: -0.039
-  - **cruise**: Baseline RMS: 4.98deg; r1 RMS: 9.69deg; Baseline speed err: -0.010; r1 speed err: -0.045
-  - **fast**: Baseline RMS: 5.47deg; r1 RMS: 9.25deg; Baseline speed err: +0.013; r1 speed err: -0.017 (+1 fall)
+  - creep: Baseline RMS: 3.69deg; r1 RMS: 10.85deg; Baseline speed err: -0.024; r1 speed err: -0.039
+  - cruise: Baseline RMS: 4.98deg; r1 RMS: 9.69deg; Baseline speed err: -0.010; r1 speed err: -0.045
+  - fast: Baseline RMS: 5.47deg; r1 RMS: 9.25deg; Baseline speed err: +0.013; r1 speed err: -0.017 (+1 fall)
 
   Speed tracking got worse everywhere too, and a fall appeared at the top
   of the fast band that wasn't there before. Visual replay (leg-tinting
   GIFs, published: `https://claude.ai/artifact/NkTMcBhwfJYATn4TsmQb37`)
   confirms it isn't subtle -- visibly heavier tint (more residual
   correction) at both creep and cruise.
-- **Diagnostic before deciding the fix:** checked `r_imitation` directly
+- Diagnostic before deciding the fix: checked `r_imitation` directly
   (pinned probe at cmd 0.04/0.10/0.13, both checkpoints) rather than assume
   the plan's anticipated failure mode. Result: **not collapsed** -- 13.9-14.2
   (r1) vs 15.2-15.7 (baseline), a real but modest ~9-10% dip, nowhere near
   the crawl-regression signature (`r_imitation` cratering) the decision gate
   was written to catch. That rules out "reference target too hard to hit"
   as the primary story.
-- **Actual pattern:** imitation match stays reasonable, but residual usage
+- Actual pattern: imitation match stays reasonable, but residual usage
   nearly doubles *and* speed-tracking gets worse, **including at cmd=0.10**
   -- the literal calibration point where the amplitude-scaling formula is a
   no-op (`amp = clip(0.10/0.10, ...) = 1.0`, `ref_pose = ref` exactly). If
@@ -202,7 +202,7 @@ above is a more complete answer to the same underlying limitation.
   there too. Reads as: training across the *whole* command range against a
   continuously-reshaping reference produced a worse shared policy
   everywhere, not a localized reward-imbalance at the extremes.
-- **Decision: round 2 diverges from the plan's pre-committed fix.** The plan
+- Decision: round 2 diverges from the plan's pre-committed fix. The plan
   said "adjust `FAC_IMITATION` upward" on a crawl-regression signature --
   that signature isn't present, so that fix doesn't match the diagnosis.
   Instead, narrowed `AMP_SCALE_MIN`/`AMP_SCALE_MAX` from `0.35`/`1.60`
@@ -211,7 +211,7 @@ above is a more complete answer to the same underlying limitation.
   aggressively across the command range) rather than guessing at reward
   weights the data doesn't implicate. `FAC_IMITATION` left at `16`
   (unchanged) since it isn't the bottleneck the data points to.
-- **Launched:** `gaitfriction_r2`, 3M steps, PID 77201, fresh run (not a
+- Launched: `gaitfriction_r2`, 3M steps, PID 77201, fresh run (not a
   continuation), smoke-tested clean first. This is round 2 of the loop's
   "revert after two non-improving rounds" budget -- if this doesn't clear
   the same speed-sweep bar, the amplitude-scaling approach reverts entirely
@@ -275,7 +275,7 @@ to flicker across, full stop -- but the citation overstated how cleanly
 that specific history proves hard thresholds on this signal are
 dangerous in isolation.
 
-**Implementation:** new `FAC_RESID_CALM_BONUS` (default `0.0`, off),
+Implementation: new `FAC_RESID_CALM_BONUS` (default `0.0`, off),
 added to `residual_cost` in the reward function, scaled by a *continuous*
 `calm_factor = max(0, 1 - tilt/IMITATION_TILT_FADE)` -- full extra weight
 at tilt=0, smoothly ramping to zero extra weight by the same
@@ -289,9 +289,9 @@ clean, finite rewards, cost tracks tilt as expected.
 entirely.** Completed 2026-09-18, 3,014,656 steps, converged clean. Same
 pinned speed-sweep evaluation as round 1:
 
-- **creep**: Baseline RMS: 3.85deg; r2 RMS: 7.45deg; Baseline speed err: -0.016; r2 speed err: -0.031
-- **cruise**: Baseline RMS: 4.98deg; r2 RMS: 7.18deg; Baseline speed err: -0.010; r2 speed err: -0.024
-- **fast**: Baseline RMS: 5.41deg; r2 RMS: 7.52deg; Baseline speed err: +0.006; r2 speed err: -0.003 (+1 fall)
+- creep: Baseline RMS: 3.85deg; r2 RMS: 7.45deg; Baseline speed err: -0.016; r2 speed err: -0.031
+- cruise: Baseline RMS: 4.98deg; r2 RMS: 7.18deg; Baseline speed err: -0.010; r2 speed err: -0.024
+- fast: Baseline RMS: 5.41deg; r2 RMS: 7.52deg; Baseline speed err: +0.006; r2 speed err: -0.003 (+1 fall)
 
 Narrowing the clip range (0.35/1.60 -> 0.70/1.30) roughly halved the size
 of the round-1 regression (was ~2x baseline, now ~1.5x) but didn't come
@@ -308,9 +308,9 @@ mismatch below ~0.035 ratio, not touched by this revert.
 Completed 2026-09-18, 3,014,656 steps, converged (`approx_kl` ~0.001, no
 instability). Speed-sweep result:
 
-- **creep**: Baseline RMS: 4.08deg; r3 RMS: 6.83deg; Baseline speed err: -0.008; r3 speed err: -0.012
-- **cruise**: Baseline RMS: 4.99deg; r3 RMS: 7.85deg; Baseline speed err: -0.014; r3 speed err: -0.019
-- **fast**: Baseline RMS: 5.18deg; r3 RMS: 8.47deg; Baseline speed err: -0.015; r3 speed err: -0.029 (+1 fall)
+- creep: Baseline RMS: 4.08deg; r3 RMS: 6.83deg; Baseline speed err: -0.008; r3 speed err: -0.012
+- cruise: Baseline RMS: 4.99deg; r3 RMS: 7.85deg; Baseline speed err: -0.014; r3 speed err: -0.019
+- fast: Baseline RMS: 5.18deg; r3 RMS: 8.47deg; Baseline speed err: -0.015; r3 speed err: -0.029 (+1 fall)
 
 Residual usage went **up**, not down, despite the extra cost specifically
 penalizing it -- the counterintuitive direction. Checked reward-hacking
@@ -367,7 +367,7 @@ building anything -- n=16/point (vs the earlier 4-6 point samples, which
 had real non-monotonic noise), calm-ground DR (friction/mass/payload on,
 terrain/push off):
 
-- **actual**: 0.03: .023; 0.04: .028; 0.05: .032; 0.06: .036; 0.07: .043; 0.08: .045; 0.09: .053; 0.10: .055; 0.11: .056; 0.115: .058; 0.125: .062; 0.13: .062; 0.14: .069; 0.15: .072
+- actual: 0.03: .023; 0.04: .028; 0.05: .032; 0.06: .036; 0.07: .043; 0.08: .045; 0.09: .053; 0.10: .055; 0.11: .056; 0.115: .058; 0.125: .062; 0.13: .062; 0.14: .069; 0.15: .072
 
 Monotonic this time -- the earlier "overshoot at high commands" finding
 was small-sample noise, not real. Undershoot grows from ~23% at cmd=0.03
@@ -424,9 +424,9 @@ different-looking number.
 
 **Corrected, valid result:**
 
-- **creep**: Baseline RMS: 4.08deg; r5 RMS: 9.17deg; Baseline speed err: -0.008; r5 speed err: -0.020
-- **cruise**: Baseline RMS: 4.99deg; r5 RMS: 10.22deg; Baseline speed err: -0.014; r5 speed err: +0.003 (+1 fall)
-- **fast**: Baseline RMS: 5.18deg; r5 RMS: 10.31deg; Baseline speed err: -0.015; r5 speed err: -0.017
+- creep: Baseline RMS: 4.08deg; r5 RMS: 9.17deg; Baseline speed err: -0.008; r5 speed err: -0.020
+- cruise: Baseline RMS: 4.99deg; r5 RMS: 10.22deg; Baseline speed err: -0.014; r5 speed err: +0.003 (+1 fall)
+- fast: Baseline RMS: 5.18deg; r5 RMS: 10.31deg; Baseline speed err: -0.015; r5 speed err: -0.017
 
 Also a regression -- residual usage roughly doubled, same magnitude as
 the amplitude-scaling failures, plus a new fall at cruise (cmd=0.12) that

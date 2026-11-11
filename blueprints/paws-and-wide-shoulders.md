@@ -4,29 +4,29 @@ Two printed changes to G2's legs, both designed from simulator results and both 
 
 ## Wide shoulder parts
 
-- **What**: The two Petoi side shoulders, reprinted wider at the two servo ends only
-- **Added width**: 0.2 in (5.08 mm) per side. Track 2.76 in to 3.16 in.
-- **Construction**: Each end is cut at |X| = 33.0 mm (inside the screw-hole pads) and |Z| >= 31 mm. The outer part (servo seat and screw holes) moves out by 5.08 mm, and the gap is filled with the shoulder's own cross-section at the cut. Servo height, fore-aft position and shaft angle do not change.
-- **Source**: `wide_shoulder_ends.scad` (parametric: `collar`, `cut_x`, `z0`), built on Petoi's `Bittle_SideShoulder.stl`. A 0.4 in variant exists and was not chosen.
-- **Material and print**: Print with infill, not solid: the simulator counted about 16 g of added mass in total and 16 g cost a little (1.2% to 2.5% falls). Weigh the printed pair and record it.
+- What: The two Petoi side shoulders, reprinted wider at the two servo ends only
+- Added width: 0.2 in (5.08 mm) per side. Track 2.76 in to 3.16 in.
+- Construction: Each end is cut at |X| = 33.0 mm (inside the screw-hole pads) and |Z| >= 31 mm. The outer part (servo seat and screw holes) moves out by 5.08 mm, and the gap is filled with the shoulder's own cross-section at the cut. Servo height, fore-aft position and shaft angle do not change.
+- Source: `wide_shoulder_ends.scad` (parametric: `collar`, `cut_x`, `z0`), built on Petoi's `Bittle_SideShoulder.stl`. A 0.4 in variant exists and was not chosen.
+- Material and print: Print with infill, not solid: the simulator counted about 16 g of added mass in total and 16 g cost a little (1.2% to 2.5% falls). Weigh the printed pair and record it.
 
-- **What:** The rail between the front and rear servo windows is the unchanged Petoi part, so the top and inside keep the lid's footprint. Four servos and their legs move outward.
+- What: The rail between the front and rear servo windows is the unchanged Petoi part, so the top and inside keep the lid's footprint. Four servos and their legs move outward.
 
 
 Why 0.2 in: the joints all swing in the pitch plane, so the track can only be widened by a spacer. In the simulator (V7, 481 g, today's load) falls dropped from 8.1% to 2.3% with 0.2 in and 2.7% with 0.4 in, and the steep side slopes were fixed. At today's load 0.4 in is worse on 1 in step-downs (74% falls against 45% for 0.2 in; stock 70%) and on random ledges; it wins only at the 708 g one-pound goal (1.2% against 3.3% heavy-load falls). The simulator does not model servo torque, heat or shaft side load, and V7 is heading-blind, so turning is not tested.
 
 ## Paw ("seated" design)
 
-- **What**: A printed foot shell that clips over the stock foot disc and pivots on it
-- **Source and specs**: `seated/wide_foot_part.scad` and `seated/SPECS.md` in the owner's prototypes folder (outside this repository); export with `openscad -o seated.stl -D show_pin=false wide_foot_part.scad`. SPECS.md holds the full dimension tables and the simulator notes.
-- **Size**: 21.8 mm (0.86 in) wide, 27.5 mm (1.08 in) long, 9.2 mm (0.36 in) tall. Pivot 4.5 mm above the sole on the foot's centre.
-- **Mass**: 3.25 g per paw at 100% infill (PETG, density 1.27 g/cm3 assumed). Print at 100% infill: the balance depends on it. Four paws add about 13 g.
-- **Balance**: The centre of mass sits within 0.1 mm of the pivot (hollow toe, heel 3 mm longer), so the toe stays up through the swing without a friction pin.
-- **Stops**: Toe up 30 degrees, toe down 13 degrees, hard stops of plastic on the shank.
-- **Grip**: Cone pegs on 1.0 mm thick, 2.5 mm wide flaps, preload 0.055 mm per side; estimated 1.8 mN.m of friction at the pivot plus load-dependent rim friction in the seats (estimates, not measured).
-- **Sole**: Flat from y = -7.5 to +5.5 mm, heel rolled up on a 5.2 mm radius (end rises about 3 mm), toe curled on a 30 mm radius.
+- What: A printed foot shell that clips over the stock foot disc and pivots on it
+- Source and specs: `seated/wide_foot_part.scad` and `seated/SPECS.md` in the owner's prototypes folder (outside this repository); export with `openscad -o seated.stl -D show_pin=false wide_foot_part.scad`. SPECS.md holds the full dimension tables and the simulator notes.
+- Size: 21.8 mm (0.86 in) wide, 27.5 mm (1.08 in) long, 9.2 mm (0.36 in) tall. Pivot 4.5 mm above the sole on the foot's centre.
+- Mass: 3.25 g per paw at 100% infill (PETG, density 1.27 g/cm3 assumed). Print at 100% infill: the balance depends on it. Four paws add about 13 g.
+- Balance: The centre of mass sits within 0.1 mm of the pivot (hollow toe, heel 3 mm longer), so the toe stays up through the swing without a friction pin.
+- Stops: Toe up 30 degrees, toe down 13 degrees, hard stops of plastic on the shank.
+- Grip: Cone pegs on 1.0 mm thick, 2.5 mm wide flaps, preload 0.055 mm per side; estimated 1.8 mN.m of friction at the pivot plus load-dependent rim friction in the seats (estimates, not measured).
+- Sole: Flat from y = -7.5 to +5.5 mm, heel rolled up on a 5.2 mm radius (end rises about 3 mm), toe curled on a 30 mm radius.
 
-- **What:** The stock foot stays in the paw, sticking out 1.0 mm through an opening in the sole. No pin and no glue: two flaps with cone pegs push into the edges of the foot's hole.
+- What: The stock foot stays in the paw, sticking out 1.0 mm through an opening in the sole. No pin and no glue: two flaps with cone pegs push into the edges of the foot's hole.
 
 
 ### The 2026-10-23 foot-shape update
@@ -42,9 +42,9 @@ The wider foot is `wing = 1.82` (extra width on each outer side only; the window
 
 ### Simulator results for the paws (V7, heavy-load falls; stock 15.2%, 481 g 8.1%)
 
-- **Seated paws, nominal grip**: 1.8%
-- **Seated paws, looser / tighter grip**: 1.4% / 2.7%
-- **Seated paws and 0.2 in wide shoulders**: 0.1%
+- Seated paws, nominal grip: 1.8%
+- Seated paws, looser / tighter grip: 1.4% / 2.7%
+- Seated paws and 0.2 in wide shoulders: 0.1%
 
 These runs used the seated paw before the sole update. The new sole was confirmed on the CLpaw shape (same sole, free pivot), not re-run with the seated grip.
 

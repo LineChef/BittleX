@@ -98,13 +98,13 @@ mechanically," not a guess.
    (not fully calibrated) — plan on step 2's calibration pass, don't treat
    it as conditional. A joint that feels stuck despite a correct command is
    likely new-gear protection, not a fault — rotate it by hand first.
-2. **On the calibration stand, before it touches the ground:** full
+2. On the calibration stand, before it touches the ground: full
    range-of-motion pass by hand / `check_serial` (watch for binding / leg-on-leg
    collision), then firmware `c` auto joint calibration (also enterable by
    powering on with the robot tilted one side up, if serial/app isn't
    ready yet). Safe place for first
    power-on. Detailed gait steps: [`guides/gait-deployment.md`](gait-deployment.md) step 6.
-3. **Still on the stand, BiBoard's own USB port, no Pi wired:**
+3. Still on the stand, BiBoard's own USB port, no Pi wired:
    `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in
    `.env` to that port → `firstmove` (guided, confirmed, one joint at a time) →
    once that's clean, `send kbalance` → `skills` → `allmoves` (cycles EVERY
@@ -119,7 +119,7 @@ mechanically," not a guess.
    [`blueprints/mounting.md`](../../blueprints/mounting.md).)*
 
 **Phase 1 — the Pi is now physically wired to the frame**
-4. **Weigh the final build** on a kitchen scale, with the Pi + PiSugar S + camera
+4. Weigh the final build: on a kitchen scale, with the Pi + PiSugar S + camera
    + mount actually on the robot. Weigh the **camera cluster and the PiSugar S
    battery separately** (the battery is >½ the current spine estimate; if it
    mounts somewhere distinct, it needs its own sim body). Balance each piece on

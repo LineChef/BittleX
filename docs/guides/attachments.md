@@ -30,20 +30,20 @@ In this order: `G2_ATTACHMENT` in the environment (or `.env`), else the state fi
 
 [`pi_pipeline/attachments/gait_profiles.json`](../../pi_pipeline/attachments/gait_profiles.json) holds, for each of `none`, `head` and `arm`:
 
-- **`payload_profile`**: The sim payload the attachment's policies must be trained on (`pod` = the 185 g pod + the 42 g AI head; `none` and the arm get theirs when a policy is trained for them)
-- **`current`**: The policy in use, its foot trim, the payload it was trained on, the date it was saved
-- **`history`**: Earlier policies, newest last: the last-known-good when the current one cannot be used
+- `payload_profile`: The sim payload the attachment's policies must be trained on (`pod` = the 185 g pod + the 42 g AI head; `none` and the arm get theirs when a policy is trained for them)
+- `current`: The policy in use, its foot trim, the payload it was trained on, the date it was saved
+- `history`: Earlier policies, newest last: the last-known-good when the current one cannot be used
 
 At start-up the fitted attachment's `current` runs. It is skipped when its file is missing or when its sidecar's `payload_profile` names a different payload; the newest usable history entry runs instead. If nothing saved is usable, the legacy `DEFAULT_POLICY` runs and the reason is logged (`g2attach status` and `python -m pi_pipeline.doctor` show it). A policy without a recorded payload is allowed and flagged. `G2_FOOT_TRIM` still overrides the saved trim.
 
 Saving a gait:
 
-- **Promotion:** `promote_release.py --candidate trained/X.onnx --name V7 --attachment head --payload-profile pod [--trim fl=-0.3]` copies the release, points `DEFAULT_POLICY` at it as before, writes the payload into the release sidecar, and saves it as the attachment's current gait (the previous one moves to the history). It commits the profile file with the release.
-- **One attachment only:** add `--attachment-only` to save the release as that attachment's gait without moving `DEFAULT_POLICY` (the arm's ARM1, so V7 stays the head and no-attachment policy). A sidecar `base_ref` must have its `pi_pipeline/gait/<base_ref>_ref.npy` (ARM1: `wkArm_ref.npy`, Petoi's arm walk).
-- **By hand:** `g2attach save head Release_Candidate<name>_ppo.onnx --trim fl=-0.3 --payload pod` edits the profile file on the Mac; commit it and deploy.
-- **Per floor:** `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` saves a trim measured on one floor for the fitted attachment's current gait (`off` removes it). When the floor label (`g2floor`) is set and under 12 hours old, a walk on that floor uses it; any other floor uses the general trim. The order is `G2_FOOT_TRIM`, then the per-floor trim, then the saved trim, then `DEFAULT_TRIMS`. Floor labels are always set by a person; nothing names the floor automatically.
-- **Claw carrying height while walking (arm):** `python -m pi_pipeline.attachments walk-lift 10` sets the lift servo's angle (joint 1, degrees, -30 to 60) that every walk holds; `walk-lift off` returns to the firmware's own (about 0-2 after `kbalance`, which resets it at every stand). One `i1 N` is sent after the stand-up and before the first stride, in `run_gait.py` and `walk_tools.py` (`standup.apply_walk_lift`); nothing is sent unless it is set. Commit `gait_profiles.json` and deploy with the Pi idle; the first walk with a value is run with a hand near. Which direction raises the claw, and by how much, is not measured yet (open details in `docs/plan-detail/arm2-policy-plan.md`).
-- **Exports:** a new export records its payload with `export_onnx.py --sidecar-extra '{"payload_profile": "pod"}'`.
+- Promotion: `promote_release.py --candidate trained/X.onnx --name V7 --attachment head --payload-profile pod [--trim fl=-0.3]` copies the release, points `DEFAULT_POLICY` at it as before, writes the payload into the release sidecar, and saves it as the attachment's current gait (the previous one moves to the history). It commits the profile file with the release.
+- One attachment only: add `--attachment-only` to save the release as that attachment's gait without moving `DEFAULT_POLICY` (the arm's ARM1, so V7 stays the head and no-attachment policy). A sidecar `base_ref` must have its `pi_pipeline/gait/<base_ref>_ref.npy` (ARM1: `wkArm_ref.npy`, Petoi's arm walk).
+- By hand: `g2attach save head Release_Candidate<name>_ppo.onnx --trim fl=-0.3 --payload pod` edits the profile file on the Mac; commit it and deploy.
+- Per floor: `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` saves a trim measured on one floor for the fitted attachment's current gait (`off` removes it). When the floor label (`g2floor`) is set and under 12 hours old, a walk on that floor uses it; any other floor uses the general trim. The order is `G2_FOOT_TRIM`, then the per-floor trim, then the saved trim, then `DEFAULT_TRIMS`. Floor labels are always set by a person; nothing names the floor automatically.
+- Claw carrying height while walking (arm): `python -m pi_pipeline.attachments walk-lift 10` sets the lift servo's angle (joint 1, degrees, -30 to 60) that every walk holds; `walk-lift off` returns to the firmware's own (about 0-2 after `kbalance`, which resets it at every stand). One `i1 N` is sent after the stand-up and before the first stride, in `run_gait.py` and `walk_tools.py` (`standup.apply_walk_lift`); nothing is sent unless it is set. Commit `gait_profiles.json` and deploy with the Pi idle; the first walk with a value is run with a hand near. Which direction raises the claw, and by how much, is not measured yet (open details in `docs/plan-detail/arm2-policy-plan.md`).
+- Exports: a new export records its payload with `export_onnx.py --sidecar-extra '{"payload_profile": "pod"}'`.
 
 `tools/g2_deploy_when_online.sh` sends every policy a saved gait names, as well as `DEFAULT_POLICY`, so a swap never needs a new deploy.
 
@@ -51,9 +51,9 @@ Saving a gait:
 
 Each attachment names the BiBoard firmware it needs: the first line of the BiBoard's `?` banner. The arm is a separate build of Petoi's firmware (compile-time option `ROBOT_ARM`, model "Bittle X+Arm": its own skill table, the claw on the tail joint, index 2, and a wider range for joint 1). At start-up the voice service and the app ask `?` when an attachment other than `none` is fitted; if the firmware does not fit, they log it and take the attachment's skills out. `python -m pi_pipeline.doctor --serial` shows the same check.
 
-- **`none`**: not checked
-- **`head`**: `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head)
-- **`arm`**: `Bittle X+Arm`
+- `none`: not checked
+- `head`: `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head)
+- `arm`: `Bittle X+Arm`
 
 The arm's skills (15, enabled for voice: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet, so a first run is made with a hand near. `hunt` and `showOff` are names the arm build is only inferred to redefine.
 
@@ -61,16 +61,16 @@ The arm's skills (15, enabled for voice: `pick_up` / `put_down` also `_below` `_
 
 A profile in `gait_profiles.json` can switch Pi behaviour off while its attachment is fitted. A missing key means on, so `none` and `head` behave as before.
 
-- **`easing`**: Off means: smoothing a skill's own motion and the stock stand-up ramp stay off (`G2_STAND_RAMP_S` is ignored; the arm stands up with the plain firmware `kbalance`, `poses.stand_via`); Arm: off
-- **`blending`**: Off means: pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first (see below); Arm: on
-- **`gyro_balance`**: Off means: the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb`; Arm: **on**: the Pi sends no `gb` after a skill or at start-up
-- **`gait_switching`**: Off means: the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it; Arm: off
-- **`skills`**: Off means: the attachment's own skills stay out of the conversation; Arm: on
-- **`fall_recovery`**: Off means: the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (see below); Arm: off
+- `easing`: Off means: smoothing a skill's own motion and the stock stand-up ramp stay off (`G2_STAND_RAMP_S` is ignored; the arm stands up with the plain firmware `kbalance`, `poses.stand_via`); Arm: off
+- `blending`: Off means: pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first (see below); Arm: on
+- `gyro_balance`: Off means: the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb`; Arm: **on**: the Pi sends no `gb` after a skill or at start-up
+- `gait_switching`: Off means: the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it; Arm: off
+- `skills`: Off means: the attachment's own skills stay out of the conversation; Arm: on
+- `fall_recovery`: Off means: the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (see below); Arm: off
 
-- **blending:** pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first frame before sending it (`link/transitions.py`; for the arm it blends into the ARM variant of a gait, `wkArmF`, and the arm's own shifted rest and balance poses), and a policy walk ends with a blend to balance (`G2_TRANSITION_RAMP_S` caps it). Off: the firmware jumps the legs there at full servo speed
-- **gyro_balance:** only the idle policy turns it off once he has been still. The catch: with it on the firmware's own self-right (`rc`) can run after a fall (it has shaken the Pi plug loose); `"gyro_balance": false` in the arm profile puts it back
-- **fall_recovery:** the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (they do not work with the claw payload); the firmware's own auto self-right (`rc`, repeated until he is upright) runs only while its gyro assist is on, and a skill or a board restart turns that on, so the link sends `gb` right after every skill and after connecting (left on, the firmware keeps trying to get up after a fall and can shake the Pi plug loose)
+- blending: pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first frame before sending it (`link/transitions.py`; for the arm it blends into the ARM variant of a gait, `wkArmF`, and the arm's own shifted rest and balance poses), and a policy walk ends with a blend to balance (`G2_TRANSITION_RAMP_S` caps it). Off: the firmware jumps the legs there at full servo speed
+- gyro_balance: only the idle policy turns it off once he has been still. The catch: with it on the firmware's own self-right (`rc`) can run after a fall (it has shaken the Pi plug loose); `"gyro_balance": false` in the arm profile puts it back
+- fall_recovery: the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (they do not work with the claw payload); the firmware's own auto self-right (`rc`, repeated until he is upright) runs only while its gyro assist is on, and a skill or a board restart turns that on, so the link sends `gb` right after every skill and after connecting (left on, the firmware keeps trying to get up after a fall and can shake the Pi plug loose)
 
 
 The arm's `poses` entry holds the arm firmware's rest and balance poses (measured on G2), the lift servo's rest 59 and walking 0, and `stand_via`: `kbalance` (the default: the firmware's own `kbalance`, which from rest also sets the lift to 0) or `sequenced` (`gait/standup.py` `stand_sequenced`: rear legs, then front legs, the lift servo easing from 60 to 0; kept in the code but not used: easing is off).

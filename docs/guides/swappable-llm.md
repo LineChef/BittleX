@@ -11,9 +11,9 @@ Set `CLAUDE_MODEL` in `.env` (default in `pi_pipeline/config.py`), e.g. `CLAUDE_
 
 ## Modes (`G2_LLM_MODE` in `.env`)
 
-- **`claude` (default)**: What answers: Claude for every turn; Needs: `ANTHROPIC_API_KEY`
-- **`fast`**: What answers: the fast backend only; nothing is sent to Anthropic; Needs: the three `G2_FAST_LLM_*` values below; no Anthropic key
-- **`routed`**: What answers: the fast backend for casual turns; Claude when the router says so, or when the fast backend fails; Needs: both
+- `claude` (default): What answers: Claude for every turn; Needs: `ANTHROPIC_API_KEY`
+- `fast`: What answers: the fast backend only; nothing is sent to Anthropic; Needs: the three `G2_FAST_LLM_*` values below; no Anthropic key
+- `routed`: What answers: the fast backend for casual turns; Claude when the router says so, or when the fast backend fails; Needs: both
 
 The fast backend is any server that speaks `POST {base}/chat/completions` with tool calls: hosted free or cheap tiers, aggregators, or a local
 server. Set `G2_FAST_LLM_BASE_URL` (up to and including `/v1`), `G2_FAST_LLM_API_KEY` and `G2_FAST_LLM_MODEL`. The model should support tool

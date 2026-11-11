@@ -2,7 +2,7 @@
 
 > Full working detail. The short, published roadmap is [`../project-plan.md`](../project-plan.md). Keep both in step.
 
-**Goal:** a Bittle X quadruped ("G2") that (1) learns to walk via reinforcement learning rather than scripted keyframes,
+Goal: a Bittle X quadruped ("G2") that (1) learns to walk via reinforcement learning rather than scripted keyframes,
 (2) perceives its surroundings with an onboard camera and avoids obstacles, (3) holds voice conversations through the Claude
 API, and (4) keeps persistent memory of past interactions.
 
@@ -12,39 +12,39 @@ controller.
 **How this document works.** It is the roadmap and decision log — checklists, statuses and links, not narrative. Where things
 live (one home per fact; see [`maintaining-docs.md`](../maintaining-docs.md)):
 
-- **What is true right now (deployed, tested on the robot, open problems, next steps)**: [`STATUS.md`](../STATUS.md)
-- **Full detail behind a phase (moved here verbatim 2026-10-02)**: [`plan-detail/`](./)
-- **Open work by ID**: [`backlog.md`](../backlog.md)
-- **Dated data and findings**: the logs: [`rl/real-walk-log.md`](../rl/real-walk-log.md), [`rl/hw1-log.md`](../rl/hw1-log.md), …
-- **Parts list and hardware decisions**: [`hardware/parts-and-decisions.md`](../hardware/parts-and-decisions.md)
-- **Day-1 bring-up sequence**: [`guides/bring-up-sequence.md`](../guides/bring-up-sequence.md) (executable: `python -m pi_pipeline.bringup`)
+- What is true right now (deployed, tested on the robot, open problems, next steps): [`STATUS.md`](../STATUS.md)
+- Full detail behind a phase (moved here verbatim 2026-10-02): [`plan-detail/`](./)
+- Open work by ID: [`backlog.md`](../backlog.md)
+- Dated data and findings: the logs: [`rl/real-walk-log.md`](../rl/real-walk-log.md), [`rl/hw1-log.md`](../rl/hw1-log.md), …
+- Parts list and hardware decisions: [`hardware/parts-and-decisions.md`](../hardware/parts-and-decisions.md)
+- Day-1 bring-up sequence: [`guides/bring-up-sequence.md`](../guides/bring-up-sequence.md) (executable: `python -m pi_pipeline.bringup`)
 
 Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 🔧 in progress · ⬜ not started.
 
 ## Phases at a glance
 
-- **1 Repo setup**: State: ✅; Detail: below
-- **2 Orientation**: State: ✅ (curriculum items deferred); Detail: below
-- **3 RL training in simulation**: State: ✅ policies built through V6 (deployed: see STATUS); further gait training only on the user's go; Detail: [`plan-detail/phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md)
-- **Recovery (catch / get-up)**: State: 🧩 built; partly tested on hardware; Detail: [`plan-detail/recovery.md`](../archive/plan-detail/recovery.md)
-- **4 Hardware assembly**: State: 🔧 assembled and bring-up done; Pi mount is temporary; Detail: [`plan-detail/phase4-hardware-assembly.md`](phase4-hardware-assembly.md)
-- **5 Basic control**: State: ✅; Detail: [`plan-detail/phase5-basic-control.md`](../archive/plan-detail/phase5-basic-control.md)
-- **6 Sim-to-real deployment**: State: 🔧 loop and safety layers built; first walks done; Detail: [`plan-detail/phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md)
-- **7 Voice + Claude**: State: ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned; Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md)
-- **8 Perception**: State: 🧩 model on the camera and "what do you see" works; navigation reflexes gated off; Detail: [`plan-detail/phase8-perception.md`](phase8-perception.md)
-- **9 Memory**: State: ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added; Detail: [`plan-detail/phase9-memory.md`](phase9-memory.md)
-- **10 Integration**: State: 🔧 the behavior runtime runs on G2 in exploration sessions; the full app over a long run is still to do; Detail: [`plan-detail/phase10-integration.md`](../archive/plan-detail/phase10-integration.md)
-- **Petoi AI Head vs the Pi**: State: ⬜ decision pending; head on the bench, not in the build; Detail: below, [`planned/ai-head/`](../planned/ai-head/README.md)
+- 1 Repo setup: State: ✅; Detail: below
+- 2 Orientation: State: ✅ (curriculum items deferred); Detail: below
+- 3 RL training in simulation: State: ✅ policies built through V6 (deployed: see STATUS); further gait training only on the user's go; Detail: [`plan-detail/phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md)
+- Recovery (catch / get-up): State: 🧩 built; partly tested on hardware; Detail: [`plan-detail/recovery.md`](../archive/plan-detail/recovery.md)
+- 4 Hardware assembly: State: 🔧 assembled and bring-up done; Pi mount is temporary; Detail: [`plan-detail/phase4-hardware-assembly.md`](phase4-hardware-assembly.md)
+- 5 Basic control: State: ✅; Detail: [`plan-detail/phase5-basic-control.md`](../archive/plan-detail/phase5-basic-control.md)
+- 6 Sim-to-real deployment: State: 🔧 loop and safety layers built; first walks done; Detail: [`plan-detail/phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md)
+- 7 Voice + Claude: State: ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned; Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md)
+- 8 Perception: State: 🧩 model on the camera and "what do you see" works; navigation reflexes gated off; Detail: [`plan-detail/phase8-perception.md`](phase8-perception.md)
+- 9 Memory: State: ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added; Detail: [`plan-detail/phase9-memory.md`](phase9-memory.md)
+- 10 Integration: State: 🔧 the behavior runtime runs on G2 in exploration sessions; the full app over a long run is still to do; Detail: [`plan-detail/phase10-integration.md`](../archive/plan-detail/phase10-integration.md)
+- Petoi AI Head vs the Pi: State: ⬜ decision pending; head on the bench, not in the build; Detail: below, [`planned/ai-head/`](../planned/ai-head/README.md)
 
 ## Open TODOs that affect everything
 
-- **Sim payload bug (found 2026-09-23, fixed in the env):** the welded payload bodies had no inertia, so the sim body could not tilt;
+- Sim payload bug (found 2026-09-23, fixed in the env): the welded payload bodies had no inertia, so the sim body could not tilt;
   every policy since `run20m_ppo` trained on it. Still to do: classify past resilience conclusions as unaffected/suspect/invalidated,
   list the trainings to re-test (including approaches closed on locked-body results), re-baseline the deployed policy and the scripted
   walk, and recheck the fall-recovery replay (and the URDF's ±90° joint limits against the real `rc` keyframes).
   Full text: [`plan-detail/sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md). The replay tool `sysid_replay.py` carried the same bug
   and was fixed 2026-10-01.
-- **Hardware first:** the carpet failures (the front-left shoulder servo was replaced 2026-10-06) come before any new walking work —
+- Hardware first: the carpet failures (the front-left shoulder servo was replaced 2026-10-06) come before any new walking work —
   [`rl/real-walk-log.md`](../rl/real-walk-log.md), [`STATUS.md`](../STATUS.md).
 
 ## Hardware (parts, power, enclosure)
@@ -234,7 +234,7 @@ The behavior runtime (`BehaviorDriver`, `BehaviorRuntime`, `app/`) is built and 
 - Hardware debugging is a different skill than web debugging — no stack traces; a fault could be code, wiring, power, or the hardware itself.
 - RL gaits look rougher than an animal's, especially early; sim-to-real rarely works first try — expect a gap and iteration.
 - Full integration (Phase 10) is the hardest, messiest part.
-- **No flipping or rolling tricks** (decided 2026-09-15): the Pi + PiSugar stack rides on a printed standoff that is not impact-rated and shifts the
+- No flipping or rolling tricks: (decided 2026-09-15): the Pi + PiSugar stack rides on a printed standoff that is not impact-rated and shifts the
   moment of inertia; `flip`/`flipD`/`flipF`/`bf`/`tbl`/`rl` (as a trick)/`bx`/`lucky`/`excited` are excluded from any voice or `perform_skill` set while that mount
   is in use. Detail: [`hardware/petoi-skills-survey.md`](../hardware/petoi-skills-survey.md).
 - Never put G2 on its back for a test: the Pi and BiBoard are exposed.

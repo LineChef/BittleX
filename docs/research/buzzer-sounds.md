@@ -14,17 +14,17 @@ Researched 2026-10-04 for the voice cues (acknowledgement chirp) and the behavio
   (notes 4 and 8). So everything meant to be heard should live low, well below the 1-35 ceiling.
 
 ## Is there a ready-made library of chirps?
-- **No built-in Petoi sound library.** The guide has only the format and one worked example (Twinkle, Twinkle). Petoi's curriculum has a
+- No built-in Petoi sound library: The guide has only the format and one worked example (Twinkle, Twinkle). Petoi's curriculum has a
   [Singing Bittle X project](https://learning.petoi.com/Petoi%20Web-based%20Curriculum/Project%20Singing%20Bittle%20X%20-%20Train%20Bittle%20X%20to%20show%20%202dd7eabef82481f19d54e5aca6c936d8)
   built around moods and singing, and the guide notes an AI can generate a melody sequence, but neither ships a catalogue.
-- **RTTTL (ringtone) is the big ready-made source.** It is a plain-text melody format with large public collections of ringtones, and
+- RTTTL (ringtone) is the big ready-made source: It is a plain-text melody format with large public collections of ringtones, and
   Arduino libraries play it ([AnyRtttl](https://reference.arduino.cc/reference/en/libraries/anyrtttl),
   [PlayRtttl](https://arduino.cc/reference/en/libraries/playrtttl),
   [NonBlockingRTTTL](https://github.com/end2endzone/nonblockingrtttl),
   [Melody Player](https://reference.arduino.cc/reference/en/libraries/melody-player)). Those libraries drive a buzzer pin directly, so they
   do not help here: the buzzer belongs to the BiBoard and only `b` tokens are sent to it. What can be reused is the **format and the songs**: a small
   RTTTL parser that converts note names to semitone numbers and durations to divisors, then transposes the result into notes 1-35.
-- **R2-D2 / emotional-robot sounds** are design references, not libraries: the
+- R2-D2 / emotional-robot sounds: are design references, not libraries: the
   [R2D2 sound generator](https://instructables.com/R2D2-Sound-Generator),
   an [Arduino forum thread](https://forum.arduino.cc/t/r2d2-sounds-via-tone-command/52697) and a Politecnico di Milano
   [emotional sounds project](https://pii.deib.polimi.it/emotional-sound-like-r2d2-or-bb8/) describe fast glides, trills and

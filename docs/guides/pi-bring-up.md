@@ -18,12 +18,12 @@ bit). None of it needs the robot.
 From the repo's hardware research (`docs/hardware/specs.md`, `pi-power.md`) —
 what is physically needed to join the three boards:
 
-- **PiSugar S → Pi Zero 2 W**: What connects: pogo pins on the PiSugar mate to the copper pads on the **underside** of the Pi; it clips to the Pi's back with the **standoffs/screws in the PiSugar box**; What to buy: **nothing extra** — no cable, no soldering. Charge it via its **own micro-USB** (have a USB-A→micro-USB cable). Does *not* touch the 40-pin header, so it coexists with the BiBoard wiring.
-- **Pi → BiBoard (serial, data-only)**: What connects: 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays (see below); What to buy: **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them), and possibly a **5-pin header** to solder onto BiBoard if it's not already populated
-- **microSD → computer** (for flashing): What connects: writing the Pi OS image; What to buy: a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**.
+- PiSugar S → Pi Zero 2 W: What connects: pogo pins on the PiSugar mate to the copper pads on the **underside** of the Pi; it clips to the Pi's back with the **standoffs/screws in the PiSugar box**; What to buy: **nothing extra** — no cable, no soldering. Charge it via its **own micro-USB** (have a USB-A→micro-USB cable). Does *not* touch the 40-pin header, so it coexists with the BiBoard wiring.
+- Pi → BiBoard (serial, data-only): What connects: 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays (see below); What to buy: **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them), and possibly a **5-pin header** to solder onto BiBoard if it's not already populated
+- microSD → computer: (for flashing): What connects: writing the Pi OS image; What to buy: a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**.
 
-- **Pi → BiBoard (serial, data-only):** 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power) — BiBoard's 5-pin header has two +5V pins, both also left unconnected. Confirmed pinout: [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos of exactly where to solder: [`blueprints/build-logs/pi-biboard-build-notes.md`](../hardware/build-logs/pi-biboard-build-notes.md).
-- **Pi → BiBoard (serial, data-only):** **Check the Bittle X box first** — Petoi sometimes includes a BiBoard↔Pi cable, which would cover this already.
+- Pi → BiBoard (serial, data-only): 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power) — BiBoard's 5-pin header has two +5V pins, both also left unconnected. Confirmed pinout: [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos of exactly where to solder: `blueprints/build-logs/pi-biboard-build-notes.md`.
+- Pi → BiBoard (serial, data-only): **Check the Bittle X box first** — Petoi sometimes includes a BiBoard↔Pi cable, which would cover this already.
 
 
 Also nice to have: a small strip of **thermal tape** for the WH heatsink (no
@@ -38,12 +38,12 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 
 ## 0. The headline facts that shape every choice
 
-- **512 MB RAM, soldered, not expandable**: the whole voice stack (Vosk ~300 MB runtime + Piper/onnxruntime + Python) barely fits; swap is mandatory, running voice+vision together is doubtful, PyTorch is a bad idea (see §7)
-- **4× Cortex-A53 @ 1 GHz (ARMv8, aarch64)**: must run **64-bit** Pi OS for ML wheels; compiles are slow; real-time TTS/STT is not guaranteed — must be measured
-- **Wi-Fi `brcmfmac` with power-save **on by default** (Bookworm)**: SSH stalls or drops under CPU load until it is disabled. Do this first; the fault is hard to diagnose later ([forum](https://forums.raspberrypi.com/viewtopic.php?t=357629))
-- **Bookworm = NetworkManager, config lives in `/boot/firmware/` not `/boot/`**: old `wpa_supplicant.conf` / `ssh` file tricks are dead; use the Imager ([zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/))
-- **PiSugar S** is a *dumb* UPS — no I²C, no battery %, no voltage query: can only sense "external power present"; battery monitoring must be external or skipped; the fancier PiSugar 2/3 are what the tutorials assume ([PiSugar docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series))
-- **serial on the Zero 2 W defaults to the flaky **mini-UART** (`/dev/ttyS0`); the good PL011 is tied to Bluetooth**: for a reliable BiBoard link, disable BT and take the PL011 — done in config, no robot needed
+- 512 MB RAM, soldered, not expandable: the whole voice stack (Vosk ~300 MB runtime + Piper/onnxruntime + Python) barely fits; swap is mandatory, running voice+vision together is doubtful, PyTorch is a bad idea (see §7)
+- 4× Cortex-A53 @ 1 GHz (ARMv8, aarch64): must run **64-bit** Pi OS for ML wheels; compiles are slow; real-time TTS/STT is not guaranteed — must be measured
+- Wi-Fi `brcmfmac` with power-save: on by default** (Bookworm)**: SSH stalls or drops under CPU load until it is disabled. Do this first; the fault is hard to diagnose later ([forum](https://forums.raspberrypi.com/viewtopic.php?t=357629))
+- Bookworm = NetworkManager, config lives in `/boot/firmware/` not `/boot/`: old `wpa_supplicant.conf` / `ssh` file tricks are dead; use the Imager ([zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/))
+- PiSugar S: is a *dumb* UPS — no I²C, no battery %, no voltage query: can only sense "external power present"; battery monitoring must be external or skipped; the fancier PiSugar 2/3 are what the tutorials assume ([PiSugar docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series))
+- serial on the Zero 2 W defaults to the flaky mini-UART** (`/dev/ttyS0`); the good PL011 is tied to Bluetooth**: for a reliable BiBoard link, disable BT and take the PL011 — done in config, no robot needed
 
 ---
 
@@ -52,7 +52,7 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 1. Install **Raspberry Pi Imager** (`brew install --cask raspberry-pi-imager` or from raspberrypi.com).
 2. Choose OS → **Raspberry Pi OS Lite (64-bit)**. *Lite* = no desktop (the Pi runs headless). *64-bit* is non-negotiable for the ML packages. Stay on **Bookworm**, not the newer Trixie — Trixie has had headless-Wi-Fi regressions ([industrialmonitordirect](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)).
 3. Choose Storage → the 32 GB card.
-4. **Edit Settings (the gear / "OS customisation")** — this is the whole headless setup, do it now:
+4. Edit Settings (the gear / "OS customisation"): this is the whole headless setup, do it now:
    - hostname: e.g. `g2pi`  → reachable as `g2pi.local` via mDNS
    - enable **SSH** → "Allow public-key authentication only", paste the Mac's `~/.ssh/id_ed25519.pub` (make one with `ssh-keygen -t ed25519` if none exists)
    - username + password: set a real user (there is **no default `pi` user** on Bookworm, so skipping this makes login impossible)
@@ -203,15 +203,15 @@ power source is connected... does not support power inquiry"
 ([PiSugar docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series)).
 
 So:
-- **No `pisugar-power-manager` software** worth installing — it's built for the
+- No `pisugar-power-manager` software: worth installing — it's built for the
   2/3, which expose battery % over I²C at `0x57`/`0x75`. On the S it has nothing
   to read.
-- **No battery-percentage or low-battery signal** for the code. A "G2 is getting low"
+- No battery-percentage or low-battery signal: for the code. A "G2 is getting low"
   warning needs an external ADC on a Grove analog pin; otherwise sessions are
   simply time-boxed. (Matches the plan's existing note.)
 - Physical setup: charge it full over its own micro-USB; pogo-pins mate to the
   Pi's underside test pads; it just passes power through.
-- **The one config choice:** the S uses the I²C **SCL** GPIO as an auto-boot
+- The one config choice: the S uses the I²C **SCL** GPIO as an auto-boot
   trigger, which clashes with using the Pi's I²C bus for anything else
   ([PiSugar/PiSugar#17](https://github.com/PiSugar/PiSugar/issues/17),
   [#113](https://github.com/PiSugar/PiSugar/issues/113)). The project does not use the Pi's
@@ -301,23 +301,23 @@ robot)? `git clone --filter=blob:none --no-checkout <repo> ~/bittleX && cd
 `rl_training`'s history/checkpoints — more moving parts than `rsync`, so it's
 not the default here, but it is available for updating with `git pull` instead.
 
-**Why the audio install is the fragile step (detail):** packages with compiled
+Why the audio install is the fragile step (detail): packages with compiled
 code ship as *wheels* per OS+CPU+Python. If no `linux_aarch64` wheel matches,
 pip compiles from source *on the Pi* — needs `-dev` headers (cryptic failures
 without them) and can take 20 min–hours and **OOM mid-build** on 512 MB. Per
 package:
 
-- **`numpy`**: fine — aarch64 wheels exist (or `apt install python3-numpy`)
-- **`sounddevice`**: pure-Python, but **dead without `libportaudio2`** from apt
-- **`vosk`**: ships aarch64 wheels; ~50 MB model on disk, **~300 MB RAM at runtime** ([forum](https://forums.raspberrypi.com/viewtopic.php?t=326417))
-- **`onnxruntime`**: historically *the* problem child, but 2025+ has manylinux **aarch64** wheels on PyPI *and* on [piwheels](https://www.piwheels.org/project/onnxruntime/); pin a version whose `cp311` aarch64 wheel exists. Fallback: a named wheel URL.
-- **`piper-tts`**: pulls `onnxruntime`; real-time on a Pi **5**, lags on a Pi **4** for medium/high voices ([hackster](https://www.hackster.io/sarakit/easy-offline-text-to-speech-on-raspberry-pi-a-tts-guide-255a0f)) → on the Zero 2 W plan for **x_low / low (16 kHz)** voices and *measure*
+- `numpy`: fine — aarch64 wheels exist (or `apt install python3-numpy`)
+- `sounddevice`: pure-Python, but **dead without `libportaudio2`** from apt
+- `vosk`: ships aarch64 wheels; ~50 MB model on disk, **~300 MB RAM at runtime** ([forum](https://forums.raspberrypi.com/viewtopic.php?t=326417))
+- `onnxruntime`: historically *the* problem child, but 2025+ has manylinux **aarch64** wheels on PyPI *and* on [piwheels](https://www.piwheels.org/project/onnxruntime/); pin a version whose `cp311` aarch64 wheel exists. Fallback: a named wheel URL.
+- `piper-tts`: pulls `onnxruntime`; real-time on a Pi **5**, lags on a Pi **4** for medium/high voices ([hackster](https://www.hackster.io/sarakit/easy-offline-text-to-speech-on-raspberry-pi-a-tts-guide-255a0f)) → on the Zero 2 W plan for **x_low / low (16 kHz)** voices and *measure*
 
 Mitigations already implied: run the install **after** §4 (swap up) so a compile
 can't OOM; prefer `apt` for `numpy`/PortAudio; keep swappiness high during the
 install.
 
-**PyTorch / the RL policy:** installable on 64-bit OS (aarch64 wheels exist) but
+PyTorch / the RL policy: installable on 64-bit OS (aarch64 wheels exist) but
 `import torch` alone is ~150–250 MB resident — reckless on a 512 MB box also
 running Vosk. The Phase-3 policy is a *tiny* MLP (`[256,256]`, 276-in, 8-out) —
 a handful of matmuls, sub-millisecond once loaded; the cost is torch's
@@ -344,14 +344,14 @@ Piper→Vosk word recall ~90%. It measures the things the plan flags as untested
 **Measured on the real Pi Zero 2 W** (`en_US-ryan-low` + the small Vosk model, no API key set so the Claude round-trip was skipped,
 robot not involved):
 
-- **RAM total / baseline process**: Result: 416 MB / 15 MB
-- **Piper loaded**: Result: +114 MB, 10 s to load
-- **Vosk loaded**: Result: +240 MB, 5.6 s to load
-- **Peak free memory with both loaded**: Result: 71 MB; Verdict: OK (above the ~40 MB floor)
-- **Piper synth**: Result: 1.72× realtime (9.9 s for 5.8 s of audio); Verdict: **WARN — slower than speech**
-- **Vosk transcribe**: Result: 2.22× realtime (12.9 s for 5.8 s of audio); Verdict: **WARN**
-- **Piper→Vosk word recall**: Result: 83%
-- **60 s all-core load**: Result: 40.8 → 51.5 °C, throttle flags 0x0, scheduler jitter 10 ms; Verdict: OK
+- RAM total / baseline process: Result: 416 MB / 15 MB
+- Piper loaded: Result: +114 MB, 10 s to load
+- Vosk loaded: Result: +240 MB, 5.6 s to load
+- Peak free memory with both loaded: Result: 71 MB; Verdict: OK (above the ~40 MB floor)
+- Piper synth: Result: 1.72× realtime (9.9 s for 5.8 s of audio); Verdict: **WARN — slower than speech**
+- Vosk transcribe: Result: 2.22× realtime (12.9 s for 5.8 s of audio); Verdict: **WARN**
+- Piper→Vosk word recall: Result: 83%
+- 60 s all-core load: Result: 40.8 → 51.5 °C, throttle flags 0x0, scheduler jitter 10 ms; Verdict: OK
 
 That is roughly 30× (Piper) and 12× (Vosk) slower than the Mac baseline above. The Vosk number is a whole-file batch run, so the live
 streaming path should lag less after speech stops, but it is not measured yet. Open: re-run with the Claude API section enabled,
@@ -363,18 +363,18 @@ reserved for graphics and the `vc4-kms-v3d` display driver sets aside a further 
 `config.txt.bak-pre-gpumem` beside it). To get a display or a CSI ribbon camera back: restore the overlay line (or copy the backup over `config.txt`), remove or
 raise `gpu_mem`, and reboot. An SPI screen needs neither. The voice model is also loaded once and shared (`voice/vosk_model.py`), which cut swap use from 308 to 175 MB.
 
-- **RAM baseline**: `free -h` idle after boot; after importing the voice stack;
+- RAM baseline: `free -h` idle after boot; after importing the voice stack;
   during a live STT+TTS exchange. Flag if headroom < ~40 MB.
-- **Vosk STT**: wall-time to transcribe a fixed 3–5 s WAV with the small model;
+- Vosk STT: wall-time to transcribe a fixed 3–5 s WAV with the small model;
   also streaming latency (partial-result lag).
-- **Piper TTS**: synth time for a fixed sentence at `x_low` and `low`; report as
+- Piper TTS: synth time for a fixed sentence at `x_low` and `low`; report as
   ×real-time (synth_seconds / audio_seconds — want < 1.0).
-- **Claude API**: round-trip latency for a minimal `messages.create` from the
+- Claude API: round-trip latency for a minimal `messages.create` from the
   Pi's network, 5 samples, p50/p95. (Just HTTPS — the SDK installs clean.)
-- **Serial**: (later, needs BiBoard) round-trip of a no-op token.
-- **Thermals / Wi-Fi**: `vcgencmd measure_temp` and an `ssh`-liveness ping while
+- Serial: (later, needs BiBoard) round-trip of a no-op token.
+- Thermals / Wi-Fi: `vcgencmd measure_temp` and an `ssh`-liveness ping while
   `stress-ng --cpu 4 --timeout 120s` runs — confirms §3 actually took.
-- **ONNX policy** (later): load the exported policy, time 1000 `run()` calls.
+- ONNX policy: (later): load the exported policy, time 1000 `run()` calls.
 
 Deliverable of the bench: a go/no-go on "voice pipeline runs on this Pi in real
 time", and numbers to decide voice-only vs voice+vision co-residency.
@@ -431,15 +431,15 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
 
 ## Open questions — status after this research
 
-- **Serial device name on the Zero 2 W?**: `/dev/ttyS0` (mini-UART) by default; **switch to `/dev/ttyAMA0` / `serial0`** via `dtoverlay=disable-bt` for a stable 115200 link. Config file is `/boot/firmware/config.txt` on Bookworm.
-- **Can a Pi Zero 2 W run `model.predict()` fast enough?**: The MLP is trivial; **run it as ONNX, not PyTorch** (torch's RAM cost is the real problem). Fast enough is very likely; benchmark in §8 when Phase 6 comes.
-- **Battery monitoring via PiSugar S?**: **No.** The S has no I²C, no fuel gauge, no power query — external ADC or time-boxing only.
-- **zram or swapfile?**: Both: small lz4 zram + 1 GB SD swapfile backstop, high swappiness. Verify the split under load; some say 512 MB is too little for zram to help — measure.
-- **Wi-Fi power-save disable method?**: `/etc/NetworkManager/conf.d/wifi-powersave-off.conf` → `wifi.powersave = 2`, restart NetworkManager.
-- **Real-time Piper on the Zero 2 W?**: **Unknown — the actual risk.** Real-time on Pi 5, lags on Pi 4 for bigger voices. Assume `x_low`/`low` voices; §8 decides.
-- **Real-time Vosk on the Zero 2 W?**: Small model runs; streaming API keeps latency low; **~300 MB RAM** is the pinch, and small-model accuracy is mediocre.
-- **Bookworm vs Trixie?**: **Bookworm 64-bit Lite** — Trixie had headless-Wi-Fi regressions.
-- **Does the Pi need I²C enabled?**: No. Leaving it off also sidesteps the PiSugar auto-boot/I²C clash.
+- Serial device name on the Zero 2 W?: `/dev/ttyS0` (mini-UART) by default; **switch to `/dev/ttyAMA0` / `serial0`** via `dtoverlay=disable-bt` for a stable 115200 link. Config file is `/boot/firmware/config.txt` on Bookworm.
+- Can a Pi Zero 2 W run `model.predict()` fast enough?: The MLP is trivial; **run it as ONNX, not PyTorch** (torch's RAM cost is the real problem). Fast enough is very likely; benchmark in §8 when Phase 6 comes.
+- Battery monitoring via PiSugar S?: **No.** The S has no I²C, no fuel gauge, no power query — external ADC or time-boxing only.
+- zram or swapfile?: Both: small lz4 zram + 1 GB SD swapfile backstop, high swappiness. Verify the split under load; some say 512 MB is too little for zram to help — measure.
+- Wi-Fi power-save disable method?: `/etc/NetworkManager/conf.d/wifi-powersave-off.conf` → `wifi.powersave = 2`, restart NetworkManager.
+- Real-time Piper on the Zero 2 W?: **Unknown — the actual risk.** Real-time on Pi 5, lags on Pi 4 for bigger voices. Assume `x_low`/`low` voices; §8 decides.
+- Real-time Vosk on the Zero 2 W?: Small model runs; streaming API keeps latency low; **~300 MB RAM** is the pinch, and small-model accuracy is mediocre.
+- Bookworm vs Trixie?: **Bookworm 64-bit Lite** — Trixie had headless-Wi-Fi regressions.
+- Does the Pi need I²C enabled?: No. Leaving it off also sidesteps the PiSugar auto-boot/I²C clash.
 
 ## Sources
 - Headless Bookworm / Imager: [zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/), [skyboo.net](https://skyboo.net/2024/02/preparing-headless-sd-card-for-raspberry-pi-zero-2-w-without-raspberry-pi-imager/), [industrialmonitordirect (Trixie vs Bookworm)](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)

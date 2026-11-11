@@ -8,127 +8,127 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 
 ## environment
 
-- **`g2`**: cd repo + pipeline venv
-- **`g2rl`**: cd RL dir + RL venv
-- **`g2back`**: return to the dir before g2/g2rl
-- **`g2test`**: run the pipeline test suite
+- `g2`: cd repo + pipeline venv
+- `g2rl`: cd RL dir + RL venv
+- `g2back`: return to the dir before g2/g2rl
+- `g2test`: run the pipeline test suite
 
 ## camera capture + model train
 
-- **`g2cam <name> [session]`**: start the live capture preview at localhost:8080, saving to ~/Desktop/G2Memory/g2_face_capture/<name>/session_<n>/
-- **`g2cam-stop`**: stop the capture preview # stop the capture preview
-- **`g2cam-info`**: serial port + which model is on the module
-- **`g2pcam <name> [session]`**: run the preview on the Pi, tunnel it to localhost:8080, open it; captures land on the Pi in ~/g2_cap/<name>/session_<n>/
-- **`g2see`**: just LOOK: live feed + detection boxes from the camera mounted on G2 (plugged into the Pi) at localhost:8080. No name, nothing saved, no capture folder. Closing the tab stops it. Same G2_PI requirement as g2pcam; stop early with g2pcam-stop.
-- **`g2pcam-pull <name> [session]`**: copy a Pi capture to $G2_CAP_ROOT/<name>/session_<n>/ (then g2curate/g2auto as usual)
-- **`g2clean`**: dry-run list of scratch files (Mac + Pi); `g2clean --apply` deletes them
-- **`g2membackup`**: snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/G2Memory/memory-backups); needs G2_PI
-- **`g2wifi list/status/scan/add <ssid>/remove <ssid>`**: manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI
-- **`g2pcam-stop`**: kill the tunnel + the preview process on the Pi
-- **`g2curate <name> [session] [rotate]`**: filter a raw capture -> <session>/curated/ (score, de-dup, rotate upright, YOLO pre-labels). rotate default 0 (camera mounted upright); use 90/180/270 if the contact sheet comes out rotated.
-- **`g2promote <class> [session]`**: copy a reviewed curated session into the library
-- **`g2neg [session] [rotate] [min-sharpness]`**: curate an empty-room sweep as pure negatives + add to the library. min-sharpness defaults to 25 (drops the motion-blur from walking; a flat room scene still passes).
-- **`g2libstatus`**: print the vision library manifest (images per class)
-- **`g2auto [classes] [--dry-run]`**: the FULL automated pipeline: for every pending raw session (curate -> dedup-against-library -> promote), then rebuild the 150/class optimized upload set. Capture (g2cam) is the only manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/, ready to import into SenseCraft. Idempotent -- safe to re-run any time, already-promoted sessions are skipped automatically.
+- `g2cam <name> [session]`: start the live capture preview at localhost:8080, saving to ~/Desktop/G2Memory/g2_face_capture/<name>/session_<n>/
+- `g2cam-stop`: stop the capture preview # stop the capture preview
+- `g2cam-info`: serial port + which model is on the module
+- `g2pcam <name> [session]`: run the preview on the Pi, tunnel it to localhost:8080, open it; captures land on the Pi in ~/g2_cap/<name>/session_<n>/
+- `g2see`: just LOOK: live feed + detection boxes from the camera mounted on G2 (plugged into the Pi) at localhost:8080. No name, nothing saved, no capture folder. Closing the tab stops it. Same G2_PI requirement as g2pcam; stop early with g2pcam-stop.
+- `g2pcam-pull <name> [session]`: copy a Pi capture to $G2_CAP_ROOT/<name>/session_<n>/ (then g2curate/g2auto as usual)
+- `g2clean`: dry-run list of scratch files (Mac + Pi); `g2clean --apply` deletes them
+- `g2membackup`: snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/G2Memory/memory-backups); needs G2_PI
+- `g2wifi list/status/scan/add <ssid>/remove <ssid>`: manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI
+- `g2pcam-stop`: kill the tunnel + the preview process on the Pi
+- `g2curate <name> [session] [rotate]`: filter a raw capture -> <session>/curated/ (score, de-dup, rotate upright, YOLO pre-labels). rotate default 0 (camera mounted upright); use 90/180/270 if the contact sheet comes out rotated.
+- `g2promote <class> [session]`: copy a reviewed curated session into the library
+- `g2neg [session] [rotate] [min-sharpness]`: curate an empty-room sweep as pure negatives + add to the library. min-sharpness defaults to 25 (drops the motion-blur from walking; a flat room scene still passes).
+- `g2libstatus`: print the vision library manifest (images per class)
+- `g2auto [classes] [--dry-run]`: the FULL automated pipeline: for every pending raw session (curate -> dedup-against-library -> promote), then rebuild the 150/class optimized upload set. Capture (g2cam) is the only manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/, ready to import into SenseCraft. Idempotent -- safe to re-run any time, already-promoted sessions are skipped automatically.
 
 ## vision runtime
 
-- **`g2vision [labels]`**: run the detection pipeline over serial, print live detections no arg -> uses VISION_LABELS / VISION_MIN_SCORE from .env (the deployed model) with arg -> overrides the label(s) for this run, e.g. g2vision person
-- **`g2vision-demo`**: mock feed, no hardware
-- **`g2visioneval [label] [secs]`**: timed measurement: detection rate / confidence / floor / flicker for the dataset-size threshold test. Stand in frame at close/mid/far. Add a 3rd arg 'empty' + point at a clear scene for the false-fire check. e.g. g2visioneval <label> 30 / g2visioneval <label> 30 empty
-- **`g2simtrain [status/log/report/apply/revert DIR/stop]`**: the sim training of the ball-chase settings (tools/sim_train, 2026-11-02): status = stage, progress, best scores, finish estimate (default); log = follow the log live; report = open the HTML report when done; apply = send the recommended values to G2 now (it also happens by itself once training is done and the Pi is on and idle; a backup is made first); revert DIR = put the backup back; stop = stop it for good. A pla
-- **`g2watchrun [--fast]`**: watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of its own, not an approximation; it joins wherever the run is). Default = each episode at real speed, then the newest; --fast = follow live at training speed (about 4-5x real time). Drag or scroll to change the view: it is kept. Needs a run started after 2026-10-09 (older runs have no
-- **`g2watchsim [TAG] [watch_trained args]`**: (the old g2watchrun) a FRESH simulation of a run's newest checkpoint in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges. --calm = the flat scoring world instead. g2watchsim the run that wrote the newest checkpoint (the one in progress) g2watchsim v3_20m a given run; g2watchsim v3_20m --dr-push 0.35 adds rando
+- `g2vision [labels]`: run the detection pipeline over serial, print live detections no arg -> uses VISION_LABELS / VISION_MIN_SCORE from .env (the deployed model) with arg -> overrides the label(s) for this run, e.g. g2vision person
+- `g2vision-demo`: mock feed, no hardware
+- `g2visioneval [label] [secs]`: timed measurement: detection rate / confidence / floor / flicker for the dataset-size threshold test. Stand in frame at close/mid/far. Add a 3rd arg 'empty' + point at a clear scene for the false-fire check. e.g. g2visioneval <label> 30 / g2visioneval <label> 30 empty
+- `g2simtrain [status/log/report/apply/revert DIR/stop]`: the sim training of the ball-chase settings (tools/sim_train, 2026-11-02): status = stage, progress, best scores, finish estimate (default); log = follow the log live; report = open the HTML report when done; apply = send the recommended values to G2 now (it also happens by itself once training is done and the Pi is on and idle; a backup is made first); revert DIR = put the backup back; stop = stop it for good. A pla
+- `g2watchrun [--fast]`: watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of its own, not an approximation; it joins wherever the run is). Default = each episode at real speed, then the newest; --fast = follow live at training speed (about 4-5x real time). Drag or scroll to change the view: it is kept. Needs a run started after 2026-10-09 (older runs have no
+- `g2watchsim [TAG] [watch_trained args]`: (the old g2watchrun) a FRESH simulation of a run's newest checkpoint in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges. --calm = the flat scoring world instead. g2watchsim the run that wrote the newest checkpoint (the one in progress) g2watchsim v3_20m a given run; g2watchsim v3_20m --dr-push 0.35 adds rando
 
 ## voice / conversation
 
-- **`g2chat`**: type to Claude, replies via `say` (needs ANTHROPIC_API_KEY)
-- **`g2voice`**: wake word + mic + Piper TTS (needs audio deps + models)
-- **`g2audio`**: devices / wake / stt / tts
+- `g2chat`: type to Claude, replies via `say` (needs ANTHROPIC_API_KEY)
+- `g2voice`: wake word + mic + Piper TTS (needs audio deps + models)
+- `g2audio`: devices / wake / stt / tts
 
 ## memory
 
-- **`g2mem [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]`**: inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi).
-- **`g2pimem`**: G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
-- **`g2embedder`**: move the object gallery to the DINOv2 embedder (user, 2026-11-06): push-model / bench / switch / revert, each its own step (tools/g2_switch_embedder.sh); the labelled pictures are never touched.
-- **`g2places`**: feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics.
-- **`g2pics`**: the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo).
-- **`g2walls`**: the wall pictures (the labelled recognition shots and the near-wall pictures kept in roams) as thumbnails on the Walls tab of the review page.
-- **`g2wallstats [DAYS]`**: statistics from the wall and detection logs on the Pi: looks per state, the nearest wall in inches, the turns, the times he stayed near a wall.
-- **`g2wallreplay [DIR]`**: what an exploring G2 would do with each saved wall picture (runs on the Pi; default ~/g2_wall_pics); nothing moves.
-- **`g2wallpic LABEL INCHES [ANGLE]`**: take one labelled wall picture on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice); distance in inches from the lens to the base of the wall.
-- **`g2look [LABEL] [INCHES] [ANGLE]`**: take one picture with the claw camera right now, G2 STAYING WHERE HE IS (standing; you set him up between pictures), exposure balancing on, saved on the Pi with its label.
-- **`g2turn3 [left/right]`**: hardware test of the 3-point turn (back up while turning one way, then forward turning the other way): G2 on his feet, a clear foot behind, hands near; reports the heading change of each half. Stops the voice service first.
-- **`g2cmds [--board] [--hours N] [--last N]`**: what the Pi sent to the BiBoard and what the board did on its own. A move the board started itself (its voice module: you, said without "G2", or a TV in the room) shows as BOARD (NOT FROM THE PI) (the `not_from_pi` flag); BOARD (on its own) is timing only and misses moves while the Pi is busy.
-- **`g2sync [status/run/now TASK]`**: every copy from the Pi to this Mac in one job (goal data, pictures, walk logs, wall pictures, the memory DB, the logs), each on its own schedule. status: when each last worked and STALE if too old. run: the ones that are due. now TASK (or now all): that one now. The background loop (g2_bg_jobs.sh) runs it every 30 min.
-- **`g2mic [status/on/off [MINUTES]]`**: G2's wake word ("G2"): `off` turns it off for MINUTES (default 10, at most 120; only the stop words are heard meanwhile), `on` turns it back on now (he cannot hear "mic on" while it is off), `status` says which and how long is left. "G2, mic off [for N minutes]" does `off` by voice. g2micon = g2mic on.
-- **`g2micon`**: —
-- **`g2send CMD [CMD...]`**: send raw BiBoard commands from any folder, one argument per command, 5 s apart (e.g. `g2send kbalance klaunch`; quote joint commands: `g2send "i0 30 1 15"`). Stops the voice service, refuses below a 30% pack or a silent board, sends `gb` after the last skill (never after a gait), prints each reply (they lag one command behind), then starts the voice service again. Hands near: it moves G2.
-- **`g2claw calibrate/pictures/test/hold`**: the claw look hardware checks on the Pi (behavior/claw_look.py), from any folder; stops the voice service first (g2look done / g2goal start it again). G2 standing or lying with his hands-near rule. calibrate: the ball about 12 in straight ahead; measures which way a positive arm pan turns the camera and saves it. pictures: three pictures (straight, pan +, pan -), copied to ~/Desktop/G2Memory/g2_pictures/claw/<time> a
-- **`g2imu [rest/stand] [SECONDS]`**: record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise.
-- **`g2picscurate [IN_DIR] [OUT_DIR]`**: curate the pulled exploration pictures (default ~/Desktop/G2Memory/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and
-- **`g2cal [build/status/show [ID]/harm-check ID POLICY.../approve ID/revert/auto]`**: the real-data calibration builder (docs/rl/real-data-pipeline.md, Phase 3): fits what G2's run logs support, writes numbered snapshots, scores policies in the old and new world (idle Mac only), and applies the approval rules. The background loop (`g2bg status`) runs `auto` every 30 min.
-- **`g2calauto`**: run the real-data calibration step now (pull the Pi logs, ingest, calibrate); `g2calauto status` lists snapshots
-- **`g2bg [start [MIN]/stop/status/once]`**: the Mac-side background loop (every 30 min): re-curates the exploration pictures and runs the calibration step. It ends at a restart/logout: `g2bg start` again.
-- **`g2data [sync/ingest/status]`**: G2's automatic run logs on the Mac (docs/rl/real-data-pipeline.md). With no argument: sync, then ingest, then status. sync = copy the Pi's run logs and detection logs to ~/g2_data (the Pi keeps its copy); ingest = measure every run, apply the quality gates, store it compressed (nothing deleted; a run that fails a gate is quarantined with its reasons); status = how many runs are usable, by hardware epoch, floor and pa
-- **`g2reset [status/logs]`**: restart G2's voice loop on the Pi (prints "restarting voice loop..." then "voice loop restarted"; G2 also says "I am online." out loud when he is back) (use it when G2 does not answer voice commands; works even when he cannot hear you). If an exploration session is running it is ended first.
-- **`g2attach [status/list/none/head/arm/save ATTACHMENT POLICY [--trim T] [--payload P]]`**: which attachment G2 wears on the neck, and the gait saved for each (docs/planned/attachments.md).
-- **`g2floor [LABEL]`**: show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs.
+- `g2mem [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]`: inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi).
+- `g2pimem`: G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
+- `g2embedder`: move the object gallery to the DINOv2 embedder (user, 2026-11-06): push-model / bench / switch / revert, each its own step (tools/g2_switch_embedder.sh); the labelled pictures are never touched.
+- `g2places`: feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics.
+- `g2pics`: the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo).
+- `g2walls`: the wall pictures (the labelled recognition shots and the near-wall pictures kept in roams) as thumbnails on the Walls tab of the review page.
+- `g2wallstats [DAYS]`: statistics from the wall and detection logs on the Pi: looks per state, the nearest wall in inches, the turns, the times he stayed near a wall.
+- `g2wallreplay [DIR]`: what an exploring G2 would do with each saved wall picture (runs on the Pi; default ~/g2_wall_pics); nothing moves.
+- `g2wallpic LABEL INCHES [ANGLE]`: take one labelled wall picture on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice); distance in inches from the lens to the base of the wall.
+- `g2look [LABEL] [INCHES] [ANGLE]`: take one picture with the claw camera right now, G2 STAYING WHERE HE IS (standing; you set him up between pictures), exposure balancing on, saved on the Pi with its label.
+- `g2turn3 [left/right]`: hardware test of the 3-point turn (back up while turning one way, then forward turning the other way): G2 on his feet, a clear foot behind, hands near; reports the heading change of each half. Stops the voice service first.
+- `g2cmds [--board] [--hours N] [--last N]`: what the Pi sent to the BiBoard and what the board did on its own. A move the board started itself (its voice module: you, said without "G2", or a TV in the room) shows as BOARD (NOT FROM THE PI) (the `not_from_pi` flag); BOARD (on its own) is timing only and misses moves while the Pi is busy.
+- `g2sync [status/run/now TASK]`: every copy from the Pi to this Mac in one job (goal data, pictures, walk logs, wall pictures, the memory DB, the logs), each on its own schedule. status: when each last worked and STALE if too old. run: the ones that are due. now TASK (or now all): that one now. The background loop (g2_bg_jobs.sh) runs it every 30 min.
+- `g2mic [status/on/off [MINUTES]]`: G2's wake word ("G2"): `off` turns it off for MINUTES (default 10, at most 120; only the stop words are heard meanwhile), `on` turns it back on now (he cannot hear "mic on" while it is off), `status` says which and how long is left. "G2, mic off [for N minutes]" does `off` by voice. g2micon = g2mic on.
+- `g2micon`: —
+- `g2send CMD [CMD...]`: send raw BiBoard commands from any folder, one argument per command, 5 s apart (e.g. `g2send kbalance klaunch`; quote joint commands: `g2send "i0 30 1 15"`). Stops the voice service, refuses below a 30% pack or a silent board, sends `gb` after the last skill (never after a gait), prints each reply (they lag one command behind), then starts the voice service again. Hands near: it moves G2.
+- `g2claw calibrate/pictures/test/hold`: the claw look hardware checks on the Pi (behavior/claw_look.py), from any folder; stops the voice service first (g2look done / g2goal start it again). G2 standing or lying with his hands-near rule. calibrate: the ball about 12 in straight ahead; measures which way a positive arm pan turns the camera and saves it. pictures: three pictures (straight, pan +, pan -), copied to ~/Desktop/G2Memory/g2_pictures/claw/<time> a
+- `g2imu [rest/stand] [SECONDS]`: record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise.
+- `g2picscurate [IN_DIR] [OUT_DIR]`: curate the pulled exploration pictures (default ~/Desktop/G2Memory/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and
+- `g2cal [build/status/show [ID]/harm-check ID POLICY.../approve ID/revert/auto]`: the real-data calibration builder (docs/rl/real-data-pipeline.md, Phase 3): fits what G2's run logs support, writes numbered snapshots, scores policies in the old and new world (idle Mac only), and applies the approval rules. The background loop (`g2bg status`) runs `auto` every 30 min.
+- `g2calauto`: run the real-data calibration step now (pull the Pi logs, ingest, calibrate); `g2calauto status` lists snapshots
+- `g2bg [start [MIN]/stop/status/once]`: the Mac-side background loop (every 30 min): re-curates the exploration pictures and runs the calibration step. It ends at a restart/logout: `g2bg start` again.
+- `g2data [sync/ingest/status]`: G2's automatic run logs on the Mac (docs/rl/real-data-pipeline.md). With no argument: sync, then ingest, then status. sync = copy the Pi's run logs and detection logs to ~/g2_data (the Pi keeps its copy); ingest = measure every run, apply the quality gates, store it compressed (nothing deleted; a run that fails a gate is quarantined with its reasons); status = how many runs are usable, by hardware epoch, floor and pa
+- `g2reset [status/logs]`: restart G2's voice loop on the Pi (prints "restarting voice loop..." then "voice loop restarted"; G2 also says "I am online." out loud when he is back) (use it when G2 does not answer voice commands; works even when he cannot hear you). If an exploration session is running it is ended first.
+- `g2attach [status/list/none/head/arm/save ATTACHMENT POLICY [--trim T] [--payload P]]`: which attachment G2 wears on the neck, and the gait saved for each (docs/planned/attachments.md).
+- `g2floor [LABEL]`: show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs.
 
 ## config introspection
 
-- **`g2feat`**: resolve G2_FEATURES; `g2feat --profiles` lists bring-up stages
-- **`g2traits`**: resolve G2_TRAITS -> prompt / behaviour / bonds
-- **`g2diag`**: list / summarize [sid] / tail [sid] / replay <sid>
+- `g2feat`: resolve G2_FEATURES; `g2feat --profiles` lists bring-up stages
+- `g2traits`: resolve G2_TRAITS -> prompt / behaviour / bonds
+- `g2diag`: list / summarize [sid] / tail [sid] / replay <sid>
 
 ## robot serial link (HW)
 
-- **`g2serial`**: ports / ping / send <cmd> / skills / rest
-- **`g2power`**: status / headless / interactive / governor <n>
+- `g2serial`: ports / ping / send <cmd> / skills / rest
+- `g2power`: status / headless / interactive / governor <n>
 
 ## operate G2 (Mac -> Pi)
 
-- **`g2ssh`**: open a shell on the Pi.
-- **`g2punt`**: one punt attempt without the voice command (the same as saying "G2, punt"): stops the voice service on the Pi, runs `behavior.ball_chase --punts 1` (stand from rest, find the ball, walk to it, punch it once, rest), then starts the voice service again. Extra words go to the chase, e.g. g2punt --punt-max 3.5. G2 in rest, the ball in front of him; see docs/guides/punt.md.
-- **`g2puntstop`**: end a punt attempt now (he rests, the voice service comes back).
-- **`g2puntset [NAME VALUE / init]`**: show the punt settings a run would use now (the file ~/.local/share/g2/punt_settings.json on the Pi), change one (g2puntset punt_max_in 3.5), or write the file with every default (init). Read at the start of every run: no deploy.
-- **`g2goal [list/show GOAL/set GOAL .../run GOAL/stop/status/history GOAL/suggestions/confirm/cancel GOAL KNOB/verdict GOAL N right/wrong/pin/limit/undo/forget GOAL KNOB .../overrides GOAL/reset GOAL --yes/pull/report [GOAL]]`**: goals G2 works toward and what he learned (docs/guides/goals.md). run = one session without the voice command (the same as saying "G2, ball goal"): it runs inside the running voice service, which is not stopped (the port stays open); stop = end it (he rests). apply = send the edits queued in the review page's Goals tab to the Pi (also done by pull and run); pull = copy the journal and the learned state to ~/Desktop/G
-- **`g2ball`**: start the ball goal yourself (the same as saying "G2, ball goal"): up to 10 punt attempts; stops the voice service on the Pi, stands G2 up from rest, rests him at the end, starts the voice service and copies the goal data to the Mac. G2 in rest on the floor, the ball in front of him, your hands near.
-- **`g2ballstop`**: stop it: the attempt ends at its next step (a second or two), G2 rests, the voice service comes back. If it is still moving after that, say "emergency stop" or run app --halt.
-- **`g2deploy [--once/--cancel/--max-hours N/--replace]`**: push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once; --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.
-- **`g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard/report [html]]`**: run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze.
-- **`g2stop [voice/explore]`**: the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride.
-- **`g2rest`**: send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first.
-- **`g2english`**: set the BiBoard's onboard voice module back to English (it falls back to Chinese after some power cycles): sends XAc (enable), XAb, XAa (English), 1.2 s apart,
-- **`g2baseline [start [RUNS] [LABEL]/stop/status/logs/fetch]`**: logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac.
-- **`g2walk [RUNS] [LABEL]`**: RUNS (default 1) logged 12.5 s walks at 0.10 m/s with the deployed policy, on the Pi. The voice service is stopped for them and restarted after; G2 speaks before each run so you can set him at the start of the lane. Logs: ~/g2_runs/<LABEL>_*.csv on the Pi; `g2baseline fetch` copies them here.
-- **`g2turns [start [RUNS]/stop/status/logs/fetch]`**: logged firmware turn runs (kwkL and kwkR alternating) on the Pi, to measure the real turn rate.
-- **`g2walklog LOG.csv [LOG.csv ...]`**: summarize walk logs: roll, pitch and yaw, the first fall, battery voltage.
-- **`g2policy TAG NAME [--dry-run]`**: promote a trained checkpoint to G2's default: export it with its sidecar as Release_Candidate<NAME>, set DEFAULT_POLICY, run the tests, commit, then arm the deploy. The user's call only.
-- **`g2api [HOURS]`**: Claude API calls, tokens and approximate cost on the Pi over the last HOURS (default 24), by source. Use it to watch cost.
-- **`g2crash [N]`**: why did the voice service or an exploration session crash? The last N (default 5) unclean ends, with the stage and the resources at the time.
+- `g2ssh`: open a shell on the Pi.
+- `g2punt`: one punt attempt without the voice command (the same as saying "G2, punt"): stops the voice service on the Pi, runs `behavior.ball_chase --punts 1` (stand from rest, find the ball, walk to it, punch it once, rest), then starts the voice service again. Extra words go to the chase, e.g. g2punt --punt-max 3.5. G2 in rest, the ball in front of him; see docs/guides/punt.md.
+- `g2puntstop`: end a punt attempt now (he rests, the voice service comes back).
+- `g2puntset [NAME VALUE / init]`: show the punt settings a run would use now (the file ~/.local/share/g2/punt_settings.json on the Pi), change one (g2puntset punt_max_in 3.5), or write the file with every default (init). Read at the start of every run: no deploy.
+- `g2goal [list/show GOAL/set GOAL .../run GOAL/stop/status/history GOAL/suggestions/confirm/cancel GOAL KNOB/verdict GOAL N right/wrong/pin/limit/undo/forget GOAL KNOB .../overrides GOAL/reset GOAL --yes/pull/report [GOAL]]`: goals G2 works toward and what he learned (docs/guides/goals.md). run = one session without the voice command (the same as saying "G2, ball goal"): it runs inside the running voice service, which is not stopped (the port stays open); stop = end it (he rests). apply = send the edits queued in the review page's Goals tab to the Pi (also done by pull and run); pull = copy the journal and the learned state to ~/Desktop/G
+- `g2ball`: start the ball goal yourself (the same as saying "G2, ball goal"): up to 10 punt attempts; stops the voice service on the Pi, stands G2 up from rest, rests him at the end, starts the voice service and copies the goal data to the Mac. G2 in rest on the floor, the ball in front of him, your hands near.
+- `g2ballstop`: stop it: the attempt ends at its next step (a second or two), G2 rests, the voice service comes back. If it is still moving after that, say "emergency stop" or run app --halt.
+- `g2deploy [--once/--cancel/--max-hours N/--replace]`: push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once; --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.
+- `g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard/report [html]]`: run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze.
+- `g2stop [voice/explore]`: the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride.
+- `g2rest`: send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first.
+- `g2english`: set the BiBoard's onboard voice module back to English (it falls back to Chinese after some power cycles): sends XAc (enable), XAb, XAa (English), 1.2 s apart,
+- `g2baseline [start [RUNS] [LABEL]/stop/status/logs/fetch]`: logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac.
+- `g2walk [RUNS] [LABEL]`: RUNS (default 1) logged 12.5 s walks at 0.10 m/s with the deployed policy, on the Pi. The voice service is stopped for them and restarted after; G2 speaks before each run so you can set him at the start of the lane. Logs: ~/g2_runs/<LABEL>_*.csv on the Pi; `g2baseline fetch` copies them here.
+- `g2turns [start [RUNS]/stop/status/logs/fetch]`: logged firmware turn runs (kwkL and kwkR alternating) on the Pi, to measure the real turn rate.
+- `g2walklog LOG.csv [LOG.csv ...]`: summarize walk logs: roll, pitch and yaw, the first fall, battery voltage.
+- `g2policy TAG NAME [--dry-run]`: promote a trained checkpoint to G2's default: export it with its sidecar as Release_Candidate<NAME>, set DEFAULT_POLICY, run the tests, commit, then arm the deploy. The user's call only.
+- `g2api [HOURS]`: Claude API calls, tokens and approximate cost on the Pi over the last HOURS (default 24), by source. Use it to watch cost.
+- `g2crash [N]`: why did the voice service or an exploration session crash? The last N (default 5) unclean ends, with the stage and the resources at the time.
 
 ## bring-up and checks
 
-- **`g2doctor [--serial]`**: the bring-up readiness checklist: .env, API key, models, dependencies, serial port, audio, disk. --serial also pings the board.
-- **`g2bringup [--list/--restart/--from ID]`**: the guided, resumable hardware bring-up sequence.
-- **`g2app [--serial/--bench/--trace FILE]`**: the whole robot as one program (voice loop + behavior runtime). Mock by default; --serial talks to the BiBoard; --bench blocks autonomous movement.
-- **`g2check`**: the docs checks: broken links, facts in the wrong page, orphan pages, stale generated pages (the pre-commit hook runs it).
-- **`g2bundle [--out DIR] [--base /docs]`**: build the docs bundle (every page as site-ready Markdown, a navigation manifest and a search index) into build/docs-bundle for the website. CI builds and publishes it on every push; this is the local preview. Format: docs/guides/docs-bundle.md.
-- **`g2docsgen`**: regenerate the generated docs: the backlog, the shell-helpers page, the environment-variable reference, the cheat sheet's A to Z index and the results index. Run it after changing an item heading, an alias comment or the result files.
+- `g2doctor [--serial]`: the bring-up readiness checklist: .env, API key, models, dependencies, serial port, audio, disk. --serial also pings the board.
+- `g2bringup [--list/--restart/--from ID]`: the guided, resumable hardware bring-up sequence.
+- `g2app [--serial/--bench/--trace FILE]`: the whole robot as one program (voice loop + behavior runtime). Mock by default; --serial talks to the BiBoard; --bench blocks autonomous movement.
+- `g2check`: the docs checks: broken links, facts in the wrong page, orphan pages, stale generated pages (the pre-commit hook runs it).
+- `g2bundle [--out DIR] [--base /docs]`: build the docs bundle (every page as site-ready Markdown, a navigation manifest and a search index) into build/docs-bundle for the website. CI builds and publishes it on every push; this is the local preview. Format: docs/guides/docs-bundle.md.
+- `g2docsgen`: regenerate the generated docs: the backlog, the shell-helpers page, the environment-variable reference, the cheat sheet's A to Z index and the results index. Run it after changing an item heading, an alias comment or the result files.
 
 ## simulation and training
 
-- **`g2train TAG [--steps N] [--force]`**: start a training run with the full pre-run checklist (start_run.sh): a new tag, no run already going, no leftover viewers. Never start a 20M unasked.
-- **`g2eta plan --steps 3e6 --tail stage / now --target 20e6 --tail final20m / check`**: timing estimates read from the trainer's logs. Quote them (with a completion clock) whenever you launch anything.
-- **`g2preflight`**: must print ALL PASS before a 20M run is offered: the RL tests, audits, a smoke run, benchmark scoring and replay checks.
-- **`g2rltest`**: run the RL test files (the pipeline's own suite is g2test).
-- **`g2watch [trained/TAG_ppo]`**: replay the newest finished policy (or the one named) in the PyBullet GUI. Needs your own terminal for the window.
-- **`g2tb [stop]`**: open TensorBoard for the training runs at localhost:6006 (starts it if needed); `g2tb stop` ends it.
+- `g2train TAG [--steps N] [--force]`: start a training run with the full pre-run checklist (start_run.sh): a new tag, no run already going, no leftover viewers. Never start a 20M unasked.
+- `g2eta plan --steps 3e6 --tail stage / now --target 20e6 --tail final20m / check`: timing estimates read from the trainer's logs. Quote them (with a completion clock) whenever you launch anything.
+- `g2preflight`: must print ALL PASS before a 20M run is offered: the RL tests, audits, a smoke run, benchmark scoring and replay checks.
+- `g2rltest`: run the RL test files (the pipeline's own suite is g2test).
+- `g2watch [trained/TAG_ppo]`: replay the newest finished policy (or the one named) in the PyBullet GUI. Needs your own terminal for the window.
+- `g2tb [stop]`: open TensorBoard for the training runs at localhost:6006 (starts it if needed); `g2tb stop` ends it.
 
 ## docs
 
-- **`g2docs`**: print the list of key docs (the full index is docs/README.md)
-- **`g2standup [N]`**: N (default 1) eased K stand-ups from rest (`g2stop voice` first: rests him and stops the voice service; hands near), swing and pack printed, then G2 is laid in rest again. Uses the Pi's deployed code and motion_feel numbers. `g2reset` starts the voice service again.
-- **`g2help`**: print the bare list of helpers with their one-line comments.
-- **`g2oddleg [note]`**: flag an odd leg the moment you see one after a stand-up (a different leg ~2% of the time): writes the time, your note and the last leg checks (angles the board held, pack volts, tilt) to ~/.local/share/g2/odd_leg.jsonl on the Pi, so the logs can be lined up with what you saw. Sends nothing to G2.
+- `g2docs`: print the list of key docs (the full index is docs/README.md)
+- `g2standup [N]`: N (default 1) eased K stand-ups from rest (`g2stop voice` first: rests him and stops the voice service; hands near), swing and pack printed, then G2 is laid in rest again. Uses the Pi's deployed code and motion_feel numbers. `g2reset` starts the voice service again.
+- `g2help`: print the bare list of helpers with their one-line comments.
+- `g2oddleg [note]`: flag an odd leg the moment you see one after a stand-up (a different leg ~2% of the time): writes the time, your note and the last leg checks (angles the board held, pack volts, tilt) to ~/.local/share/g2/odd_leg.jsonl on the Pi, so the logs can be lined up with what you saw. Sends nothing to G2.

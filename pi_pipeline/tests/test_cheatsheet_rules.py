@@ -25,22 +25,22 @@ def test_the_real_cheat_sheet_follows_its_own_rules_and_the_index_is_current():
 
 
 def test_a_row_must_be_an_example_not_the_grammar(tmp_path):
-    root = _tree(tmp_path, "- **`g2mic [status|on|off [MIN]]`**: wake word\n- **`g2mic off 30`**: wake word off for 30 minutes\n")
+    root = _tree(tmp_path, "- `g2mic [status|on|off [MIN]]`: wake word\n- `g2mic off 30`: wake word off for 30 minutes\n")
     bad = G.errors(root)
     assert len(bad) == 1 and "grammar" in bad[0]
 
 
 def test_long_descriptions_and_unknown_commands_are_refused(tmp_path):
-    root = _tree(tmp_path, "- **`g2rest`**: " + "x" * 81 + "\n- **`g2nothing now`**: does nothing\n- **`python -m pi_pipeline.power status`**: any module path is fine\n")
+    root = _tree(tmp_path, "- `g2rest`: " + "x" * 81 + "\n- `g2nothing now`: does nothing\n- `python -m pi_pipeline.power status`: any module path is fine\n")
     bad = G.errors(root)
     assert any("81 characters" in b for b in bad) and any("g2nothing" in b for b in bad) and len(bad) == 2
 
 
 def test_the_index_lists_each_command_once_with_every_section_it_is_in(tmp_path):
-    root = _tree(tmp_path, "- **`g2mic off 30`**: off\n- **`g2mic on`**: on\n- **`g2rest`**: rest\n", "- **`g2rest`**: rest again\n- **`g2back`**: go back\n")
+    root = _tree(tmp_path, "- `g2mic off 30`: off\n- `g2mic on`: on\n- `g2rest`: rest\n", "- `g2rest`: rest again\n- `g2back`: go back\n")
     idx = G.build_index(root)
     assert idx.count("`g2mic`") == 1 and "[Voice and mic](#voice-and-mic)" in idx
-    rest = [line for line in idx.splitlines() if line.startswith("- **`g2rest`**")][0]
+    rest = [line for line in idx.splitlines() if line.startswith("- `g2rest`")][0]
     assert "(#voice-and-mic)" in rest and "cheatsheet-advanced.md#setup" in rest
     assert idx.index("`g2back`") < idx.index("`g2mic`") < idx.index("`g2rest`")                       # A to Z
-    assert "<!-- index:start -->\n- **`g2back`**" in G.build(root)
+    assert "<!-- index:start -->\n- `g2back`" in G.build(root)

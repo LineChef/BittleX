@@ -7,35 +7,35 @@ so it can learn things the camera model was never trained on.
 
 ## Your feedback, and where each item lives in this plan
 
-- **Does taking a snapshot make an API call? If not, use snapshots**: **No.** A snapshot is one USB request to the camera (`AT+INVOKE=1,0,0`); the API is called only when a picture is attached to a message to Claude. Phase 1 uses snapshots only; nothing in this plan calls the API. Tests use fakes (standing rule, 2026-10-07).
-- **G2 walks a bit, stops, does the inspect pose, looks down and up**: Phase 1: a survey stop at the end of each exploration leg
-- **One picture looking down, one looking up, then keep exploring**: Phase 1: `survey_plan` (bow, stand, one picture once the stance settles, walk on)
-- **Name things by voice; you will try it in exploration testing**: Phase 1 (saving a named picture) and Phase 5 (recognition from the saved names)
-- **Explain how naming would work**: Phase 5, and the user test script below
-- **A routine to process the exploration pictures, like the capture sessions, so training data is good**: Phase 2: `tools/curate_exploration.py` (reuses the capture tools' quality gates)
-- **When G2 sees an object he has not seen and that has no name, he asks "what am I looking at?"**: Phase 5: the ask
-- **When he recognizes an object, he says what he sees, so it can be told that it is working as he learns**: Phase 5: the announce, plus a log of every recognition
-- **Start recognizing objects outside the AI camera model's training**: The whole plan: the gallery recognizes by similarity, not by trained class
-- **A comprehensive plan that includes all of this feedback**: This page
-- **"Loop me in when you are in a good spot to talk about it"**: Checkpoints below: the first is after Phase 1 is built and tested, before it goes on G2
-- **Pictures and your privacy**: Pictures stay on the Pi; copying them to the Mac for processing needs your OK each time; people are skipped in the curated set (decision 3)
+- Does taking a snapshot make an API call? If not, use snapshots: **No.** A snapshot is one USB request to the camera (`AT+INVOKE=1,0,0`); the API is called only when a picture is attached to a message to Claude. Phase 1 uses snapshots only; nothing in this plan calls the API. Tests use fakes (standing rule, 2026-10-07).
+- G2 walks a bit, stops, does the inspect pose, looks down and up: Phase 1: a survey stop at the end of each exploration leg
+- One picture looking down, one looking up, then keep exploring: Phase 1: `survey_plan` (bow, stand, one picture once the stance settles, walk on)
+- Name things by voice; you will try it in exploration testing: Phase 1 (saving a named picture) and Phase 5 (recognition from the saved names)
+- Explain how naming would work: Phase 5, and the user test script below
+- A routine to process the exploration pictures, like the capture sessions, so training data is good: Phase 2: `tools/curate_exploration.py` (reuses the capture tools' quality gates)
+- When G2 sees an object he has not seen and that has no name, he asks "what am I looking at?": Phase 5: the ask
+- When he recognizes an object, he says what he sees, so it can be told that it is working as he learns: Phase 5: the announce, plus a log of every recognition
+- Start recognizing objects outside the AI camera model's training: The whole plan: the gallery recognizes by similarity, not by trained class
+- A comprehensive plan that includes all of this feedback: This page
+- "Loop me in when you are in a good spot to talk about it": Checkpoints below: the first is after Phase 1 is built and tested, before it goes on G2
+- Pictures and your privacy: Pictures stay on the Pi; copying them to the Mac for processing needs your OK each time; people are skipped in the curated set (decision 3)
 
 ## What exists, what is new
 
-- **Exists:** the gallery's decision logic (new / same / duplicate / too low quality / capacity), the exploration state machine, the picture helper for the
+- Exists: the gallery's decision logic (new / same / duplicate / too low quality / capacity), the exploration state machine, the picture helper for the
   voice service, the capture-session tools (`tools/curate_captures.py`, `tools/auto_process_captures.py`, `tools/optimize_library.py`).
-- **Built 2026-10-07 (Phase 1 code, tested with fakes, not yet on G2):** a one-picture call on the camera feed (`feed.snapshot()`), the survey stop and
+- Built 2026-10-07 (Phase 1 code, tested with fakes, not yet on G2): a one-picture call on the camera feed (`feed.snapshot()`), the survey stop and
   naming choreography (`behavior/survey.py`, driver, bindings), the "this is a <name>" parser.
-- **Built since:** saving and labelling the pictures, the exploration wiring, and the processing tool (`tools/curate_exploration.py`, Phase 2).
-- **Not built:** the embedding model, the localizer, recognition, the ask and announce.
+- Built since: saving and labelling the pictures, the exploration wiring, and the processing tool (`tools/curate_exploration.py`, Phase 2).
+- Not built: the embedding model, the localizer, recognition, the ask and announce.
 
 ## How identifying a specific object works (plain words)
 
-1. **Every picture gets a fingerprint:** a small model turns a picture (or a crop of it) into a list of numbers; pictures of the same thing give similar lists.
-2. **Naming:** you say "this is a mug" with the mug in view. G2 saves that picture under the name and its fingerprint in the library, locked so it is never forgotten.
-3. **Recognizing:** a later picture whose fingerprint is close enough to a named one makes him say "I see the mug". A fingerprint that matches nothing becomes an unnamed entry, and he may ask
+1. Every picture gets a fingerprint: a small model turns a picture (or a crop of it) into a list of numbers; pictures of the same thing give similar lists.
+2. Naming: you say "this is a mug" with the mug in view. G2 saves that picture under the name and its fingerprint in the library, locked so it is never forgotten.
+3. Recognizing: a later picture whose fingerprint is close enough to a named one makes him say "I see the mug". A fingerprint that matches nothing becomes an unnamed entry, and he may ask
    "What am I looking at?" (the ask, limited by cooldowns).
-4. **Boxes:** the first version needs none. It fingerprints the whole picture plus an overlapping grid of tiles (Phase 4, v0). Drawing a box around the object comes with the localizer (Phase 4, v1),
+4. Boxes: the first version needs none. It fingerprints the whole picture plus an overlapping grid of tiles (Phase 4, v0). Drawing a box around the object comes with the localizer (Phase 4, v1),
    only if the tiles prove too coarse. The on-camera detector's own boxes (faces and the like) are already saved in each picture's sidecar, and the curation tool can draw those on contact sheets.
 
 ## Status of the processing tool (checked 2026-10-07)
@@ -63,7 +63,7 @@ Thresholds are the capture tools' defaults and will need tuning on the first rea
 6. Tests: the feed with a fake serial, the plans and parser, the driver emitting the right effects at the end of a leg and for a name request, the
    bindings, the saver. Full suite green.
 
-**Checkpoint A (you are looped in):** Phase 1 built and tested, deployed to the Pi, the test script below ready. Nothing runs on G2 without your go.
+Checkpoint A (you are looped in): Phase 1 built and tested, deployed to the Pi, the test script below ready. Nothing runs on G2 without your go.
 
 ### Phase 2: process the exploration pictures like a capture session (built 2026-10-07; run it after the first real session)
 `tools/curate_exploration.py IN_DIR OUT_DIR`, run on the Mac after you OK copying the pictures:
@@ -78,7 +78,7 @@ Output location: `training_data/exploration/<session>/` (not tracked by git, lik
 
 ### Phase 3: choose the embedding model, offline
 
-**Status (2026-10-07, user asked to start the build):** the plumbing is built and tested without any model file: `vision/embedder.py` (a `HistogramEmbedder` baseline that needs nothing downloaded, and an `OnnxEmbedder` for any exported image model), `vision/localizer.py` (v0 of Phase 4: the whole picture plus a 3 x 3 overlapping tile grid), `vision/recognizer.py` (learn a named picture, recognise by the best view, never rename a look-alike of a differently named entry), `ObjectGallery.match()` (ask without learning), and `tools/eval_embedder.py` (within-object against between-object similarity, leave-one-out retrieval, hit rate on held-out pictures, false recognitions in survey pictures). First numbers for the baseline on G2's real pictures (4 dishwasher pictures, 11 survey pictures): within-object similarity 0.68, hit rate 25% at threshold 0.80, 18% of survey pictures falsely recognised: weak, as expected. The learned models wait for the user's yes to download one (CLAUDE.md hard rule) and for more named objects (the gap needs two or more).
+Status (2026-10-07, user asked to start the build): the plumbing is built and tested without any model file: `vision/embedder.py` (a `HistogramEmbedder` baseline that needs nothing downloaded, and an `OnnxEmbedder` for any exported image model), `vision/localizer.py` (v0 of Phase 4: the whole picture plus a 3 x 3 overlapping tile grid), `vision/recognizer.py` (learn a named picture, recognise by the best view, never rename a look-alike of a differently named entry), `ObjectGallery.match()` (ask without learning), and `tools/eval_embedder.py` (within-object against between-object similarity, leave-one-out retrieval, hit rate on held-out pictures, false recognitions in survey pictures). First numbers for the baseline on G2's real pictures (4 dishwasher pictures, 11 survey pictures): within-object similarity 0.68, hit rate 25% at threshold 0.80, 18% of survey pictures falsely recognised: weak, as expected. The learned models wait for the user's yes to download one (CLAUDE.md hard rule) and for more named objects (the gap needs two or more).
 
 1. Collect the first data: two or three exploration sessions of about 30 minutes plus the objects you name.
 2. Candidate small models (MobileNet-class, a small CLIP-style, a small DINO-class), run on the Mac over the curated pictures.
@@ -87,19 +87,19 @@ Output location: `training_data/exploration/<session>/` (not tracked by git, lik
 4. Pick one, export it to ONNX, and time it on the Pi Zero 2 W (milliseconds per picture, memory, CPU heat); the budget is one embedding per crop, a few per
    survey stop. A model change later means starting the gallery over (noted in `object_gallery.py`).
 
-**Model provenance and first comparison (2026-10-09, user's yes to the download):** MobileNetV2 (opset 12, exported from PyTorch 1.8) from the official ONNX Model Zoo, `https://github.com/onnx/models/raw/main/validated/vision/classification/mobilenet/model/mobilenetv2-12.onnx` (one redirect to GitHub's own file host `media.githubusercontent.com`), 13,964,571 bytes, SHA-256 `c0c3f76d93fa3fd6580652a45618618a220fced18babf65774ed169de0432ad5` (the zoo publishes no checksum, so this is a record, not a comparison); license Apache-2.0 (the zoo's). Kept in `~/g2_data/models/mobilenetv2-12/`, outside the repo. Checked read-only: it parses, `onnx.checker` passes, only standard operators (Conv, Clip, Add, GlobalAveragePool, Gemm and the like), no custom-domain operators, and it loads in onnxruntime. The embedder uses a derived copy, `mobilenetv2-12-features.onnx`, whose output is the 1280 x 7 x 7 feature map before the pooling and classifier (the embedder then averages it to 1280 numbers).
+Model provenance and first comparison (2026-10-09, user's yes to the download): MobileNetV2 (opset 12, exported from PyTorch 1.8) from the official ONNX Model Zoo, `https://github.com/onnx/models/raw/main/validated/vision/classification/mobilenet/model/mobilenetv2-12.onnx` (one redirect to GitHub's own file host `media.githubusercontent.com`), 13,964,571 bytes, SHA-256 `c0c3f76d93fa3fd6580652a45618618a220fced18babf65774ed169de0432ad5` (the zoo publishes no checksum, so this is a record, not a comparison); license Apache-2.0 (the zoo's). Kept in `~/g2_data/models/mobilenetv2-12/`, outside the repo. Checked read-only: it parses, `onnx.checker` passes, only standard operators (Conv, Clip, Add, GlobalAveragePool, Gemm and the like), no custom-domain operators, and it loads in onnxruntime. The embedder uses a derived copy, `mobilenetv2-12-features.onnx`, whose output is the 1280 x 7 x 7 feature map before the pooling and classifier (the embedder then averages it to 1280 numbers).
 On the 25 readable named pictures of 8 objects (6 cut-off survey pictures were left out), whole-picture vectors, threshold 0.80:
 
-- **histogram baseline**: within-object: 0.781; between-object: 0.588; gap: 0.193; leave-one-out retrieval: 82%; hit rate: 82%; survey pictures that "match": 68%
-- **MobileNetV2 features**: within-object: 0.788; between-object: 0.687; gap: 0.101; leave-one-out retrieval: 77%; hit rate: 73%; survey pictures that "match": 46%
+- histogram baseline: within-object: 0.781; between-object: 0.588; gap: 0.193; leave-one-out retrieval: 82%; hit rate: 82%; survey pictures that "match": 68%
+- MobileNetV2 features: within-object: 0.788; between-object: 0.687; gap: 0.101; leave-one-out retrieval: 77%; hit rate: 73%; survey pictures that "match": 46%
 
 Too little data to choose: most objects have 4-5 pictures, the survey pictures contain the named kitchen fixtures themselves (so some "false" matches are real), and 0.80 is not the right threshold for both scales. Rerun `tools/eval_embedder.py` once more objects have 5 or more labelled pictures. Time on the Pi Zero 2 W is still to measure when the Pi is online.
 
-**Second model, DINOv2-small (2026-10-09, the user's yes):** a self-supervised image model trained to match the same thing across views, which is the property instance recognition needs (MobileNetV2 is a 1,000-category classifier: it groups kinds, not individuals). ONNX conversion by the `onnx-community` organization (a third-party export; Meta publishes only PyTorch weights) of `facebook/dinov2-small` (license Apache-2.0), pinned to commit `8b1f705a3a7f6f062f6bdd21986c1583d3ef105d`, file `onnx/model.onnx`, 88,532,934 bytes, SHA-256 `f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a` (matches the publisher's own checksum from the Hub API). Kept in `~/g2_data/models/dinov2-small/`, outside the repo. Checked read-only: parses, `onnx.checker` passes, only standard operators (MatMul, Softmax, Erf, LayerNorm pieces and the like), no custom-domain operators, loads in onnxruntime; one 224 px picture takes 0.06 s on the Mac. Output (1, 257, 384): class token plus 256 patch tokens, pooled by the embedder as class + mean (768 numbers). The 24 MB int8 file (`model_int8.onnx`, SHA-256 `dfce54a8...`) is the Pi candidate, not fetched.
+Second model, DINOv2-small (2026-10-09, the user's yes): a self-supervised image model trained to match the same thing across views, which is the property instance recognition needs (MobileNetV2 is a 1,000-category classifier: it groups kinds, not individuals). ONNX conversion by the `onnx-community` organization (a third-party export; Meta publishes only PyTorch weights) of `facebook/dinov2-small` (license Apache-2.0), pinned to commit `8b1f705a3a7f6f062f6bdd21986c1583d3ef105d`, file `onnx/model.onnx`, 88,532,934 bytes, SHA-256 `f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a` (matches the publisher's own checksum from the Hub API). Kept in `~/g2_data/models/dinov2-small/`, outside the repo. Checked read-only: parses, `onnx.checker` passes, only standard operators (MatMul, Softmax, Erf, LayerNorm pieces and the like), no custom-domain operators, loads in onnxruntime; one 224 px picture takes 0.06 s on the Mac. Output (1, 257, 384): class token plus 256 patch tokens, pooled by the embedder as class + mean (768 numbers). The 24 MB int8 file (`model_int8.onnx`, SHA-256 `dfce54a8...`) is the Pi candidate, not fetched.
 
-- **histogram baseline**: within-object: 0.781; between-object: 0.588; gap: 0.193; leave-one-out retrieval: 82%; hit rate at 0.80: 82%; survey pictures that "match" at 0.80: 68%
-- **MobileNetV2**: within-object: 0.788; between-object: 0.687; gap: 0.101; leave-one-out retrieval: 77%; hit rate at 0.80: 73%; survey pictures that "match" at 0.80: 46%
-- **DINOv2-small**: within-object: 0.756; between-object: 0.534; gap: **0.222**; leave-one-out retrieval: **91%**; hit rate at 0.80: 45%; survey pictures that "match" at 0.80: 19%
+- histogram baseline: within-object: 0.781; between-object: 0.588; gap: 0.193; leave-one-out retrieval: 82%; hit rate at 0.80: 82%; survey pictures that "match" at 0.80: 68%
+- MobileNetV2: within-object: 0.788; between-object: 0.687; gap: 0.101; leave-one-out retrieval: 77%; hit rate at 0.80: 73%; survey pictures that "match" at 0.80: 46%
+- DINOv2-small: within-object: 0.756; between-object: 0.534; gap: **0.222**; leave-one-out retrieval: **91%**; hit rate at 0.80: 45%; survey pictures that "match" at 0.80: 19%
 
 DINOv2 separates best (largest gap, best retrieval, fewest false matches) but its similarities sit lower, so the 0.80 threshold (set for the histogram scale) is too high for it: the hit rate at 0.80 is low only because of that. Next: tune the same-instance and duplicate thresholds for it on the labelled pictures (about 0.65-0.70 to start), time the int8 file on the Pi, then switch `G2_EMBEDDER` to it. Still only 25 named pictures of 8 objects; recheck after the first 5 labelled pictures per object.
 
@@ -113,15 +113,15 @@ DINOv2 separates best (largest gap, best retrieval, fewest false matches) but it
 1. Enable the gallery (`features.object_gallery`) inside the exploration session: every survey picture and named picture is embedded, scored for quality, and
    passed to the gallery.
 2. Named picture: the gallery entry gets the name (and is locked against eviction).
-3. **The ask:** a survey picture that matches nothing, whose crop is good enough, becomes an unnamed entry. G2 asks out loud "What am I looking at?" at
+3. The ask: a survey picture that matches nothing, whose crop is good enough, becomes an unnamed entry. G2 asks out loud "What am I looking at?" at
    most once per entry, with a cooldown (decision 4) and a per-session limit. Your answer ("this is a mug") names that entry; if you do not answer within a
    window, it stays unnamed and he does not ask again about it.
-4. **The announce:** a survey picture that matches a named entry above the match threshold makes him say "I see the mug" (a cooldown per name, so he does
+4. The announce: a survey picture that matches a named entry above the match threshold makes him say "I see the mug" (a cooldown per name, so he does
    not repeat). Every recognition, miss and ask is also written to the diagnostics log (name, similarity, picture file), so a session can be reviewed
    afterwards with the pictures next to it.
 5. Thresholds start at the gallery's defaults (same instance 0.80, near duplicate 0.93) and are tuned on the collected data.
 
-**Checkpoint B (you are looped in):** after Phase 3's model choice and before Phase 5 goes on G2: the thresholds, what he says, how often.
+Checkpoint B (you are looped in): after Phase 3's model choice and before Phase 5 goes on G2: the thresholds, what he says, how often.
 
 ### Phase 6: evaluate with real sessions
 Test protocol (each session about 30 minutes, you present): place five to eight ordinary objects at floor level; name three by voice; let him explore;
@@ -142,15 +142,15 @@ Storage cap and tidy for the picture folders, battery and heat while the camera 
 
 Rule from you: **no picture is deleted unless it is a duplicate, and he does not forget what he has been taught.**
 
-- **Pictures:** kept forever (`G2_PICTURE_KEEP_DAYS` default is now 0, and the exploration pictures never use an age rule). The only deletion is a near-duplicate: a
+- Pictures: kept forever (`G2_PICTURE_KEEP_DAYS` default is now 0, and the exploration pictures never use an age rule). The only deletion is a near-duplicate: a
   picture whose 256-bit average hash is within 12 bits of one already saved for the same pose (3 bits for a named object, so its different views are kept)
   is not written at all, the earliest of a cluster is kept. Disk: about 15 KB each, a few MB per exploring hour; the log warns at 2 GB.
-- **What he knows is the fingerprint index, not the pictures.** Entries you named, and entries locked as "enough data", are never evicted and do not count
+- What he knows is the fingerprint index, not the pictures. Entries you named, and entries locked as "enough data", are never evicted and do not count
   against the cap. Only unnamed, unlocked candidates (things he noticed but nobody named) are capped, at 300; over the cap the oldest unnamed one is
   forgotten, never a named one. Safety ceiling on all entries: 5,000 (new entries stop, nothing is removed). Samples per entry before it locks: 8.
-- **Forgetting an unnamed candidate never deletes its pictures**, so it can be re-learned: the library can always be rebuilt from the pictures (also what makes a
+- Forgetting an unnamed candidate never deletes its pictures, so it can be re-learned: the library can always be rebuilt from the pictures (also what makes a
   model change cheap).
-- **To add when recognition is wired (Phase 5):** a daily snapshot of the gallery index (last 14 kept) so a corrupted file cannot erase what he learned; copying
+- To add when recognition is wired (Phase 5): a daily snapshot of the gallery index (last 14 kept) so a corrupted file cannot erase what he learned; copying
   the index and named pictures to the Mac with `g2pics pull`; merging two unnamed candidates that converge (similarity above 0.85) instead of keeping both;
   matching in numpy (the pure-Python comparison is fine for hundreds of entries, too slow for thousands).
 
@@ -186,7 +186,7 @@ and why the curation tool does not discard pictures just because they were taken
 ## Picture workflow, decided 2026-10-10 (user)
 
 Survey pictures no longer feed the object gallery on their own (only a picture named by voice does). The path from a picture to training data:
-1. **Automatic filter** (every time the g2pics page loads the pictures, no step to run): too dark, blown out, blurry, flat, cut off, a person in it, and near-duplicates are marked and hidden by default ("Show the N filtered" brings them back). Nothing is deleted; look pictures and contact pictures are never curated.
-2. **You label by hand** (Name) and can remove a wrong detector tag (the x on a tag, undoable; the record stays in the sidecar and curation ignores a removed tag, so a false "person" no longer sets a picture aside).
-3. **Promotion is automatic for labelled pictures** (user, 2026-10-10: "if they are labeled we should assume they are ready for training"): a picture in a name's folder that the filter kept is promoted when the page loads (and queued for the gallery); Unpromote takes one out and it stays out. A class header shows how many of its pictures are in. Promote by hand puts one back. What promotion does: a copy goes to `training_data/exploration/promoted/<name>/` (gitignored). Only promoted pictures are training data. Unpromote takes the copy back out.
-4. **Automatic loading into the robot's gallery**: promoting also queues the picture on the Pi (`pi_pipeline/vision/promoted_loader.py`); the gallery learns it under its label at once if no exploration is running, otherwise at the next exploration start. A look-alike that already has a different name is not loaded (reported on the page). Un-promoting leaves the gallery as it is.
+1. Automatic filter: (every time the g2pics page loads the pictures, no step to run): too dark, blown out, blurry, flat, cut off, a person in it, and near-duplicates are marked and hidden by default ("Show the N filtered" brings them back). Nothing is deleted; look pictures and contact pictures are never curated.
+2. You label by hand: (Name) and can remove a wrong detector tag (the x on a tag, undoable; the record stays in the sidecar and curation ignores a removed tag, so a false "person" no longer sets a picture aside).
+3. Promotion is automatic for labelled pictures: (user, 2026-10-10: "if they are labeled we should assume they are ready for training"): a picture in a name's folder that the filter kept is promoted when the page loads (and queued for the gallery); Unpromote takes one out and it stays out. A class header shows how many of its pictures are in. Promote by hand puts one back. What promotion does: a copy goes to `training_data/exploration/promoted/<name>/` (gitignored). Only promoted pictures are training data. Unpromote takes the copy back out.
+4. Automatic loading into the robot's gallery: promoting also queues the picture on the Pi (`pi_pipeline/vision/promoted_loader.py`); the gallery learns it under its label at once if no exploration is running, otherwise at the next exploration start. A look-alike that already has a different name is not loaded (reported on the page). Un-promoting leaves the gallery as it is.

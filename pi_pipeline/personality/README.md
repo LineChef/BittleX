@@ -3,9 +3,9 @@
 G2's personality is a set of **traits**. Each trait is a small, self-contained
 bias that can touch three channels — you implement only the ones it needs:
 
-- **how G2 talks / decides**: method: `prompt_fragment()`; effect: a sentence appended to Claude's system prompt
-- **how G2 behaves on its own**: method: `bias(params)`; effect: nudges `BehaviorParams` (explore timing, novelty pull, cue frequency, caution)
-- **expressive reactions**: method: `cues(event)`; effect: skill / cue tokens for a named event ("novelty", "explore_start", …)
+- how G2 talks / decides: method: `prompt_fragment()`; effect: a sentence appended to Claude's system prompt
+- how G2 behaves on its own: method: `bias(params)`; effect: nudges `BehaviorParams` (explore timing, novelty pull, cue frequency, caution)
+- expressive reactions: method: `cues(event)`; effect: skill / cue tokens for a named event ("novelty", "explore_start", …)
 
 Every trait has a `level` in `[0, 1]` and should scale all three channels by it,
 so `0.2` reads as "a little" and `0.9` as "a lot".

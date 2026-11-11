@@ -10,22 +10,22 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
 - The arm is fitted and G2 is on the floor, never a desk (there is no edge detector), with room around him and the ball in sight. Hands near.
 - Set the floor label (**"G2, the floor is hardwood"**): what he learns is kept per floor.
 - A charged pack: no attempt starts below 30%, and the session reads the pack before every attempt.
-- **Once, before the first claw look:** measure which way the arm pans. Put the ball about 12 in straight ahead, voice service stopped:
+- Once, before the first claw look: measure which way the arm pans. Put the ball about 12 in straight ahead, voice service stopped:
   `ssh -t "$G2_PI"`, then `cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.claw_look --calibrate`. It saves `claw_pan_sign`.
   `--test` does one look around with the current settings.
 
 ## 2. Start and stop
 
-- **Start**: **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt")
-- **Old way**: `g2goal run ball_punt --standalone`, or `G2_GOAL_INPROCESS=0` in the Pi's `.env`: the voice service is stopped, the session runs in its own process, the service is started again
-- **Stop**: **"emergency stop"** is not heard during a session (the voice loop is busy running it; the BiBoard's own voice module still hears spoken commands)
-- **It ends by itself**: after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand)
-- **A fall after a good punt**: the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit (see below)
+- Start: **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt")
+- Old way: `g2goal run ball_punt --standalone`, or `G2_GOAL_INPROCESS=0` in the Pi's `.env`: the voice service is stopped, the session runs in its own process, the service is started again
+- Stop: **"emergency stop"** is not heard during a session (the voice loop is busy running it; the BiBoard's own voice module still hears spoken commands)
+- It ends by itself: after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand)
+- A fall after a good punt: the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit (see below)
 
-- **Start:** He says "Starting the goal: punt the ball." and the session runs **inside the running voice service** : nothing is stopped or restarted, the serial port to the BiBoard is never closed, and the service's camera and IMU stream are used. Without voice: `g2ball` (same as `g2goal run ball_punt`): it asks the running service to start the goal and follows its log in your terminal
-- **Old way:** It is also the fallback when the service has no camera or serial link. After a stop and restart the BiBoard often went silent to the Pi (no answer to `P`, no IMU frames, the session ended `board_silent`, [`../STATUS.md`](../STATUS.md) open problems 15 and 18)
-- **Stop:** use `g2ballstop` (or `g2goal stop`; he finishes the current move and rests) or `g2stop`. Ctrl-C in the `g2ball` terminal asks the session to stop
-- **A fall after a good punt:** the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit, noted "then I fell", and counts for what he learns; the session still ends. A fall with no successful punt stays a fall (score 0)
+- Start: He says "Starting the goal: punt the ball." and the session runs **inside the running voice service** : nothing is stopped or restarted, the serial port to the BiBoard is never closed, and the service's camera and IMU stream are used. Without voice: `g2ball` (same as `g2goal run ball_punt`): it asks the running service to start the goal and follows its log in your terminal
+- Old way: It is also the fallback when the service has no camera or serial link. After a stop and restart the BiBoard often went silent to the Pi (no answer to `P`, no IMU frames, the session ended `board_silent`, [`../STATUS.md`](../STATUS.md) open problems 15 and 18)
+- Stop: use `g2ballstop` (or `g2goal stop`; he finishes the current move and rests) or `g2stop`. Ctrl-C in the `g2ball` terminal asks the session to stop
+- A fall after a good punt: the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit, noted "then I fell", and counts for what he learns; the session still ends. A fall with no successful punt stays a fall (score 0)
 
 
 He stands still for 5 s between attempts and rests at the end. Short cues: "target acquired", "searching", "punting", then "Got it." or "Missed."
@@ -35,9 +35,9 @@ He stands still for 5 s between attempts and rests at the end. Short cues: "targ
 Most settings are his to change ("free"). A few belong to the operator: he may only suggest a change ("ask"; today only the lunge speed), and some he never touches ("fixed").
 When the voice service comes back after a session, he says each new suggestion, for example *"I have a suggestion from my practice at punt the ball: a lunge time of 0.1 s instead of 0.12 s, because I punched from 3.1 in but the ball only went 4 in. Say confirm, cancel, or review."* No wake word is needed for the answer.
 
-- **"confirm" (or "yes")**: the change goes into the punt settings file
-- **"cancel" (or "no")**: dropped; he will not suggest that value again for a while
-- **"review", or nothing**: kept for later, in the report and in `g2goal suggestions`; he does not say it again. Later: `g2goal confirm ball_punt punch_lunge_s` or `g2goal cancel ...`
+- "confirm" (or "yes"): the change goes into the punt settings file
+- "cancel" (or "no"): dropped; he will not suggest that value again for a while
+- "review", or nothing: kept for later, in the report and in `g2goal suggestions`; he does not say it again. Later: `g2goal confirm ball_punt punch_lunge_s` or `g2goal cancel ...`
 
 ## 4. Reading what he learned
 
@@ -66,7 +66,7 @@ and the lessons he saved to memory (up to 3 per session, as facts with source `g
 the same floor, the values he keeps hold their record in the next session, the notes match what was seen. A setting flagged "at the end of its range" means a rule may be wrong or the goal is out of reach.
 Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 
-**Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
+Measured, not judged: his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
 attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt". A measured rate replaces the default only after 2 clean samples (`MIN_SAMPLES` in `behavior/chase_pace.py`); until then the defaults time the moves: 28 deg/s for a turn and 24 for a pulse (the firmware turn that is the default gait runs about 28, and lower defaults made every plain turn overshoot). Plain turns and the turn after a claw look stop on the gyro like the line-up turns.
 
 ### Editing from the Goals tab
@@ -105,26 +105,26 @@ file. Every override is in the report under "Overrides". `g2goal reset ball_punt
 
 ## 7. What else teaches him
 
-- **Plain punts count too.** A "G2, punt" or `g2punt` attempt is scored and added to the ball goal's records (shown as "Plain punt" in the report); nothing is changed by it.
-- **A new floor or new hardware starts from his best elsewhere.** His records are kept per attachment, floor and hardware epoch. Under new conditions he starts from his best
+- Plain punts count too: A "G2, punt" or `g2punt` attempt is scored and added to the ball goal's records (shown as "Plain punt" in the report); nothing is changed by it.
+- A new floor or new hardware starts from his best elsewhere. His records are kept per attachment, floor and hardware epoch. Under new conditions he starts from his best
   values on the nearest other ones (the same floor on the previous hardware first), with fresh records, so old evidence never holds him at an old answer. **When the hardware changes
   the hardware** (ARM2's wider shoulders and paws, a new servo), add an entry to `pi_pipeline/telemetry/hardware_epochs.json` and deploy; his walking
   pace and turn rates start from the old values the same way.
-- **A settled setting is left alone.** When one value clearly beats the values next to it, he moves on to the next setting his failures point at; it is looked at again if that
+- A settled setting is left alone: When one value clearly beats the values next to it, he moves on to the next setting his failures point at; it is looked at again if that
   value starts failing.
-- **The pack %** is kept with every attempt (the report's "pack" column); he does not learn from it yet.
+- The pack %: is kept with every attempt (the report's "pack" column); he does not learn from it yet.
 
 ## 8. Several goals
 
-- **Turn away from walls** is a standing goal: always on, never started. Every exploration and every ball chase that meets a wall dials it in, both ways: a bump (or turning but
+- Turn away from walls: is a standing goal: always on, never started. Every exploration and every ball chase that meets a wall dials it in, both ways: a bump (or turning but
   still touching) pushes his wall distances out; turning with lots of room to spare, or leaving a ball lying by a wall, pulls them in. Its settings:
   `python -m pi_pipeline.behavior.wall_settings` (the file `~/.local/share/g2/wall_settings.json`); `g2goal report walls` shows what he learned.
-- **Walls come first.** While chasing the ball he never gets closer than `chase_wall_in` (10 in to start, learned, never below 4 in) to a wall, turns away at it, and leaves a ball
+- Walls come first: While chasing the ball he never gets closer than `chase_wall_in` (10 in to start, learned, never below 4 in) to a wall, turns away at it, and leaves a ball
   lying nearer a wall than that (the attempt ends "ball by the wall" and does not count against the punt). A bump while walking stops the walk.
-- **Calibrating the wall reading** (`python -m pi_pipeline.vision.wall_distance calibrate`, voice service stopped) is optional: he learns against the reading as it is. After a new
+- Calibrating the wall reading: (`python -m pi_pipeline.vision.wall_distance calibrate`, voice service stopped) is optional: he learns against the reading as it is. After a new
   calibration his records start fresh and his settings carry over to the same real distances, so he adjusts to it on his own.
-- **The order:** `g2goal priority` shows it, `g2goal priority walls ball_punt` sets it (highest first).
-- **"G2, practise"** (or "practice"): he picks what to practise from the stored order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
+- The order: `g2goal priority` shows it, `g2goal priority walls ball_punt` sets it (highest first).
+- "G2, practise": (or "practice"): he picks what to practise from the stored order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
   goal session, or a 5-minute exploration roam for walls). "G2, practise walls" or "practise the punt" names one. `g2goal practise` shows his scores without moving him.
 
 ## 8b. The "Identify new objects" goal
@@ -135,18 +135,18 @@ An attempt is scored from what the roam left behind: **new object** (a new candi
 
 It needs an exploration to run: inside the voice service that is `G2_EXPLORE_INPROCESS=1` with the explore, vision and vision_safety features on (not yet tried on G2); when the service is not set up for it, `g2goal run` falls back to the old stop-and-run hand-over (`--standalone`).
 
-**What the first run showed:** the hand-over run works, with two things to know. The roam skips the speech models (`--light`: no narration, no wake word), because with them loaded the process ran out of memory and sat in swap, never reaching the roam. And the gallery's queue of promoted pictures (`~/.local/share/g2/gallery_pending.json`) is learned at the start of every roam: at about 2 s a picture with the learned embedder, a long queue (349 pictures) held the roam for minutes, so a stale queue is moved aside, not learned again, after a rebuild (`tools/rebuild_gallery.py`). Result of the first run: 0 of 3 (3 to 4 usable pictures each, all of things already known).
+What the first run showed: the hand-over run works, with two things to know. The roam skips the speech models (`--light`: no narration, no wake word), because with them loaded the process ran out of memory and sat in swap, never reaching the roam. And the gallery's queue of promoted pictures (`~/.local/share/g2/gallery_pending.json`) is learned at the start of every roam: at about 2 s a picture with the learned embedder, a long queue (349 pictures) held the roam for minutes, so a stale queue is moved aside, not learned again, after a rebuild (`tools/rebuild_gallery.py`). Result of the first run: 0 of 3 (3 to 4 usable pictures each, all of things already known).
 
-**Plain exploration feeds the goal too:** every exploration of a minute or more is judged like a roam (new candidates, usable pictures) and starts with the goal's learned look settings (peek interval, fallback picture, pickiness; a value set by hand wins). The goal's own roams are not counted twice. When a goal session ends normally (all attempts, the target, the time), the "da naaaa" plays once; not after a fall, a stop, the battery or a silent board.
+Plain exploration feeds the goal too: every exploration of a minute or more is judged like a roam (new candidates, usable pictures) and starts with the goal's learned look settings (peek interval, fallback picture, pickiness; a value set by hand wins). The goal's own roams are not counted twice. When a goal session ends normally (all attempts, the target, the time), the "da naaaa" plays once; not after a fall, a stop, the battery or a silent board.
 
 ## 9. Where things live on the Pi
 
-- **`~/.local/share/g2/goals.json`**: changes to a goal (`g2goal set ball_punt --attempts 8 --control punt_max_in=fixed`); missing = the built-in goal
-- **`~/.local/share/g2/goal_journal.jsonl`**: every session, attempt (with its full trace), decision, suggestion answer
-- **`~/.local/share/g2/goal_state.json`**: what he learned, per goal, attachment and floor
-- **`~/.local/share/g2/punt_settings.json`**: the operator's own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md))
-- **`~/.local/share/g2/chase_pace.json`**: his measured pace and turn rates
-- **`~/.local/share/g2/goal_overrides.json`**: pins, limits and undone values
-- **`~/.local/share/g2/wall_settings.json`**: the operator's own wall settings: where the walls goal starts
+- `~/.local/share/g2/goals.json`: changes to a goal (`g2goal set ball_punt --attempts 8 --control punt_max_in=fixed`); missing = the built-in goal
+- `~/.local/share/g2/goal_journal.jsonl`: every session, attempt (with its full trace), decision, suggestion answer
+- `~/.local/share/g2/goal_state.json`: what he learned, per goal, attachment and floor
+- `~/.local/share/g2/punt_settings.json`: the operator's own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md))
+- `~/.local/share/g2/chase_pace.json`: his measured pace and turn rates
+- `~/.local/share/g2/goal_overrides.json`: pins, limits and undone values
+- `~/.local/share/g2/wall_settings.json`: the operator's own wall settings: where the walls goal starts
 
 Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE`, `G2_GOAL_OVERRIDES`, `G2_WALL_SETTINGS` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).

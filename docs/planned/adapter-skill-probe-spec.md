@@ -1,8 +1,8 @@
 # Adapter skill probe — implementation spec
 
-> **Note (2026-10-17):** scripts for closed campaigns named on this page (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree; recover one with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.
+> Note (2026-10-17): scripts for closed campaigns named on this page (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree; recover one with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.
 
-**Status:** SPECCED, NOT BUILT. Lives on `development` (this doc only, no code).
+Status: SPECCED, NOT BUILT. Lives on `development` (this doc only, no code).
 The throwaway `adapter-skill-probe` branch was deleted 2026-09-07 — it only ever
 held an older copy of this spec. Deferred; resume by branching fresh from
 `development`. Phase D A/B still running (see `vision-goal-locomotion-plan.md`
@@ -28,9 +28,9 @@ either way.
 
 ## Three runs
 
-- **`probe_ref`**: what: from scratch, single skill (high-step only); steps: 2e6; purpose: yardstick — what learning this skill looks like with nothing competing
-- **`probe_adapterA`**: what: frozen `run20m_ppo` + zero-init adapter, **adapter-only** training, high-step skill; steps: 2e6; purpose: the actual test
-- **`probe_ctrlB`**: what: from scratch, 2-skill (normal + high-step, per-episode one-hot); steps: 3e6; purpose: control — can a net of this class hold skill + normal, both intact
+- `probe_ref`: what: from scratch, single skill (high-step only); steps: 2e6; purpose: yardstick — what learning this skill looks like with nothing competing
+- `probe_adapterA`: what: frozen `run20m_ppo` + zero-init adapter, **adapter-only** training, high-step skill; steps: 2e6; purpose: the actual test
+- `probe_ctrlB`: what: from scratch, 2-skill (normal + high-step, per-episode one-hot); steps: 3e6; purpose: control — can a net of this class hold skill + normal, both intact
 
 `probe_ref` is the shared yardstick both A and B are measured against (A-vs-B
 head-to-head is NOT a controlled comparison — different init/params/budget — and
@@ -38,7 +38,7 @@ was never meant to be; each run's binary yes/no is what feeds the 2×2).
 
 ## Skill = crouch-walk (anchored to the firmware `cr` gait)
 
-**Updated 2026-09-07:** use the built-in OpenCat `crF` (crawl) trajectory as the
+Updated 2026-09-07: use the built-in OpenCat `crF` (crawl) trajectory as the
 skill target, not a hand-tuned `PAW_Z_TARGET` high-step. Reasons:
 - `cr_ref.npy` (from `reference_gait/build_skill_reference.py crF`) is a real
   firmware trajectory with the **largest limb-coordination difference from wkF**
@@ -80,24 +80,24 @@ Existing `FAC_CLEARANCE * paw_clearance` term does the rest.
 
 ## Adapter policy (`adapter_policy.py` + `train_adapter.py`)
 
-- **Base:** `run20m_ppo` (278-d, blind). Probe env with `SKILL_MODE=1` is 279-d.
+- Base: `run20m_ppo` (278-d, blind). Probe env with `SKILL_MODE=1` is 279-d.
   First widen the base with the graft mechanism (1 zero column) so the frozen base
   ignores the skill dim:
   `env G2E_SKILL_MODE=1 python graft_terrain_policy.py --src trained/run20m_ppo --dst trained/run20m_graft279_skill`
   (graft already parity-checks; expect max|Δaction| < 1e-4.)
-- **Adapter module:** small MLP `[279 → 64 → 64 → 8]`, final layer weight+bias
+- Adapter module: small MLP `[279 → 64 → 64 → 8]`, final layer weight+bias
   **zero-init**. Reads the full obs (incl. skill bit).
-- **Policy:** subclass `stable_baselines3.common.policies.ActorCriticPolicy`.
+- Policy: subclass `stable_baselines3.common.policies.ActorCriticPolicy`.
   `action_mean = frozen_base_action_path(obs) + adapter(obs)`.
   Freeze `features_extractor`, `mlp_extractor`, `action_net`. Trainable: adapter +
   the whole value path (`mlp_extractor` vf side is shared — simplest is to let the
   value path train; it is not deployed, harmless).
-- **log_std:** RESET to `log(0.3)` at init and leave trainable. The converged base
+- log_std: RESET to `log(0.3)` at init and leave trainable. The converged base
   std is ~0 → zero exploration for the new skill → Run A cannot learn without this.
-- **Parity check (before any training):** with adapter zeroed, `action_mean` must
+- Parity check (before any training): with adapter zeroed, `action_mean` must
   equal base `action_mean` to < 1e-5 over N random obs. Mirror the check loop in
   `graft_terrain_policy.py`.
-- **Smoke:** ~2k steps `DummyVecEnv`; assert base params unchanged and adapter
+- Smoke: ~2k steps `DummyVecEnv`; assert base params unchanged and adapter
   params changed after one update. Then commit.
 
 ## Driver `run_adapter_probe.sh` (mirror `run_ab_vision.sh`)
@@ -123,9 +123,9 @@ Log → `trained/adapter_probe_results.log`. Milestone lines: `probe_ref done`,
 
 ## Verdict (2×2)
 
-- **yes**: B learns skill: —; Read: **adapters viable** → architecture = stable base + cheap per-skill adapters
-- **no**: B learns skill: yes; Read: base too specialized → need a fresh **multi-skill base** first (seed from `run20m_ppo`), then adapters on that
-- **no**: B learns skill: no; Read: skill too hard at this budget OR this net class can't hold it → rethink the target skill, not the architecture
+- yes: B learns skill: —; Read: **adapters viable** → architecture = stable base + cheap per-skill adapters
+- no: B learns skill: yes; Read: base too specialized → need a fresh **multi-skill base** first (seed from `run20m_ppo`), then adapters on that
+- no: B learns skill: no; Read: skill too hard at this budget OR this net class can't hold it → rethink the target skill, not the architecture
 
 Run A must ALSO show ~0 regression on the obstacle-free cells (expected by
 construction with a frozen base — confirm it).
@@ -134,13 +134,13 @@ construction with a frozen base — confirm it).
 
 Deferring this probe costs nothing from Phase D. `abD_vision` / `abD_blind` are
 durable checkpoints; they wait. When the probe is built:
-- **Frozen base:** prefer `abD_blind` over `run20m_ppo` if Phase D shows it is a
+- Frozen base: prefer `abD_blind` over `run20m_ppo` if Phase D shows it is a
   strong cluttered-course walker with no obstacle-free regression — it has already
   seen ledges/rubble/slopes/tall obstacles and carries the anti-stall behaviour.
-- **Test skill:** let the Phase D result pick it — `high-step` if low obstacles
+- Test skill: let the Phase D result pick it — `high-step` if low obstacles
   are the gap, `brace/slow` if tall ones are.
 
-**Downstream payoff:** if this probe says adapters are viable AND Phase D says
+Downstream payoff: if this probe says adapters are viable AND Phase D says
 vision wins, design Tier B's fresh ~20M as the **multi-skill base** from step 0
 (skill-code input + skill distribution). The base gets built for the cost of a run
 already planned, instead of a separate 20M later. Requires the cheap probe to run

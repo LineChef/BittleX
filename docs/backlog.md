@@ -7,68 +7,68 @@
 
 Status key: 🔴 blocked on hardware · 🟡 partial sim work possible now · ⚪ may never be needed · 🟢 confirmed need. Source: [`hardware-gated-backlog.md`](planned/hardware-gated-backlog.md).
 
-- **[H1](planned/hardware-gated-backlog.md#h1--learned-vs-scripted-head-to-head-on-the-real-robot--)**: Item: Learned vs scripted head-to-head on the real robot; Status: 🔴
-- **[H2](planned/hardware-gated-backlog.md#h2--payload-re-tuning--)**: Item: Payload re-tuning; Status: 🟡
-- **[H3](planned/hardware-gated-backlog.md#h3--clean-re-run-of-the-4a-ledge-test----)**: Item: Clean re-run of the 4a ledge test; Status: 🟡 ⚪
-- **[H4](planned/hardware-gated-backlog.md#h4--active-stance-recovery-from-scratch----)**: Item: Active stance recovery, from scratch; Status: 🔴 ⚪
-- **[H5](planned/hardware-gated-backlog.md#h5--command-conditioned-turning-yaw--)**: Item: Command-conditioned turning (yaw); Status: 🔴
-- **[H6](planned/hardware-gated-backlog.md#h6--specialty-gaits-sidestep--sneak--backward----)**: Item: Specialty gaits: sidestep / sneak / backward; Status: 🔴 ⚪
-- **[H7](planned/hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy-----confirmed-need-2026-09-15)**: Item: Climb as a separate skill policy; Status: 🔴 🟢 CONFIRMED NEED (2026-09-15)
-- **[H8](planned/hardware-gated-backlog.md#h8--on-mcu-gait-policy-decision-transformer--)**: Item: On-MCU gait policy (Decision Transformer); Status: 🔴
-- **[H9](planned/hardware-gated-backlog.md#h9--get-up--self-right-coverage----)**: Item: Get-up / self-right coverage; Status: 🟡 ⚪
-- **[H10](planned/hardware-gated-backlog.md#h10--carpet-resistance-sysid-calibration--)**: Item: Carpet resistance sysid calibration; Status: 🔴
-- **[H11](planned/hardware-gated-backlog.md#h11--servo-thermal-management--)**: Item: Servo thermal management; Status: 🟡
-- **[H12](planned/hardware-gated-backlog.md#h12--training-course-redesign----)**: Item: Training-course redesign; Status: 🟡 ⚪
-- **[H13](planned/hardware-gated-backlog.md#h13--servo-response-characterization-τ-speed-ceiling--)**: Item: Servo response characterization (τ, speed ceiling); Status: 🟡
-- **[H14](planned/hardware-gated-backlog.md#h14--actuator-net-a-learned-servo-model-for-the-sim----)**: Item: Actuator net: a learned servo model for the sim; Status: 🟡 ⚪
+- [H1](planned/hardware-gated-backlog.md#h1--learned-vs-scripted-head-to-head-on-the-real-robot--): Item: Learned vs scripted head-to-head on the real robot; Status: 🔴
+- [H2](planned/hardware-gated-backlog.md#h2--payload-re-tuning--): Item: Payload re-tuning; Status: 🟡
+- [H3](planned/hardware-gated-backlog.md#h3--clean-re-run-of-the-4a-ledge-test----): Item: Clean re-run of the 4a ledge test; Status: 🟡 ⚪
+- [H4](planned/hardware-gated-backlog.md#h4--active-stance-recovery-from-scratch----): Item: Active stance recovery, from scratch; Status: 🔴 ⚪
+- [H5](planned/hardware-gated-backlog.md#h5--command-conditioned-turning-yaw--): Item: Command-conditioned turning (yaw); Status: 🔴
+- [H6](planned/hardware-gated-backlog.md#h6--specialty-gaits-sidestep--sneak--backward----): Item: Specialty gaits: sidestep / sneak / backward; Status: 🔴 ⚪
+- [H7](planned/hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy-----confirmed-need-2026-09-15): Item: Climb as a separate skill policy; Status: 🔴 🟢 CONFIRMED NEED (2026-09-15)
+- [H8](planned/hardware-gated-backlog.md#h8--on-mcu-gait-policy-decision-transformer--): Item: On-MCU gait policy (Decision Transformer); Status: 🔴
+- [H9](planned/hardware-gated-backlog.md#h9--get-up--self-right-coverage----): Item: Get-up / self-right coverage; Status: 🟡 ⚪
+- [H10](planned/hardware-gated-backlog.md#h10--carpet-resistance-sysid-calibration--): Item: Carpet resistance sysid calibration; Status: 🔴
+- [H11](planned/hardware-gated-backlog.md#h11--servo-thermal-management--): Item: Servo thermal management; Status: 🟡
+- [H12](planned/hardware-gated-backlog.md#h12--training-course-redesign----): Item: Training-course redesign; Status: 🟡 ⚪
+- [H13](planned/hardware-gated-backlog.md#h13--servo-response-characterization-τ-speed-ceiling--): Item: Servo response characterization (τ, speed ceiling); Status: 🟡
+- [H14](planned/hardware-gated-backlog.md#h14--actuator-net-a-learned-servo-model-for-the-sim----): Item: Actuator net: a learned servo model for the sim; Status: 🟡 ⚪
 
 ## Robustness ablations
 
 Status key: `TODO`, `LATER`, `DEFERRED`, `DROPPED`, `EXPLORE`, `REVISIT` — as written in each heading. Source: [`robustness-backlog.md`](planned/robustness-backlog.md).
 
-- **[R1](planned/robustness-backlog.md#r1--single-weak--dead-servo--dropped-2026-09-03)**: Item: Single weak / dead servo; Status: `DROPPED` (2026-09-03)
-- **[R2](planned/robustness-backlog.md#r2--imu-bias--mount-tilt--deferred-2026-09-03)**: Item: IMU bias & mount tilt; Status: `DEFERRED` (2026-09-03)
-- **[R3](planned/robustness-backlog.md#r3--pick-up--set-down--todo-not-yet-triaged)**: Item: Pick-up & set-down; Status: `TODO` (not yet triaged)
-- **[R4](planned/robustness-backlog.md#r4--directional-terrain-catches--todo)**: Item: Directional terrain catches; Status: `TODO`
-- **[R5](planned/robustness-backlog.md#r5--slope-transitions--later-2026-09-03)**: Item: Slope transitions; Status: `LATER` (2026-09-03)
-- **[R6](planned/robustness-backlog.md#r6--leftright-friction-asymmetry--later-2026-09-03)**: Item: Left/right friction asymmetry; Status: `LATER` (2026-09-03)
-- **[R7](planned/robustness-backlog.md#r7--servo-backlash--deadband--dropped-2026-09-03)**: Item: Servo backlash / deadband; Status: `DROPPED` (2026-09-03)
-- **[R8](planned/robustness-backlog.md#r8--aggressive-command-dynamics--dropped-2026-09-03)**: Item: Aggressive command dynamics; Status: `DROPPED` (2026-09-03)
-- **[R9](planned/robustness-backlog.md#r9--within-episode-degradation--revisit-after-the-20m-run-user-2026-09-05)**: Item: Within-episode degradation; Status: `REVISIT after the 20M run` (user, 2026-09-05)
-- **[R10](planned/robustness-backlog.md#r10--long-duration-drift--todo--priority-eval-not-train-2026-09-03)**: Item: Long-duration drift; Status: `TODO — PRIORITY` (eval, not train) (2026-09-03)
-- **[R11](planned/robustness-backlog.md#r11--lateral-link-collision--dropped-2026-09-03)**: Item: Lateral link collision; Status: `DROPPED` (2026-09-03)
-- **[R12](planned/robustness-backlog.md#r12--uneven-leftright-surface--explore-user-2026-09-03)**: Item: Uneven left/right surface; Status: `EXPLORE` (user 2026-09-03)
+- [R1](planned/robustness-backlog.md#r1--single-weak--dead-servo--dropped-2026-09-03): Item: Single weak / dead servo; Status: `DROPPED` (2026-09-03)
+- [R2](planned/robustness-backlog.md#r2--imu-bias--mount-tilt--deferred-2026-09-03): Item: IMU bias & mount tilt; Status: `DEFERRED` (2026-09-03)
+- [R3](planned/robustness-backlog.md#r3--pick-up--set-down--todo-not-yet-triaged): Item: Pick-up & set-down; Status: `TODO` (not yet triaged)
+- [R4](planned/robustness-backlog.md#r4--directional-terrain-catches--todo): Item: Directional terrain catches; Status: `TODO`
+- [R5](planned/robustness-backlog.md#r5--slope-transitions--later-2026-09-03): Item: Slope transitions; Status: `LATER` (2026-09-03)
+- [R6](planned/robustness-backlog.md#r6--leftright-friction-asymmetry--later-2026-09-03): Item: Left/right friction asymmetry; Status: `LATER` (2026-09-03)
+- [R7](planned/robustness-backlog.md#r7--servo-backlash--deadband--dropped-2026-09-03): Item: Servo backlash / deadband; Status: `DROPPED` (2026-09-03)
+- [R8](planned/robustness-backlog.md#r8--aggressive-command-dynamics--dropped-2026-09-03): Item: Aggressive command dynamics; Status: `DROPPED` (2026-09-03)
+- [R9](planned/robustness-backlog.md#r9--within-episode-degradation--revisit-after-the-20m-run-user-2026-09-05): Item: Within-episode degradation; Status: `REVISIT after the 20M run` (user, 2026-09-05)
+- [R10](planned/robustness-backlog.md#r10--long-duration-drift--todo--priority-eval-not-train-2026-09-03): Item: Long-duration drift; Status: `TODO — PRIORITY` (eval, not train) (2026-09-03)
+- [R11](planned/robustness-backlog.md#r11--lateral-link-collision--dropped-2026-09-03): Item: Lateral link collision; Status: `DROPPED` (2026-09-03)
+- [R12](planned/robustness-backlog.md#r12--uneven-leftright-surface--explore-user-2026-09-03): Item: Uneven left/right surface; Status: `EXPLORE` (user 2026-09-03)
 
 ## Behavior ideas
 
 Status key: 🔴 hardware/camera-gated · 🟡 partial · ⚪ low priority · 🟢 confirmed · BUILT/WIRED as noted; no marker = idea, not started. Source: [`behavior-ideas.md`](planned/behavior-ideas.md).
 
-- **[B1](planned/behavior-ideas.md#b1--on-mcu-gait-policy-decision-transformer)**: Item: On-MCU gait policy (Decision Transformer); Status: —
-- **[B2](planned/behavior-ideas.md#b2--specialty-rl-gaits)**: Item: Specialty RL gaits; Status: —
-- **[B3](planned/behavior-ideas.md#b3--skill-composer-authoring)**: Item: Skill Composer authoring; Status: —
-- **[B9](planned/behavior-ideas.md#b9--vision--servo-resistance-obstacle-traversal)**: Item: Vision + servo-resistance obstacle traversal; Status: —
-- **[B9a](planned/behavior-ideas.md#b9a--feedback-only-jam-reflex----built-not-wired-in-gaitjam_guardpy-needs-real-strain-traces)**: Item: Feedback-only jam reflex; Status: 🟡 BUILT, NOT WIRED IN (`gait/jam_guard.py`; needs real strain traces)
-- **[B13](planned/behavior-ideas.md#b13--climb-as-a-separate-skill-policy---confirmed-need-2026-09-15)**: Item: Climb as a separate skill policy; Status: 🟢 CONFIRMED NEED (2026-09-15)
-- **[B14](planned/behavior-ideas.md#b14--jump--hop-as-an-on-command-skill----)**: Item: Jump / hop as an on-command skill; Status: 🟡 ⚪
-- **[B21](planned/behavior-ideas.md#b21--pick-up-small-objects-with-its-mouth)**: Item: Pick up small objects with its mouth; Status: —
-- **[B22](planned/behavior-ideas.md#b22--actuated-tail-hardware-addition--tail-driven-behaviors)**: Item: Actuated tail (hardware addition + tail-driven behaviors); Status: —
-- **[B17](planned/behavior-ideas.md#b17--house-room-scene-generator-for-vision-detectors--reflex-rules-vision-gated---)**: Item: House-room scene generator, for vision detectors + reflex rules (vision-gated); Status: 🔴 ⚪
-- **[B4](planned/behavior-ideas.md#b4--expressive-body-language----partly-built-gestures-and-expressive-skills-exist)**: Item: Expressive body language; Status: 🟡 PARTLY BUILT (gestures and expressive skills exist)
-- **[B5](planned/behavior-ideas.md#b5--emotive-sound-chirp-vocabulary---built--wired-2026-09-10)**: Item: Emotive sound (chirp vocabulary); Status: BUILT + WIRED 2026-09-10
-- **[B6](planned/behavior-ideas.md#b6--mood-from-memory---built--wired-2026-09-10)**: Item: Mood from memory; Status: BUILT + WIRED 2026-09-10
-- **[B19](planned/behavior-ideas.md#b19--stylised-character-voicepersona-presets--)**: Item: Stylised character voice/persona presets; Status: ⚪
-- **[B7](planned/behavior-ideas.md#b7--patrol-mode)**: Item: Patrol mode; Status: —
-- **[B8](planned/behavior-ideas.md#b8--go-to-object)**: Item: Go-to-object; Status: —
-- **[B15](planned/behavior-ideas.md#b15--recognize-household-members----)**: Item: Recognize household members; Status: 🟡 ⚪
-- **[B16](planned/behavior-ideas.md#b16--cliffguard-ledge--desk-edge-avoidance---highest-priority--built-but-inert-no-floor-vs-edge-classifier-exists-yet--)**: Item: `CliffGuard`: ledge / desk-edge avoidance; Status: 🔴 HIGHEST PRIORITY — BUILT but inert: no floor-vs-edge classifier exists yet ⚪
-- **[B20](planned/behavior-ideas.md#b20--generic-objects-recognition-a-6th-detector-class-or-a-separate-pi-side-layer---partially-built-2026-09-14-behind-featuresobject_gallery-localizer--embedding-model-still-hardware-gated)**: Item: Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer; Status: PARTIALLY BUILT 2026-09-14 (behind `features.object_gallery`; localizer + embedding model still hardware-gated)
-- **[B11](planned/behavior-ideas.md#b11--learn-its-way-around-the-house-topological-place-memory----partly-built-p1-logging-built-not-deployed)**: Item: Learn its way around the house (topological place memory); Status: 🟡 PARTLY BUILT (P1 logging built, not deployed)
-- **[B10](planned/behavior-ideas.md#b10--teach-me-a-trick)**: Item: Teach me a trick; Status: —
-- **[B25](planned/behavior-ideas.md#b25--kinesthetic-teaching-hand-guided-skills-recorded-from-g2s-own-joints----built-gaitteachpy-not-tried-on-g2)**: Item: Kinesthetic teaching: hand-guided skills recorded from G2's own joints; Status: 🟡 BUILT (`gait/teach.py`), not tried on G2
-- **[B12](planned/behavior-ideas.md#b12--im-running-low--power-awareness----built-battery-watch-pi-runtime-warning-power-status)**: Item: "I'm running low" — power awareness; Status: 🟢 BUILT (battery watch, Pi runtime warning, power status)
-- **[B18](planned/behavior-ideas.md#b18--idle-power-management--feels-alive-idle-behaviour--)**: Item: Idle power management + "feels alive" idle behaviour; Status: 🟡
-- **[B23](planned/behavior-ideas.md#b23--bounded-self-modification-g2-adjusts-its-own-personality-knobs-from-experience)**: Item: Bounded self-modification: G2 adjusts its own personality knobs from experience; Status: —
-- **[B24](planned/behavior-ideas.md#b24--agency-g2-forms-its-own-goals-not-just-executes-rule-based-autonomy)**: Item: Agency: G2 forms its own goals, not just executes rule-based autonomy; Status: —
-- **[B26](planned/behavior-ideas.md#b26--wire-the-servo-thermal-governor-into-the-behavior-layer--)**: Item: Wire the servo-thermal governor into the behavior layer; Status: 🟡
-- **[B27](planned/behavior-ideas.md#b27--supervise-the-microphone-and-wake-word-worker----built-camera-reader-and-microphone-stream-supervised-2026-10-18)**: Item: Supervise the microphone and wake-word worker; Status: 🟢 BUILT (camera reader and microphone stream supervised 2026-10-18)
-- **[B28](planned/behavior-ideas.md#b28--goals-g2-works-toward-a-goal-you-set-and-learns-from-his-attempts----built-2026-10-31-not-run-on-g2)**: Item: Goals: G2 works toward a goal you set and learns from his attempts; Status: 🟢 BUILT 2026-10-31, not run on G2
+- [B1](planned/behavior-ideas.md#b1--on-mcu-gait-policy-decision-transformer): Item: On-MCU gait policy (Decision Transformer); Status: —
+- [B2](planned/behavior-ideas.md#b2--specialty-rl-gaits): Item: Specialty RL gaits; Status: —
+- [B3](planned/behavior-ideas.md#b3--skill-composer-authoring): Item: Skill Composer authoring; Status: —
+- [B9](planned/behavior-ideas.md#b9--vision--servo-resistance-obstacle-traversal): Item: Vision + servo-resistance obstacle traversal; Status: —
+- [B9a](planned/behavior-ideas.md#b9a--feedback-only-jam-reflex----built-not-wired-in-gaitjam_guardpy-needs-real-strain-traces): Item: Feedback-only jam reflex; Status: 🟡 BUILT, NOT WIRED IN (`gait/jam_guard.py`; needs real strain traces)
+- [B13](planned/behavior-ideas.md#b13--climb-as-a-separate-skill-policy---confirmed-need-2026-09-15): Item: Climb as a separate skill policy; Status: 🟢 CONFIRMED NEED (2026-09-15)
+- [B14](planned/behavior-ideas.md#b14--jump--hop-as-an-on-command-skill----): Item: Jump / hop as an on-command skill; Status: 🟡 ⚪
+- [B21](planned/behavior-ideas.md#b21--pick-up-small-objects-with-its-mouth): Item: Pick up small objects with its mouth; Status: —
+- [B22](planned/behavior-ideas.md#b22--actuated-tail-hardware-addition--tail-driven-behaviors): Item: Actuated tail (hardware addition + tail-driven behaviors); Status: —
+- [B17](planned/behavior-ideas.md#b17--house-room-scene-generator-for-vision-detectors--reflex-rules-vision-gated---): Item: House-room scene generator, for vision detectors + reflex rules (vision-gated); Status: 🔴 ⚪
+- [B4](planned/behavior-ideas.md#b4--expressive-body-language----partly-built-gestures-and-expressive-skills-exist): Item: Expressive body language; Status: 🟡 PARTLY BUILT (gestures and expressive skills exist)
+- [B5](planned/behavior-ideas.md#b5--emotive-sound-chirp-vocabulary---built--wired-2026-09-10): Item: Emotive sound (chirp vocabulary); Status: BUILT + WIRED 2026-09-10
+- [B6](planned/behavior-ideas.md#b6--mood-from-memory---built--wired-2026-09-10): Item: Mood from memory; Status: BUILT + WIRED 2026-09-10
+- [B19](planned/behavior-ideas.md#b19--stylised-character-voicepersona-presets--): Item: Stylised character voice/persona presets; Status: ⚪
+- [B7](planned/behavior-ideas.md#b7--patrol-mode): Item: Patrol mode; Status: —
+- [B8](planned/behavior-ideas.md#b8--go-to-object): Item: Go-to-object; Status: —
+- [B15](planned/behavior-ideas.md#b15--recognize-household-members----): Item: Recognize household members; Status: 🟡 ⚪
+- [B16](planned/behavior-ideas.md#b16--cliffguard-ledge--desk-edge-avoidance---highest-priority--built-but-inert-no-floor-vs-edge-classifier-exists-yet--): Item: `CliffGuard`: ledge / desk-edge avoidance; Status: 🔴 HIGHEST PRIORITY — BUILT but inert: no floor-vs-edge classifier exists yet ⚪
+- [B20](planned/behavior-ideas.md#b20--generic-objects-recognition-a-6th-detector-class-or-a-separate-pi-side-layer---partially-built-2026-09-14-behind-featuresobject_gallery-localizer--embedding-model-still-hardware-gated): Item: Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer; Status: PARTIALLY BUILT 2026-09-14 (behind `features.object_gallery`; localizer + embedding model still hardware-gated)
+- [B11](planned/behavior-ideas.md#b11--learn-its-way-around-the-house-topological-place-memory----partly-built-p1-logging-built-not-deployed): Item: Learn its way around the house (topological place memory); Status: 🟡 PARTLY BUILT (P1 logging built, not deployed)
+- [B10](planned/behavior-ideas.md#b10--teach-me-a-trick): Item: Teach me a trick; Status: —
+- [B25](planned/behavior-ideas.md#b25--kinesthetic-teaching-hand-guided-skills-recorded-from-g2s-own-joints----built-gaitteachpy-not-tried-on-g2): Item: Kinesthetic teaching: hand-guided skills recorded from G2's own joints; Status: 🟡 BUILT (`gait/teach.py`), not tried on G2
+- [B12](planned/behavior-ideas.md#b12--im-running-low--power-awareness----built-battery-watch-pi-runtime-warning-power-status): Item: "I'm running low" — power awareness; Status: 🟢 BUILT (battery watch, Pi runtime warning, power status)
+- [B18](planned/behavior-ideas.md#b18--idle-power-management--feels-alive-idle-behaviour--): Item: Idle power management + "feels alive" idle behaviour; Status: 🟡
+- [B23](planned/behavior-ideas.md#b23--bounded-self-modification-g2-adjusts-its-own-personality-knobs-from-experience): Item: Bounded self-modification: G2 adjusts its own personality knobs from experience; Status: —
+- [B24](planned/behavior-ideas.md#b24--agency-g2-forms-its-own-goals-not-just-executes-rule-based-autonomy): Item: Agency: G2 forms its own goals, not just executes rule-based autonomy; Status: —
+- [B26](planned/behavior-ideas.md#b26--wire-the-servo-thermal-governor-into-the-behavior-layer--): Item: Wire the servo-thermal governor into the behavior layer; Status: 🟡
+- [B27](planned/behavior-ideas.md#b27--supervise-the-microphone-and-wake-word-worker----built-camera-reader-and-microphone-stream-supervised-2026-10-18): Item: Supervise the microphone and wake-word worker; Status: 🟢 BUILT (camera reader and microphone stream supervised 2026-10-18)
+- [B28](planned/behavior-ideas.md#b28--goals-g2-works-toward-a-goal-you-set-and-learns-from-his-attempts----built-2026-10-31-not-run-on-g2): Item: Goals: G2 works toward a goal you set and learns from his attempts; Status: 🟢 BUILT 2026-10-31, not run on G2

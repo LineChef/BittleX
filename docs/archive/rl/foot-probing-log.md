@@ -12,12 +12,12 @@ top of the frozen `run20m_resid30_ppo` walk -- no training happened.**
 ## Starting point
 
 Two things already validated before this round:
-- **Sensing signal**: commanded-vs-actual joint tracking error under
+- Sensing signal: commanded-vs-actual joint tracking error under
   position control reliably reveals real ground contact -- confirmed against
   `p.getContactPoints()` ground truth at 27mm/30mm ledge depths in the
   original, simpler prototype (reactive trigger, straight-down search only,
   no forward-reach phase).
-- **Trigger timing**: the original trigger was reactive (freeze only after
+- Trigger timing: the original trigger was reactive (freeze only after
   the paw crosses the ledge edge), which let the body already be mid-topple
   (17-30° tilt observed) before the probe even ran -- fixed with a proactive
   trigger (freeze while the paw is still approaching and the body is level,
@@ -96,9 +96,9 @@ tuning problem
 Traced the full approach gait cycle step by step (tilt, load state, and
 distance-to-edge every step). The FL paw has exactly two "unloaded and
 roughly level" windows before crossing the edge:
-- **Early** (~t=4-8, paw 25-30mm from the edge): level (tilt 3-4°),
+- Early: (~t=4-8, paw 25-30mm from the edge): level (tilt 3-4°),
   unloaded -- this is what the proactive trigger fires on.
-- **Late** (~t=78+, paw 5-18mm from the edge, much closer): also unloaded,
+- Late: (~t=78+, paw 5-18mm from the edge, much closer): also unloaded,
   but tilt has already climbed to 10-18° by then (ordinary within-stride
   postural oscillation, unrelated to the ledge) -- too late for the <5°
   safety condition that makes the trigger "proactive" in the first place.
@@ -166,13 +166,13 @@ the probe sequence, and test on a shorter ledge the leg can plausibly clear.
 sequence (settle -> weight-shift -> lift -> reach -> search), versus 10-17
 deg with the opportunistic-freeze approach. Two further fixes compounded
 with the stop-and-settle to get here:
-- **Lift**: the settled standing pose has the knee nearly straight (~0-3
+- Lift: the settled standing pose has the knee nearly straight (~0-3
   deg) -- a poorly-conditioned start for an IK vertical-lift solve
   (confirmed: IK barely moved the paw, ~1.7mm of 20mm intended, despite
   joints tracking their IK targets fine -- a mechanical-advantage problem,
   not a tracking one). Switched to direct knee-flexion (not IK): -40 deg
   gives ~26mm of clean lift at <2 deg tilt, every trial.
-- **Reach**: IK reach done *from* that now well-conditioned bent-knee pose
+- Reach: IK reach done *from* that now well-conditioned bent-knee pose
   (rather than from the near-straight settled pose) reaches a genuine,
   repeatable plateau at +40mm past the edge, tilt still ~1.5 deg -- more
   than double the previous best (~18mm at 10+ deg tilt).
@@ -187,9 +187,9 @@ vector at the moment of "contact" (not just whether `getContactPoints()`
 fires, which round 1 already used, but hadn't checked *what surface* it
 fired on):
 
-- **Flat/no-ledge control**: normal = `(0.00, 0.00, 1.00)` -- straight up,
+- Flat/no-ledge control: normal = `(0.00, 0.00, 1.00)` -- straight up,
   a genuine floor hit. Correct.
-- **Every nonzero ledge tested, including the shallowest (5mm)**: normal
+- Every nonzero ledge tested, including the shallowest (5mm): normal
   dominated by the X component (`~0.76-0.90` X vs `~0.43-0.65` Z) -- a
   near-vertical surface, not the floor. Checked the contact position
   directly: x sits right at `EDGE_X`, the ledge's own riser (the vertical

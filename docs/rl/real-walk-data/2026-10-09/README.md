@@ -6,24 +6,24 @@ Logs in this folder (CSV, `run_gait --log-extra` columns). Logged yaw = firmware
 
 ## Air walk and lane, heading hold ON (front-left foot hold, trim limit -0.6)
 
-- **v4_air_01**: What: V4 held in the air, 6 s; Result: level (roll +1.5, pitch -1.4), yaw +5, no faults
-- **v4_lane_20261009_run01**: What: V4 12.5 s; Result: 4 ft, 10 in left of the line; yaw +31; hold pinned at -0.6
-- **v4_laneB_run01 / 02 / 03**: What: V4 12.5 s; Result: run 2: 4 ft 1 in, 9 in left; run 3: 4 ft, centered with the body turned left at the end; yaw +27 / +23 / +24
+- v4_air_01: What: V4 held in the air, 6 s; Result: level (roll +1.5, pitch -1.4), yaw +5, no faults
+- v4_lane_20261009_run01: What: V4 12.5 s; Result: 4 ft, 10 in left of the line; yaw +31; hold pinned at -0.6
+- v4_laneB_run01 / 02 / 03: What: V4 12.5 s; Result: run 2: 4 ft 1 in, 9 in left; run 3: 4 ft, centered with the body turned left at the end; yaw +27 / +23 / +24
 
 ## Capture A, heading hold OFF, 12.5 s, alternating scripted / V4 (sysidA2_run01..12)
 
-- **1**: Walk: scripted; Tape (fwd, side): 48, +12; Logged yaw: +1
-- **2**: Walk: V4; Tape (fwd, side): 55, +6; Logged yaw: +72
-- **3**: Walk: scripted; Tape (fwd, side): 48, +10; Logged yaw: +2
-- **4**: Walk: V4; Tape (fwd, side): 48, +6; Logged yaw: +108
-- **5**: Walk: scripted; Tape (fwd, side): 48, +4; Logged yaw: +1
-- **6**: Walk: V4; Tape (fwd, side): 54, +6; Logged yaw: +101
-- **7**: Walk: scripted; Tape (fwd, side): 48, +8; Logged yaw: +2
-- **8**: Walk: V4; Tape (fwd, side): 51, +4; Logged yaw: +112
-- **9**: Walk: scripted; Tape (fwd, side): 52, +6; Logged yaw: +2
-- **10**: Walk: V4; Tape (fwd, side): 51, +6; Logged yaw: +112
-- **11**: Walk: scripted; Tape (fwd, side): 48, +6; Logged yaw: -5
-- **12**: Walk: V4; Tape (fwd, side): 54, +6; Logged yaw: +103
+- 1: Walk: scripted; Tape (fwd, side): 48, +12; Logged yaw: +1
+- 2: Walk: V4; Tape (fwd, side): 55, +6; Logged yaw: +72
+- 3: Walk: scripted; Tape (fwd, side): 48, +10; Logged yaw: +2
+- 4: Walk: V4; Tape (fwd, side): 48, +6; Logged yaw: +108
+- 5: Walk: scripted; Tape (fwd, side): 48, +4; Logged yaw: +1
+- 6: Walk: V4; Tape (fwd, side): 54, +6; Logged yaw: +101
+- 7: Walk: scripted; Tape (fwd, side): 48, +8; Logged yaw: +2
+- 8: Walk: V4; Tape (fwd, side): 51, +4; Logged yaw: +112
+- 9: Walk: scripted; Tape (fwd, side): 52, +6; Logged yaw: +2
+- 10: Walk: V4; Tape (fwd, side): 51, +6; Logged yaw: +112
+- 11: Walk: scripted; Tape (fwd, side): 48, +6; Logged yaw: -5
+- 12: Walk: V4; Tape (fwd, side): 54, +6; Logged yaw: +103
 
 V4 mean 52.2 in forward, 5.7 in right, roll sd 3.9 deg; scripted mean 48.7 in, 7.7 in right, roll sd 4.6 deg. No falls in any run.
 
@@ -47,6 +47,6 @@ Started on tile 4 in before the ramp, 4 ft of floor beyond. All six cleared it. 
 
 `real2sim.py` replays the joint commands G2 actually sent through the training environment (no randomization) and compares the body motion with G2's IMU. Nine V4 hold-off hardwood logs (capture A runs 2, 4, 6, 8, 10, 12 and the three facing-check runs; the scripted-walk logs have a different format and were not replayed):
 
-- **Per log:** real roll sway 3.5-4.3 deg against 2.7-2.9 in the sim (the sim sways about 30% less), pitch 1.9-2.9 against 1.7-1.9, dominant sway frequency 0.77-0.79 Hz real against 0.79 sim (matches). Gap score 0.02-0.10 (mean about 0.04).
-- **Fit** (`real2sim_fit.json`, 60 grid points over servo speed limit, motor force and ground friction): best gap 0.028 at servo speed 320 deg/s (the sim uses 200), motor force 0.18-0.22, friction 1.0-1.3. The five best points differ by under 0.002 in gap, so the data does not separate these three settings: **not confident, nothing applied.** It must reproduce on a second session (another day or battery) and pass `tools/g2_calibrate.py`'s gates before any value goes into training. Heading is not part of the fit (real data never sets drift).
-- **Ingest** (`tools/g2_ingest.py` on the Pi's automatic logs, 196 runs): 35 usable (119 s of steady walking), all from hardware epoch 2026-10-07 on tile; 153 quarantined (65 with a steady window under 2 s, 60 steering-test runs, 55 whose floor was not confirmed for that time, 50 with too few rows); 8 excluded. Today's explicit-log capture runs are not in the store (they have no automatic sidecar); they feed `real2sim.py` directly.
+- Per log: real roll sway 3.5-4.3 deg against 2.7-2.9 in the sim (the sim sways about 30% less), pitch 1.9-2.9 against 1.7-1.9, dominant sway frequency 0.77-0.79 Hz real against 0.79 sim (matches). Gap score 0.02-0.10 (mean about 0.04).
+- Fit: (`real2sim_fit.json`, 60 grid points over servo speed limit, motor force and ground friction): best gap 0.028 at servo speed 320 deg/s (the sim uses 200), motor force 0.18-0.22, friction 1.0-1.3. The five best points differ by under 0.002 in gap, so the data does not separate these three settings: **not confident, nothing applied.** It must reproduce on a second session (another day or battery) and pass `tools/g2_calibrate.py`'s gates before any value goes into training. Heading is not part of the fit (real data never sets drift).
+- Ingest: (`tools/g2_ingest.py` on the Pi's automatic logs, 196 runs): 35 usable (119 s of steady walking), all from hardware epoch 2026-10-07 on tile; 153 quarantined (65 with a steady window under 2 s, 60 steering-test runs, 55 whose floor was not confirmed for that time, 50 with too few rows); 8 excluded. Today's explicit-log capture runs are not in the store (they have no automatic sidecar); they feed `real2sim.py` directly.

@@ -1,6 +1,6 @@
 # Slope-ceiling campaign log
 
-> **Superseded (2026-09-23), see [`hw1-log.md`](../../rl/hw1-log.md) "Slopes":** the
+> Superseded (2026-09-23), see [`hw1-log.md`](../../rl/hw1-log.md) "Slopes": the
 > benchmark's slope labels were inverted (pitch > 0 is *downhill*), T7.x–T9.x
 > ran without the payload (cell-knob leak), and ~35 % of every slope cell's
 > episodes were flat rough ground. So "T9.1 18° up" was really 18° downhill,
@@ -18,9 +18,9 @@ While stress-testing `run20m_ppo` looking for a genuine fall (separate from
 the resid30 question), a quick decathlon pass found a real, clear failure
 mode that horizontal pushes and terrain roughness never produced:
 
-- **T9.1 -- 18 deg slope up (beyond training's 14 deg ceiling)**: Learned fall rate: **62%**; Scripted fall rate: 0%
-- **T8.2 -- rough/uneven + rolling swell**: Learned fall rate: 12%; Scripted fall rate: 0%
-- **T9.3 -- denser/taller rubble than training**: Learned fall rate: 22%; Scripted fall rate: 25%
+- T9.1 -- 18 deg slope up (beyond training's 14 deg ceiling): Learned fall rate: **62%**; Scripted fall rate: 0%
+- T8.2 -- rough/uneven + rolling swell: Learned fall rate: 12%; Scripted fall rate: 0%
+- T9.3 -- denser/taller rubble than training: Learned fall rate: 22%; Scripted fall rate: 25%
 
 Extensive testing ruled out other candidate stressors as the "real" weak
 point: horizontal shoves (any direction/timing, up to absurd magnitudes),
@@ -38,7 +38,7 @@ Falling 62% (not 100%) at 18 deg suggests this is "at the edge of / just
 past what it learned," not a hard geometric wall -- the kind of gap
 curriculum expansion usually fixes.
 
-**Open question, not yet resolved:** whether this is purely a
+Open question, not yet resolved: whether this is purely a
 training-exposure gap (curriculum expansion fixes it) or partly a
 sim-traction/fidelity issue at steep angles (this project has hit a
 sim-fidelity wall before, on climbing). Treat a clean result as evidence,
@@ -67,7 +67,7 @@ tumbling down the slope rather than a controlled stop. Reads as the same
 underlying gap (undefined behavior past the trained slope envelope)
 showing up on whichever side isn't covered, not two independent problems.
 
-**Consequence for this campaign's approach:** raising `SLOPE_MAX_DEG`
+Consequence for this campaign's approach: raising `SLOPE_MAX_DEG`
 needs to validate *both* directions (up and down) going forward, not just
 re-check the original up-slope failure point -- a fix that only chases the
 side that failed on the current leading checkpoint risks re-creating the
@@ -82,16 +82,16 @@ only the previously-known failure point still applies.
 
 ### Round 1 — slopeceiling_r1
 
-- **Started:** 2026-09-18, 3M steps, PID 92879. Base: `run20m_resid30_ppo`'s
+- Started: 2026-09-18, 3M steps, PID 92879. Base: `run20m_resid30_ppo`'s
   recipe (the frozen base) -- `FAC_NOSTALL` stays off (reverted, documented
   negative result in the resiliency campaign), gait-friction's cadence
   correction stays off (also reverted). Fresh run, not a continuation.
-- **`SLOPE_MAX_DEG` 14 -> 20**, bidirectional -- past both known failure
+- `SLOPE_MAX_DEG` 14 -> 20: , bidirectional -- past both known failure
   points (T9.1 18deg up, T9.2 20deg down), same "raise past what breaks
   it" logic as the original 10->14 move, now applied to both signs of
   tilt instead of one.
-- **Smoke test:** passed clean before launch.
-- **What to check at completion:** fall rate specifically on T9.1-style
+- Smoke test: passed clean before launch.
+- What to check at completion: fall rate specifically on T9.1-style
   (steep up) and T9.2-style (steep down) decathlon cells, not just
   aggregate metrics -- confirms whether the fix actually closes both
   directions of the gap, or just moves which side fails.

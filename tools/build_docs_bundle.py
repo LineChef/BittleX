@@ -25,6 +25,9 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_render  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
@@ -39,8 +42,8 @@ TOP_LAYOUT = [("Start here", ["how-it-works", "capabilities", "STATUS", "project
               ("Under the hood", ["architecture", "code-map", "rl", "code"]),
               ("About", ["about", "legal"])]
 # Working notes stay in the repo but never reach the site: plans, backlogs, history, outside-project reviews, run logs.
-EXCLUDED_DIRS = ("docs/plan-detail/", "docs/planned/", "docs/archive/", "docs/research/", "docs/rl/real-walk-data/")
-EXCLUDED_FILES = {"docs/backlog.md", "docs/maintaining-docs.md", "docs/rl/real-walk-log.md", "docs/rl/hw1-log.md", "docs/rl/results-index.md",
+EXCLUDED_DIRS = ("docs/plan-detail/", "docs/planned/", "docs/archive/", "docs/research/", "docs/rl/real-walk-data/", "docs/hardware/build-logs/")
+EXCLUDED_FILES = {"docs/vision/capture-progress.md", "docs/vision/wall-check-plan.md", "docs/backlog.md", "docs/maintaining-docs.md", "docs/rl/real-walk-log.md", "docs/rl/hw1-log.md", "docs/rl/results-index.md",
                   "docs/rl/carpet-findings-2026-10-20.md", "docs/rl/getup-sim-replay.md", "docs/rl/h1-rubric.md", "docs/rl/sysid-capture-plan.md",
                   "docs/rl/training-upgrade-2026-10.md"}
 # Who a page is for and what it is, by section; a page's front matter (`audience:` / `kind:`) overrides these.
@@ -378,6 +381,8 @@ def build(out, base, gh, branch, check=True):
         dest = os.path.join(out, "pages", (route or "index") + ".md")
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         open(dest, "w", encoding="utf-8").write(text)
+        entries[route]["html"] = "pages/" + (route or "index") + ".html"
+        open(os.path.join(out, entries[route]["html"]), "w", encoding="utf-8").write(md_render.render(text, section=section, audience=audience, kind=kind, slugify=slug))      # the same page as semantic HTML (tools/md_render.py)
         digest.update(src.encode() + text.encode())
         search.append({"route": route, "title": title, "section": entries[route]["section"],
                        "headings": [h["text"] for h in entries[route]["headings"]], "text": plain_text(raw)[:4000]})

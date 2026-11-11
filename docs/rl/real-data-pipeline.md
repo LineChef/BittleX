@@ -8,7 +8,7 @@ Related: [`hardware-logging.md`](hardware-logging.md) (what a log carries).
 
 1. Approval is **semi-automatic**: collection, sync, filtering and fitting are automatic; a calibration snapshot is used by a retrain only once approved, and a change that stays within the noise and passes every check is approved automatically (see Approval).
 2. The data store is **outside the repo** (`~/g2_data/` on the Mac); only non-personal summaries are committed.
-3. **Every** policy walk is logged, including voice-triggered and exploration walking, not only direct runs.
+3. Every: policy walk is logged, including voice-triggered and exploration walking, not only direct runs.
 4. Everything is kept, **compressed losslessly** (gzip). The user tells Claude when hardware changes (a new hardware epoch).
 
 ## Flow
@@ -19,19 +19,19 @@ approval (auto or user) -> `g2_profile` loads the approved snapshot at retrain l
 
 ## What gets captured (movement-path inventory, 2026-10-07)
 
-- **Policy walking from the voice service and the exploration runtime**: Where it goes through: `PolicyWalker` -> `run_gait.run()` with no log path; Capture: one choke point: auto-log when no `--log` is given (`G2_AUTOLOG=off` disables)
-- **Policy walks started from the command line / baseline runner**: Where it goes through: `run_gait.run()`; Capture: already logged with `--log`; the auto-log fills in when none is given
-- **Scripted `wkF` open-loop walks**: Where it goes through: `run_gait.openloop()`; Capture: only run from the command line / baseline runner, which already pass `--log`; not hooked
-- **Firmware gaits and skills sent as tokens (turns, `kwk*`, tricks, rest, stand)**: Where it goes through: `WalkerSink` / `SerialActuatorSink`; Capture: IMU-only recorder (later phase); commands are already traceable through `link/trace.py`
-- **Idle / rest IMU**: Where it goes through: the IMU stream the app already reads; Capture: low-rate recorder (later phase): IMU bias and noise at rest are free, plentiful data
-- **Events: falls, guard stops, thermal cooldowns, battery alerts, pick-ups**: Where it goes through: diag events; Capture: event log, used for real fault and fall rates
+- Policy walking from the voice service and the exploration runtime: Where it goes through: `PolicyWalker` -> `run_gait.run()` with no log path; Capture: one choke point: auto-log when no `--log` is given (`G2_AUTOLOG=off` disables)
+- Policy walks started from the command line / baseline runner: Where it goes through: `run_gait.run()`; Capture: already logged with `--log`; the auto-log fills in when none is given
+- Scripted `wkF` open-loop walks: Where it goes through: `run_gait.openloop()`; Capture: only run from the command line / baseline runner, which already pass `--log`; not hooked
+- Firmware gaits and skills sent as tokens (turns, `kwk*`, tricks, rest, stand): Where it goes through: `WalkerSink` / `SerialActuatorSink`; Capture: IMU-only recorder (later phase); commands are already traceable through `link/trace.py`
+- Idle / rest IMU: Where it goes through: the IMU stream the app already reads; Capture: low-rate recorder (later phase): IMU bias and noise at rest are free, plentiful data
+- Events: falls, guard stops, thermal cooldowns, battery alerts, pick-ups: Where it goes through: diag events; Capture: event log, used for real fault and fall rates
 
 Every run gets a sidecar with: kind, policy name, commands, git commit, hardware epoch, surface label, battery at start and end, features on, why the run ended.
 
 ## Hardware epochs and surfaces
 
-- **Epoch** (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
-- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
+- Epoch: (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
+- Surface: (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
   Grout depth is unmeasured; the logs will show how often feet catch. Snags are not detected on the robot today, so they appear in the log only as IMU and command signatures; a hand label would make them usable for hazard rates (offered to the user, not built).
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
@@ -48,16 +48,16 @@ left-right symmetry for fitted *parameters* (approved 2026-10-07; see below); **
 
 Why: on 2026-10-18 the store held 625 runs, 38 usable and only 2 from the current epoch (`hw-2026-10-18`, the pod and AI head). The builder fits two loop-timing numbers that do not depend on the floor or a foot trim, yet every run had to pass every gate. What changed (`tools/g2_ingest.py`, `tools/g2_calibrate.py`):
 
-1. **Gate per fit.** Each run in `manifest.json` lists the kinds of fit it may feed, `uses`: `timing` (the loop-timing fits) and/or `body` (roll and pitch spread, event rates). `status` is `usable` when `uses` is not empty, `excluded` when a person said so, otherwise `quarantined`.
+1. Gate per fit: Each run in `manifest.json` lists the kinds of fit it may feed, `uses`: `timing` (the loop-timing fits) and/or `body` (roll and pitch spread, event rates). `status` is `usable` when `uses` is not empty, `excluded` when a person said so, otherwise `quarantined`.
 
    Each reason has a code (`reason_codes`); the checks for the floor label (unknown or older than 72 h), a steady window under 2 s, over 5% late ticks and the outlier screen keep a run out of body fits only.
 
    Every other check (a steering test run, the hold working hard, a fall / collision / pickup label, an epoch not `fit_ok`, a damaged clock, a stale IMU, missing values, under 1 s steady) keeps it out of every fit. The builder reads `timing` for its fits and `body` for the roll / pitch monitor. A manifest from before this change has no `uses`: its usable runs count for both.
-2. **The everyday trim is his normal gait.** A walk with `foot_trim` equal to the policy's `DEFAULT_TRIMS` entry, a trim saved with an attachment's gait for that policy (or its per-floor trim for the floor of the run), or marked `foot_trim_source: "everyday"` (the walk loop writes it since 2026-10-18 when the default trim was applied) is no longer a steering test. An explicit `--foot-trim`, the heading hold, `steer_const` and scripted walks still are. Drift still never feeds a fit: the trim is not fitted, the builder reads no yaw, and the whitelist, the drift-proxy screen and the canary stand.
-3. **Timing fits need a 1 s steady window** (body fits keep 2 s); the timing fits pool seconds across runs.
-4. **The late-tick check guards body fits only.** For the timing fits it would remove exactly the runs whose jitter the jitter fit measures.
-5. **The floor label is a body-fit gate.** The timing fits do not depend on the floor; the person's overrides and the 72 h limit still apply to body fits.
-6. **A run that did not end cleanly (a fall, a crash, a stale IMU, any stop but `stopped` or `complete`) is used up to its last second.** The cut is one second (`END_CUT_S`); the late-tick, stale-IMU and missing-value checks and the fitted rows ignore the cut part (`window()` in the ingest tool is shared with the builder). The end reason stays in the manifest, so falls still count for event rates.
+2. The everyday trim is his normal gait: A walk with `foot_trim` equal to the policy's `DEFAULT_TRIMS` entry, a trim saved with an attachment's gait for that policy (or its per-floor trim for the floor of the run), or marked `foot_trim_source: "everyday"` (the walk loop writes it since 2026-10-18 when the default trim was applied) is no longer a steering test. An explicit `--foot-trim`, the heading hold, `steer_const` and scripted walks still are. Drift still never feeds a fit: the trim is not fitted, the builder reads no yaw, and the whitelist, the drift-proxy screen and the canary stand.
+3. Timing fits need a 1 s steady window (body fits keep 2 s); the timing fits pool seconds across runs.
+4. The late-tick check guards body fits only: For the timing fits it would remove exactly the runs whose jitter the jitter fit measures.
+5. The floor label is a body-fit gate: The timing fits do not depend on the floor; the person's overrides and the 72 h limit still apply to body fits.
+6. A run that did not end cleanly (a fall, a crash, a stale IMU, any stop but `stopped` or `complete`) is used up to its last second. The cut is one second (`END_CUT_S`); the late-tick, stale-IMU and missing-value checks and the fitted rows ignore the cut part (`window()` in the ingest tool is shared with the builder). The end reason stays in the manifest, so falls still count for event rates.
 
 Result on the same 625 runs: 195 usable (111 for body fits, 195 for timing fits), 407 quarantined, 23 excluded; the current epoch has 18 runs and 132 s for the timing fits (it had 2). The builder's accepted number is unchanged (`G2E_IMU_HOLD_STEPS` 16); `G2E_CMD_PATH_EXTRA_MS_MAX` stays refused.
 The 247 runs with too few rows (239 of them empty: the log was opened and no walk row was written) are unchanged and still need an explanation. Not built, asked for later: pooling the timing fits across hardware epochs, and reporting empty logs separately.
@@ -65,22 +65,22 @@ The 247 runs with too few rows (239 of them empty: the log was opened and no wal
 ## Keeping drift out of the sim (guards, agreed 2026-10-07)
 
 Hardware drift is not a stable property of G2 (it moved from about +142 to about +40 deg per 12.7 s with one servo swap and grew from +44 to +178 deg as the pack sagged); a sim trained against it learns a one-sided correction (the V2.1 problem). The guards:
-1. **Whitelist:** the builder's output has a fixed list of allowed parameters; any other key is rejected. There is no yaw, heading, lateral or drift entry (a test enforces it).
-2. **No yaw or heading input to any fit:** only yaw-free statistics (roll and pitch spread, timing, IMU noise at rest).
-3. **Mean lean excluded:** a steady roll or pitch offset is a mounting or calibration offset and correlates with one-sided leg differences; only the spread is used, never the mean. The IMU zero is estimated at rest and fed as a range.
-4. **Drift canary:** after a candidate snapshot, the reference policy runs in the new sim; if the sim's measured heading drift or the mirror gap changes beyond noise, the snapshot is leaking asymmetry and is blocked.
-5. **Proxy screen:** each parameter's per-run estimate is compared with that run's heading change; a parameter that tracks drift is dropped as a drift proxy.
-6. **Battery confound:** voltage bands are kept apart, because drift grew as the pack sagged.
-7. **Monitor-only drift channel:** per-run drift is stored for audits and is not visible to the builder.
+1. Whitelist: the builder's output has a fixed list of allowed parameters; any other key is rejected. There is no yaw, heading, lateral or drift entry (a test enforces it).
+2. No yaw or heading input to any fit: only yaw-free statistics (roll and pitch spread, timing, IMU noise at rest).
+3. Mean lean excluded: a steady roll or pitch offset is a mounting or calibration offset and correlates with one-sided leg differences; only the spread is used, never the mean. The IMU zero is estimated at rest and fed as a range.
+4. Drift canary: after a candidate snapshot, the reference policy runs in the new sim; if the sim's measured heading drift or the mirror gap changes beyond noise, the snapshot is leaking asymmetry and is blocked.
+5. Proxy screen: each parameter's per-run estimate is compared with that run's heading change; a parameter that tracks drift is dropped as a drift proxy.
+6. Battery confound: voltage bands are kept apart, because drift grew as the pack sagged.
+7. Monitor-only drift channel: per-run drift is stored for audits and is not visible to the builder.
 
 ## Snag detection from the logs (hypothesis to test on the kitchen runs)
 
 Snags will be frequent on kitchen tile (feet catching on grout lines) and the user will not label them (no voice notes, no per-event labels). The sensor is the limit: the IMU gives a fresh frame only every 200 ms, so a brief catch may show in one frame or only through the policy's
 reaction; the logged joint angles are commands, not measurements. The approach, in order:
-1. **Look at distributions first**, before building any detector, and keep turns, pick-ups and ordinary gait impacts from being mistaken for snags.
-2. **Periodicity:** grout lines recur at the tile size, so at about 0.1 m/s disturbances should recur every (tile size / speed) seconds; a regular beat in roll and pitch spikes locked to that period is strong evidence. Needs the tile size (asked, not yet known).
-3. **Floor comparison:** the same policy on hardwood is the baseline; extra spikes, stalls and policy-correction jumps on tile are the snag effect, with no labels needed. A same-day, same-battery hardwood control walk makes this clean (asked).
-4. **Policy reaction:** a catch should make the policy's correction jump (logged at 80 Hz).
+1. Look at distributions first: , before building any detector, and keep turns, pick-ups and ordinary gait impacts from being mistaken for snags.
+2. Periodicity: grout lines recur at the tile size, so at about 0.1 m/s disturbances should recur every (tile size / speed) seconds; a regular beat in roll and pitch spikes locked to that period is strong evidence. Needs the tile size (asked, not yet known).
+3. Floor comparison: the same policy on hardwood is the baseline; extra spikes, stalls and policy-correction jumps on tile are the snag effect, with no labels needed. A same-day, same-battery hardwood control walk makes this clean (asked).
+4. Policy reaction: a catch should make the policy's correction jump (logged at 80 Hz).
 Individual snags may not be identifiable; a **rate of snag-like events per metre walked, per floor** is what the sim's hazard setting needs, and the statistical view is enough for that. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower.
 Nothing from the kitchen reaches the sim until it passes the ingest gates and the audit.
 
@@ -88,7 +88,7 @@ Nothing from the kitchen reaches the sim until it passes the ingest gates and th
 
 Runs when enough new usable data has arrived (default: 10 new usable runs in the current epoch and surface). Fits only the confident tier: IMU bias and noise at rest; command cadence, latency and loop jitter;
 servo rate and force (needs the bench data); roll and pitch swing statistics; pack voltage against behaviour; real fall and fault rates. Writes a snapshot: each value, its range, the number of runs, epoch, surface, and the checks passed.
-**Harm check before any approval:** score the reference policies (V2.1 and the current V3 candidate) on the benchmark in the snapshot's world; flat-ground falls must not rise, the mirror gap must not worsen, and no benchmark cell
+Harm check before any approval: score the reference policies (V2.1 and the current V3 candidate) on the benchmark in the snapshot's world; flat-ground falls must not rise, the mirror gap must not worsen, and no benchmark cell
 may drop beyond its noise. A change that fails is blocked.
 
 ## Approval: who and when
@@ -99,13 +99,13 @@ The first snapshot is no longer always reviewed. Anything that fails a gate othe
 
 The table below is the earlier rule, kept for history.
 
-- **Every changed value within its noise band, every check and the harm check pass, no epoch change, and the total change since the last **human**-approved snapshot is under the cumulative cap**: Who approves: **Automatic** (the rules); recorded as auto-approved and shown in the next report; one command reverts to the previous snapshot; When: when the snapshot is built
-- **A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded**: Who approves: **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks; When: at the next session after the proposal exists; always reviewed before a 20M go
-- **Harm check fails**: Who approves: **Blocked**, not approvable until the cause is understood
+- Every changed value within its noise band, every check and the harm check pass, no epoch change, and the total change since the last human**-approved snapshot is under the cumulative cap**: Who approves: **Automatic** (the rules); recorded as auto-approved and shown in the next report; one command reverts to the previous snapshot; When: when the snapshot is built
+- A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded: Who approves: **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks; When: at the next session after the proposal exists; always reviewed before a 20M go
+- Harm check fails: Who approves: **Blocked**, not approvable until the cause is understood
 
 **Training launches.** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
-1. **Automatic when idle:** a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is running on the Mac (no training, benchmark or other test in progress, so nothing gets a random slowdown), at most one per snapshot, and its result is reported. The harm check (benchmark scoring, no training) follows the same idle-only rule.
-2. **Always before a 20M:** when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first, on an otherwise idle Mac (reused if one already finished for that snapshot), and its result is reported before the 20M starts.
+1. Automatic when idle: a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is running on the Mac (no training, benchmark or other test in progress, so nothing gets a random slowdown), at most one per snapshot, and its result is reported. The harm check (benchmark scoring, no training) follows the same idle-only rule.
+2. Always before a 20M: when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first, on an otherwise idle Mac (reused if one already finished for that snapshot), and its result is reported before the 20M starts.
 When the user launches a run, it uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
 
 ## Symmetry rule (approved 2026-10-07)
@@ -138,14 +138,14 @@ and the carpet detector. For those, a tape-measured average speed per dedicated 
 
 ## Phases and status
 
-- **0**: What: Inventory, schema, epochs file, capture module with tests; Status: **done 2026-10-07** (`pi_pipeline/telemetry/`, the hook in `run_gait.run()`, `g2floor`; tests in `test_autolog.py`; not yet on the Pi)
-- **1**: What: Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi; Status: **policy-walk capture done and verified on G2**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started
-- **2**: What: Sync, ingest gates, store, `g2data status`; Status: **built 2026-10-07** (`tools/g2_ingest.py`, `g2data sync
-- **3**: What: Calibration builder, harm check, snapshots, approval, `g2_profile` loading; Status: **built 2026-10-08** (`tools/g2_calibrate.py`, `g2cal`; background loop `tools/g2_bg_jobs.sh`, `g2bg`, calling `tools/g2_cal_auto.sh`; tests in `test_g2_calibrate.py`)
-- **4**: What: Backfill of the 2026-10-01 to 10-07 logs by epoch; Status: not started
-- **5**: What: Retrain runner reads the snapshot; report in the pre-20M report; Status: not started
+- 0: What: Inventory, schema, epochs file, capture module with tests; Status: **done 2026-10-07** (`pi_pipeline/telemetry/`, the hook in `run_gait.run()`, `g2floor`; tests in `test_autolog.py`; not yet on the Pi)
+- 1: What: Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi; Status: **policy-walk capture done and verified on G2**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started
+- 2: What: Sync, ingest gates, store, `g2data status`; Status: **built 2026-10-07** (`tools/g2_ingest.py`, `g2data sync
+- 3: What: Calibration builder, harm check, snapshots, approval, `g2_profile` loading; Status: **built 2026-10-08** (`tools/g2_calibrate.py`, `g2cal`; background loop `tools/g2_bg_jobs.sh`, `g2bg`, calling `tools/g2_cal_auto.sh`; tests in `test_g2_calibrate.py`)
+- 4: What: Backfill of the 2026-10-01 to 10-07 logs by epoch; Status: not started
+- 5: What: Retrain runner reads the snapshot; report in the pre-20M report; Status: not started
 
-- **3:** Fits the confident tier the walk logs support (IMU frame rate -> `G2E_IMU_HOLD_STEPS`, loop jitter -> `G2E_CMD_PATH_EXTRA_MS_MAX`); IMU bias and noise, servo rate and force, fall and snag rates are listed as needing data (rest-IMU recorder, bench data, many more metres). Snapshots are numbered and immutable in `~/g2_data/calibration/`; `g2_profile` loads only an approved one and records `G2_CAL_ID`. The harm check scores V2.1 and the newest V3 policy in the old and new world and waits for an idle Mac
+- 3: Fits the confident tier the walk logs support (IMU frame rate -> `G2E_IMU_HOLD_STEPS`, loop jitter -> `G2E_CMD_PATH_EXTRA_MS_MAX`); IMU bias and noise, servo rate and force, fall and snag rates are listed as needing data (rest-IMU recorder, bench data, many more metres). Snapshots are numbered and immutable in `~/g2_data/calibration/`; `g2_profile` loads only an approved one and records `G2_CAL_ID`. The harm check scores V2.1 and the newest V3 policy in the old and new world and waits for an idle Mac
 
 
 ## First result (2026-10-07, kitchen tile, hardware epoch `hw-2026-10-07`)

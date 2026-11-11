@@ -26,9 +26,9 @@ firmware's decoder has to recognise its output head.**
 Every training toolchain has moved forward since Jan 2025 and their exports
 drifted out of sync with that frozen decoder. Symptoms of a mismatch:
 
-- **`boxes:[]` every frame, `inference` time normal**: firmware ran the conv layers but its decoder produced nothing from the head → head format it doesn't recognise
-- **box flood** — 10-30 boxes/frame, high conf, on an anchor grid, `postprocess: 0ms`, confidence/IoU sliders do nothing: firmware is dumping raw anchor outputs — objectness gate + NMS never applied → head format it doesn't recognise
-- **`Invoke failed` / Device Logger blank**: quantisation broken OR head type unsupported (see SSCMA issues #276, #294, #319)
+- `boxes:[]` every frame, `inference` time normal: firmware ran the conv layers but its decoder produced nothing from the head → head format it doesn't recognise
+- box flood: 10-30 boxes/frame, high conf, on an anchor grid, `postprocess: 0ms`, confidence/IoU sliders do nothing: firmware is dumping raw anchor outputs — objectness gate + NMS never applied → head format it doesn't recognise
+- `Invoke failed` / Device Logger blank: quantisation broken OR head type unsupported (see SSCMA issues #276, #294, #319)
 
 A working model is **quiet on an empty scene** and puts **one box per real
 object**.
@@ -36,23 +36,23 @@ object**.
 **What firmware `20250102` DOES decode** (from its changelog + stock models):
 - Swift-YOLO as exported by **SSCMA / ModelAssistant `2.0.0` branch** (all the
   stock SenseCraft models — Person Detection, Hand Gesture — are this)
-- **Ultralytics YOLOv8** exported with **`ultralytics==8.2.8`** (per Seeed's
+- Ultralytics YOLOv8: exported with **`ultralytics==8.2.8`** (per Seeed's
   official wiki `ma_deploy_yolov8`, last updated Apr 2024) — **confirmed working
   2026-09-09**, exported locally on Apple Silicon (recipe below)
 - YOLO11 (added in the `20250102` release)
-- **NOT** YOLO26. **NOT** RTMDet. **NOT** the SSCMA `main` / `fix/colab-py312-main`
+- NOT: YOLO26. **NOT** RTMDet. **NOT** the SSCMA `main` / `fix/colab-py312-main`
   re-implemented Swift-YOLO head.
 
 ---
 
 ## Paths tried this session and their outcomes
 
-- **Ultralytics YOLOv8, `ultralytics==8.4.146`, `format=saved_model` (NHWC)**: toolchain: new ultralytics; on-device result: **`boxes:[]`** — 8.4.x LiteRT/ai-edge-torch export ≠ 8.2.8 graph
-- **YOLO26 (`yolo26_GV2.ipynb`)**: toolchain: ultralytics; on-device result: trained fine, **0 detections** — firmware has no YOLO26 decode
-- **SSCMA Swift-YOLO, `ModelAssistant` **`main`** branch (v1, junk boxes)**: toolchain: vendored stack, no mmcv, fast; on-device result: **box flood**
-- **SSCMA Swift-YOLO, `main` branch (v3, real boxes, mAP@50 0.87)**: toolchain: same; on-device result: **box flood, identical** — proved it's the export head, not the data
-- **SSCMA Swift-YOLO, **`fix/colab-py312`** (the `2.0.0` MMDet pipeline)**: toolchain: needs `mmcv 2.2` **source build, ~30 min, stalls Colab**; on-device result: not completed — killed the build at 41 min
-- **Ultralytics YOLOv8n, `ultralytics==8.2.8`, `format=tflite int8`** — trained on Colab, **exported locally on Apple Silicon** (arm64 py3.9): toolchain: 8.2.8 onnx2tf path, then vela; on-device result: ✅ **WORKS** — clean single boxes, quiet on empty scene, `postprocess: 1ms`. Detects up close; box geometry frozen near the training-average location (under-calibrated INT8 — only 100 calib images)
+- Ultralytics YOLOv8, `ultralytics==8.4.146`, `format=saved_model` (NHWC): toolchain: new ultralytics; on-device result: **`boxes:[]`** — 8.4.x LiteRT/ai-edge-torch export ≠ 8.2.8 graph
+- YOLO26 (`yolo26_GV2.ipynb`): toolchain: ultralytics; on-device result: trained fine, **0 detections** — firmware has no YOLO26 decode
+- SSCMA Swift-YOLO, `ModelAssistant`: `main`** branch (v1, junk boxes)**: toolchain: vendored stack, no mmcv, fast; on-device result: **box flood**
+- SSCMA Swift-YOLO, `main` branch (v3, real boxes, mAP@50 0.87): toolchain: same; on-device result: **box flood, identical** — proved it's the export head, not the data
+- SSCMA Swift-YOLO: `fix/colab-py312`** (the `2.0.0` MMDet pipeline)**: toolchain: needs `mmcv 2.2` **source build, ~30 min, stalls Colab**; on-device result: not completed — killed the build at 41 min
+- Ultralytics YOLOv8n, `ultralytics==8.2.8`, `format=tflite int8`: trained on Colab, **exported locally on Apple Silicon** (arm64 py3.9): toolchain: 8.2.8 onnx2tf path, then vela; on-device result: ✅ **WORKS** — clean single boxes, quiet on empty scene, `postprocess: 1ms`. Detects up close; box geometry frozen near the training-average location (under-calibrated INT8 — only 100 calib images)
 
 Key realisation: v1 (bad boxes) and v3 (good boxes, mAP 0.87) flooded
 **identically**. That rules out the training data. The common factor is the
@@ -72,7 +72,7 @@ scene, `postprocess: 1ms`. All three classes detect.
 Seeed's official multi-class recipe is `wiki.seeedstudio.com/ma_deploy_yolov8` —
 no mmcv, no COCO conversion, multi-class is just `nc` in `data.yaml`.
 
-**The one non-obvious split:** Colab **trains** 8.2.8 fine but **cannot export**
+The one non-obvious split: Colab **trains** 8.2.8 fine but **cannot export**
 it — Colab is Python 3.13 now and every `format=tflite` run hits the onnx2tf
 `flatbuffer_direct` bug. Export must run on an environment old enough to match
 the 8.2.8 toolchain: **arm64 Python 3.9** (`/usr/bin/python3` → 3.9.6 on this
@@ -85,20 +85,20 @@ right venv and refuses to run on x86.
 Every command below refers to a file **in this repo** — nothing lives only in a
 notebook or a scratch dir any more.
 
-- **1**: step: **Capture** each class (motion-gated). Ask the tag name first; follow `docs/vision/capture-checklist.md`.; command: `g2cam <class> <session>`
-- **2**: step: **Curate** — dedup, contact sheet, writes YOLO `.txt` from the capture-time detector.; command: `curate_captures.py … --class-id N` (aliases `g2neg` for empty rooms)
-- **3**: step: **Promote** the good frames into the library.; command: `g2promote <class> <session>`
-- **4**: step: **Auto-box** any class whose captures had no boxes (pets), using a COCO YOLOv8.; command: `python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/<class> --coco-class {person,dog,cat} --weights yolov8m.pt --imgsz 800 --overwrite`
-- **5**: step: **Combine** the library → one flat folder, class-ids rewritten from `--classes` order.; command: `python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library --classes <you>,dog,cat --out ~/Desktop/G2Memory/g2_vision_library/upload_vN`
-- **6**: step: **Split + resize + zip** → the dataset the notebook eats.; command: `python tools/gv2/split_yolo_dataset.py ~/Desktop/G2Memory/g2_vision_library/upload_vN --classes <you>,dog,cat --imgsz 224 --out ~/Desktop/G2Memory/g2_vision_library/custom_data_yolo_vN.zip`
-- **7**: step: **Train** on Colab — `g2_yolov8_828_3class.ipynb`, T4 GPU, upload the zip from step 6, run top-to-bottom, download `best.pt`.; command: notebook: `yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100`
-- **8**: step: **Build a calibration set** — 300+ varied jpgs. Reuse `upload_vN` or a wider pull; a flat folder of `.jpg` is all the script needs.; command: (a folder path)
-- **9**: step: **Export + vela locally** — makes the arm64 venv, patches onnx2tf, exports INT8 tflite, vela → 100% NPU.; command: `tools/gv2/export_yolov8_gv2.sh best.pt <calib_dir> 3 <you>,dog,cat`
-- **10**: step: **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → (see below)
-- **11**: step: **Verify** on device: quiet on empty scene, one box per object. Headless: `python tools/vision_diag.py <port> --secs 40`.
-- **12**: step: **Cleanup** — delete the Colab runtime (wipes the uploaded photos). See the Cleanup section.
+- 1: step: **Capture** each class (motion-gated). Ask the tag name first; follow `docs/vision/capture-checklist.md`.; command: `g2cam <class> <session>`
+- 2: step: **Curate** — dedup, contact sheet, writes YOLO `.txt` from the capture-time detector.; command: `curate_captures.py … --class-id N` (aliases `g2neg` for empty rooms)
+- 3: step: **Promote** the good frames into the library.; command: `g2promote <class> <session>`
+- 4: step: **Auto-box** any class whose captures had no boxes (pets), using a COCO YOLOv8.; command: `python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/<class> --coco-class {person,dog,cat} --weights yolov8m.pt --imgsz 800 --overwrite`
+- 5: step: **Combine** the library → one flat folder, class-ids rewritten from `--classes` order.; command: `python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library --classes <you>,dog,cat --out ~/Desktop/G2Memory/g2_vision_library/upload_vN`
+- 6: step: **Split + resize + zip** → the dataset the notebook eats.; command: `python tools/gv2/split_yolo_dataset.py ~/Desktop/G2Memory/g2_vision_library/upload_vN --classes <you>,dog,cat --imgsz 224 --out ~/Desktop/G2Memory/g2_vision_library/custom_data_yolo_vN.zip`
+- 7: step: **Train** on Colab — `g2_yolov8_828_3class.ipynb`, T4 GPU, upload the zip from step 6, run top-to-bottom, download `best.pt`.; command: notebook: `yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100`
+- 8: step: **Build a calibration set** — 300+ varied jpgs. Reuse `upload_vN` or a wider pull; a flat folder of `.jpg` is all the script needs.; command: (a folder path)
+- 9: step: **Export + vela locally** — makes the arm64 venv, patches onnx2tf, exports INT8 tflite, vela → 100% NPU.; command: `tools/gv2/export_yolov8_gv2.sh best.pt <calib_dir> 3 <you>,dog,cat`
+- 10: step: **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → (see below)
+- 11: step: **Verify** on device: quiet on empty scene, one box per object. Headless: `python tools/vision_diag.py <port> --secs 40`.
+- 12: step: **Cleanup** — delete the Colab runtime (wipes the uploaded photos). See the Cleanup section.
 
-- **10:** **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → Add Object again** per chip; plain Enter overwrites the one chip), Send. Or `python-sscma` serial (see "Also worth knowing").
+- 10: **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → Add Object again** per chip; plain Enter overwrites the one chip), Send. Or `python-sscma` serial (see "Also worth knowing").
 
 
 ### What `export_yolov8_gv2.sh` does (and why each piece is load-bearing)
@@ -109,9 +109,9 @@ Exact pins live in the script (`ultralytics==8.2.8`, `tensorflow==2.16.2`,
 `ethos-u-vela==5.0.0`). Three fixes are **mandatory** — each was a hard failure
 without it:
 
-- **`TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1`**: `_pickle.UnpicklingError: Weights only load failed` (torch ≥2.6 defaults `weights_only=True`)
-- **`TF_USE_LEGACY_KERAS=1`**: `A KerasTensor cannot be used as input to a TensorFlow function` (onnx2tf 1.17.5 is Keras-2; TF 2.16 ships Keras-3)
-- **patch `onnx2tf/onnx2tf.py`: `normalized_calib_data = (…) / std` → append `.astype(np.float32)`**: `Cannot set tensor: Got FLOAT64 but expected FLOAT32 … serving_default_images:0` (INT8 calib normalisation promotes to float64)
+- `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1`: `_pickle.UnpicklingError: Weights only load failed` (torch ≥2.6 defaults `weights_only=True`)
+- `TF_USE_LEGACY_KERAS=1`: `A KerasTensor cannot be used as input to a TensorFlow function` (onnx2tf 1.17.5 is Keras-2; TF 2.16 ships Keras-3)
+- patch `onnx2tf/onnx2tf.py`: `normalized_calib_data = (…) / std` → append `.astype(np.float32)`: `Cannot set tensor: Got FLOAT64 but expected FLOAT32 … serving_default_images:0` (INT8 calib normalisation promotes to float64)
 
 `onnxsim` (**not** `onnxslim` — different package) is also required, or onnx2tf
 hits `MaxPool: unsupported operand … 'NoneType' and 'int'` on unsimplified
@@ -203,19 +203,19 @@ Take this route if pinned-8.2.8 YOLOv8 also floods.
 
 ## Also worth knowing
 
-- **Local serial flashing (skip SenseCraft cloud):** `python-sscma` —
+- Local serial flashing (skip SenseCraft cloud): `python-sscma` —
   `sscma.cli flasher model_int8_vela.tflite 0x400000`, then set class names with
   `AT+MODEL=1` + `AT+INFO="<base64 of {uuid,name,version,classes[]}>"`. Removes
   SenseCraft as a variable and stops uploading the model + class names to Seeed.
   Device holds up to 4 models (`0x400000 0x600000 0x800000 0xA00000`),
   `AT+MODELS?` lists them, `AT+MODEL=n` switches.
-- **SSCMA export calibration bug (#276, #294):** `tools/export.py` INT8
+- SSCMA export calibration bug (#276, #294): `tools/export.py` INT8
   calibration only picks up **`.jpg`** files at the **top level** of
   `--image_path`. PNG or nested → silent bad quantisation → invoke fails. Fix:
   jpg, top-level, delete stale `calibration_image_sample_data_20x128x128x3_float32.npy`.
-- **SenseCraft web training is single-class only** — not an option for
+- SenseCraft web training is single-class only: not an option for
   multi-class.
-- **Model size ceiling: ~2 MB** quantised (device flash slot). The vela models
+- Model size ceiling: ~2 MB: quantised (device flash slot). The vela models
   are ~1 MB, fine.
 - Firmware source: `github.com/Seeed-Studio/sscma-example-we2` (releases) /
   `SSCMA-Micro` submodule. No release since `20250102`; `main` has Dec-2025

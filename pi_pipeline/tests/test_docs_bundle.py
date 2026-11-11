@@ -107,3 +107,8 @@ def test_top_level_layout_groups_every_name_once():
     names = [n for _, group in B.TOP_LAYOUT for n in group]
     assert len(names) == len(set(names))
     assert set(B.SECTION_DEFAULTS) <= set(B.SECTIONS)
+
+
+def test_log_style_pages_are_not_published():
+    for path in ("docs/vision/capture-progress.md", "docs/vision/wall-check-plan.md", "docs/hardware/build-logs/i2s-audio-build-log.md", "docs/hardware/build-logs/pi-biboard-build-notes.md"):
+        assert B.is_excluded(path), path

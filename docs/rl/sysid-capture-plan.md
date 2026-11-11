@@ -4,19 +4,19 @@ Real-robot data to fit the sim and to score policies. No video. Rules (user, 202
 (drift direction and size stay out of the sim; command drift is the Pi heading hold's job). A value only counts as confident if a fit on one session reproduces on another (different day or battery).
 Why and what is in or out: [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md). What each log carries: [`hardware-logging.md`](hardware-logging.md).
 
-**Before the first session:** the Pi has the `--log-extra` change (the deploy watcher installs it when the Pi next comes online; check `~/g2_logs/deploy_done`).
+Before the first session: the Pi has the `--log-extra` change (the deploy watcher installs it when the Pi next comes online; check `~/g2_logs/deploy_done`).
 
-**Policy (updated 2026-10-18):** the walks are V7 on the pod and AI head payload (the plan was written for V2.1; the baseline runner walks whatever policy is deployed). V7's hardwood calibration is already done (2026-10-18, its fixed trim `fl=-0.3`, [`real-walk-log.md`](real-walk-log.md)); this capture is for fitting the sim, not for calibrating the walk again.
+Policy (updated 2026-10-18): the walks are V7 on the pod and AI head payload (the plan was written for V2.1; the baseline runner walks whatever policy is deployed). V7's hardwood calibration is already done (2026-10-18, its fixed trim `fl=-0.3`, [`real-walk-log.md`](real-walk-log.md)); this capture is for fitting the sim, not for calibrating the walk again.
 Since 2026-10-18 a walk with the everyday trim counts as his normal gait in the ingest gates, so these walks can feed the fits ([`real-data-pipeline.md`](real-data-pipeline.md), "Looser gates"); only a test trim (`--foot-trim`), the heading hold or a scripted walk keeps a run out. Set the floor first (`g2floor`): without a fresh label a run feeds the timing fits only.
 
 ## Session A (full pack, hardwood lane, same start spot as the baselines)
 
-- **1**: What: Pack voltage at rest; Command: `check_serial send P` (g2-voice stopped); Notes: write it down at the start and the end
-- **2**: What: 6 V7 walks, extra columns; Command: `bash tools/g2_baseline.sh start 6 sysidA_v7`; Notes: `--log-extra` is on by default; fetch with `g2_baseline.sh fetch`
-- **3**: What: 6 scripted `wkF` walks (no policy); Command: `bash tools/g2_baseline.sh start 6 sysidA_wkF --scripted-mix abab` runs V7 and `wkF` alternately; use it for 12 runs; Notes: the scripted walk is the open-loop reference
-- **4**: What: Ground truth after every run, by tape; Command: forward distance and sideways offset at the end (cm, + = right); Notes: report the numbers in chat; no video
-- **5**: What: Bench servo tests (Pi off the lid, Mac USB); Command: `tools/servo_static_test.py`, then the H13 step test; Notes: unloaded in the air, then loaded standing; repeat with the pack at about 7.9 V
-- **6**: What: Low-pack walks; Command: the same 6 V7 walks when the resting pack reads about 7.9 V; Notes: gives speed and servo strength against voltage (the `volt` column)
+- 1: What: Pack voltage at rest; Command: `check_serial send P` (g2-voice stopped); Notes: write it down at the start and the end
+- 2: What: 6 V7 walks, extra columns; Command: `bash tools/g2_baseline.sh start 6 sysidA_v7`; Notes: `--log-extra` is on by default; fetch with `g2_baseline.sh fetch`
+- 3: What: 6 scripted `wkF` walks (no policy); Command: `bash tools/g2_baseline.sh start 6 sysidA_wkF --scripted-mix abab` runs V7 and `wkF` alternately; use it for 12 runs; Notes: the scripted walk is the open-loop reference
+- 4: What: Ground truth after every run, by tape; Command: forward distance and sideways offset at the end (cm, + = right); Notes: report the numbers in chat; no video
+- 5: What: Bench servo tests (Pi off the lid, Mac USB); Command: `tools/servo_static_test.py`, then the H13 step test; Notes: unloaded in the air, then loaded standing; repeat with the pack at about 7.9 V
+- 6: What: Low-pack walks; Command: the same 6 V7 walks when the resting pack reads about 7.9 V; Notes: gives speed and servo strength against voltage (the `volt` column)
 
 ## Session B (another day, another charge): repeat 1-4 and 6 only. The fit on A is checked against B.
 
@@ -34,7 +34,7 @@ Three goals in one: test the exploration updates (wake chime, API tone, shutter 
 4. Optional but useful: a short same-battery control walk on hardwood (`g2floor hardwood` first, then back to `g2floor tile`) so the tile-versus-hardwood comparison is same-day. Tell Claude the tile size if known.
 5. `bash tools/g2_explore.sh stop`, then `g2pics pull` and `g2picscurate` for the pictures; Claude reads the first autolog run's loop timing (the first run with the capture hook on hardware) and the sidecars.
 6. Judge: the survey picture angle, the shutter volume, the chimes.
-7. **Mats and the small rug stay out of the exploration area** (pull them aside or block them with boxes): carpet is G2's known weak spot (every gait stalled on the 6.4 mm house carpet, no pile model in the sim), exploration has no surface or edge detection, and a run that crosses between floors would carry one wrong floor label and contaminate the tile fits and the snag rate. If he heads for one, stop him (`g2_explore.sh stop` or `python -m pi_pipeline.app --halt`).
+7. Mats and the small rug stay out of the exploration area (pull them aside or block them with boxes): carpet is G2's known weak spot (every gait stalled on the 6.4 mm house carpet, no pile model in the sim), exploration has no surface or edge detection, and a run that crosses between floors would carry one wrong floor label and contaminate the tile fits and the snag rate. If he heads for one, stop him (`g2_explore.sh stop` or `python -m pi_pipeline.app --halt`).
    Test them separately afterwards: tape the mat or rug down so it cannot slide on the tile, measure the edge height with a ruler, `g2floor mat` (or `rug`), then three or four head-on passes with the user present. An edge inside the sim's 12 to 35 mm ledge range can be one of the one or two ledge heights.
 
 ## Per-foot steering test (hardware; RUN 2026-10-07: the front feet steer, results in `real-walk-log.md`)

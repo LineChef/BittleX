@@ -18,13 +18,13 @@
 
 ### Resolved
 
-- **Pi power: independent, via PiSugar S 1200 mAh.** Drawing the Pi from Bittle's
+- Pi power: independent, via PiSugar S 1200 mAh. Drawing the Pi from Bittle's
   shared battery causes "reduced motion capability" (Petoi's own docs) and risks
   servo-spike brownouts. The PiSugar pogo-pins to the Pi's underside pads, leaving
   the GPIO header free, and provides UPS safe-shutdown. To avoid two 5 V sources,
   wire BiBoard → Pi **data-only (RX/TX/GND)**, no 5 V. Full reasoning:
   [`docs/hardware/pi-power.md`](pi-power.md).
-- **Enclosure:** Petoi ships an official back-cover STL with a Pi cutout
+- Enclosure: Petoi ships an official back-cover STL with a Pi cutout
   ([`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl)),
   so the cover can close over the mounted Pi. **2026-09-16: likely too shallow
   for Pi+PiSugar.** Measured its real bbox — 71.2 × **18.6** × 73.9 mm, and
@@ -33,13 +33,13 @@
   custom-modified version is now planned alongside the clips — see "Build:
   modified standoff clips + cover" below and `blueprints/mounting.md`
   for the full plan.
-- **BiBoard V1 MCU:** standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
+- BiBoard V1 MCU: standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
   ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
   detection results over serial rather than streaming raw frames. Flash is
   **4 MB**, SRAM **520 KB** (Petoi pages citing "16 MB / WROOM-32D" describe
   BiBoard V0). Board also carries a **6-axis IMU (no magnetometer; G2's board carries an ICM42670, and the firmware supports the MPU6050 on other units)**, an
   onboard offline voice-recognition module, and a speaker.
-- **Full vendor-doc spec sheet** for every part — with the "why it matters" for
+- Full vendor-doc spec sheet: for every part — with the "why it matters" for
   each — is in [`docs/hardware/specs.md`](specs.md).
   Key downstream effects: no magnetometer ⇒ favour **yaw-rate** over absolute
   heading in the RL reward (Phase 3); the vision module can stream **detections
@@ -52,7 +52,7 @@
   discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
   official board diagram. Data-only wiring is straightforward. Full pinout:
   [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos:
-  [`pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md).
+  `pi-biboard-build-notes.md`.
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.
@@ -89,24 +89,24 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
 "external power present"), so G2 can't *measure* its charge — it has to
 *estimate* from elapsed run time.
 
-- **Plan:** track uptime since the last time it was on the charger; when it
+- Plan: track uptime since the last time it was on the charger; when it
   passes a learned threshold, G2 proactively says something in character ("I'm
   getting tired, might need to rest on the charger soon") via the voice
   pipeline, and repeats/escalates as it gets closer to the empirical limit. On
   the charger ("external power present" flips true) it resets and can say it's
   charging.
-- **Needs first:** real battery-life data — run G2 doing representative work
+- Needs first: real battery-life data — run G2 doing representative work
   (idle, walking, talking, vision on) on a full charge until the Pi browns out,
   a few times, to get mean runtime and its spread. Do this early in hardware
   bring-up.
-- **Built:** `pi_pipeline/power/` (CPU governor / Wi-Fi power-save
+- Built: `pi_pipeline/power/` (CPU governor / Wi-Fi power-save
   toggle / disable-unused peripherals) and `behavior/idle_posture.py` (idle-REST
   staged descent — sit, then lie down, with life signs). Battery-*aware*
   behaviour (rest sooner on low charge) is blocked on the estimate above.
   **Sleep-mode FSM built 2026-09-10** (`behavior/sleep_mode.py`). On-demand
   vision (the two-stream safety/rich split) is still a design task (B18). Full
   analysis: [`hardware/pi-power.md`](pi-power.md).
-- **Later upgrade for a real signal (not just a timer):** an ADC on a BiBoard
+- Later upgrade for a real signal (not just a timer): an ADC on a BiBoard
   Grove analog pin (G3/G4) reading the pack voltage, so the warning is based on
   actual cell state. Optional; the timer is enough to start.
 

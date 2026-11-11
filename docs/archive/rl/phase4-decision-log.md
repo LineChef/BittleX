@@ -24,20 +24,20 @@ Bailout gates: both PASS, but 3M on-track flat-eval nominal speed was
 
 Full eval (eval_p4a.log, 10:11 AM 2026-09-03):
 
-- **cruise (cmd 0.10)**: run20m_ppo: ~0.10; p4a: **0.050**; verdict: halved
-- **fast (cmd 0.13)**: run20m_ppo: ~0.137; p4a: **0.060**; verdict: halved
-- **creep (cmd 0.04)**: run20m_ppo: ~0.033; p4a: 0.009; verdict: worse
-- **backward (cmd -0.06)**: run20m_ppo: ~-0.060; p4a: -0.027; verdict: worse
-- **speed-track err**: run20m_ppo: 0.007 "good"; p4a: **0.050 "loose"**; verdict: broke
-- **decathlon falls (payload, 25 cells)**: run20m_ppo: 0%; p4a: 0%; verdict: unchanged (payload masks)
-- **decathlon speeds**: run20m_ppo: ~0.06-0.10; p4a: ~0.03-0.05; verdict: crawling everywhere
-- **gauntlet T5.1 progress**: run20m_ppo: 0.083; p4a: 0.065; verdict: slower
-- **T6.1 -24deg descent**: run20m_ppo: 0.058; p4a: 0.019; verdict: much slower
-- **T6.3 brutal shoves**: run20m_ppo: 0.088; p4a: 0.040; verdict: much slower
-- **ledge probe up-15 (mean end x)**: run20m_ppo: 0.141; p4a: **0.014**; verdict: WORSE
-- **ledge probe up-25 / up-30**: run20m_ppo: 0.042 / 0.033; p4a: 0.008 / 0.008; verdict: WORSE
-- **ledge probe dn-15 / dn-30**: run20m_ppo: 0.226 / 0.224; p4a: 0.116 / 0.142; verdict: WORSE
-- **ledge probe min-x (up cells)**: run20m_ppo: +0.03; p4a: **-0.066**; verdict: robot backs AWAY from the ledge
+- cruise (cmd 0.10): run20m_ppo: ~0.10; p4a: **0.050**; verdict: halved
+- fast (cmd 0.13): run20m_ppo: ~0.137; p4a: **0.060**; verdict: halved
+- creep (cmd 0.04): run20m_ppo: ~0.033; p4a: 0.009; verdict: worse
+- backward (cmd -0.06): run20m_ppo: ~-0.060; p4a: -0.027; verdict: worse
+- speed-track err: run20m_ppo: 0.007 "good"; p4a: **0.050 "loose"**; verdict: broke
+- decathlon falls (payload, 25 cells): run20m_ppo: 0%; p4a: 0%; verdict: unchanged (payload masks)
+- decathlon speeds: run20m_ppo: ~0.06-0.10; p4a: ~0.03-0.05; verdict: crawling everywhere
+- gauntlet T5.1 progress: run20m_ppo: 0.083; p4a: 0.065; verdict: slower
+- T6.1 -24deg descent: run20m_ppo: 0.058; p4a: 0.019; verdict: much slower
+- T6.3 brutal shoves: run20m_ppo: 0.088; p4a: 0.040; verdict: much slower
+- ledge probe up-15 (mean end x): run20m_ppo: 0.141; p4a: **0.014**; verdict: WORSE
+- ledge probe up-25 / up-30: run20m_ppo: 0.042 / 0.033; p4a: 0.008 / 0.008; verdict: WORSE
+- ledge probe dn-15 / dn-30: run20m_ppo: 0.226 / 0.224; p4a: 0.116 / 0.142; verdict: WORSE
+- ledge probe min-x (up cells): run20m_ppo: +0.03; p4a: **-0.066**; verdict: robot backs AWAY from the ledge
 
 Decision: **REVERT.** Fails all three bar criteria at once -- (b) nominal walk
 ~50% slower, (c) ledge handling measurably WORSE not better. 0% falls is not a
@@ -175,11 +175,11 @@ it kept the capability.
 **Bare-robot recovery probe (benchmark_recovery.py -- payload OFF, rough
 terrain, calibrated shoves 0.20-0.44, 64 eps/ckpt):**
 
-- **fall rate**: run20m_ppo: 48%; p4c: 50%
-- **big tilt spikes (>0.6 rad)**: run20m_ppo: 42; p4c: 39
-- **spikes that re-settled**: run20m_ppo: 1; p4c: 4
-- **resettle time (steps)**: run20m_ppo: 20.0; p4c: 22.8
-- **net forward x (mean)**: run20m_ppo: 0.166; p4c: 0.161
+- fall rate: run20m_ppo: 48%; p4c: 50%
+- big tilt spikes (>0.6 rad): run20m_ppo: 42; p4c: 39
+- spikes that re-settled: run20m_ppo: 1; p4c: 4
+- resettle time (steps): run20m_ppo: 20.0; p4c: 22.8
+- net forward x (mean): run20m_ppo: 0.166; p4c: 0.161
 
 Fall rate is the metric that matters and it's **identical** (48 vs 50%, n=64,
 +-6% noise). Recovered-spike counts are single digits -- noise, would flip on a
@@ -195,16 +195,16 @@ BALANCE_W_DIAG + RESIDUAL_RECOVER_DEG. Commit 59f709a.
 ## PHASE 4 CONCLUSION -- no gait change; run20m_ppo stands
 
 Three rounds, no keeper for the gait:
-- **4a** ledge into training DR (25mm/30%): regressed the walk ~50%, worse ledge
+- 4a: ledge into training DR (25mm/30%): regressed the walk ~50%, worse ledge
   handling. Confounded by the LR-restart divergence (see below) but the config
   produced no keeper regardless.
-- **4b** phase-clock + imitation-fade revival: PPO diverged (kl 40-670). 3rd
+- 4b: phase-clock + imitation-fade revival: PPO diverged (kl 40-670). 3rd
   failure of that lever in project history. Retired.
-- **4c** diagonal-support catch shaping: first clean continuation, walk fully
+- 4c: diagonal-support catch shaping: first clean continuation, walk fully
   preserved, but zero measurable recovery gain. Reverted.
 
 **What Phase 4 actually produced (all kept):**
-1. **train.py finetune fix (commit bcf20fd)** -- `--finetune-lr` (constant,
+1. train.py finetune fix (commit bcf20fd): -- `--finetune-lr` (constant,
    default 3e-5) + `--finetune-target-kl` (0.05). EVERY prior `--from`
    continuation silently diverged: it restarted `linear_schedule(3e-4)` on a
    converged std~0.06 policy -> approx_kl 70-400, clip_fraction ~0.99. run20m
@@ -212,12 +212,12 @@ Three rounds, no keeper for the gait:
    continuations (phase2, phase3, phase3b, run20m itself if it was a `--from`)
    were also kicked -- worth knowing, though those runs were long enough to
    re-converge. **This is the main deliverable of Phase 4.**
-2. **benchmark_recovery.py** -- bare-robot stance-recovery probe. The
+2. benchmark_recovery.py: -- bare-robot stance-recovery probe. The
    payload-on decathlon cannot measure recovery (metric pinned at 0); this can.
-3. **Ledge terrain primitive + T7 decathlon tier + render_showcase.py** -- eval
+3. Ledge terrain primitive + T7 decathlon tier + render_showcase.py -- eval
    infrastructure, inert in training (LEDGE_HEIGHT=0), used by T7 / showcase /
    probe.
-4. **Negative knowledge:** ledge-in-DR breeds timidity; phase-clock surgery is
+4. Negative knowledge: ledge-in-DR breeds timidity; phase-clock surgery is
    dead; a conservative continuation of the converged 20M policy can't move
    stance-recovery behaviour -- FAC_BALANCE=4.0 is near the ceiling a
    residual-gait policy reaches here.

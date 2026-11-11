@@ -19,14 +19,29 @@ Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 
 ## What is in the bundle
 
-- **`latest.json`**: A tiny pointer: `version`, `built`, the names of the other files (`manifest`, `search`, `schema`), page and asset counts. Fetch this first; it changes whenever any page changes
-- **`manifest.json`**: The navigation tree (`nav`), every page's metadata (`pages`), the assets list, and the settings the links were built with (`base`, `assetsUrl`, `repo`, `branch`)
-- **`schema.json`**: The JSON Schema of `latest.json`, `manifest.json` and `search.json` (source: [`docs-bundle.schema.json`](docs-bundle.schema.json)); the contract below in machine-readable form
-- **`search.json`**: One plain-text record per page (title, headings, the first 4,000 characters) for a client-side search library
-- **`pages/<route>.md`**: Each page's Markdown with its links already rewritten. `pages/index.md` is the home page
-- **`assets/<repo path>`**: Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan)
+- `latest.json`: A tiny pointer: `version`, `built`, the names of the other files (`manifest`, `search`, `schema`), page and asset counts. Fetch this first; it changes whenever any page changes
+- `manifest.json`: The navigation tree (`nav`), every page's metadata (`pages`), the assets list, and the settings the links were built with (`base`, `assetsUrl`, `repo`, `branch`)
+- `schema.json`: The JSON Schema of `latest.json`, `manifest.json` and `search.json` (source: [`docs-bundle.schema.json`](docs-bundle.schema.json)); the contract below in machine-readable form
+- `search.json`: One plain-text record per page (title, headings, the first 4,000 characters) for a client-side search library
+- `pages/<route>.md`: Each page's Markdown with its links already rewritten. `pages/index.md` is the home page
+- `pages/<route>.html`: The same page as semantic HTML, one `<article>` with no class names and the links already rewritten. The `html` field of each page entry gives its path. See "Semantic HTML" below
+- `assets/<repo path>`: Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan)
 
 A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `audience`, `kind`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. `summary` is the first paragraph as plain text, at most 220 characters; a longer one is cut at a word boundary and ends with `…`. `search.json`'s `text` is the opposite, a raw cut-off at 4,000 characters.
+
+## Semantic HTML
+
+Each page is also written as `pages/<route>.html`: a single `<article>` that carries `data-section`, `data-audience` and `data-kind`. It contains only plain tags, so the site styles it by tag and adds wrappers or classes where it needs them.
+
+- `h1` to `h6`: The page's own headings, each with an `id` that is the anchor slug (the same ids as the `headings` list)
+- `p`: A paragraph
+- `h4`: A title that opens a list item or a paragraph (the text before its first colon, written without the colon). The text after it follows in a `p`
+- `ul` and `li`: A bulleted list. An item with a title is `<li><h4>Title</h4><p>text</p></li>`, with a nested list after the `p`
+- `ol` and `li`: A numbered list, used for procedures
+- `aside[data-callout]`: A callout written as `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`; its first child is `<h4>Warning</h4>`
+- `blockquote`: Any other block quote
+- `pre[data-lang] > code`: A fenced code block
+- `code`, `a[href]`, `img[src][alt]`, `em`, `strong` and `hr`: Inline code, links, images, emphasis and rules
 
 **Sections** are a closed set: `overview`, `guides`, `hardware`, `vision`, `rl`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
 
@@ -46,7 +61,7 @@ A node with `folder: true` is a folder with no page of its own (`code`, `legal`,
 
 Summaries keep underscores in code names the same way. Required and optional fields of every file are listed in the schema (`required`). The `nav` tree is ordered the way each folder's README lists its pages.
 
-**Routes:** `docs/guides/cheatsheet.md` is `guides/cheatsheet`; a folder's `README.md` is the folder route; `docs/README.md` is the home page (`""`); `blueprints/...` keeps its path; code READMEs live under `code/` (`code/pi_pipeline/voice`); the repository README is `about`.
+Routes: `docs/guides/cheatsheet.md` is `guides/cheatsheet`; a folder's `README.md` is the folder route; `docs/README.md` is the home page (`""`); `blueprints/...` keeps its path; code READMEs live under `code/` (`code/pi_pipeline/voice`); the repository README is `about`.
 
 **Links** inside pages are rewritten when the bundle is built: a link to another page becomes `<base>/<route>#anchor` (default base `/docs`), a link to an asset becomes `<base>/_assets/<repo path>`, and a link to a file that is not a page (a script, for example) becomes a GitHub link on the `development` branch. Serve the bundle's `assets/` folder at `<base>/_assets/` in the site, or change the links with `--base` and `--assets-url` at build time.
 
@@ -60,8 +75,8 @@ The order of the top-level pages and folders is set in the builder (`TOP_LAYOUT`
 
 The bundle gives the site a **default** order and the site may override any of it. Every entry in `manifest.pages` carries its place in the tree: `parent` (the route of its parent page, or `null` at the top), `order` (its position among its siblings) and `group` (the sidebar group label, when it has one). `manifest.nav` is the same tree already assembled. So the site has two ways to work:
 
-1. **Use `nav` as delivered.** The order and groups come from the folder READMEs.
-2. **Own the order in the site.** Build the tree from the flat `pages` list and apply a small override config kept in the site's repo. Anything the config does not mention keeps its bundle order, so a new page still appears.
+1. Use `nav` as delivered: The order and groups come from the folder READMEs.
+2. Own the order in the site: Build the tree from the flat `pages` list and apply a small override config kept in the site's repo. Anything the config does not mention keeps its bundle order, so a new page still appears.
 
 ```ts
 // src/config/docsNav.ts: a sketch of the overrides the site can keep

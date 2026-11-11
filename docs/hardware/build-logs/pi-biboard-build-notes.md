@@ -31,16 +31,16 @@ edge, three ports along the bottom:
 
 *(Image not included: third-party artwork. See [the vendor's page](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).)* Top-down port map of the Raspberry Pi Zero 2W: 40-pin GPIO header along the top edge with pins 2 (5V, not used), 6 (GND), 8 (GPIO14/TXD), 10 (GPIO15/RXD) called out; microSD slot on the left edge; mini-HDMI, a micro-USB "USB" data-only port, and a micro-USB "PWR IN" port along the bottom edge; unused CSI camera port on the right edge
 
-- **PWR IN** is the micro-USB port at the far end of the bottom edge,
+- PWR IN: is the micro-USB port at the far end of the bottom edge,
   farthest from the mini-HDMI — silkscreen reads `PWR IN`. This is where a
   bench power supply goes.
-- **USB** is the middle micro-USB port, for data only (keyboard, USB-gadget
+- USB: is the middle micro-USB port, for data only (keyboard, USB-gadget
   mode). **Powering the Pi through this port is the #1 first-timer
   mistake** — it may not boot, or boot erratically. The two ports are
   physically identical; only the tiny silkscreen text tells them apart.
 - The **microSD slot** is on the short edge, opposite the CSI camera
   connector (unused on G2 — vision runs through BiBoard's Grove module).
-- **No power button.** The Pi boots the instant power is applied. To turn
+- No power button: The Pi boots the instant power is applied. To turn
   off: `sudo shutdown now` over SSH, wait ~10s for the LED to go dark, then
   unplug.
 - The Zero 2 W takes **5V over micro-USB** (not USB-C like the Pi 4/5). For
@@ -63,10 +63,10 @@ symmetrically, so PiSugar physically bolts on in **two different 180°
 rotations** — screws thread in fine either way. Only one of them is
 electrically correct:
 
-- **Correct:** PiSugar's own micro-USB charging port, power switch, and
+- Correct: PiSugar's own micro-USB charging port, power switch, and
   battery end up under the Pi's mini-HDMI/USB-port edge. PiSugar's pogo-pin
   end ends up under the Pi's GPIO header edge.
-- **Wrong (but bolts on just as easily):** PiSugar rotated 180° from that —
+- Wrong (but bolts on just as easily): PiSugar rotated 180° from that —
   pogo pins land on bare PCB under the middle of the board, nowhere near the
   header.
 
@@ -78,7 +78,7 @@ land on the Pi's header solder-joint row (the double row of small pads at
 the base of the 40-pin header, visible from the underside) — don't rely on
 the screw holes fitting as confirmation, since they fit either way.
 
-**What the pogo pins actually contact:** 5 spring-loaded pogo pins (not 2),
+What the pogo pins actually contact: 5 spring-loaded pogo pins (not 2),
 landing directly on the underside solder joints of the Pi's own 40-pin
 header — not a separate test-pad cluster elsewhere on the board. Confirmed
 three ways: PiSugar's official FAQ states pogo pins contact "the bottom of
@@ -109,11 +109,11 @@ That matters for where the Pi mounts; see
 
 If it isn't already populated, solder a 5-pin header there. Left to right:
 
-- **1 (square pad)**: TX2
-- **2**: RX2
-- **3**: GND
-- **4**: +5V
-- **5**: +5V
+- 1 (square pad): TX2
+- 2: RX2
+- 3: GND
+- 4: +5V
+- 5: +5V
 
 **Done 2026-09-29** — 5-pin female header soldered to BiBoard.
 
@@ -122,9 +122,9 @@ If it isn't already populated, solder a 5-pin header there. Left to right:
 Three wires, crossed — one board's "sending" line goes to the other's
 "listening" line:
 
-- **TX2**: pin 10 (GPIO15, RXD)
-- **RX2**: pin 8 (GPIO14, TXD)
-- **GND**: pin 6
+- TX2: pin 10 (GPIO15, RXD)
+- RX2: pin 8 (GPIO14, TXD)
+- GND: pin 6
 
 Leave BiBoard's two +5V pins and the Pi's pin 2 (5V) **unconnected** — PiSugar
 is already powering the Pi.
@@ -132,14 +132,14 @@ is already powering the Pi.
 Both sides at once, wires drawn crossing between them — the fastest way to
 see exactly which pin goes where:
 
-- **6**: Signal: GND (black); BiBoard 5-pin socket: GND
-- **8**: Signal: GPIO14, TXD (amber); BiBoard 5-pin socket: RX2 (9)
-- **10**: Signal: GPIO15, RXD (green); BiBoard 5-pin socket: TX2 (10)
-- **2**: Signal: 5 V; BiBoard 5-pin socket: not wired (skip)
+- 6: Signal: GND (black); BiBoard 5-pin socket: GND
+- 8: Signal: GPIO14, TXD (amber); BiBoard 5-pin socket: RX2 (9)
+- 10: Signal: GPIO15, RXD (green); BiBoard 5-pin socket: TX2 (10)
+- 2: Signal: 5 V; BiBoard 5-pin socket: not wired (skip)
 
 The two +5V pins on BiBoard's socket stay unused. The drawn version of this table is in [`../wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
 
-**Why TX and RX cross:** one device's "I'm sending" line has to reach the
+Why TX and RX cross: one device's "I'm sending" line has to reach the
 other device's "I'm listening" line. Pi TXD carries the Pi's outgoing data,
 so it plugs into BiBoard's RX2 (BiBoard's incoming). BiBoard's TX2 carries
 BiBoard's outgoing data, so it plugs into the Pi's RXD (the Pi's incoming).
@@ -177,10 +177,10 @@ standard short ones.
 
 Full pinout, both boards:
 
-- **Ground**: BiBoard: GND; Pi: pin 6
-- **BiBoard sends / Pi receives**: BiBoard: TX2; Pi: pin 10 (RXD)
-- **Pi sends / BiBoard receives**: BiBoard: RX2; Pi: pin 8 (TXD)
-- **Power (not wired)**: BiBoard: +5V, +5V; Pi: pin 2
+- Ground: BiBoard: GND; Pi: pin 6
+- BiBoard sends / Pi receives: BiBoard: TX2; Pi: pin 10 (RXD)
+- Pi sends / BiBoard receives: BiBoard: RX2; Pi: pin 8 (TXD)
+- Power (not wired): BiBoard: +5V, +5V; Pi: pin 2
 
 ### Pi 40-pin header, full reference
 
@@ -201,7 +201,7 @@ deleted, so there's one place to look, not three.
 Source diagram (both sides of BiBoard, all 17 numbered components):
 [Petoi's official wiring diagram](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1).
 
-**Note:** BiBoard V1's spec sheet lists Pi compatibility as "Pi 3A+, 4, 5" —
+Note: BiBoard V1's spec sheet lists Pi compatibility as "Pi 3A+, 4, 5" —
 the Pi Zero 2 WH isn't named. The pins used here (5V/GND/GPIO14/GPIO15) are
 identical across every 40-pin Pi header including the Zero 2 W, so this is
 expected to work regardless — worth a quick visual check of the header once
