@@ -239,4 +239,4 @@ BiBoard connector/pin the claw servo uses. Resolve these from Petoi's shop page 
 - It changes the mass and front/rear balance, which the gait policy is trained against (payload study:
   [`specs.md`](../hardware/specs.md) and the proposed-build weights). The arm's weight is not published, so that needs a measurement.
 - The arm build is a separate firmware, and a firmware change interacts with the BiBoard flashing and calibration state; see
-  `calibration-and-bringup-research.md`.
+  `calibration-and-bringup-research.md` (removed; see git history).

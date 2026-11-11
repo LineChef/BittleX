@@ -49,8 +49,8 @@ Hardware
 - PiSugar S 1200 mAh: Independent Pi power, not shared with the servo battery — see [`docs/hardware/pi-power.md`](docs/hardware/pi-power.md)
 - Petoi AI Vision Camera Module: Grove Vision AI V2, onboard neural processor for on-device inference
 
-Full parts list, costs, and vendor-doc specs: [`docs/hardware/parts-and-decisions.md`](docs/hardware/parts-and-decisions.md)
-and [`docs/hardware/specs.md`](docs/hardware/specs.md).
+The parts list is in [`docs/hardware/as-built.md`](docs/hardware/as-built.md) and the vendor-doc specs are in
+[`docs/hardware/specs.md`](docs/hardware/specs.md).
 
 Project Status
 --------------

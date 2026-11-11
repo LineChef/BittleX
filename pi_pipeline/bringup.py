@@ -71,8 +71,8 @@ def _steps() -> list[Step]:
             "feels stuck/weak despite a correct command, that's likely tight "
             "new-gear protection kicking in, not a fault -- rotate it by "
             "hand with moderate resistance first. Route the neck cable "
-            "knee-side to shoulder-side to avoid pinching. Full research: "
-            "docs/hardware/calibration-and-bringup-research.md."),
+            "knee-side to shoulder-side to avoid pinching. The calibration steps "
+            "are in blueprints/calibration.md."),
         Step("2", "Assembly & mechanical (Phase 0)", "Range-of-motion pass + firmware calibration",
             "ON THE STAND, BEFORE it touches the ground -- and stay there "
             "through step 13a (see the rule at the top of this list): a full "

@@ -946,7 +946,7 @@ the empirical limit, reset when placed on the charger. Optional later upgrade:
 an ADC on a BiBoard Grove analog pin (G3/G4) reading pack voltage for a true
 signal. Needs battery-life data first (idle / walking / talking / vision-on runs
 to brown-out, repeated). Software on the voice pipeline + memory.
-See the "Power awareness" note in `docs/hardware/parts-and-decisions.md`.
+See the "Power awareness" note in `docs/hardware/parts-and-decisions.md` (removed; see git history).
 
 ### B18 — Idle power management + "feels alive" idle behaviour  🟡
 Runtime-maximising measures + the lifelike idle layer they hang off. Full

@@ -4,7 +4,7 @@ The order G2 was built in, with the page that holds the detail for each step. Fo
 
 1. Mount the PiSugar S under the Pi Zero 2 W (pogo-pin contact, header stays free)
 2. Assemble the Bittle X V2 frame, servos and BiBoard from Petoi's kit. See: Petoi's assembly guide
-3. Erase and reflash the BiBoard with the current official OpenCat firmware. See: [`../docs/hardware/petoi-firmware-reference.md`](../docs/hardware/petoi-firmware-reference.md), [`../docs/hardware/calibration-and-bringup-research.md`](../docs/hardware/calibration-and-bringup-research.md)
+3. Erase and reflash the BiBoard with the current official OpenCat firmware. See: [`../docs/hardware/petoi-firmware-reference.md`](../docs/hardware/petoi-firmware-reference.md)
 4. Calibrate the eight leg servos with the bracket and verify with `kbalance`. See: [`calibration.md`](calibration.md)
 5. Prepare the BiBoard's 5-pin Pi socket (solder the header)
 6. Wire Pi to BiBoard: TX, RX and GND only (data, no 5 V). See: [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html)
@@ -14,6 +14,6 @@ The order G2 was built in, with the page that holds the detail for each step. Fo
 10. Mount the Pi stack, camera, speaker and microphone in the Bittle X Pi add-on pod on the platform cover (an interim mount used a modified back cover). See: [`mounting.md`](mounting.md)
 11. Replace the front-left shoulder servo and re-run calibration. See: [`calibration.md`](calibration.md)
 
-After the hardware is together: [`../docs/guides/bring-up-sequence.md`](../docs/guides/bring-up-sequence.md) is the ordered software and first-movement bring-up (run it with `python -m pi_pipeline.bringup`).
+After the hardware is together, [Reproducing G2](../docs/guides/reproduce-g2.md) is the ordered software and first-movement bring-up (the guided version is `python -m pi_pipeline.bringup`).
 
 Not part of the build: the Petoi AI Head and the arm module. Its wiring, if it is ever added, is Part 2 of the wiring guide.
