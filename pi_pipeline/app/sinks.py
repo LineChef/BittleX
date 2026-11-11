@@ -125,7 +125,19 @@ class WalkerSink:
     def turning(self) -> bool:
         return self._clock() < self._turn_until
 
+    def hold(self) -> None:
+        """Nothing walks or turns until `release()`: a sag recovery is moving the legs (every walk / turn command is ignored meanwhile)."""
+        self._held = True
+        self._turn_until = 0.0
+
+    def release(self) -> None:
+        self._held, self._last = False, ""         # the next walk sends its token again
+
+    _held = False
+
     def walk(self, bias: float = 0.0) -> None:
+        if self._held:
+            return
         if self.turning():
             return                              # a timed turn is running: let it finish before walking on
         if self._turn_until:                    # it just ended: the next command (re)starts cleanly
@@ -145,6 +157,8 @@ class WalkerSink:
 
     def turn(self, rad: float, urgent: bool = False) -> None:
         r = float(rad)
+        if self._held:
+            return
         if urgent:
             self._turn_until = 0.0              # a wall ahead: cancel the turn that is running and turn away now
         if abs(r) < self.TURN_MIN_RAD or self.turning():
@@ -220,7 +234,9 @@ class WalkerSink:
             def report():
                 try:
                     y1 = fn()
-                    if y1 is not None:
+                    if y1 is not None and y1 == y0 and dur >= 1.0:
+                        log.warning("turn result: asked %s %.0f deg, but the yaw reading did not change at all over %.1f s: no IMU frames came in (the IMU print is off?), so this is NO measurement of the turn", side, asked_deg, dur)
+                    elif y1 is not None:
                         got = (y1 - y0 + 180.0) % 360.0 - 180.0
                         log.info("turn result: asked %s %.0f deg, the IMU saw %+.0f deg (+ = right)", side, asked_deg, got)
                 except Exception:  # noqa: BLE001

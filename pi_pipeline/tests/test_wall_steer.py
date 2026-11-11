@@ -265,3 +265,23 @@ def test_a_new_look_during_a_turn_away_does_not_start_the_hit_sequence_but_a_bum
     c.adv(0.6)
     big = payloads(d.tick(DriverInputs(frame=[])), EffectKind.TURN)
     assert big and big[0] > 2.0                                                  # and turns around to the RIGHT, the turn-away's side, not the look's left
+
+
+def test_the_same_wall_turned_away_from_three_times_hands_over_to_the_hit_sequence(monkeypatch):
+    """2026-11-10 roam: eight identical 52-degree turns in 35 s, 'wall ahead 12 in' every time. The third turn-away at the same distance backs up and turns around instead."""
+    d, c = _explorer(monkeypatch)
+    for n in range(2):
+        t = d.tick(DriverInputs(frame=[], wall=_wall(c, inches=12.0, turn="right")))
+        assert [p for p in payloads(t, EffectKind.DIAG) if p[0] == "wall.steer"], n
+        c.adv(5.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, inches=12.0, turn="right")))
+    hit = [p for p in payloads(t, EffectKind.DIAG) if p[0] == "wall.hit"]
+    assert hit and "times in" in hit[0][1] and not [p for p in payloads(t, EffectKind.DIAG) if p[0] == "wall.steer"]
+
+
+def test_turns_away_from_walls_at_different_distances_do_not_count_as_a_loop(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    for inches in (12.0, 20.0, 12.0, 20.0):
+        t = d.tick(DriverInputs(frame=[], wall=_wall(c, inches=inches, turn="right")))
+        assert not [p for p in payloads(t, EffectKind.DIAG) if p[0] == "wall.hit"]
+        c.adv(5.0)

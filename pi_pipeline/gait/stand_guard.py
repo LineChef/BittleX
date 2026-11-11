@@ -89,7 +89,8 @@ class StandGuard:
                  guard: bool = True, reassert_s: float = 60.0, quiet_after_activity_s: float = 8.0, on_trip=None,
                  reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = 60.0,
                  clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2,
-                 on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0):
+                 on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0,
+                 is_walking=None, walk_sag_deg: float = 12.0):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
         self._balance_off_idle, self._guard = balance_off_idle, guard
@@ -120,8 +121,59 @@ class StandGuard:
         self._sag_checked_at = -1e9
         self._sag_running = False
         self.sags = 0
+        # Sagging legs WHILE WALKING (2026-11-10 roam: both back legs gave way and he stopped walking, and the stand check never ran because it needs 5 s with no command). `is_walking()` says a firmware
+        # gait is the last move; the tilt a few seconds into the walk is the reference, a later median that is `walk_sag_deg` away from it is a sag. Off unless `is_walking` is given.
+        self._is_walking, self._walk_sag_deg = is_walking, walk_sag_deg
+        self._walk_t0: float | None = None
+        self._walk_ref: tuple | None = None
 
     OFF_RESEND_S = 30.0
+    WALK_REF_FROM_S, WALK_REF_TO_S, WALK_CHECK_FROM_S = 2.0, 5.0, 8.0
+
+    def _check_walk_sag(self, now: float) -> None:
+        """Walking: a tilt median of the last 3 s that has moved `walk_sag_deg` from the one 2-5 s into the walk calls `on_sag(roll, pitch)` once (the caller stops the walk first). Never inside a gait's first 8 s."""
+        if self._on_sag is None or self._is_walking is None or self._sag_running:
+            return
+        try:
+            walking = bool(self._is_walking())
+        except Exception:  # noqa: BLE001
+            walking = False
+        if not walking:
+            self._walk_t0 = self._walk_ref = None
+            return
+        if self._walk_t0 is None:
+            self._walk_t0 = now
+            return
+        since = now - self._walk_t0
+        if self._walk_ref is None and since >= self.WALK_REF_TO_S:
+            rows = [x for x in self._hist if self._walk_t0 + self.WALK_REF_FROM_S <= x[0] <= self._walk_t0 + self.WALK_REF_TO_S]
+            self._walk_ref = self._median_tilt(rows) if len(rows) >= 5 else None
+            if self._walk_ref is None:
+                self._walk_t0 = now                  # no frames to judge by (the IMU print is off): start counting again, the check stays quiet
+            return
+        if self._walk_ref is None or since < self.WALK_CHECK_FROM_S or now - self._sag_checked_at < self._sag_every_s:
+            return
+        rows = [x for x in self._hist if x[0] >= now - 3.0]
+        if len(rows) < 8:
+            return
+        roll, pitch = self._median_tilt(rows)
+        if max(abs(roll - self._walk_ref[0]), abs(pitch - self._walk_ref[1])) <= self._walk_sag_deg or max(abs(roll), abs(pitch)) > 40.0:
+            return
+        self._sag_checked_at = now
+        self.sags += 1
+        self._sag_running = True
+        log.warning("legs sagged while walking (roll %+.0f pitch %+.0f deg; walked at roll %+.0f pitch %+.0f): stop, attention pose, stand up again", roll, pitch, self._walk_ref[0], self._walk_ref[1])
+
+        def work():
+            try:
+                self._on_sag(roll, pitch)
+            except Exception:  # noqa: BLE001
+                log.exception("sag recovery failed")
+            finally:
+                self._sag_running = False
+                self._walk_t0 = self._walk_ref = None
+                self.note_activity()
+        threading.Thread(target=work, name="walk-sag-recovery", daemon=True).start()
 
     def note_activity(self) -> None:
         self._quiet_until = self._clock() + self._quiet_s
@@ -272,6 +324,8 @@ class StandGuard:
         if self._is_busy():
             self._quiet_until = now + self._quiet_s
             self._det.reset()
+            if self._guard and not getattr(self, "_paused", False):
+                self._check_walk_sag(now)
             return False
         if not getattr(self, "_paused", False) and self._guard:
             self._check_sag(now)

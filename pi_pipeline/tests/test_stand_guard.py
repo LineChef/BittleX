@@ -277,3 +277,59 @@ def test_a_sag_is_not_looked_for_while_not_standing_or_before_five_seconds_or_af
     assert sag_run(lambda s: -2.0 if s < 3.5 else -20.0, seconds=4.9)[1] == []
     assert sag_run(lambda s: -2.0 if s < 7.0 else -55.0)[1] == []         # past 40 deg: a fall, the fall handler's business
 
+
+
+# ---- sagging legs while walking (2026-11-10)
+
+def _walk_run(g, link, clock, seconds, roll, pitch):
+    for _ in range(int(seconds / 0.2)):
+        clock.t += 0.2
+        link.queue = [imu_line(roll, pitch)]
+        g.tick()
+
+
+def test_legs_that_sag_while_walking_call_the_recovery_once_after_the_reference_is_taken():
+    import time as _t
+    link, clock, hits = FakeLink(), Clock(), []
+    g = StandGuard(link, is_busy=lambda: True, clock=clock, sleep=lambda s: None, balance_off_idle=False,
+                   on_sag=lambda r, p: hits.append((r, p)), is_walking=lambda: True)
+    _walk_run(g, link, clock, 8.0, 1.0, -2.0)           # walks level: the reference
+    assert hits == []
+    _walk_run(g, link, clock, 6.0, 1.0, -18.0)          # the back legs give way: the nose drops
+    for _ in range(50):
+        if hits:
+            break
+        _t.sleep(0.02)
+    assert len(hits) == 1 and hits[0][1] < -10
+
+
+def test_a_steady_walk_never_calls_the_walk_sag_recovery_and_not_walking_stays_quiet():
+    link, clock, hits = FakeLink(), Clock(), []
+    g = StandGuard(link, is_busy=lambda: True, clock=clock, sleep=lambda s: None, balance_off_idle=False,
+                   on_sag=lambda r, p: hits.append(1), is_walking=lambda: True)
+    _walk_run(g, link, clock, 30.0, 2.0, -3.0)
+    g2 = StandGuard(link, is_busy=lambda: True, clock=clock, sleep=lambda s: None, balance_off_idle=False,
+                    on_sag=lambda r, p: hits.append(2), is_walking=lambda: False)
+    _walk_run(g2, link, clock, 8.0, 1.0, -2.0)
+    _walk_run(g2, link, clock, 8.0, 1.0, -25.0)
+    assert hits == []
+
+
+def test_the_walker_ignores_walk_and_turn_commands_while_held_and_sends_its_token_again_after():
+    from pi_pipeline.app.sinks import WalkerSink
+    sent = []
+
+    class L:
+        last_motion_command = ""
+
+        def send(self, c, **kw):
+            sent.append(c)
+    w = WalkerSink(L())
+    w.walk(0.0)
+    w.hold()
+    w.walk(0.0)
+    w.turn(1.0)
+    assert sent == ["kwkF"]
+    w.release()
+    w.walk(0.0)
+    assert sent == ["kwkF", "kwkF"]

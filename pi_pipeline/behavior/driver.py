@@ -565,6 +565,8 @@ class BehaviorDriver:
         very_near = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN
         if not (blocked or ahead or very_near or (w.state == "near" and w.confirmed)):
             return None
+        if self._steer_repeats(now, w.nearest_in):
+            return self._hit_wall(i, now, force=f"wall turned away from {self.STEER_REPEAT_N} times in {self.STEER_REPEAT_S:g} s and still {w.nearest_in if w.nearest_in is not None else 0:g} in ahead")
         self._wall_seen_t = w.t
         self._last_wall_reaction = now
         side = w.turn or "right"
@@ -581,6 +583,24 @@ class BehaviorDriver:
         fx.append(Effect(EffectKind.TURN, UrgentTurn(rad), why))
         self._last_reason = why
         return fx
+
+    STEER_REPEAT_N = 3           # this many wall turn-aways ...
+    STEER_REPEAT_S = 20.0        # ... within this many seconds ...
+    STEER_REPEAT_IN = 2.0        # ... at the same distance (inches): the turns are not clearing the wall (sagging legs, a corner), so the hit sequence (back up, turn around) takes over
+
+    def _steer_repeats(self, now: float, nearest_in) -> bool:
+        """Records this wall turn-away and says whether it is the STEER_REPEAT_N-th at the same wall distance within STEER_REPEAT_S (2026-11-10 roam: eight identical 52-degree turns in 35 s, "wall ahead 12 in" every time).
+        The same rule in every mode that steers by the wall (the hit sequence is the one the IMU contact uses)."""
+        hist = getattr(self, "_steer_hist", None)
+        if hist is None:
+            hist = self._steer_hist = []
+        hist[:] = [(t, d) for t, d in hist if now - t <= self.STEER_REPEAT_S]
+        same = [1 for t, d in hist if d is not None and nearest_in is not None and abs(d - nearest_in) <= self.STEER_REPEAT_IN]
+        if len(same) + 1 >= self.STEER_REPEAT_N:
+            hist.clear()
+            return True
+        hist.append((now, nearest_in))
+        return False
 
     def _wall_unbelieved(self, w) -> bool:
         """The same rule as the ball chase's `vet_wall` (ball_chase.wall_stuck_count): a wall reading at the calibration's closest row for WALL_STUCK_LOOKS fresh looks in a row is not believed (on the claw camera it
@@ -604,7 +624,7 @@ class BehaviorDriver:
         self._contact_t = time.monotonic()
         logging.getLogger("g2.wall.hit").info("IMU contact signal: %s", ev)
 
-    def _hit_wall(self, i: DriverInputs, now: float) -> list | None:
+    def _hit_wall(self, i: DriverInputs, now: float, force: str | None = None) -> list | None:
         """He has walked into a wall (the last wall look is fresh and says blocked, or a wall 6 in or closer on three or more groups): say "ooooof", back up, then turn around toward the
         open side (user, 2026-10-10). A prototype from vision alone; a stall / jam signal is still to come. Runs as a choreography so nothing else acts until it is done.
         `G2_HIT_WALL=0` turns it off."""
@@ -617,9 +637,9 @@ class BehaviorDriver:
                  and w.nearest_in <= self.STUCK_NEAREST_IN and w.prev_nearest_in <= self.STUCK_NEAREST_IN and abs(w.nearest_in - w.prev_nearest_in) <= 2.0 and w.near_groups >= 3
                  and self._last_wall_reaction < w.t - w.prev_age_s)            # two looks in a row at the same close wall and no turn in between: he is not getting anywhere
         seen = fresh and (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3) or stuck)
-        if not (seen or contact):
+        if not (seen or contact or force):
             return None
-        if now < self._wall_turn_until and not contact:
+        if now < self._wall_turn_until and not contact and not force:
             return None                           # a new look at the wall he is already turning away from: let that turn finish (2026-10-10: the turn-away and the hit turn fought); a real bump (IMU) still counts
         if contact:
             self._contact_seen = self._contact_t
@@ -630,7 +650,8 @@ class BehaviorDriver:
         if self._steer_side and now - self._steer_t <= self.WALL_TURN_HOLD_S + self.STEER_KEEP_SIDE_S:
             side = self._steer_side               # he was just turning away toward this side: keep it, so the turn-around does not undo the turn-away
         rad = self.HIT_TURN_RAD * (1.0 if side == "right" else -1.0)
-        why = (f"hit something (IMU: pushing without moving, {state}): oof, back up, turn {side}" if contact and not seen else
+        why = (f"{force}: oof, back up, turn {side}" if force and not contact and not seen else
+               f"hit something (IMU: pushing without moving, {state}): oof, back up, turn {side}" if contact and not seen else
                f"{'stuck at a wall' if stuck and state != 'blocked' else 'hit a wall'} ({near if near is not None else 0:g} in, {state}): oof, back up, turn {side}")
         logging.getLogger("g2.wall.hit").info("%s", why)
         steps = [(0.0, Effect(EffectKind.DIAG, ("wall.hit", why), why)),
