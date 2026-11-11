@@ -23,9 +23,7 @@ stock, default way to run a Pi on Bittle: *"All of the robots run on
 NyBoard/BiBoard which can power the Pi and communicate with the Pi through the
 serial port in the 2x5 socket."*
 
-Correction: an earlier version of this doc quoted *"Reduced
-motion capability may happen when connected to Pi! A stronger battery is
-needed"* as if it were general Petoi guidance. Re-traced to its source
+Note: the remark *"Reduced motion capability may happen when connected to Pi! A stronger battery is needed"* is not general Petoi guidance. Re-traced to its source
 (`guide.petoi.com`'s Raspberry-Pi-serial-port page): that warning is on the
 **NyBoard/Nybble** section, about Nybble's stock **two 14500 batteries in
 series**, and Petoi's own fix for it is to upgrade to *"high drain 7.4 Lipo
@@ -108,7 +106,7 @@ shared-power question entirely.
 Resolved — data-only wiring confirmed
 -------------------------------------
 
-2026-09-14: BiBoard V1's Pi connector is a discrete 5-pin header (TX2,
+BiBoard V1's Pi connector is a discrete 5-pin header (TX2,
 RX2, GND, +5V, +5V), each pin its own solder pad — not a rigid block that
 forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
 both +5V pins left unconnected) is straightforward. Full pinout, confirmed
@@ -156,7 +154,7 @@ By voice: "what is your power level" / "how much battery do you have left" gives
 
 It enters the estimate only when you confirm it was a full charge run to empty (`python -m pi_pipeline.power runtime count <index>`; `runtime list` shows the indexes). A clean OS shutdown is discarded. The Pi-battery warning uses timed tests and confirmed log runs, and ignores manual entries.
 
-`runtime add <seconds> full` records a run you vouch for as full-to-empty (source `confirmed`, also used by the warning). The estimate is the mean of those: 2026-10-10 the user confirmed 11,376 s, 11,776 s and 12,245 s (3 h 24 min: booted about 9:00:49 AM, last seen 12:24:54 PM, unreachable from 12:25:39 PM), so 11,799 s (3.28 h).
+`runtime add <seconds> full` records a run you vouch for as full-to-empty (source `confirmed`, also used by the warning). The estimate is the mean of those; the confirmed runs were 11,376 s, 11,776 s and 12,245 s (3 h 24 min: booted about 9:00:49 AM, last seen 12:24:54 PM, unreachable from 12:25:39 PM), so 11,799 s (3.28 h).
 
 Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
@@ -192,17 +190,13 @@ Next
 - DONE: disable-unused (`pi_pipeline.power`), Wi-Fi power-save toggle,
   CPU-governor helper — `python -m pi_pipeline.power status|headless|interactive`
   — **and** idle-REST staged descent (`IdlePosture`) and the sleep-mode state
-  machine (`SleepMode`), both fully built + wired + tested (corrected 2026-09-16;
-  an earlier version of this doc listed these as still needing a focused
-  design session — they don't, that work already landed).
+  machine (`SleepMode`), both fully built + wired + tested.
 - Focused-session TODO on-demand vision rate-scaling only — the camera
-  currently just goes on/off with sleep mode, not scaled to activity level as
-  originally scoped above.
+  currently just goes on/off with sleep mode, not scaled to activity level.
 - Hardware-gated: a real power budget from an inline current meter (the
   PiSugar S has no telemetry) — active walking, idle-stand, sit, REST, Pi under
   vision load, Pi asleep. Feeds the sleep-mode timeout tuning.
-- **Forward-looking caution, found on Petoi's community forum archive,
-  2026-09-16:** if a *real* OS-level power-off is ever added (not needed
+- **Forward-looking caution, from Petoi's community forum archive:** if a *real* OS-level power-off is ever added (not needed
   today — G2's "shut down" voice command is deliberately not an OS power-off,
   see `archive/plan-detail/phase10-integration.md` "Graceful shutdown"), a community member
   ([petoi.camp, "Next Steps: Pogo Pins..." thread](https://www.petoi.camp/))

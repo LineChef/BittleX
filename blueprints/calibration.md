@@ -1,4 +1,4 @@
-# Servo calibration (post-reflash), 2026-09-29
+# Servo calibration (post-reflash)
 
 Real joint calibration on G2's BiBoard, done after the firmware reflash
 wiped the previous coarse/factory calibration (see
@@ -54,14 +54,14 @@ saving calibration
 difference): **all four feet came down level both times.** Calibration
 confirmed good.
 
-This is the same pose used earlier (2026-09-28, pre-reflash) to rule out
+This is the same pose used earlier (pre-reflash) to rule out
 a per-leg zero-point offset while chasing the `vtF` stumble; see
 Petoi's assembly guide.
 
 After the front-left shoulder servo was replaced
 ------------------------------------------------
 
-The front-left shoulder servo (servo 8) was replaced on 2026-10-06 and the
+The front-left shoulder servo (servo 8) was replaced and the
 joint calibration was redone afterwards; the date of the second calibration was
 not recorded. The walking evidence for the swap (drift fell from about 140 to
 about 40 degrees per 12.5 s). The walk logs record it.
@@ -86,7 +86,7 @@ joint, "Shoulder" (4 to 7) is unused on Bittle.
 If the arm firmware's calibration starts from zero, these are the leg values to enter before the `c-2` claw calibration; the calibration pose then shows whether
 any leg needs a touch-up.
 
-Bittle X+Arm calibration (2026-10-24, about 10:10 PM)
+Bittle X+Arm calibration
 -----------------------------------------------------
 
 After the Petoi robot arm replaced the AI head and the BiBoard was flashed with Petoi's Bittle X+Arm firmware (software B10_260527, written with the Desktop App's
@@ -109,7 +109,7 @@ The calibration pose hides this because it puts every joint at 0 degrees, so a s
 the knee, so each right servo got the other one's angle. With gyro balance off, the stand pose measured a 31 degree roll even though the commanded angles were
 symmetric left to right.
 
-How it was found: G2 on his feet, one joint moved at a time (`m<socket> <angle>`, 10 degrees for 1.5 s, then back) in the order 8, 12, 9, 13, 11, 15, 10, 14.
+Method: G2 on his feet, one joint moved at a time (`m<socket> <angle>`, 10 degrees for 1.5 s, then back) in the order 8, 12, 9, 13, 11, 15, 10, 14.
 On the left the upper leg moved first and then the knee. On the right the knee moved first and then the upper leg.
 
 Fix: swap the cables back (9 and 13, 10 and 14), then redo the right legs in the Joint Calibrator, because offsets entered while the cables were swapped went to the

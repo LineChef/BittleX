@@ -20,7 +20,7 @@ Related: `vision/capture-checklist.md` (the capture routine),
 - The repo, with the venv: `source pi_pipeline/.venv/bin/activate`.
 - Camera plugged into the Mac. Confirm: `ls /dev/cu.usbmodem*`.
 
-> **The port has one owner at a time.** SenseCraft's in-app "disconnect" does NOT release the
+> **Only one program can hold the port at a time.** SenseCraft's in-app "disconnect" does NOT release the
 > browser's serial port — the **SenseCraft tab must be closed** before any local
 > script can open `/dev/cu.usbmodem*` (else "Resource busy"; `lsof` shows
 > Google Chrome).

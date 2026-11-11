@@ -9,7 +9,7 @@ Status: person-detection model deployed + validated end-to-end; the
 `terrain_feature`) are built and mock-tested; the multi-model management below is
 **not built**.
 
-> **2026-09-08 — vision-navigation held behind a flag.** The camera currently
+> **Vision navigation is held behind a flag.** The camera currently
 > runs a **single-class face model** (one enrolled face), not an
 > obstacle/edge/person detector. There is **no sensor that "just sees" things in
 > G2's path** — a tiny
@@ -114,7 +114,7 @@ A thin `pi_pipeline/vision/model_manager.py`:
 Do this first — dataset-quality threshold experiment
 ----------------------------------------------------
 
-The 2026-09-06 practice run only proved "37 dark frames = far below the floor."
+An early practice run only proved "37 dark frames = far below the floor."
 Before committing effort per person/class, find the floor:
 
 1. Capture **one good, varied daylight set** (~120 images) of a single subject.
@@ -151,7 +151,7 @@ Consumers (mostly built)
 - `vision/feed.py` `SerialDetectionFeed`: Uses: parses INVOKE → `Detection`; State: built; auto-starts inference; `VISION_LABELS` names classes
 - `vision/avoidance.py` `Avoider`: Uses: box area → closeness, `center_x` → bearing; State: built; thresholds need real-detection + stopping-distance calibration
 - `vision/scene.py`: Uses: detections → text → Claude narration; State: built
-- `vision/terrain_feature.py`: Uses: box → (dist, bearing, tall_flag) for the gait obs; State: removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d)
+- `vision/terrain_feature.py`: Uses: box → (dist, bearing, tall_flag) for the gait obs; State: removed with vision-in-the-gait closed; recover it from git (it is in commit f6f133d)
 - `personality/bonds.py`: Uses: detection label → disposition / closeness; State: built (API only)
 - `memory` + B11 place memory: Uses: accumulate "kitchen has a table", "dog near couch"; State: memory built; place-graph not
 

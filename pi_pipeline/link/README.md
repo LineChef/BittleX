@@ -33,7 +33,7 @@ on the Pi Zero 2 W.
 Command reference (what is used)
 --------------------------------
 
-Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (2026-09-07 —
+Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (see
 `docs/hardware/petoi-firmware-reference.md`) + project Phase 4 notes:
 
 - `k<skill>`: perform a named skill — `kwkF`, `ksit`, `kbalance`, `ktrF`, `kcrF`, …

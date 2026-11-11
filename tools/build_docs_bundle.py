@@ -36,7 +36,41 @@ sys.path.insert(0, HERE)
 GIT_EXES = ("git", "/Library/Developer/CommandLineTools/usr/bin/git")
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".html"}
 CODE_READMES = ("pi_pipeline/README.md", "tools/README.md", "rl_training/README.md", "rl_training/opencat-gym/reference_gait/README.md")
-FOLDER_TITLES = {"hardware/build-logs": "Build logs", "code": "Code READMEs", "legal": "Legal", "code/pi_pipeline": "Pi pipeline code"}
+FOLDER_TITLES = {"hardware/build-logs": "Build logs", "code": "Code", "legal": "Legal"}
+# The short titles the site's navigation shows (docs/nav-titles.json: route -> title). A page keeps its full `title`; its nav node and its `navTitle` use the short one. A top-level node is one or two words,
+# a child is at most four words and 30 characters, so the sidebar does not wrap; the build refuses anything longer.
+NAV_TITLES_FILE = os.path.join(ROOT, "docs", "nav-titles.json")
+NAV_TOP_WORDS, NAV_TOP_CHARS, NAV_CHILD_WORDS, NAV_CHILD_CHARS = 2, 22, 4, 30
+
+
+NAV_ORDER_FILE = os.path.join(ROOT, "docs", "nav-order.json")
+
+
+def load_nav_order():
+    """docs/nav-order.json: for a folder route (or "top"), a list of [group label, [child routes in order]]. Most important first. A child that is not listed fails the build, so every page has a deliberate place."""
+    try:
+        return json.load(open(NAV_ORDER_FILE, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def load_nav_titles():
+    try:
+        return json.load(open(NAV_TITLES_FILE, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def nav_title_problems(nodes, depth=0):
+    """Titles in the nav tree that are too long to fit the sidebar: [(route, title, why)]."""
+    bad = []
+    for n in nodes:
+        words, chars = len(n["title"].split()), len(n["title"])
+        lw, lc = (NAV_TOP_WORDS, NAV_TOP_CHARS) if depth == 0 else (NAV_CHILD_WORDS, NAV_CHILD_CHARS)
+        if words > lw or chars > lc:
+            bad.append((n["route"], n["title"], f"{'top-level' if depth == 0 else 'child'} nav titles are at most {lw} words and {lc} characters"))
+        bad += nav_title_problems(n.get("children", []), depth + 1)
+    return bad
 # Top-level order and sidebar groups (a top-level node's `group`): what a newcomer reads first, then how to build and run G2, then the internals.
 TOP_LAYOUT = [("Start here", ["how-it-works", "capabilities", "STATUS", "project-plan"]),
               ("Build and operate", ["guides", "hardware", "vision", "blueprints"]),
@@ -50,14 +84,14 @@ EXCLUDED_FILES = {"docs/vision/capture-progress.md", "docs/vision/wall-check-pla
 # Who a page is for and what it is, by section; a page's front matter (`audience:` / `kind:`) overrides these.
 AUDIENCES = ["visitor", "builder", "contributor"]
 KINDS = ["overview", "guide", "reference", "concept"]
-SECTION_DEFAULTS = {"overview": ("visitor", "overview"), "guides": ("builder", "guide"), "hardware": ("builder", "reference"),
+SECTION_DEFAULTS = {"overview": ("visitor", "overview"), "specification": ("contributor", "reference"), "guides": ("builder", "guide"), "hardware": ("builder", "reference"),
                     "vision": ("builder", "reference"), "rl": ("contributor", "concept"), "blueprints": ("builder", "guide"),
                     "code": ("contributor", "reference"), "legal": ("visitor", "reference"), "about": ("visitor", "overview")}
 LEFT_OUT = "left-out page: "
 LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
 FENCE = re.compile(r"^(```|~~~)")
 # The closed sets the schema (docs/guides/docs-bundle.schema.json, shipped as schema.json) promises; the build refuses a value outside them, so the schema cannot drift.
-SECTIONS = ["overview", "guides", "hardware", "vision", "rl", "blueprints", "code", "legal", "about"]
+SECTIONS = ["overview", "specification", "guides", "hardware", "vision", "rl", "blueprints", "code", "legal", "about"]
 ASSET_KINDS = ["png", "jpg", "jpeg", "gif", "svg", "pdf", "html"]      # one per ASSET_EXT; the files in the bundle today are html and pdf
 SUMMARY_MAX = 220
 
@@ -284,7 +318,9 @@ def groups_of(readme_text, readme_src, pages):
 
 def build_nav(entries, bodies, pages):
     """entries: route -> entry. Returns a nested nav list."""
-    nodes = {r: {"route": r, "title": e["title"], "section": e["section"], "children": []} for r, e in entries.items()}
+    titles = load_nav_titles()
+    nav_order, unplaced = load_nav_order(), []
+    nodes = {r: {"route": r, "title": titles.get(r, e["title"]), "section": e["section"], "children": []} for r, e in entries.items()}
     folders = {}
 
     def folder(path):
@@ -293,7 +329,7 @@ def build_nav(entries, bodies, pages):
         if path in nodes:
             folders[path] = nodes[path]
             return nodes[path]
-        title = FOLDER_TITLES.get(path, path.split("/")[-1])
+        title = titles.get(path, FOLDER_TITLES.get(path, path.split("/")[-1]))
         n = {"route": path, "title": title, "section": "", "children": [], "folder": True}
         folders[path] = n
         parent = folder(posixpath.dirname(path)) if posixpath.dirname(path) else None
@@ -325,6 +361,22 @@ def build_nav(entries, bodies, pages):
             for c in n["children"]:
                 if c["route"] in g:
                     c["group"] = g[c["route"]]
+        listed = nav_order.get(n["route"])
+        if listed and n["children"]:                  # an explicit order (docs/nav-order.json) replaces the README's order and groups
+            by = {c["route"]: c for c in n["children"]}
+            arranged = []
+            for label, routes in listed:
+                for r in routes:
+                    c = by.pop(r, None)
+                    if c is not None:
+                        c.pop("group", None)
+                        if label:
+                            c["group"] = label
+                        arranged.append(c)
+            if by:
+                unplaced.extend(sorted(by))
+                arranged += sorted(by.values(), key=lambda c: c["title"].lower())
+            n["children"] = arranged
         for c in n["children"]:
             finish(c)
         if not n["children"]:
@@ -337,7 +389,7 @@ def build_nav(entries, bodies, pages):
     ordered = []
     if home:
         ordered.append(home)
-    for label, names in TOP_LAYOUT:
+    for label, names in (nav_order.get("top") or TOP_LAYOUT):
         for name in names:
             if name in top:
                 n = top.pop(name)
@@ -346,6 +398,8 @@ def build_nav(entries, bodies, pages):
     ordered += [top[k] for k in sorted(top)]
     for n in ordered:
         finish(n)
+    if unplaced:
+        raise SystemExit("pages with no place in the navigation order (add them to docs/nav-order.json):\n  " + "\n  ".join(unplaced))
     return ordered
 
 
@@ -374,7 +428,7 @@ def build(out, base, gh, branch, check=True):
         audience, kind = meta.get("audience", d_aud), meta.get("kind", d_kind)
         if audience not in AUDIENCES or kind not in KINDS:
             raise SystemExit(f"{src}: front matter audience '{audience}' / kind '{kind}' must be one of {AUDIENCES} / {KINDS}")
-        entries[route] = {"route": route, "title": title, "section": section, "source": src, "updated": updated, "audience": audience, "kind": kind,
+        entries[route] = {"route": route, "title": title, "navTitle": load_nav_titles().get(route, title), "section": section, "source": src, "updated": updated, "audience": audience, "kind": kind,
                           "summary": summary_of(raw), "headings": headings_of(raw)}
         bodies[route] = raw
         dest = os.path.join(out, "pages", (route or "index") + ".md")
@@ -409,6 +463,9 @@ def build(out, base, gh, branch, check=True):
             raise SystemExit(f"{len(bad)} private term(s) found in the bundle; not publishing (run the pre-commit privacy check)")
     version = digest.hexdigest()[:12]
     nav = build_nav(entries, bodies, pages)
+    too_long = nav_title_problems(nav)
+    if too_long:
+        raise SystemExit("navigation titles too long for the sidebar (shorten them in docs/nav-titles.json):\n  " + "\n  ".join(f"{r or '(home)'}: {t!r}: {why}" for r, t, why in too_long))
     bad_sections = sorted({e["section"] for e in entries.values()} - set(SECTIONS))
     bad_kinds = sorted({a_["kind"] for a_ in asset_list} - set(ASSET_KINDS))
 

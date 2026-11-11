@@ -1,6 +1,6 @@
 # Mounting and case: as built
 
-How the Pi, the PiSugar S battery, the camera, the speaker and the microphone are attached to G2's frame. Since 2026-10-17 G2 carries the **Bittle X Pi add-on** (v0.24) on the **Bittle X Platform** (v3.2), a case designed for this project's parts.
+How the Pi, the PiSugar S battery, the camera, the speaker and the microphone are attached to G2's frame. G2 carries the **Bittle X Pi add-on** (v0.24) on the **Bittle X Platform** (v3.2), a case designed for this project's parts.
 
 The design, the print files and the full build guide are in the separate project: [Bittle X Platform and Pi add-on](https://beetlebugorg.github.io/bittlex/) (3D viewer: [`/viewer/`](https://beetlebugorg.github.io/bittlex/viewer/)). This page records what G2 uses and where things sit; the project holds the step-by-step assembly, so it is not copied here.
 
@@ -24,14 +24,14 @@ Front is the head end; left and right are G2's left and right.
 - Pod (body + top panel): Clicks onto the four pegs: set it 7 mm behind its place with the grille to the rear, slide it 7 mm forward until it clicks (about 3.2 N). No tools, glue or tape. To remove: open the panel, pull the three BiBoard plugs off, slide the body 7 mm rearward and lift
 - Pi Zero 2 W + PiSugar S: The Pi plugs and the BiBoard header are in the left well. The PiSugar switch is under a window in the panel beside the HDMI opening (move it with a fingernail)
 - Camera: **On top of the pod, front of the panel**, in a printed camera mount (a bayonet socket in the panel: turn 40° counterclockwise, drop in, turn 40° clockwise to click). The camera case snaps between the mount's brackets with the **lens forward and the USB port up**. The mount can be turned end for end to point the lens to the rear. USB cable (USB-C at the camera, micro-USB at the Pi's data port) runs about 120 mm
-- Petoi AI head: its Grove cable in **G1** (UART2, the socket directly below the Pi's 5-pin header), **all four wires connected**, so it is powered by the BiBoard and shares UART2 with the Pi. The head's model sends motion commands to the BiBoard (seen in a test on 2026-10-18). Operating rules: [`../docs/guides/operating-g2.md`](../docs/guides/operating-g2.md)
+- Petoi AI head: its Grove cable in **G1** (UART2, the socket directly below the Pi's 5-pin header), **all four wires connected**, so it is powered by the BiBoard and shares UART2 with the Pi. The head's model sends motion commands to the BiBoard (seen in a test). Operating rules: [`../docs/guides/operating-g2.md`](../docs/guides/operating-g2.md)
 
 
-What changed from the interim mount (2026-09-29 to 2026-10-17): the camera moved from the front of the case to the top of the pod, the speaker stays at the very back, and the microphone moved from the top of the lid to the right wall near the front. The payload is now inside one pod instead of PiSugar's own case velcroed to a modified cover. The pod is designed for the **PiSugar S**. The project's site, guide and 3D viewer say "PiSugar 2" throughout; that is an error in their documentation (confirmed by the owner, who is the case's designer), so read every "PiSugar 2" there as the PiSugar S.
+What changed from the interim mount: the camera moved from the front of the case to the top of the pod, the speaker stays at the very back, and the microphone moved from the top of the lid to the right wall near the front. The payload is now inside one pod instead of PiSugar's own case velcroed to a modified cover. The pod is designed for the **PiSugar S**. The project's site, guide and 3D viewer say "PiSugar 2" throughout; that is an error in their documentation (confirmed by the case's designer), so read every "PiSugar 2" there as the PiSugar S.
 
 Mass: the design's own figure is **135 g with the electronics** (center of mass 9.0 mm from the robot center). **G2's weighed payload (Pi, PiSugar S, camera, speaker, microphone, wiring and the pod) is 185 g**, against 168 g with the previous mount: 17 g (about 10%) more.
 
-G2 now also carries the **Petoi AI Head** (42 g, Petoi's figure; it replaces the stock head on the head servo), counted on top of the 185 g: payload **227 g**, about 50% of Petoi's recommended 1 lb (453.6 g) maximum carry (owner's recollection, not yet sourced). With the base robot unchanged at about 254 g, the whole robot is about **481 g** (was 422 g).
+G2 now also carries the **Petoi AI Head** (42 g, Petoi's figure; it replaces the stock head on the head servo), counted on top of the 185 g: payload **227 g**, about 50% of Petoi's recommended 1 lb (453.6 g) maximum carry (a recollection, not yet sourced). With the base robot unchanged at about 254 g, the whole robot is about **481 g** (was 422 g).
 
 The sim uses these numbers ([`../docs/hardware/specs.md`](../docs/hardware/specs.md)).
 
@@ -80,4 +80,4 @@ Per the project: code MIT; designs and documents CC BY 4.0 (Jeremy Collins); the
 History
 -------
 
-The first design, a corner clip, was abandoned. The interim mount used PiSugar's own case shell (75 × 31 × 36 mm, nearly twice the stock cover's 18.6 mm internal depth) velcroed on top of a modified Petoi cover (`Bittle_Cover_with_hole_for_Pi.stl`, with the PiSugar switch exposed and the SD port widened), with the camera at the front of the case, the speaker at the very back and the microphone on top of the lid (all confirmed 2026-09-29 to 2026-10-06; payload about 168 g, roughly 100 × 40 × 38 mm).
+The first design, a corner clip, was abandoned. The interim mount used PiSugar's own case shell (75 × 31 × 36 mm, nearly twice the stock cover's 18.6 mm internal depth) velcroed on top of a modified Petoi cover (`Bittle_Cover_with_hole_for_Pi.stl`, with the PiSugar switch exposed and the SD port widened), with the camera at the front of the case, the speaker at the very back and the microphone on top of the lid (all confirmed; payload about 168 g, roughly 100 × 40 × 38 mm).

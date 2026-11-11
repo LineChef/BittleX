@@ -16,7 +16,7 @@ Folders
 
 - `training_data/exploration/auto/`: Holds: The current curated set: `keep/survey/<date>/` survey pictures, `keep/named/<name>/` named objects, `contact/` overview thumbnails per group, `manifest.json`, `summary.txt`; Rebuilt?: Yes, every 30 minutes from `~/Desktop/G2Memory/g2_pictures/explore`
 - `training_data/exploration/promoted/<name>/`: Holds: The labelled pictures you promoted: the training data the gallery learns from; Rebuilt?: **No**; this is the one to protect
-- `training_data/exploration/<date_time>/`: Holds: A manual curation from `g2picscurate`; the first one, from 2026-10-07, holds a few pictures `auto/` no longer has; Rebuilt?: Not automatically
+- `training_data/exploration/<date_time>/`: Holds: A manual curation from `g2picscurate`; the first one holds a few pictures `auto/` no longer has; Rebuilt?: Not automatically
 - `~/Desktop/G2Memory/g2_pictures/explore/`: Holds: The pulled originals, with the review page's state (`promoted.json`, `unpromoted.json`, `people.json`); Rebuilt?: Pull again from the Pi
 
 Everything under `training_data/` is local. Back up `promoted/` if the pictures matter; it is small.

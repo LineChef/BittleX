@@ -1,6 +1,6 @@
 # Disabled moves (pod payload)
 
-With the Pi pod and the AI head on (about 481 g, 46% of it over the front feet), any move that leaves G2 on three feet, extends the legs or jumps tips him over. The wave flipped him twice in one session (both times triggered by mis-heard speech), and the owner reported the same for the other one-foot moves.
+With the Pi pod and the AI head on (about 481 g, 46% of it over the front feet), any move that leaves G2 on three feet, extends the legs or jumps tips him over. The wave flipped him twice in one session (both times triggered by mis-heard speech), and the same was reported for the other one-foot moves.
 
 `link/opencat.py` `DISABLED_SKILLS` lists the tokens; `SerialLink.send` refuses them for every caller (voice, gestures, survey) and plays the wrong-answer horn. The voice skills `wave` and `scratch` stay in Claude's list, marked disabled, so a request for them gets the horn and not a silent no.
 

@@ -15,12 +15,12 @@ Every new mechanic in `opencat_gym_env.py` defaults off, so older checkpoints an
 A chain is a plan plus a runner that carries it out unattended and stops only for a judgement call:
 
 - V3: Runner: `phase_v3.py` (also the scoring code the others reuse); State: done
-- V4 (screens, then a 20M): Runner: `phase_v4.py`; State: done, deployed 2026-10-09
+- V4 (screens, then a 20M): Runner: `phase_v4.py`; State: done, deployed
 - V5: Runner: `phase_v5.py`; State: done, not promoted
 - V6 (staged skills, then a 20M): Runner: `phase_v6.py`; State: done, deployed
 - High-step creep: Runner: `phase_hs.py`; State: stopped, goal not met
 
-The rules every plan follows: a fresh candidate each time; screens of at most 3M steps with two seeds per lever, judged on learnability and no flat-ground regression; a 20M only after `preflight.py` prints ALL PASS and only on the user's go; difficulty capped by what a capable policy can pass (`passability_audit.py`); nothing trains on a consolidated 20M.
+The rules every plan follows: a fresh candidate each time; screens of at most 3M steps with two seeds per lever, judged on learnability and no flat-ground regression; a 20M only after `preflight.py` prints ALL PASS and only on explicit approval; difficulty capped by what a capable policy can pass (`passability_audit.py`); nothing trains on a consolidated 20M.
 
 3\. Train
 --------
@@ -40,7 +40,7 @@ The rules every plan follows: a fresh candidate each time; screens of at most 3M
 6\. Promote and deploy
 ---------------------
 
-Promotion is the user's decision (`promote_release.py`, or `tools/g2_promote_policy.sh TAG NAME`): the release is named `Release_Candidate<name>`, `DEFAULT_POLICY` is pointed at it, the tests run, and the deploy waits for the Pi. The previous release stays on the Pi as a fallback. Then test on G2 on his feet, hands near, with the trim for that policy ([`../guides/gait-deployment.md`](../guides/gait-deployment.md)).
+Promotion needs explicit approval (`promote_release.py`, or `tools/g2_promote_policy.sh TAG NAME`): the release is named `Release_Candidate<name>`, `DEFAULT_POLICY` is pointed at it, the tests run, and the deploy waits for the Pi. The previous release stays on the Pi as a fallback. Then test on G2 on his feet, hands near, with the trim for that policy ([`../guides/gait-deployment.md`](../guides/gait-deployment.md)).
 
 7\. Feed real data back
 ----------------------

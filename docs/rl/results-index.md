@@ -55,7 +55,7 @@ Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mount
 `control`
 ---------
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +55.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +60.
 
 - `v3_report/control.json`: Size: 46 KB; Cited by: not cited
 - `v3_report_v3_20m/control.json`: Size: 46 KB; Cited by: not cited
@@ -154,7 +154,7 @@ Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail
 `joint`
 -------
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +70.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +71.
 
 - `joint_cmd_run20m.json`: Size: 239 KB; Cited by: not cited
 - `joint_cmd_scripted.json`: Size: 25 KB; Cited by: not cited
@@ -218,7 +218,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`history.md`](../ar
 `pod`
 -----
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`reproduce-g2.md`](../guides/reproduce-g2.md), [`settings-switches.md`](../guides/settings-switches.md) +16.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`reproduce-g2.md`](../guides/reproduce-g2.md), [`settings-switches.md`](../guides/settings-switches.md) +17.
 
 - `pod_report/pod.json`: Size: 313 KB; Cited by: not cited
 
@@ -249,7 +249,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`c
 `report`
 --------
 
-Docs that mention this family: [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +52.
+Docs that mention this family: [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +55.
 
 - `v6_report/report_full.html`: Size: 54 KB; Cited by: [`v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md)
 

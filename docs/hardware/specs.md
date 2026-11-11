@@ -11,7 +11,7 @@ BiBoard V1 (the controller in Bittle X V2)
 
 - MCU: ESP32-U4WDH (Xtensa dual-core LX6), via an ESP32-MINI-1 module
 - SRAM / ROM / Flash: 520 KB / 448 KB / **4 MB**
-- IMU: **6-axis ICM42670 on G2's board** (the firmware supports the MPU6050 too; confirmed `ICM:` on G2, 2026-09-20) — 3-axis gyro + 3-axis accel
+- IMU: **6-axis ICM42670 on G2's board** (the firmware supports the MPU6050 too; confirmed `ICM:` on G2) — 3-axis gyro + 3-axis accel
 - Servo drive: 12 PWM channels (position PWM)
 - Grove sockets: 4, typed: G1 = UART2, G2 = I²C, G3/G4 = analog in
 - Input / operating voltage: 7–9 V in, 5 V operating, 0.1–0.2 A board draw
@@ -105,7 +105,7 @@ correct in practice, not just in research. Tooling:
 test, avoids the reboot-per-invocation confound of testing this with two
 separate CLI calls).
 
-**Over the Pi's UART, 2026-10-18 (firmware B10_260527, G2 standing on a desk, pod and AI head on):** `f` still returns only its echo on Serial 2 (0 of 5 reads, `check_serial posecheck`; a raw 2 s capture held the echo and IMU frames only). Sending it is not harmless: in the raw capture roll went from -1.5 to -21 deg within 1.5 s of one request (the next request stayed level), and the check logged tilt changes of 15-77 deg during four of five reads. The firmware apparently still releases the servos to read them and prints the result only to USB. So the eased-transition stage 2 (read the pose when it is unknown) stays off; servo reads are not safe while G2 stands.
+**Over the Pi's UART (firmware B10_260527, G2 standing on a desk, pod and AI head on):** `f` still returns only its echo on Serial 2 (0 of 5 reads, `check_serial posecheck`; a raw 2 s capture held the echo and IMU frames only). Sending it is not harmless: in the raw capture roll went from -1.5 to -21 deg within 1.5 s of one request (the next request stayed level), and the check logged tilt changes of 15-77 deg during four of five reads. The firmware apparently still releases the servos to read them and prints the result only to USB. So the eased-transition stage 2 (read the pose when it is unknown) stays off; servo reads are not safe while G2 stands.
 
 **Implications for the work:**
 - → **The RL policy must not depend on fast measured joint angles.** Good news:
@@ -149,7 +149,7 @@ assembly and set the sim to that.**
 
 Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
 
-- → **Sim retuned 2026-09-03** to the *fully-loaded* config (camera expected on
+- → **Sim retuned** to the *fully-loaded* config (camera expected on
   the bot by the time the frame arrives). Now **two welded bodies** so the
   fore/aft CoM split is right, not one lumped rear mass:
   - `PAYLOAD_MASS_NOM 0.061` ± `0.018` — SPINE (Pi + PiSugar S 1200 mAh + wiring +
@@ -176,7 +176,7 @@ G2 weights as used in the sim
 One measurement, the rest assumed. **Do not look these up again; re-weigh and edit this table if anything changes.**
 
 - Whole G2 with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
-- Base robot (Bittle X V2, alloy servos, battery): Mass: about 301 g (superseded: 254 g, see the 2026-10-15 section below); Basis: assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare.; In the sim (`PAYLOAD_PROFILE=case`): URDF links
+- Base robot (Bittle X V2, alloy servos, battery): Mass: about 301 g (superseded: 254 g, see the section below); Basis: assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare.; In the sim (`PAYLOAD_PROFILE=case`): URDF links
 - Camera cluster (Grove Vision AI V2 + OV5647 + case + cable): Mass: 15 g; Basis: estimate; Seeed publishes no weight for the module; In the sim (`PAYLOAD_PROFILE=case`): front body at (0.055, 0, 0.020) m, 15 +/- 5 g
 - Speaker + amp (NS4168 kit): Mass: 20 g; Basis: estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit; In the sim (`PAYLOAD_PROFILE=case`): rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g
 - Spine block: Pi Zero 2 W, PiSugar S + cell, case, microphone (on the lid), wiring: Mass: 86 g; Basis: derived: 422 - 301 - 15 - 20; In the sim (`PAYLOAD_PROFILE=case`): spine body at (-0.022, 0, 0.025) m, 86 +/- 20 g
@@ -187,13 +187,13 @@ Superseded mount: the weights and positions in this section and the one above we
 
 G2 now carries the Bittle X Pi add-on, whose design figure is 135 g with the electronics and a center of mass 9.0 mm from the robot center ([`../../blueprints/mounting.md`](../../blueprints/mounting.md)). The camera is now on top of the pod, the microphone on its right wall near the front, the speaker at the rear. The payload was weighed at 185 g (was 168 g, +17 g or about 10%).
 
-G2 also carries the Petoi AI Head (42 g, Petoi's figure; 2026-10-18), counted on top: payload 227 g, about 50% of the 1 lb (453.6 g) maximum carry the owner recalls Petoi recommending (not yet sourced), and with the base unchanged at about 254 g the whole robot is about 481 g (was 422 g).
+G2 also carries the Petoi AI Head (42 g, Petoi's figure), counted on top: payload 227 g, about 50% of the 1 lb (453.6 g) maximum carry recalled as Petoi's recommendation (not yet sourced), and with the base unchanged at about 254 g the whole robot is about 481 g (was 422 g).
 
-The sim's `PAYLOAD_PROFILE=pod` (the default recipe from 2026-10-18) models that: one 185 g block the size of the pod (94.0 × 59.2 × 37.9 mm, 9.2 mm behind the cover's middle; the camera and speaker are inside it, so there is no separate speaker body) and a 42 g AI head body at the nose (size and position estimated).
+The sim's `PAYLOAD_PROFILE=pod` (the default recipe) models that: one 185 g block the size of the pod (94.0 × 59.2 × 37.9 mm, 9.2 mm behind the cover's middle; the camera and speaker are inside it, so there is no separate speaker body) and a 42 g AI head body at the nose (size and position estimated).
 
 The sim's front share with both is about 51% (about 46% with the old mount; the real front share with the pod and head is not weighed yet). The AI head's mass is added in full although the stock head it replaces is already inside the 254 g.
 
-Both bodies are fixed on the body and never vary from episode to episode: the pod block is exactly 185 g, perfectly balanced and flush on the torso, and the AI head is exactly 42 g at one fixed spot, both welded stiffly enough to stay within 1 mm of their places while walking. `case2` (168 g) stays for reproducing earlier runs.
+Both bodies are fixed on the body and never vary from episode to episode: the pod block is exactly 185 g, perfectly balanced and flush on the torso, and the AI head is exactly 42 g at one fixed spot, both welded stiffly enough to stay within 1 mm of their places while walking. `case2` (168 g) stays available for reproducing past results.
 The mic weighs almost nothing and is counted in the spine block. Mass randomization in training stays at +/-18% on every body link.
 
 Proposed build: component weights and balance
@@ -218,7 +218,7 @@ above.
 
 The heatsink drawn in the viewer is left out (not fitted on G2).
 
-**Status: study only.** This is a prototype; nothing from it is implemented. The sim payload (`PAYLOAD_PROFILE=case` and the 301 g base above) is unchanged until the owner says otherwise.
+**Status: study only.** This is a prototype; nothing from it is implemented. The sim payload (`PAYLOAD_PROFILE=case` and the 301 g base above) is unchanged until a change is approved.
 
 **Front/rear balance** (project method: center of mass from link and payload
 masses over the paw positions at the reset stance, as in

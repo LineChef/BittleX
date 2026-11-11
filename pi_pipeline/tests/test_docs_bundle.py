@@ -112,3 +112,24 @@ def test_top_level_layout_groups_every_name_once():
 def test_log_style_pages_are_not_published():
     for path in ("docs/vision/capture-progress.md", "docs/vision/wall-check-plan.md", "docs/hardware/build-logs/i2s-audio-build-log.md", "docs/hardware/build-logs/pi-biboard-build-notes.md"):
         assert B.is_excluded(path), path
+
+
+def test_navigation_titles_must_fit_the_sidebar():
+    nodes = [{"route": "a", "title": "Guides", "children": [{"route": "a/b", "title": "Settings and switches"}]},
+             {"route": "c", "title": "How it works in detail", "children": [{"route": "c/d", "title": "A title that is far too long for the sidebar"}]}]
+    bad = {r for r, _t, _w in B.nav_title_problems(nodes)}
+    assert bad == {"c", "c/d"}
+
+
+def test_every_title_in_the_nav_titles_file_fits_and_every_route_in_the_order_file_is_listed_once():
+    titles = B.load_nav_titles()
+    top = {r for _l, rs in B.load_nav_order()["top"] for r in rs}
+    for route, title in titles.items():
+        words, chars = len(title.split()), len(title)
+        limit = (B.NAV_TOP_WORDS, B.NAV_TOP_CHARS) if route in top or route == "" else (B.NAV_CHILD_WORDS, B.NAV_CHILD_CHARS)
+        assert words <= limit[0] and chars <= limit[1], (route, title)
+    seen = []
+    for parent, groups in B.load_nav_order().items():
+        for _label, routes in groups:
+            seen += routes
+    assert len(seen) == len(set(seen)), "a route is listed twice in docs/nav-order.json"

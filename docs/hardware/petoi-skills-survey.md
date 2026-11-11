@@ -1,6 +1,6 @@
 # Petoi OpenCat skills — what's worth pulling into G2
 
-Survey 2026-09-08. Source: `rl_training/opencat-gym/reference_gait/InstinctBittleESP.h`
+Source: `rl_training/opencat-gym/reference_gait/InstinctBittleESP.h`
 (local copy of OpenCat's built-in skill table). ~90 named skills. All callable on
 the real robot as `k<name>` over serial (see `pi_pipeline/link/opencat.py`).
 Format: header `[period, expRoll, expPitch, ratio]` — `period > 1` = looping gait,
@@ -12,14 +12,14 @@ High value for this project
 ---------------------------
 
 - `rc` (recover): what it is: scripted self-right, slow falls; use for G2: already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch.
-- `balance`: what it is: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below)
-- `bx` / `showOff` / `chr` / `lucky`: what it is: **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned (see below)
+- `balance`: what it is: **verified, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below)
+- `bx` / `showOff` / `chr` / `lucky`: what it is: **Checked as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned (see below)
 - `buttUp` (play-bow / downward-dog): what it is: posture, nose-down pitch +15°; use for G2: the **INSPECT peer-pose** the sim couldn't hold — Petoi already tuned it. Port as the INSPECT scaffold (tilt camera down at a near obstacle).
 - `carpetF` / `carpetL`: what it is: walk gait tuned for **carpet**; use for G2: directly targets the known "G2 stalls on carpet" problem. Decode + A/B vs `wkF` on the carpet cell.
 - `str` (stretch): what it is: "just woke up" stretch posture; use for G2: idle / wake behaviour for the autonomous layer.
 - `snf` (sniff): what it is: head-down sniffing loop; use for G2: **explore mode** — G2 sniffs around a new spot.
 - `scrh` (scratch): what it is: dog scratching, nose-down; use for G2: idle personality behaviour.
-- `zz` (zzz): what it is: curl up to sleep; use for G2: **sleep mode / idle-REST** (the user's power priority).
+- `zz` (zzz): what it is: curl up to sleep; use for G2: **sleep mode / idle-REST** (a power-saving priority).
 - `nd` (nod): what it is: head nod; use for G2: acknowledgement / "yes" in the voice + personality loop.
 - `sit`: what it is: sit posture; use for G2: idle, "stay", greeting.
 - `gdb` (give paw / shake): what it is: offer a paw, nose-down; use for G2: **"G2, meet X"** enrollment + bonds; social greeting.
@@ -28,12 +28,12 @@ High value for this project
 - `phF` (pounce forward): what it is: pounce; use for G2: play behaviour; could pair with vision ball/target tracking.
 - `hunt`: what it is: seeking / hunting routine; use for G2: tie into vision tracking / the avoider.
 
-- balance: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 leg joints to 30° — **byte-identical to `up`** (the neutral-stand pose). In sim the body drops *lower* and all 4 legs splay out/up, not a dynamic balancing act.
+- balance: **verified, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 leg joints to 30° — **byte-identical to `up`** (the neutral-stand pose). In sim the body drops *lower* and all 4 legs splay out/up, not a dynamic balancing act.
 
   Matches the community description of `kbalance` as a **calibration-check pose** (moves limbs symmetrically to verify servo calibration), not a trick. Already correctly used in code as the emergency-freeze/post-recovery settle token (`pi_pipeline/link/opencat.py` `BALANCE`, `pi_pipeline/behavior/emergency.py`) — that usage was already accurate.
 
-  Only `pi_pipeline/voice/skills.py`'s Claude-facing description was wrong ("stand and actively balance") — corrected 2026-09-15 to "settle into a low, stable stand (same pose as 'stand')". **Does not produce the hind-leg-rearing "stand up" motion** seen in Petoi's `stand.gif` demo. See the `bx`/`showOff`/`chr`/`lucky` row below for the actual candidate check.
-- bx / showOff / chr / lucky: **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned out not to be the trick, decoded + replayed each in PyBullet (spawn standing, play the keyframes, check final body height/pitch/roll): `showOff` and `chr` stand **taller and stiffer-legged but still on all 4 feet** (body height 0.087 m vs ~0.04 m normal stand) — not bipedal.
+  Only `pi_pipeline/voice/skills.py`'s Claude-facing description was wrong ("stand and actively balance") — corrected to "settle into a low, stable stand (same pose as 'stand')". **Does not produce the hind-leg-rearing "stand up" motion** seen in Petoi's `stand.gif` demo. See the `bx`/`showOff`/`chr`/`lucky` row below for the actual candidate check.
+- bx / showOff / chr / lucky: **Checked as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` proved not to be the trick, decoded + replayed each in PyBullet (spawn standing, play the keyframes, check final body height/pitch/roll): `showOff` and `chr` stand **taller and stiffer-legged but still on all 4 feet** (body height 0.087 m vs ~0.04 m normal stand) — not bipedal.
 
   `bx` and `lucky` both **tip the robot onto its back** in sim (roll → 180°) rather than settling into a balanced pose.
 
@@ -45,7 +45,7 @@ High value for this project
 Lower priority / situational
 ----------------------------
 
-> **Decision 2026-09-15 — no flipping or rolling behavior, mounted-payload
+> **Decision — no flipping or rolling behavior, mounted-payload
 > risk.** G2 carries a Pi + PiSugar stack (~61–78 g, see
 > [`specs.md`](specs.md) "Mounted payload weight") on a printed standoff
 > bracket off the rear frame (`blueprints/mounting.md`), not

@@ -1,6 +1,6 @@
 # Parts list and hardware decisions
 
-> **Moved verbatim from `docs/project-plan.md` on 2026-10-02** when the plan was trimmed to a roadmap. This is the full detail for
+> **Moved verbatim from `docs/project-plan.md`** when the plan was trimmed to a roadmap. This is the full detail for
 > the finalized parts list, resolved and open hardware questions, and the power-awareness plan. Current state is in [`../STATUS.md`](../STATUS.md); the roadmap item is in [`../project-plan.md`](../project-plan.md).
 
 Parts list (finalized)
@@ -13,9 +13,9 @@ Parts list (finalized)
 - Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55)
 - PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus")
 - Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6
-- Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run
-- [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera)
-- [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above)
+- Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run
+- [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera)
+- [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above)
 
 ### Resolved
 
@@ -27,7 +27,7 @@ Parts list (finalized)
   [`docs/hardware/pi-power.md`](pi-power.md).
 - Enclosure: Petoi ships an official back-cover STL with a Pi cutout
   ([`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl)),
-  so the cover can close over the mounted Pi. **2026-09-16: likely too shallow
+  so the cover can close over the mounted Pi. **Likely too shallow
   for Pi+PiSugar.** Measured its real bbox — 71.2 × **18.6** × 73.9 mm, and
   18.6 mm is the full outer depth (shell walls included), same clearance
   bottleneck as the standoff clips below, just from the enclosure side. A
@@ -49,7 +49,7 @@ Parts list (finalized)
 
 ### Open (check when hardware arrives)
 
-- ~~Confirm BiBoard V2 can be wired data-only~~ — **resolved 2026-09-14**: it's a
+- ~~Confirm BiBoard V2 can be wired data-only~~ — **resolved**: it's a
   discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
   official board diagram. Data-only wiring is straightforward. Full pinout:
   [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos:
@@ -57,7 +57,7 @@ Parts list (finalized)
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.
-  **Researched, 2026-09-16 — leaning toward "probably fine," still not fully
+  **Researched — leaning toward "probably fine," still not fully
   confirmed.** Checked Petoi's official serial docs directly
   ([overview](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac),
   [BiBoard V1 page](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1))
@@ -78,7 +78,7 @@ Parts list (finalized)
 - Confirm the back cover fits once the Pi is mounted.
 - BiBoard V1's onboard voice-recognition module + speaker: decide whether the
   wake trigger / offline fallback commands use it instead of the Pi (Phase 7).
-  **2026-09-28**: confirmed present and controllable over serial (`X<letter>`
+  Confirmed present and controllable over serial (`X<letter>`
   commands, `docs/hardware/petoi-firmware-reference.md`) — found stuck
   defaulting to Chinese with voice unresponsive (no identified trigger,
   matches a known Petoi community incident), fixed via `XAc`/`XAb`/`XAa`.
@@ -91,8 +91,7 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
 *estimate* from elapsed run time.
 
 - Plan: track uptime since the last time it was on the charger; when it
-  passes a learned threshold, G2 proactively says something in character ("I'm
-  getting tired, might need to rest on the charger soon") via the voice
+  passes a learned threshold, G2 proactively says something in character ("I'm getting tired, might need to rest on the charger soon") via the voice
   pipeline, and repeats/escalates as it gets closer to the empirical limit. On
   the charger ("external power present" flips true) it resets and can say it's
   charging.
@@ -104,7 +103,7 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
   toggle / disable-unused peripherals) and `behavior/idle_posture.py` (idle-REST
   staged descent — sit, then lie down, with life signs). Battery-*aware*
   behaviour (rest sooner on low charge) is blocked on the estimate above.
-  **Sleep-mode FSM built 2026-09-10** (`behavior/sleep_mode.py`). On-demand
+  **Sleep-mode FSM built** (`behavior/sleep_mode.py`). On-demand
   vision (the two-stream safety/rich split) is still a design task (B18). Full
   analysis: [`hardware/pi-power.md`](pi-power.md).
 - Later upgrade for a real signal (not just a timer): an ADC on a BiBoard

@@ -8,6 +8,7 @@
       "description": "A closed set. Every page, and every navigation node (folder nodes included), carries exactly one. The build fails on a value outside this list.",
       "enum": [
         "overview",
+        "specification",
         "guides",
         "hardware",
         "vision",
@@ -125,6 +126,10 @@
         "html": {
           "type": "string",
           "description": "Path of the page rendered as semantic HTML (one <article>, no class names), relative to the bundle root: pages/<route>.html. The same content as pages/<route>.md with the same rewritten links"
+        },
+        "navTitle": {
+          "type": "string",
+          "description": "The short title the navigation shows for this page (docs/nav-titles.json). `title` is the page's full title. The page's nav node `title` equals `navTitle`"
         }
       },
       "additionalProperties": false

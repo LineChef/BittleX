@@ -88,7 +88,7 @@ Pi), `high` (bigger + slower, likely too heavy for a Pi Zero 2 W). Fetched into 
 - `en_US-ryan-low`: current default; warm male but low-tier, noticeably synthetic
 - `en_US-ryan-medium`: same voice, clean; warm, casual, relaxed — good companion fit
 
-Voices tried and removed from the local folder on 2026-10-17: `en_US-amy-medium` (female, bright and upbeat), `en_US-hfc_male-medium` (male, very natural, personality-neutral) and `en_GB-alan-medium` (British male, composed, some gravitas). They download from the same repo the same way.
+Voices removed from the local folder: `en_US-amy-medium` (female, bright and upbeat), `en_US-hfc_male-medium` (male, very natural, personality-neutral) and `en_GB-alan-medium` (British male, composed, some gravitas). They download from the same repo the same way.
 
 Current default: **`en_US-ryan-low`** (the Pi Zero 2 W-safe tier). On a dev
 machine, set `PIPER_MODEL_PATH` in `.env` to a `medium` voice for nicer audio,

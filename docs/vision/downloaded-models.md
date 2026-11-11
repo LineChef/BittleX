@@ -1,10 +1,10 @@
 # Downloaded models (outside the repo)
 
-Rule: nothing is downloaded from the internet without telling the user first and waiting for a yes. Models live in `~/g2_data/models/` on the Mac, never in the repo. Each is checked against the hash its host publishes.
+Rule: nothing is downloaded from the internet without explicit approval first. Models live in `~/g2_data/models/` on the Mac, never in the repo. Each is checked against the hash its host publishes.
 
 - `dinov2_small.onnx`: Source: Hugging Face, `onnx-community/dinov2-small`, `onnx/model.onnx` (Meta's DINOv2 small, Apache 2.0); Size (bytes): 88,532,934; SHA-256: `f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a`; Checked against: the file listing on Hugging Face (LFS oid, size); Approved
 - `mobilenetv2-12.onnx`: Source: GitHub, `onnx/models`, `validated/vision/classification/mobilenet/model/mobilenetv2-12.onnx` (ONNX Model Zoo); Size (bytes): 13,964,571; SHA-256: `c0c3f76d93fa3fd6580652a45618618a220fced18babf65774ed169de0432ad5`; Checked against: the Git LFS pointer in the repo (oid, size); Approved
-- `yolox_s.onnx`: Source: Hugging Face (person detector for the picture curation); Checked against: downloaded 2026-10-07 BEFORE the rule existed, without asking; kept at the user's later approval
+- `yolox_s.onnx`: Source: Hugging Face (person detector for the picture curation); Checked against: downloaded before the approval rule existed; kept after later approval
 
 What the checks do and do not show: the hash proves the file is the one the host serves for that name, and the format (ONNX, a graph of math operations run by onnxruntime with no custom operator libraries) cannot run code the way a pickle file can. They do not prove that the publisher's account is clean, and nothing was scanned for malware or run in a sandbox.
 

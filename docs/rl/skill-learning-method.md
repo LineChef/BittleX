@@ -1,6 +1,6 @@
 # Learning a new G2 skill — the method
 
-Settled 2026-09-08 after the Phase F climb runs (1–5). This is the standard
+Settled after the Phase F climb runs (1–5). This is the standard
 recipe for teaching G2 a new motor skill (climb, get-up, a special move). Follow
 it; deviate only with a reason written down.
 
@@ -104,4 +104,4 @@ Checklist per iteration
 
 Harnesses: `climb_env.py` / `train_climb.py` / `eval_climb.py` / `climbwatch`
 (Phase F) are the template. `climb_test.py` is the keyframe-base authoring +
-scoring tool. (Removed from the working tree 2026-10-17; recover with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.)
+scoring tool. (Removed from the working tree; recover with `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.)

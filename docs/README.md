@@ -34,6 +34,7 @@ The full list of guides is in [Guides](guides/README.md). Hardware pages are in 
 Under the hood
 --------------
 
+- How each subsystem behaves, with its settings and how to verify it: [Specification](specification/README.md)
 - How the robot, the Pi and the dev machine fit together: [Architecture](architecture.md)
 - Where each package of code is documented: [Code map](code-map.md)
 - How the walking policy is trained and deployed: [Gait training](rl/README.md)

@@ -130,11 +130,11 @@ Debugging behaviour needs the *reason*, not just the action. Convention:
   each exposes a `last_reason: str` explaining its most recent `update()`.
   Implemented: `behavior/idle_posture.py` (`IdlePosture`),
   `behavior/mode_controller.py` (`ModeController`), `behavior/explore.py`
-  (`Explorer`, 2026-09-08). To add: `RecoveryFSM`, vision `avoidance`.
+  (`Explorer`). To add: `RecoveryFSM`, vision `avoidance`.
 - `BehaviorDriver`: composes those and emits the transition markers itself
   (as `DIAG` effects); the runtime's bindings log each one through `behavior/bindings.py`
   `_default_diag`, with the level and event name from `behavior/diag_bridge.py`'s map
-  (wired 2026-10-18; `diag report` reads them as the behaviour timeline).
+  (wired; `diag report` reads them as the behaviour timeline).
 - The driving loop logs the transition with the reason + the inputs that
   produced it, only when something actually changes:
 
@@ -161,7 +161,7 @@ Post-hoc tooling — `python -m pi_pipeline.diag`
 
   It reads the other logs for the session's time window, so run it where they live (the Pi) or after syncing them.
 
-  The report ends with **checks**, one `ok` / `CHECK` line each for the numbers the 2026-10-18 fixes are meant to move (falls, late walk ticks under 5%, camera timeouts, speech within 8 s and none dropped, walks that did not stop, false wake triggers, workers that gave up, walks with no floor label); `headline()` gives them as one log line.
+  The report ends with **checks**, one `ok` / `CHECK` line each for the numbers the recent fixes are meant to move (falls, late walk ticks under 5%, camera timeouts, speech within 8 s and none dropped, walks that did not stop, false wake triggers, workers that gave up, walks with no floor label); `headline()` gives them as one log line.
 
   An exploration writes its own report when it ends (`write_after()`: `report.txt` / `report.html` in the session folder, or `explore_HHMMSS.*` with a time window for a roam inside the voice service); `tools/g2_explore.sh report` shows the latest.
 - `diag summarize <session>` — timeline of WARN+ events, duration, incident

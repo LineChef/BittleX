@@ -1,6 +1,6 @@
 # Vision detector — measured behaviour (bench)
 
-Numbers measured 2026-09-05 with the **Grove Vision AI V2** on USB to the Mac,
+Numbers measured with the **Grove Vision AI V2** on USB to the Mac,
 running SenseCraft's `swift_yolo_nano_person_192_int8_vela` (model id 60086,
 single `person` class). These are the **mount-independent** characteristics —
 they feed the sim noise model for a future perception-in-the-loop gait retrain
@@ -97,12 +97,12 @@ either orientation works (train == infer), but upright lets you use
 pretrained upright models and get clean pre-labels. Curate then needs
 `--rotate 0`.
 
-### Update 2026-10-04: why the preview looked tilted when detection worked
+### Why the preview looked tilted when detection worked
 
 The mount is right: with the module's **USB port up**, the raw frame (checked with a real snapshot) is upright, which is what the
 detector needs. The tilt was the preview page itself: `tools/camera_preview.py` hard-coded a 90 degree CSS rotation of the video from
 the days when the module was mounted differently (the old note said "rotated so you look upright"). That default is now 0 degrees.
 The module's printed text does not match because the OV5647 sensor's native readout is rotated relative to the board's silkscreen:
 the orientation that matters is the one the frame comes out in, not the one the text reads. A web search found no one else reporting
-this, so it is a feature of this module and mount; the 2026-09-06 bench result above (upright frames: 100% hits; sideways: 13%) is
+this, so it is a feature of this module and mount; the bench result above (upright frames: 100% hits; sideways: 13%) is
 the evidence.

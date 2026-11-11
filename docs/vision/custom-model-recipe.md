@@ -1,6 +1,6 @@
 # Custom multi-class detection model for the Grove Vision AI V2 — what works
 
-Written 2026-09-09 after a long session of dead ends. If you're picking this up,
+If you're picking this up,
 **read the "Core constraint" section first** — it explains why most tutorials
 fail on the device.
 
@@ -38,8 +38,7 @@ object**.
 - Swift-YOLO as exported by **SSCMA / ModelAssistant `2.0.0` branch** (all the
   stock SenseCraft models — Person Detection, Hand Gesture — are this)
 - Ultralytics YOLOv8: exported with **`ultralytics==8.2.8`** (per Seeed's
-  official wiki `ma_deploy_yolov8`, last updated Apr 2024) — **confirmed working
-  2026-09-09**, exported locally on Apple Silicon (recipe below)
+  official wiki `ma_deploy_yolov8`, last updated Apr 2024) — **confirmed working**, exported locally on Apple Silicon (recipe below)
 - YOLO11 (added in the `20250102` release)
 - NOT: YOLO26. **NOT** RTMDet. **NOT** the SSCMA `main` / `fix/colab-py312-main`
   re-implemented Swift-YOLO head.
@@ -67,7 +66,7 @@ while stock Swift-YOLO works — "is the toolchain ahead of the firmware decode?
 The working recipe: `ultralytics==8.2.8`, exported locally on Apple Silicon
 ------------------------------------------------------------
 
-**2026-09-09 — this produced the first model the device actually decodes.**
+**This produced the first model the device actually decodes.**
 3-class (`<you>`, `dog`, `cat`), YOLOv8n @ 192px, mAP@50 0.907 (`<you>` 0.995,
 `dog` 0.867, `cat` 0.859). On device: one box per real object, quiet on an empty
 scene, `postprocess: 1ms`. All three classes detect.
@@ -163,7 +162,7 @@ python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/cat  --coco-cl
 python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/<you> --coco-class person --weights yolov8m.pt --conf 0.25 --imgsz 800 --max-boxes 1 --overwrite
 ```
 
-2026-09-09 results: `<you>` 230/238, `cat` 218/250, `dog` **127/250** (the rest
+Results: `<you>` 230/238, `cat` 218/250, `dog` **127/250** (the rest
 are motion-blurred junk — dog capture session had heavy blur; that class wants a
 recapture with the subject held still). Writes class id `0` as a placeholder;
 `combine_for_upload.py --classes` rewrites it from the class order.

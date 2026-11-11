@@ -1,7 +1,7 @@
 # Petoi / OpenCat firmware reference
 
-Confirmed from `PetoiCamp/OpenCatEsp32` source (2026-09-07, IMU serial
-protocol + line format re-verified against `main` again 2026-09-20), the
+Confirmed from `PetoiCamp/OpenCatEsp32` source (the IMU serial
+protocol and line format are re-verified against `main`), the
 BiBoard/ESP32 firmware that runs on G2 (Bittle X). Captured so the
 knowledge isn't lost between sessions. Verify against the repo if firmware
 has moved on.
@@ -28,7 +28,7 @@ Serial command tokens (`OpenCat.h` `T_*` macros)
 
 Newline-terminated ASCII over UART. Confirmed set:
 
-**Confirmed against the real BiBoard 2026-09-28: commands produce more than
+**Confirmed against the real BiBoard: commands produce more than
 one reply line.** `check_serial.py`'s `allmoves` sends each move with
 `read_reply=False` (fire-and-forget), then queries `P` afterward and reads
 one line back. Real-hardware logs showed the "voltage" field cycling
@@ -42,7 +42,7 @@ draining (`SerialLink.drain()`) immediately before every voltage read in
 with `read_reply=False` and later expects a clean single-line read: drain
 first, don't assume the buffer is empty.
 
-**Second layer confirmed the same day: a real, previously-undocumented
+**A second layer: a real, undocumented
 debug line, `imuException: <code>`.** After the drain fix above, most reads
 came back clean, but `wave`/`push_ups`/`check_around`/`come_here`/
 `high_five` still intermittently returned `imuException: \t0` instead of
@@ -62,7 +62,7 @@ BiBoard V1 carries a built-in offline voice-recognition module + speaker
 (`project-plan.md`'s parts notes), separate from the `T_*` command parser
 above and not decoded from the project's own firmware source — confirmed instead
 from [Petoi's official docs](https://docs.petoi.com/extensible-modules/voice-command-module)
-and against the real board 2026-09-28:
+and against the real board:
 
 - `XAa`: set English as default language
 - `XAb`: set Chinese as default language
@@ -84,20 +84,17 @@ commands (two languages) plus up to 10 you record yourself in learning mode; **"
 While it is on, a phrase meant for the Pi can also trigger it.
 
 **Do NOT send `Xa` (lowercase) — or `XAd` — to "disable" it over serial.** The board only ever replies `X` to these, so there is no
-confirmation, and the module's on/off state is saved in the board's settings across reboots. After `Xa` was sent on 2026-10-03 the module
+confirmation, and the module's on/off state is saved in the board's settings across reboots. After `Xa` was sent, the module
 kept listening and said "ok" to "stand up", but G2 did nothing, even after a reboot: voice commands had silently stopped working.
 **`XA` (uppercase) fixed it** (voice commands worked again right after). Rule of thumb from `moduleManager.h`: `X` + uppercase letter
 enables a module, `X` + lowercase disables it, and neither prints anything useful. Use the spoken switch above instead. Symptom to
 remember: module answers "ok" but the body does not move → send `XA`, and check the dial on the hat is on "Voice Command".
 
-**2026-09-28 incident: module found stuck defaulting to Chinese, with
-voice commands unresponsive, for no identified trigger (nothing bumped/
-dropped, unrelated to the serial link work, broken before this session
-started).** Matches a closed PetoiCamp/OpenCatEsp32-Quadruped-Robot PR
+**Known fault: the module can get stuck defaulting to Chinese, with voice commands unresponsive, for no identified trigger.** Matches a closed PetoiCamp/OpenCatEsp32-Quadruped-Robot PR
 (#51) where an identical symptom on BiBoard V1.0 was root-caused to the
 module getting stuck in a bad persistent armed state that survives
 reboots/reflashes -- not a firmware bug, and the author's own code-level
-fix attempt was a red herring. Recovered here by sending `XAc` (enable),
+fix attempt was a red herring. Recovery: send `XAc` (enable),
 waiting ~1.2s, `XAb` (confirmed via its own reply: `Default language:
 Chinese` -- so this *was* the stuck state), waiting ~1.2s, then `XAa`
 (confirmed via reply: `Default language: English`). Verified working
@@ -105,9 +102,7 @@ after (both "play sound" and an actual English command). If this recurs,
 this sequence is the first thing to try again before assuming a deeper
 fault.
 
-**Recurred 2026-09-29, as expected — the full erase/reflash wipes this
-too.** Same symptom, same fix, applied right after the reflash + servo
-recalibration: `XAc` → `XAb` (confirmed stuck: `Default language:
+**A full erase and reflash wipes the language setting too.** The same fix applies right after a reflash and servo recalibration: `XAc` → `XAb` (confirmed stuck: `Default language:
 Chinese`) → `XAa` (confirmed: `Default language: English`), then verified
 live by voice again ("play sound" + an actual command). Not a new
 incident — this module's state lives in the same EEPROM/NVS wiped by
@@ -118,7 +113,7 @@ step after any future full reflash, not a fault to re-diagnose.
 - `m<idx> <deg> …`: name: `T_INDEXED_SIMULTANEOUS_ASC`; meaning: move joint(s), chainable — `m0 30 8 -35`
 - `b<note> <dur> …`: name: `T_BEEP`; meaning: buzzer melody: pairs of (note, duration)
 - `d`: name: `T_REST`; meaning: rest posture, servos off (ends a looping gait)
-- `P`: name: `T_POWER`; meaning: **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack)
+- `P`: name: `T_POWER`; meaning: **print battery voltage** — confirmed against the real BiBoard (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack)
 - `j` / `j <idx>`: name: `T_JOINTS`; meaning: **return all joint angles / one joint**
 - `f`: name: `T_SERVO_FEEDBACK`; meaning: servo position feedback (if the servo chip supports it)
 - `g`: name: `T_GYRO`; meaning: gyro function toggle (bare `g`)
@@ -134,17 +129,7 @@ step after any future full reflash, not a fault to re-diagnose.
 - b<note> <dur> …: Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it
 
 
-CONFIRMED 2026-09-20, corrects the previous entry here: `v`/`V` are still
-not a real token at all (grepped current `main` source directly — no match
-anywhere in the command parser), and `pi_pipeline/gait/run_gait.py` /
-`sysid_collect.py` were both sending it until this date, which would have
-been silently ignored by the board and produced *zero* streamed IMU data —
-`--probe-imu` would have hit a dead loop-timeout at first real bring-up.
-Fixed in both files to send `gP`/`gp` instead, matching the actual
-`T_GYRO`+`C_PRINT` mechanism traced above. `python -m pi_pipeline.gait.run_gait
---probe-imu` still needs to run against the real board to confirm this against
-actual hardware (nothing above has touched a real BiBoard) — that's step 13a
-of the bring-up sequence.
+Confirmed: `v`/`V` is not a real token (no match anywhere in the command parser of the current `main` source). The board silently ignores it and streams *zero* IMU data, so `pi_pipeline/gait/run_gait.py` and `sysid_collect.py` start the IMU print with `gP` and stop it with `gp`, matching the `T_GYRO`+`C_PRINT` mechanism traced above.
 
 IMU
 ---
@@ -162,7 +147,7 @@ IMU
   Exact balance `KP/KI/KD` gains not yet pulled — TODO if the deployment balance
   loop needs matching.
 
-### Confirmed serial line format (`imu.h` `print6Axis()`, 2026-09-20)
+### Confirmed serial line format (`imu.h` `print6Axis()`)
 
 The function actually wired into the main loop (via `readEnvironment()`) —
 **not** the similarly-named but dead `print6AxisMacro()`, which is unused
@@ -193,43 +178,13 @@ derives roll/pitch rate by finite-differencing consecutive frames;
 replies). What that costs the gait policy in sim:
 `rl_training/opencat-gym/resilience_imu_rate.py`.
 
-**RESOLVED, 2026-09-28/29 — was a stale-firmware artifact, fixed by a
-reflash. Full story, in order:**
+**Current firmware prints the IMU at 5.0 Hz.** `run_gait.py --probe-imu` on the real BiBoard (firmware `B10_260527`) measures exactly 5.0 Hz (25 lines in 5 s), the documented `PRINT6AXIS_MIN_INTERVAL` cap. An older build (`B10_251121`, a 2025-11 build) printed about 249 Hz raw (1246 lines in 5 s, of which 500 were distinct 6-axis values, about 100 Hz of distinct samples) and 93 Hz under the control loop's 80 Hz command stream (`--probe-imu-load`). The rate therefore depends on the firmware build: read the version with `?` before relying on it.
+- Chip: The prefix is `ICM:` (ICM42670, not MPU6050).
+- Units: `az` reads about 9.9 at rest, so the accelerometer is in m/s², not g.
+- Banner: `?` prints a two-line banner, line 1 `Bittle X` and line 2 the version string. A single read takes only line 1 and leaves line 2 as backlog for the next read, the same class of bug as the `allmoves` desync described below.
+- Reflash: A full flash erase and reflash to Petoi's current official firmware through the Desktop App is the fix for both the stale IMU timing and the camera bug described below.
 
-1. **2026-09-28, `run_gait.py --probe-imu` against the real BiBoard
-   measured 249.2 Hz** raw line rate (1246 lines / 5 s), not "at most
-   5 Hz." Checked it wasn't the same stale line reprinted fast: of those
-   1246 lines, 500 carried a genuinely distinct 6-axis value (~100 Hz
-   distinct-sample rate). Chip prefix confirmed `ICM:` (ICM42670, not
-   MPU6050). Also noted `az` read ~9.9 at rest, consistent with **m/s²**,
-   not "g" as this doc used to say.
-2. Cross-validated under real load same day: `--probe-imu-load`
-   (sends the neutral stand pose at 80 Hz on the same UART while
-   counting IMU lines, the actual shared-bus condition the control loop
-   runs under) measured **93.0 Hz** — same ballpark, still nowhere near
-   5 Hz, ruling out a fluke/burst reading.
-3. 2026-09-29, read BiBoard's full two-line `?` banner properly
-   (a naive single-read grabs only line 1, leaving line 2 as backlog for
-   whatever reads next — same class of bug as the `allmoves` desync
-   documented below): line 1 `Bittle X`, line 2 a version string,
-   **`B10_251121`** — read as a 2025-11-21 build, ~10 months older than
-   the `main`-branch source review (2026-09-07/09-20). Strong
-   circumstantial evidence the stale build had different IMU timing.
-4. Separately that same night, found and fixed a real firmware bug
-   (below) requiring a full flash erase + reflash to Petoi's *current*
-   official firmware via the Desktop App.
-5. After the reflash, re-ran `--probe-imu`: exactly 5.0 Hz (25 lines /
-   5 s) — matching the documented `PRINT6AXIS_MIN_INTERVAL` cap exactly,
-   on the nose. Confirms step 3's theory directly rather than just
-   circumstantially: the stale ~10-month-old build genuinely had
-   different (much faster) IMU print timing than current firmware.
-
-Practical upshot: `hw1_20m`/`Release_CandidateV2`/`V2.1` were all
-trained under the *correct* assumption (`IMU_HOLD_STEPS=16`, 5 Hz) for
-G2's real, current firmware. A same-night retrain campaign built around
-the stale 93-249 Hz reading (`docs/rl/hw1-log.md` Round 5) was abandoned
-once this closed out — not a wasted detour exactly, since it's what led
-to catching the reflash-worthy bug, but its premise no longer holds.
+Practical upshot: the walking policies are trained under the correct assumption for G2's current firmware (`IMU_HOLD_STEPS=16`, 5 Hz).
 
 Onboard voice module + camera: EEPROM-persisted module state (`moduleManager.h`)
 ------------------------------------------------------------
@@ -246,7 +201,7 @@ BiBoard's extension modules, confirmed from `src/moduleManager.h`:
 Printed as `?`'s status dump: a header row of these letters, then a `0`/`1`
 row (also reachable via `X`+letter, e.g. `XC`'s enable prints it). **`G`
 here is Gesture, not Gyro/IMU** — easy to misread and chase the wrong flag
-(done once, 2026-09-28, before finding the real mechanism below).
+(the real mechanism is described below).
 
 **Confirmed from `reconfigureTheActiveModule()`'s literal source**: `X` +
 uppercase letter enables that module; `X` + lowercase letter disables only
@@ -259,7 +214,7 @@ as fallback. **This means enabling a module isn't just a runtime toggle —
 it survives power cycles**, and `initModuleManager()` re-runs `initModule()`
 for every module still marked enabled on *every boot*.
 
-**The bug this caused, 2026-09-28: enabling Camera (`XC`) permanently
+**The bug this causes: enabling Camera (`XC`) permanently
 kills the IMU streaming task, with zero restore path anywhere in the
 firmware, and re-triggers on every boot because the enabled state
 persists.** Confirmed from `camera.h`'s `groveVisionSetup()`, called by
@@ -282,7 +237,7 @@ streams real `ICM:` data again.
   line) — must be explicitly changed to **"Bittle X"**, which unlocks
   **BiBoard V1** as a Board-version option (that dropdown doesn't
   auto-update when Product changes, and silently keeps whatever board
-  was previously selected).
+  was selected before).
 - The Serial port dropdown may default to **`cu.debug-console`** even
   with the right board plugged in and detected — must be explicitly
   reselected to the actual device (`cu.usbmodem*`).
@@ -309,47 +264,13 @@ Sending it produces a `calib` banner + a 16-joint offset table, not a
 calibration flow — `opencat.is_safe()` already blocks it for exactly this
 reason.
 
-**Post-reflash state, 2026-09-29**: BiBoard is on current official
-firmware (no longer `B10_251121`, now `B10_260527` — read via `?`'s
-version banner); NVS/EEPROM is fully blank, meaning **calibration needs
-to be done for real** (the only calibration ever done before this was the
-boot-gesture entry with no actual +/- adjustments saved, so nothing of
-value was lost) and **the onboard voice module will very likely need its
-English-default fix re-applied** (`XAc`/`XAb`/`XAa`, see the voice module
-section above) since that was EEPROM-persisted too.
+**State after a full reflash:** the BiBoard runs the current official firmware (`B10_260527` at the time of writing, read from the `?` version banner). NVS/EEPROM is fully blank, so **calibration must be redone** and **the onboard voice module needs its English-default fix re-applied** (`XAc`/`XAb`/`XAa`, see the voice module section above), because both are EEPROM-persisted.
 
-**Checked GitHub `main` the same night for anything worth catching up
-on — nothing urgent, one thing to know about.** `B10_260527`
-is ~6 weeks behind `main`'s newest firmware-code commit (`DATE "260717"`,
-2026-07-17); every commit in that gap was reviewed directly via the
-GitHub API. None of it matters for the project: the camera-kills-IMU bug above is
-still present unfixed on `main` (a `camera.h` commit in the gap is a
-comment-only clarification); a `moduleManager.h` refactor that also
-touches Serial2 init resolves to the same pins (9/10) for
-`BiBoard_V1_0` either way — no pinout regression; the rest is an
-Xiaozhi-voice-UART echo feature (not applicable, the project does not use a Xiaozhi
-module) and unrelated marketing/README commits.
+**Upstream firmware check.** `B10_260527` is about 6 weeks behind `main`'s newest firmware-code commit. Nothing in that gap affects the project: the camera-kills-IMU bug above is still present on `main` (a `camera.h` commit in the gap is a comment-only clarification); a `moduleManager.h` refactor that also touches Serial2 init resolves to the same pins (9/10) for `BiBoard_V1_0`, so there is no pinout regression; and the rest is an Xiaozhi-voice-UART echo feature (not applicable, because the project does not use a Xiaozhi module) and unrelated marketing and README commits.
 
-**One real, small thing this surfaced: the voice-module Chinese-default
-bug (see the voice module section above, first hit 2026-09-28) has an
-actual upstream root-cause fix — but it lands one day after the build.**
-`main` commit `9cf4e8d` changes `configConstants.h`'s
-factory EEPROM default for `EEPROM_CURRENT_LAN` from `'b'` (Chinese) to
-`'a'` (English); a same-day commit (`b189c34`) simplifies
-`voiceSyncAtStartup()`'s language-sync logic (the `Ac->Ab->Aa` special
-case for English, matching the project's own manual workaround, is replaced with a
-single `A<lan>` send). **Checked whether the Petoi Desktop App could provide
-this fix: its release feed (`PetoiCamp/DesktopAppRelease`) tops out at
-v1.2.9, published 2026-05-28 — the same version already installed and
-used for tonight's reflash — so re-running it would just re-flash the
-identical `260527` build, not the newer one.** Reaching the fix would
-require building from raw GitHub source, which this project has
-explicitly decided against (see `project_no_firmware_fork` memory: stock
-firmware only, app layer over serial). **Decision: stay on `260527`,
-keep applying the manual `XAc`/`XAb`/`XAa` workaround after every EEPROM
-wipe** (already a known, working fix) rather than chase a one-day-newer
-build that isn't packaged anywhere yet. Revisit only if Petoi ships a
-Desktop App release newer than 1.2.9.
+**Voice-module language default.** `main` commit `9cf4e8d` changes `configConstants.h`'s factory EEPROM default for `EEPROM_CURRENT_LAN` from `'b'` (Chinese) to `'a'` (English), and a commit the same day (`b189c34`) simplifies `voiceSyncAtStartup()`'s language-sync logic (the `Ac->Ab->Aa` special case for English, which matches the project's own manual workaround, becomes a single `A<lan>` send).
+The Petoi Desktop App cannot provide this fix: its release feed (`PetoiCamp/DesktopAppRelease`) tops out at v1.2.9, the version used for the reflash, which flashes the identical `260527` build. Reaching the fix would require building from raw GitHub source, which this project does not do (stock firmware only, app layer over serial).
+The project stays on `260527`, applies the manual `XAc`/`XAb`/`XAa` workaround after every EEPROM wipe, and revisits this only if Petoi ships a Desktop App release newer than 1.2.9.
 
 ### Exception detection (`imu.h` `getImuException()`)
 
@@ -446,8 +367,8 @@ largest limb-coordination difference from wkF, so it's the clearest yes/no on
 second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-spec.md`.
 
 
-Pi UART (Serial-2) link — bring-up findings, 2026-09-30
--------------------------------------------------------
+Pi UART (Serial-2) link — bring-up findings
+-------------------------------------------
 
 - The BiBoard ignores the Pi's UART until the Serial module is enabled: send
   `XS` once over USB. `X?` prints the module table (`S,A,T,L,D,I,B,U,G,C,Q` and a
@@ -466,8 +387,8 @@ Pi UART (Serial-2) link — bring-up findings, 2026-09-30
   exactly 5.0 Hz, so the camera on the Pi does not disturb the IMU (the
   camera-kills-IMU bug needs the BiBoard's own `XC` camera module).
 
-IMU calibration (`gc`) — needed for the firmware's gyro balance, 2026-10-01
-------------------------------------------------------------
+IMU calibration (`gc`) — needed for the firmware's gyro balance
+--------------------------------------
 
 - Symptom before calibrating with firmware gyro balance ON (`gB`), `kbalance` made G2
   push its FR foot out and tilt the body ~19° roll / ~11° pitch (IMU-measured, steady);
@@ -479,7 +400,7 @@ IMU calibration (`gc`) — needed for the firmware's gyro balance, 2026-10-01
   seconds (no reply is printed, and the IMU readings jump during it -- wait it out).
 - After: balance ON `kbalance` reads roll 0.8° / pitch -0.8° with std 0.2°; at rest the
   zero moved ~4° in roll (+0.9 -> -3.2). Redo after any reflash/erase. **Persists across a full
-  power cycle** (checked 2026-10-01: balance-on `kbalance` still reads 1.0° / -1.1°).
+  power cycle** (checked: balance-on `kbalance` still reads 1.0° / -1.1°).
 - Anything using firmware balance (the scripted `kwkF` contender with gyro assist, voice
   skills, the `gB` that `run_gait` restores on exit) depends on this being calibrated.
 
@@ -501,7 +422,7 @@ More bring-up facts
 Standing wobble
 ---------------
 
-Symptom: standing on the calibration stand, G2 is steady at first (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
+Symptom: standing on the calibration stand, G2 is steady initially (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
 
 **Measured with `gait/stand_log.py`** (passive: IMU print `gP` plus a `P` voltage read, no motion commands; the `g2-voice` service stopped so only one process uses the port). Logs: `~/g2_runs/stand01..05*.csv` on the Pi.
 - Episodes: roll up to ~4-6 degrees and pitch up to ~9-11 degrees peak-to-peak; one sustained run settled into a steady cycle at **about 1.9 Hz** (roll, pitch and the accelerometer all agree), pitch ~±5 degrees by the accelerometer. At 5 Hz sampling, 1.9 Hz could also be an alias of ~3.1 Hz.
@@ -511,7 +432,7 @@ Symptom: standing on the calibration stand, G2 is steady at first (roll/pitch no
 - Conclusion: the balance feedback loop, fed by an IMU that updates at 5 Hz (see the IMU rate notes above), is marginally stable and locks into a limit cycle once disturbed; some starts (a stand-up from rest) disturb it without any touch.
 - Side notes: the firmware's accumulated yaw counter can jump by exactly 360 degrees mid-episode (an unwrap artifact; the wrapped yaw is unchanged), and the front-left shoulder servo's faults (see `rl/real-walk-log.md`) may make it easier to excite but are not needed to explain it.
 
-Fix (2026-10-04, `pi_pipeline/gait/stand_guard.py`): (1) firmware gyro balance is kept off while G2 is idle: the voice service sends `gb` at start and every 60 s, and the serial actuator sends `gB` just before a firmware gait skill and `gb` just after it (and after rest or any posture); (2) a guard thread reads the 5 Hz IMU print and, if roll or pitch swings at least 0.8 degrees (standard deviation) with at least 4 mean-crossings per 4-second window for 4 s straight, sends `gb`.
+Fix (`pi_pipeline/gait/stand_guard.py`): (1) firmware gyro balance is kept off while G2 is idle: the voice service sends `gb` at start and every 60 s, and the serial actuator sends `gB` just before a firmware gait skill and `gb` just after it (and after rest or any posture); (2) a guard thread reads the 5 Hz IMU print and, if roll or pitch swings at least 0.8 degrees (standard deviation) with at least 4 mean-crossings per 4-second window for 4 s straight, sends `gb`.
 
 Replaying the five logs: it trips about 5 s after a wobble starts in every log that has one, and never on the balance-off log. It also catches stands started by the BiBoard's own voice module (those never pass through the Pi). Everything pauses while a gait runs, and for 8 s after any command the Pi sends.
 

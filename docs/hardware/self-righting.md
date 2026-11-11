@@ -1,6 +1,6 @@
 # Self-righting after a fall
 
-Status: G2 can flip himself back over from fully on his back. This was confirmed on G2 on 2026-09-28, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for the hardware.
+Status: G2 can flip himself back over from fully on his back. This was confirmed on G2, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for the hardware.
 
 How it works (firmware)
 -----------------------

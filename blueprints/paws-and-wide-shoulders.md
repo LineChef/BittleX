@@ -1,6 +1,6 @@
 # Paws and wide shoulders: printed, not yet installed
 
-Two printed changes to G2's legs, both designed from simulator results and both printing as of 2026-10-24. Nothing here has been on G2 yet. The wide shoulder parts widen the track by 0.2 in per side; the paws are hinged clip-on feet that fit over the stock foot discs. This page records the design, the numbers behind it and what to check at installation. The simulator results are for the deployed walking policy (V7); they are evidence, not a hardware result.
+Two printed changes to G2's legs, both designed from simulator results and both printing. Nothing here has been on G2 yet. The wide shoulder parts widen the track by 0.2 in per side; the paws are hinged clip-on feet that fit over the stock foot discs. This page records the design, the numbers behind it and what to check at installation. The simulator results are for the deployed walking policy (V7); they are evidence, not a hardware result.
 
 Wide shoulder parts
 -------------------
@@ -20,7 +20,7 @@ Paw ("seated" design)
 ---------------------
 
 - What: A printed foot shell that clips over the stock foot disc and pivots on it
-- Source and specs: `seated/wide_foot_part.scad` and `seated/SPECS.md` in the owner's prototypes folder (outside this repository); export with `openscad -o seated.stl -D show_pin=false wide_foot_part.scad`. SPECS.md holds the full dimension tables and the simulator notes.
+- Source and specs: `seated/wide_foot_part.scad` and `seated/SPECS.md` in the prototypes folder (outside this repository); export with `openscad -o seated.stl -D show_pin=false wide_foot_part.scad`. SPECS.md holds the full dimension tables and the simulator notes.
 - Size: 21.8 mm (0.86 in) wide, 27.5 mm (1.08 in) long, 9.2 mm (0.36 in) tall. Pivot 4.5 mm above the sole on the foot's centre.
 - Mass: 3.25 g per paw at 100% infill (PETG, density 1.27 g/cm3 assumed). Print at 100% infill: the balance depends on it. Four paws add about 13 g.
 - Balance: The centre of mass sits within 0.1 mm of the pivot (hollow toe, heel 3 mm longer), so the toe stays up through the swing without a friction pin.
@@ -31,7 +31,7 @@ Paw ("seated" design)
 - What: The stock foot stays in the paw, sticking out 1.0 mm through an opening in the sole. No pin and no glue: two flaps with cone pegs push into the edges of the foot's hole.
 
 
-### The 2026-10-23 foot-shape update
+### The foot-shape update
 
 A sole sweep in the simulator (CLpaw base, V7, free pivot, 300 episodes per cell) picked a wider sole with a tighter heel roll. Against the previous shape (18.2 mm wide, 8 mm heel radius):
 
@@ -72,4 +72,4 @@ Not known
 Files
 -----
 
-The source files and STLs are not in this repository (the prototypes folder is outside it and ignored). A copy of the previous CLpaw and seated files, from before the 2026-10-23 sole update, is kept outside the repository in `~/.local/share/g2/paw_backups/2026-10-23_before_rank1/`.
+The source files and STLs are not in this repository (the prototypes folder is outside it and ignored). A copy of the previous CLpaw and seated files, from before the sole update, is kept outside the repository in `~/.local/share/g2/paw_backups/2026-10-23_before_rank1/`.

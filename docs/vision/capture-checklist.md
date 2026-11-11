@@ -8,7 +8,7 @@ preview + capture).
 0 · Ask for the tag name
 ------------------------
 
-**Before anything else, ask the user what name to tag this batch with.**
+**Before anything else, ask what name to tag this batch with.**
 That name is used everywhere: the capture folder, the curated folder, the YOLO
 class, and later `VISION_LABELS` + `G2_BONDS`. Lower-case, short, no spaces
 (`sam`, `mom`, `rex`). Also note **which session number** this is for that
@@ -25,7 +25,7 @@ person (`count_completed_sessions` from `behavior/enrollment.py`, or count
   are head+torso — tighten at upload. Redeploy from the SenseCraft library if
   switching.
 - Lighting: get the room as bright as reasonably possible (all lamps, brightest
-  daylight). Goal is *usable dim*, not near-black — the 2026-09-06 practice run
+  daylight). Goal is *usable dim*, not near-black — an early practice run
   failed on near-black frames. Capture under the lighting that's actually on
   when G2 is used, not the empty-room worst case.
 

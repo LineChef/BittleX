@@ -96,4 +96,4 @@ Still to do
 ------------------------------
 
 The walk policy's own terrain signal (a detection frame turned into `[present, dist_norm, bearing_norm, tall_flag]` for the policy's
-observation, mirrored in the sim by `opencat_gym_env._scan_terrain`) was removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d).
+observation, mirrored in the sim by `opencat_gym_env._scan_terrain`) was removed with vision-in-the-gait closed; recover it from git (it is in commit f6f133d).

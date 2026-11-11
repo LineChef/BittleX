@@ -19,7 +19,7 @@ Rules that apply to every run
 -----------------------------
 
 - Every new run is a fresh candidate, not a continuation or fine-tune; nothing trains on top of a consolidated 20M run (a chain that starts fresh at S0 is fine).
-- Never launch a 20M-step run unless the user asks. Screening runs are capped at 3M steps.
+- A 20M-step run starts only on explicit request. Screening runs are capped at 3M steps.
 - Difficulty never ramps above what a capable policy can pass (`passability_audit.py`).
 - Do not overwrite `run20m_resid30_ppo` (the fallback base) or `run20m_ppo` (the reference).
 - Give a timing estimate with a completion clock time when launching anything (`tools/eta.py`).
@@ -52,4 +52,4 @@ Gitignored, except the small result files that back decisions (benchmark JSON, r
 Removed campaign scripts
 ------------------------
 
-Scripts for closed campaigns (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, and the old hardware-IMU retrain chains) were removed from the working tree on 2026-10-17. To recover one: `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.
+Scripts for closed campaigns (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, and the old hardware-IMU retrain chains) were removed from the working tree. To recover one: `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.

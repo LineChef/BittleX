@@ -46,9 +46,16 @@ Each page is also written as `pages/<route>.html`: a single `<article>` that car
 - `pre[data-lang] > code`: A fenced code block
 - `code`, `a[href]`, `img[src][alt]`, `em`, `strong` and `hr`: Inline code, links, images, emphasis and rules
 
-**Sections** are a closed set: `overview`, `guides`, `hardware`, `vision`, `rl`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
+**Sections** are a closed set: `overview`, `specification`, `guides`, `hardware`, `vision`, `rl`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
 
 **Audience and kind.** `audience` is who a page is for (`visitor`, `builder` or `contributor`) and `kind` is what it is (`overview`, `guide`, `reference` or `concept`). A page sets them in optional front matter (a `---` block at the top with `audience:` and `kind:` lines, removed from the published Markdown); without it the section's default applies. A site can use them for badges and filters.
+
+Navigation titles and order
+---------------------------
+
+The sidebar shows short titles, kept in `docs/nav-titles.json` (route to title). A page keeps its full `title`, and its nav node and its `navTitle` use the short one. A top-level title is at most two words and 22 characters, a child at most four words and 30, and the build refuses anything longer.
+
+The order is in `docs/nav-order.json`: a list of `[group label, [routes in order]]` for the top level (`top`) and for each folder, with the most important page first. A child that is not listed fails the build, so every page has a deliberate place. A `group` on a nav node is the label from that file.
 
 **Left out of the bundle.** Working notes stay in the repo but are not published: `docs/plan-detail/`, `docs/planned/`, `docs/archive/`, `docs/research/`, the dated run logs in `docs/rl/`, `docs/backlog.md` and `docs/maintaining-docs.md`. The list is `EXCLUDED_DIRS` and `EXCLUDED_FILES` in the builder. The build fails if a published page links to one of them.
 

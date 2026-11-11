@@ -19,7 +19,7 @@ the changes that measurably helped were kept.
   trajectory anchors the gait; the policy deviates from the scripted pose only
   where it earns something.
 - Foot clearance: Swing feet lift to a ~20 mm target — added after the rear
-  feet were found dragging once the heading term made the body front-heavy.
+  feet dragged once the heading term made the body front-heavy.
 - Holds a ride height: A target body height is enforced, killing the
   crouch-and-collapse failure mode; joints are also pushed off their end-stops
   where they'd lose authority.
@@ -40,7 +40,7 @@ the changes that measurably helped were kept.
 - Inclines: Every episode the ground is tilted a random roll *and* pitch up
   to ±10°; the policy generalizes well past that — it climbs a 24° slope
   *forward* at ~0.06 m/s, walks down steep descents, and holds a straight line
-  across a cross-slope, at 0 % falls. (A 2026-09-23 re-measure with corrected
+  across a cross-slope, at 0 % falls. (A later re-measure with corrected
   slope labels found its limits are side-hills past ~8° and climbs past ~20°;
   see the training notes in the repo.)
 - Scattered obstacles: Every episode drops 4–10 small boxes (to ~45 mm,
@@ -116,7 +116,7 @@ ledges into the walk (bred timidity — it backed away from steps).
 contact. Against a curb, a thin lip, or sustained rough ground it **stalls rather
 than falls**, and it cannot deliberately step over or route around an obstacle
 it hasn't touched. Folding "see it → step over it" into the trained gait itself
-was tried and closed (Phase D, the `smoke_vfix3` retry) — it just plows through
+was evaluated and rejected (Phase D, the `smoke_vfix3` retry) — it just plows through
 or stalls; the accepted fix is a *discrete* reaction layered outside the walk
 policy (vision picks a scripted response, not a learned one), built and
 sim-validated but waiting on a real forward sensor. It also does not self-right

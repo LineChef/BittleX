@@ -14,7 +14,7 @@ Status at a glance
 
 **The estimator is unvalidated.** G2's servos report no temperature or current, so heat is estimated from commanded motion. Until it is checked against the real servos, treat the thresholds as guesses that err toward safety.
 
-**Bench-test checklist** (G2 on a stand or held by the user; one measurement at a time; details in section 4b):
+**Bench-test checklist** (G2 on a stand or held by hand; one measurement at a time; details in section 4b):
 - [ ] Hold a hard stance and note the time until the servo protects itself: scales `_K_GEN` and `_H_TRIP`.
 - [ ] Release a hot servo and record the cooldown curve: sets `_K_DISS`.
 - [ ] Compare feedback-servo tracking error under a normal hard push with an actual stall: sets the stall constants.
@@ -118,8 +118,7 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 > `pi_pipeline/gait/thermal_guard.py`: the I²t estimator was already there; added
 > the **3-tier per-joint indicator** (`ThermalTier` GREEN/AMBER/RED at 50 % / 85 %
 > of the estimated trip, on `GuardSnapshot.tiers` / `.hottest_tier`) and a
-> **per-joint spoken heads-up** (`snap.warm_phrase()` → "my left-front leg is
-> getting warm…"). `run_gait.py` logs `hottest_tier` to the CSV + ring buffer.
+> **per-joint spoken heads-up** (`snap.warm_phrase()` → "my left-front leg is getting warm…"). `run_gait.py` logs `hottest_tier` to the CSV + ring buffer.
 
 
 **I²t thermal estimator** — the industry-standard sensorless winding-temp proxy
@@ -218,7 +217,7 @@ been structured.
    2 000–4 000-step episodes, thermal model live. Metrics: time-to-first-trip,
    whether the policy sheds effort as joints warm, distance before a trip.
    Compare `run20m_ppo` (no thermal obs) vs a thermal-aware residual.
-4. Sustained-hold variant (`robustness_sweep.py` was removed 2026-10-17; write a new probe or recover it from the tag): hold a hard stance /
+4. Sustained-hold variant (`robustness_sweep.py` was removed; write a new probe or recover it from the tag): hold a hard stance /
    slow uphill with the thermal model on, report trip time per policy.
 5. Hardware validation (hardware-gated): once bring-up allows, run the
    robot in a fixed hard stance (or one leg against a stop) until protection

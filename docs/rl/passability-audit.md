@@ -9,7 +9,7 @@ Apply this to every new hazard, every change to a hazard's range, the level ceil
 Why
 ---
 
-The surface-transition floor was built from two slabs, each tilted about its own centre, so any ground tilt left a wall at the junction (11 cm at 3 deg, 29 cm at 8 deg). About one episode in six or seven of a staged run carried it. The 20M was not affected (it trained on the flat stage; see the decisions log, 2026-10-08), but the viewer showed the course and the user saw an impassable ledge. The audit below exists so a bug like that is found by a test, not by eye.
+The surface-transition floor was built from two slabs, each tilted about its own centre, so any ground tilt left a wall at the junction (11 cm at 3 deg, 29 cm at 8 deg). About one episode in six or seven of a staged run carried it. The 20M was not affected (it trained on the flat stage; see the decisions log), but the viewer showed an impassable ledge in the course. The audit below exists so a bug like that is found by a test, not by eye.
 
 The audit (`rl_training/opencat-gym/passability_audit.py`)
 ----------------------------------------------------------
@@ -29,7 +29,7 @@ Results so far
 - Geometry after the junction fix (300 episodes each): forced rise at most 3.5 cm (level 1.0) and 4.3 cm (1.25) for ledges alone, 6.1 cm worst case in combinations (a ledge plus a tilt); terrain at most 1.6 cm; ground tilt up to 23.9 deg at level 1.0 and 29.9 deg at 1.25.
 - Scene checks (`scene`, 100 episodes per generator at levels 1.0 and 1.25, every generator forced on): the robot is never inside the ground by more than 1 cm at the start (0.0% in all 16 cases), it stands 0.6 cm above the floor (a step-down start is higher by design), and no static object floats.
 
-  Nothing in the ground was found: an earlier "buried start" figure (5-12% on steep slopes) came from measuring the welded payload box, which has collisions switched off; with it excluded the worst ground overlap on a 30 deg slope is 0.5 cm (0.0 cm after the start-height lift).
+  Nothing in the ground explains it: an earlier "buried start" figure (5-12% on steep slopes) came from measuring the welded payload box, which has collisions switched off; with it excluded the worst ground overlap on a 30 deg slope is 0.5 cm (0.0 cm after the start-height lift).
 
   Rubble and snag blocks sit partly below the floor surface by design (only the exposed height counts), so "sunk" objects there are not a bug. One small item remains: with every generator on at once, 1% (level 1.0) to 2% (level 1.25) of episodes start with an obstacle overlapping the robot by more than 5 mm.
 - The capability results and the resulting limits are added here once Part B has run (it waits for an idle Mac, after the 20M and its reports).

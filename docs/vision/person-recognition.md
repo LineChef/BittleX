@@ -52,7 +52,7 @@ Same daylight set, three ways, compare detection rate / confidence / confusion:
 3. SenseCraft multi-class `person` + individuals, feeding `person` a large batch
    of generic people shots so the shared backbone stays person-aware.
 
-Dataset bar (from the 2026-09-06 practice failure): **80–120+ images per
+Dataset bar (from an early practice failure): **80–120+ images per
 person**, genuinely varied — window / lamp / overhead light, 3–4 spots,
 distance 1.5–6 ft, head turns, chin up/down, ~15 negatives. Camera **propped
 up** (hand out of frame), **fixed orientation**, and ideally captured with the
@@ -69,9 +69,7 @@ frames the whole time, across **3 separate sessions** for lighting/pose variety.
 
 ### Flow
 
-1. Greeting: G2: *"Nice to meet you, Alex. I need 3 sets of photos to get
-   to know you. This is session 2 of 3, one more after this. Stay in front of me
-   and follow along."* (Session count comes from how many completed sessions the
+1. Greeting: G2: *"Nice to meet you, Alex. I need 3 sets of photos to get to know you. This is session 2 of 3, one more after this. Stay in front of me and follow along."* (Session count comes from how many completed sessions the
    person already has.)
 2. Scripted pose steps, each = a spoken prompt + a capture window:
    - session 1 — basics: look at me / face close / back up / turn head / step out
@@ -86,9 +84,7 @@ frames the whole time, across **3 separate sessions** for lighting/pose variety.
    light on your face"*).
 4. Interruptions: person walks off → G2 pauses (*"come back in front of
    me"*); gone too long → abort with a friendly close.
-5. Completion: G2: *"Got it — that's set 2. Find me one more time later to
-   finish."* or, on the last: *"That's all 3 sets, Alex. Ask my humans to train
-   me on you now."*
+5. Completion: G2: *"Got it — that's set 2. Find me one more time later to finish."* or, on the last: *"That's all 3 sets, Alex. Ask my humans to train me on you now."*
 
 ### The FSM (`behavior/enrollment.py`) — BUILT
 
@@ -130,8 +126,8 @@ And it must act on `EnrollTick`:
 - `CAPTURE_ON`: `new_session_dir(...)` once per session; start saving accepted frames, tagged with `step_kind`; also save the detection box as a pre-label (YOLO txt) so upload is ~90 % labelled
 - `CAPTURE_OFF`: stop saving
 - `ORIENT`: turn body toward `tick.bearing` (only if a body/link is present)
-- `COMPLETE`: `mark_session_done(session_dir)`; tell the user; if `sessions_left == 0`, surface "ready to train"
-- `ABORT`: discard or keep partial (config); tell the user
+- `COMPLETE`: `mark_session_done(session_dir)`; tell the person enrolling; if `sessions_left == 0`, surface "ready to train"
+- `ABORT`: discard or keep partial (config); tell the person enrolling
 
 Trigger: voice command `"(hey )?g2,? meet (<name>)"` in the voice loop's local
 command matcher (sibling of `voice/commands.py` "forget that" / "go to sleep").

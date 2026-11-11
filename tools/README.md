@@ -64,9 +64,9 @@ Training support
 
 - [`eta.py`](eta.py): Timing estimates for training runs, read from the trainer's logs (`plan`, `now`, `check`). Read-only.
 - [`build_decathlon_report.py`](build_decathlon_report.py): Turns a decathlon result and its replays into a self-contained HTML report.
-- `v5_watchdog.sh`, `v6_watchdog.sh`: Keep a training chain's runner alive unattended; each stops on its own halt file. Both chains are finished; they are the templates for the next one ([`docs/rl/training-pipeline.md`](../docs/rl/training-pipeline.md)). The V3, V4 and high-step watchdogs were removed on 2026-10-17.
+- `v5_watchdog.sh`, `v6_watchdog.sh`: Keep a training chain's runner alive unattended; each stops on its own halt file. Both chains are finished; they are the templates for the next one ([`docs/rl/training-pipeline.md`](../docs/rl/training-pipeline.md)). The V3, V4 and high-step watchdogs were removed.
 
 Git hooks
 ---------
 
-[`githooks/`](githooks), enabled with `git config core.hooksPath tools/githooks`: `pre-commit` (docs check, leftover-file warning, large-commit block, privacy terms), `commit-msg` (strips attribution lines) and the `post-*` hooks that keep a local backup of `CLAUDE.md`. Since 2026-10-18 `pre-commit` also runs `ruff check` (correctness rules only, config in `pyproject.toml`) on the staged `.py` files when ruff is installed in `pi_pipeline/.venv` (`requirements-dev.txt`).
+[`githooks/`](githooks), enabled with `git config core.hooksPath tools/githooks`: `pre-commit` (docs check, leftover-file warning, large-commit block, privacy terms), `commit-msg` (strips attribution lines) and the `post-*` hooks that keep a local backup of `CLAUDE.md`. `pre-commit` also runs `ruff check` (correctness rules only, config in `pyproject.toml`) on the staged `.py` files when ruff is installed in `pi_pipeline/.venv` (`requirements-dev.txt`).
