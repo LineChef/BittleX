@@ -6,7 +6,8 @@ optional physical skill**, repeat.
 Every stage is an interface with a dev implementation and a robot implementation
 (see [`../README.md`](../README.md)), so the whole thing runs on a laptop today.
 
-## Modules
+Modules
+-------
 
 - `conversation.py`: Anthropic client, rolling history, `perform_skill` + `remember` tools. Turns a reply into `AssistantTurn(speech, actions, facts)`. Memory seam (`send(..., memory_context=)`); `set_personality()` swaps the persona mid-session.
 - `skills.py`: Curated OpenCat skill catalogue + serial command mapping (`walk_forward` → `kwkF`).
@@ -26,7 +27,8 @@ Every stage is an interface with a dev implementation and a robot implementation
 - commands.py: "forget that", "go to sleep", "enable/disable gir mode", and **"dismissed"** (after a false wake: closes the window silently and logs the trigger as false; chosen because "go to sleep" already curls him up). Also parses the answer to the floor question he asks before a roam (`parse_floor_answer`, asked by `loop.py` `_ask_floor`; `G2_FLOOR_PROMPT_S`).
 
 
-## Run it
+Run it
+------
 
 ```bash
 source pi_pipeline/.venv/bin/activate
@@ -41,7 +43,8 @@ python -m pi_pipeline.voice --mode voice
 `--actuator mock` (default) logs skill commands; `--actuator serial` sends them
 (hardware only). Say "goodbye g2" or Ctrl+C to stop.
 
-## Session & privacy behaviour (voice mode)
+Session & privacy behaviour (voice mode)
+----------------------------------------
 
 The mic is only live while G2 is powered on and started in `--mode voice`
 (`--mode text` never opens it). Within voice mode:
@@ -57,7 +60,8 @@ The mic is only live while G2 is powered on and started in `--mode voice`
 Speech that never triggers the wake word is never transcribed or stored — the
 Vosk wake grammar only matches the wake phrase.
 
-## Audio diagnostics (no API key)
+Audio diagnostics (no API key)
+------------------------------
 
 ```bash
 python -m pi_pipeline.voice.check_audio devices     # list mic / speaker devices
@@ -73,7 +77,8 @@ than a longer one — if it mis-fires on TV/background speech, set `G2_WAKE_WORD
 in `.env` to something more distinct. Use `stt` to tune `G2_STT_SILENCE_S` (the
 pause that ends a phrase).
 
-## Voices
+Voices
+------
 
 Piper voices (`en`) live at
 [`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en).
@@ -91,7 +96,8 @@ e.g. `PIPER_MODEL_PATH=models/piper/en_US-ryan-medium.onnx`. To try others,
 download `<name>.onnx` + `<name>.onnx.json` from the repo above into
 `models/piper/`.
 
-## Models for voice mode
+Models for voice mode
+---------------------
 
 Not committed (large). One script fetches the decided set into `models/` at the
 repo root, idempotently — run it on the Mac or the Pi:
@@ -126,7 +132,8 @@ Vosk transcribes a Piper-synthesised phrase back verbatim; `VoskSTT` /
 exercise live capture, the wake-word trigger, and the silence-detection timing —
 and an `ANTHROPIC_API_KEY` for the Claude leg.
 
-## Still to do in Phase 7
+Still to do in Phase 7
+----------------------
 
 - Buzzer / posture cue implementations (`cues.py`) — hardware.
 - `SerialActuator` end-to-end test + `XS` "Serial-2" mode on the BiBoard — hardware.
@@ -134,7 +141,8 @@ and an `ANTHROPIC_API_KEY` for the Claude leg.
   separate firmware path; the commands go over serial).
 - Thread health-monitoring / auto-restart once mic + serial threads are real.
 
-## API call log
+API call log
+------------
 
 Every call G2 makes to the Claude API, including the wake-word warm-up ping, is logged as JSON lines in `~/.local/share/g2/api_calls.jsonl` (`G2_API_LOG`, `off` to disable; rotated at 5 MB) and to the service journal (`g2.api`).
 Each call has a `start` line (what, which model, whether it carries a picture, which function made it) and a `done` or `error` line (seconds, token counts, stop reason). `source` says which part owns the client:

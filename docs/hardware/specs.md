@@ -6,7 +6,8 @@ open items on the bench once the parts are in hand.
 
 ---
 
-## BiBoard V1 (the controller in Bittle X V2)
+BiBoard V1 (the controller in Bittle X V2)
+------------------------------------------
 
 - MCU: ESP32-U4WDH (Xtensa dual-core LX6), via an ESP32-MINI-1 module
 - SRAM / ROM / Flash: 520 KB / 448 KB / **4 MB**
@@ -36,7 +37,8 @@ open items on the bench once the parts are in hand.
 - → **Servo position feedback: CONFIRMED to exist, but slow — not a control-rate
   signal.** Full write-up below under "Servo position feedback".
 
-## P1S alloy servos (×9: 8 legs + 1 neck)
+P1S alloy servos (×9: 8 legs + 1 neck)
+--------------------------------------
 
 - Torque: ~3 kg·cm (~0.29 N·m) peak
 - Speed: ~0.07 s / 60° (~14 rad/s no-load)
@@ -52,7 +54,8 @@ open items on the bench once the parts are in hand.
   plan (sensorless I²t estimator, behaviour-layer governor, thermal-aware
   residual policy): [`servo-thermal.md`](servo-thermal.md); backlog item H11.
 
-## Servo position feedback
+Servo position feedback
+-----------------------
 
 **Confirmed it exists on the hardware.** Petoi added position feedback to servos
 manufactured after **March 2024** (all with a label/laser-mark after May 2024,
@@ -119,7 +122,8 @@ separate CLI calls).
   quasi-static **stalled/blocked-joint detection**, and sim-to-real calibration
   spot-checks — all things that tolerate a slow, blocking read.
 
-## Mounted payload weight (BOM estimate)
+Mounted payload weight (BOM estimate)
+-------------------------------------
 
 The sim adds a payload body for the Pi stack on the rear spine
 (`opencat_gym_env.py` `PAYLOAD_MASS_*` / `PAYLOAD_POS`). The original 75 g ± 35 g
@@ -166,7 +170,8 @@ Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
   — weigh each sub-assembly, balance it on an edge for its CoM — and set
   `PAYLOAD_*` / `HEAD_*` to the measured values.
 
-## G2 weights as used in the sim
+G2 weights as used in the sim
+-----------------------------
 
 One measurement, the rest assumed. **Do not look these up again; re-weigh and edit this table if anything changes.**
 
@@ -191,7 +196,8 @@ The sim's front share with both is about 51% (about 46% with the old mount; the 
 Both bodies are fixed on the body and never vary from episode to episode: the pod block is exactly 185 g, perfectly balanced and flush on the torso, and the AI head is exactly 42 g at one fixed spot, both welded stiffly enough to stay within 1 mm of their places while walking. `case2` (168 g) stays for reproducing earlier runs.
 The mic weighs almost nothing and is counted in the spine block. Mass randomization in training stays at +/-18% on every body link.
 
-## Proposed build: component weights and balance
+Proposed build: component weights and balance
+---------------------------------------------
 
 Study of the "Bittle X Pi Add-on v0.16 on Platform v3.1" model published at
 <https://beetlebugorg.github.io/bittlex/viewer/> (66 part meshes, volumes read
@@ -249,7 +255,8 @@ difference between proposed and current is not significant (McNemar p about
 To tighten it: weigh G2 again on a level scale, balance the bare robot on
 an edge, and weigh the printed parts and the cell once they exist.
 
-## Bittle X body + battery
+Bittle X body + battery
+-----------------------
 
 - Joints: 9 servo DOF (2/leg + 1 neck); **no roll-axis joint**
 - Size / weight: 190 × 153 × 107 mm standing / 269–353 g
@@ -264,7 +271,8 @@ an edge, and weigh the printed parts and the cell once they exist.
 - → The RL `TARGET_SPEED` of 0.10 m/s is ~1/4 of the servo envelope — a
   deliberate stability choice, not a hardware ceiling.
 
-## Petoi AI Vision Camera Module (Seeed Grove Vision AI V2)
+Petoi AI Vision Camera Module (Seeed Grove Vision AI V2)
+--------------------------------------------------------
 
 - Processor: Himax WiseEye2 HX6538 — dual-core Arm Cortex-M55 + Ethos-U55 NPU (64–512 GOP/s)
 - Camera: OV5647 CSI (Raspberry Pi cam), 62° FOV recommended; other CSI cams may render green-only
@@ -300,7 +308,8 @@ an edge, and weigh the printed parts and the cell once they exist.
   Vela optimise → deploy via SenseCraft. "Small objects it sees" = a custom
   YOLOv8n on a chosen label set.
 
-## Raspberry Pi Zero 2 W
+Raspberry Pi Zero 2 W
+---------------------
 
 - SoC: RP3A0 SiP — quad-core Arm Cortex-A53 @ 1 GHz (64-bit)
 - RAM: **512 MB** LPDDR2
@@ -339,7 +348,8 @@ open-Q answers in [`pi-bring-up.md`](../guides/pi-bring-up.md)):**
 - → **Swap is mandatory** (small lz4 zram + a 1 GB SD swapfile backstop); voice +
   vision co-resident is doubtful and must be measured.
 
-## PiSugar S 1200 mAh
+PiSugar S 1200 mAh
+------------------
 
 - Output: 5 V / 2 A max
 - Battery: 1200 mAh single-cell (4.2 V max), USB-C charge

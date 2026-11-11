@@ -10,7 +10,8 @@ bias that can touch three channels — you implement only the ones it needs:
 Every trait has a `level` in `[0, 1]` and should scale all three channels by it,
 so `0.2` reads as "a little" and `0.9` as "a lot".
 
-## Configuring
+Configuring
+-----------
 
 `G2_TRAITS` — comma-separated `name=level`:
 
@@ -34,7 +35,8 @@ python -m pi_pipeline.personality                 # show what G2_TRAITS resolves
 python -m pi_pipeline.personality "curiosity=0.9" # …with an override
 ```
 
-## Using it
+Using it
+--------
 
 ```python
 from pi_pipeline.personality import Personality
@@ -47,7 +49,8 @@ cues   = p.cues("novelty")                      # -> ["head_tilt", "chirp_rising
 
 `voice/conversation.py` already calls `system_prompt()` at construction.
 
-## Body state (`body.py`)
+Body state (`body.py`)
+----------------------
 
 How the body has been doing lately, kept in `~/.local/share/g2/body_state.json` (`G2_BODY_STATE`, `off` turns it off) so the
 voice service and an exploration session, which can be separate processes, both write it:
@@ -58,7 +61,8 @@ voice service and an exploration session, which can be separate processes, both 
   "Your last exploration went well ..."). `idle_mult()` → 0.6 / 0.75 / 1.0 on the idle delays, through the behaviour runtime.
 - Notes expire: battery 2 h, fall 30 min, exploration 3 h. Servo heat is deliberately not an input.
 
-## Bonds (B15) — per-individual relationships
+Bonds (B15) — per-individual relationships
+------------------------------------------
 
 `bonds.py` is a separate, self-contained piece: how G2 relates to **specific**
 recognised people and pets, keyed by the vision model's per-individual class
@@ -95,7 +99,8 @@ a new face rather than staying reserved); unknown non-person → `neutral`.
 **API only.** Nothing here touches `behavior/` — wiring `seek_bias` into the
 Explorer / greeting layer is a separate reviewed change.
 
-## Adding a trait
+Adding a trait
+--------------
 
 1. New file, subclass `Trait`, set `name`, implement the channels it affects
    (see `curiosity.py`).

@@ -5,7 +5,8 @@ Code: `pi_pipeline/explore_session.py` (the session), `behavior/explore.py` (leg
 `behavior/survey.py` (picture stops), `behavior/interest_watch.py` (the peeks), `vision/wall_distance.py` (the wall estimator). Settings: [`settings-switches.md`](settings-switches.md).
 Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test history: `../vision/wall-check-plan.md`.
 
-## Starting it
+Starting it
+-----------
 
 - By voice: "G2, explore" (also "go ahead and look around", "exploration mode"). He says "Exploration mode.", waits 1 s, plays the Viking horn, and hands over: the voice service stops and
   a separate exploration session starts (about 30 s). The session lays him down first, then he stands with the eased stand-up and begins.
@@ -14,12 +15,14 @@ Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test hi
 - Needs: a cleared area with no edges (there is no edge detector), G2 on his feet or at rest on the floor, the BiBoard powered, the pack not low. Never on a desk or the stand.
 - Do not deploy to the Pi while a session runs: a deploy at the same moment as a crash left him circling.
 
-## Two tiers
+Two tiers
+---------
 
 - 0, attentive: What: stands still, turns toward sounds, follows faces with his gaze, reacts; Starts: always, as soon as the session is up
 - 1, roam: What: walks legs, looks, takes pictures, steers away from walls; Starts: armed by the start command; capped by the roam time
 
-## What a roam does
+What a roam does
+----------------
 
 1. Straight first: For the first 8 s of a roam he walks straight ahead. Only then may the explorer turn (a wall turn is never held back).
 2. Legs: Each leg is 8 s (`explore_leg_secs`) in one heading, then a short pause and a new heading (the stalest direction, scaled by `wander_turn_bias`). The policy walker (V6, trim `fl=-0.3`) does
@@ -40,7 +43,8 @@ Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test hi
 7. Always on underneath: The fall guard (a tilt past 60 degrees for 0.3 s plays the losing horn and rests him), the thermal guard, the battery watch (G2 pack alarms at about 30% and 20%), the watchdog
    (a stalled control loop rests him), and the emergency stop.
 
-## Sounds
+Sounds
+------
 
 - start: "Exploration mode.", 1 s, the Viking horn
 - turning away from a wall: two soft falling notes
@@ -51,12 +55,14 @@ Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test hi
 - fell over: the losing horn
 - end: "Exploration complete.", the ta-da, he lies down; "G2 online." when the voice service is back
 
-## Ending it
+Ending it
+---------
 
 The roam time runs out (the end of the cap always ends the whole session), or "that's enough" is said / "end exploration mode" / "cancel exploration", or "emergency stop", or `g2_explore.sh stop`.
 However it ends (even a crash) the unit sends rest (`d`) before the voice service starts again.
 
-## Where to look afterwards
+Where to look afterwards
+------------------------
 
 - `journalctl -u g2-explore` on the Pi (or `bash tools/g2_explore.sh logs`): turns, `g2.wall.steer`, `g2.wall.hit`, chirps, pictures.
 - `G2_PROFILE=1 bash tools/g2_explore.sh start 240` writes `profile.txt` in the session's diagnostics folder (`~/g2_logs/<session>/`): which threads use the CPU and where. Each walk's log sidecar (`~/g2_runs/auto/<date>/*.json`) records `late_ticks_pct` and `worst_tick_gap_ms`.
@@ -75,7 +81,8 @@ However it ends (even a crash) the unit sends rest (`d`) before the voice servic
 - `~/g2_runs/auto/<date>/`: the policy walk logs (CSV plus a JSON sidecar).
 - `~/.local/share/g2/noise.jsonl`: every command sent to the BiBoard, with the source that sent it.
 
-## Known limits
+Known limits
+------------
 
 The wall estimator is a prototype: readings are good to 2 to 4 in between 8 and 24 in and only say far from near beyond that; glossy floor and bright patches can fool it; the camera is rolled about 4 degrees
 (not corrected, by decision), so left and right are a little biased; the left 45 degree wall was never seen clearly; there is no edge or step detector. The pictures behind it are a prototype set (some

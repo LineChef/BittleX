@@ -11,7 +11,8 @@ What the checks do and do not show: the hash proves the file is the one the host
 Used by `tools/eval_embedder.py --embedder onnx:~/g2_data/models/<file>` (DINOv2: add `#cls` for the class token only; the default joins the class token and the mean of the patch tokens).
 
 
-## DINOv2-small as the gallery's embedder (no new download)
+DINOv2-small as the gallery's embedder (no new download)
+--------------------------------------------------------
 
 The user asked for the learned embedder to be set up. The file was already on the Mac and checked (table above), so nothing new was downloaded; `tools/g2_switch_embedder.sh push-model` copied it to the Pi's `~/.local/share/g2/models/dinov2_small.onnx` and checked the same SHA-256 there.
 

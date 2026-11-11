@@ -4,7 +4,8 @@ With the Pi pod and the AI head on (about 481 g, 46% of it over the front feet),
 
 `link/opencat.py` `DISABLED_SKILLS` lists the tokens; `SerialLink.send` refuses them for every caller (voice, gestures, survey) and plays the wrong-answer horn. The voice skills `wave` and `scratch` stay in Claude's list, marked disabled, so a request for them gets the horn and not a silent no.
 
-## Audit
+Audit
+-----
 
 Scored from the firmware's own frames (`rl_training/opencat-gym/reference_gait/InstinctBittleESP.h`): the largest left-right asymmetry within a leg pair (a lifted foot), the knee range, and the largest front-rear shoulder difference (body tilt).
 

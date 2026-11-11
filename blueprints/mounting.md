@@ -6,7 +6,8 @@ The design, the print files and the full build guide are in the separate project
 
 Wiring is in [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html); the parts and their weights in [`../docs/hardware/as-built.md`](../docs/hardware/as-built.md).
 
-## What is on G2 now
+What is on G2 now
+-----------------
 
 Front is the head end; left and right are G2's left and right.
 
@@ -34,7 +35,8 @@ G2 now also carries the **Petoi AI Head** (42 g, Petoi's figure; it replaces the
 
 The sim uses these numbers ([`../docs/hardware/specs.md`](../docs/hardware/specs.md)).
 
-## Wiring in the pod
+Wiring in the pod
+-----------------
 
 G2's own wiring guide ([`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html), I²S build log) is the source of truth for the pins and is not changed by the pod. The project's build guide shows the same pins except the amp ground on pin 14 (G2's is on pin 9); the table below is the project's, for comparison.
 
@@ -48,7 +50,8 @@ G2's own wiring guide ([`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.ht
 
 The mic's SEL is on pin 39 (a ground, left channel), as before. All wire lengths and the route of every wire are in the project's build guide ("Wire table").
 
-## Measurements that any mount has to respect
+Measurements that any mount has to respect
+------------------------------------------
 
 - Platform interface: four pegs at (X, Z) = (±12, −5.5) and (±12, 14.5) mm, a centred 24 × 20 mm rectangle; add-on plate bottom at 26 mm above the cover origin, 1.5 mm thick at the keyholes; slide 7 mm. Frame: +X robot right, +Z toward the tail (−Z is the head end).
 - The pod must stay within Z −37.8 to 56.2 mm and |X| ≤ 29.6 mm (beyond that, check the legs and the head). The head turns −85° to 85° without contact (the project's model check).
@@ -57,20 +60,24 @@ The mic's SEL is on pin 39 (a ground, left channel), as before. All wire lengths
 - Pi Zero 2 W and PiSugar S are both 65 × 30 mm. The Pi needs its own power: wiring 5 V from BiBoard as well would put two 5 V sources on the Pi. The link is data only.
 - Printing (all parts, no supports): PLA works; PETG for parts that are removed often or get warm. 0.20 mm layers (first layer 0.25 mm), 3 walls, 20% gyroid, 220 °C (the project's "Bittle X" Cura profile). The platform cover prints standing on its rear end with a break-off foot (`cover_pegs_foot`).
 
-## Back touch sensor
+Back touch sensor
+-----------------
 
 On a Bittle X V2 the back touch sensor is a flexible circuit glued inside the cover top; the add-on covers most of its touch areas, and the project advises disabling back-touch mode (serial command `Xb`) while an add-on is on the robot. G2's touch sensors are not enabled, so nothing needs to be done. Do not send `Xa` or `XAd` to the BiBoard voice module (see the project rules).
 
-## Open items
+Open items
+----------
 
 - [ ] The front/rear weight split with the pod and the AI head, and a weighing of the whole robot with both (the sim says about 51% on the front paws and 480 g; the AI head's size, position and mass inside the sim are estimates, and its mass is added in full although the stock head it replaces is part of the 254 g base).
 - [ ] The camera's real field of view from its new position and height. Its orientation is unchanged from the old mount.
 - [ ] Mic gain and speaker loudness in the new positions (the mic moved to the wall, the speaker faces a rear grille).
 
-## Licenses
+Licenses
+--------
 
 Per the project: code MIT; designs and documents CC BY 4.0 (Jeremy Collins); the Petoi cover, side shoulder and front plate models come from [PetoiCamp/NonCodeFiles](https://github.com/PetoiCamp/NonCodeFiles), published without a stated license, and `cover_pegs.stl` is made from the Petoi cover; the PiSugar fit models are GPL-3.0. This repository links to the project and does not copy its files.
 
-## History
+History
+-------
 
 The first design, a corner clip, was abandoned. The interim mount used PiSugar's own case shell (75 × 31 × 36 mm, nearly twice the stock cover's 18.6 mm internal depth) velcroed on top of a modified Petoi cover (`Bittle_Cover_with_hole_for_Pi.stl`, with the PiSugar switch exposed and the SD port widened), with the camera at the front of the case, the speaker at the very back and the microphone on top of the lid (all confirmed 2026-09-29 to 2026-10-06; payload about 168 g, roughly 100 × 40 × 38 mm).

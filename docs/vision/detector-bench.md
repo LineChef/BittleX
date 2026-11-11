@@ -8,7 +8,8 @@ they feed the sim noise model for a future perception-in-the-loop gait retrain
 cone, range-vs-confidence falloff, pixel→ground geometry) still need the camera
 fixed to G2 and measured against known distances.
 
-## Firmware / module facts
+Firmware / module facts
+-----------------------
 
 - Name / FW: "Grove Vision AI V2", software `2025.01.02`, `at_api v0`
 - USB serial: CH343 bridge (VID `1a86` / PID `55d3`), `/dev/ttyACM0` / `/dev/cu.usbmodem*`, 921600
@@ -18,7 +19,8 @@ fixed to G2 and measured against known distances.
 - Start / stop: module does not self-stream — send `AT+INVOKE=-1,0,1` (loop, results-only, no JPEG) to start, `AT+BREAK` to stop. `feed.py` does this.
 - Model-reselect + inference restart: ~0.5 s
 
-## Detector behaviour
+Detector behaviour
+------------------
 
 Empty bench, 22 s / 340 frames → **0 false positives**.
 Clear target (person, ~3–5 ft, centred, holding still), 25 s / 384 frames:
@@ -30,7 +32,8 @@ Clear target (person, ~3–5 ft, centred, holding still), 25 s / 384 frames:
 - Centre jitter (static target): Value: cx σ ≈ **5 px**, cy σ ≈ **3 px**; Note: ~2 % of frame — bearing is fairly stable
 - Box-size jitter (static target): Value: w σ ≈ **18 px**, h σ ≈ **16 px**; Note: **~7–8 % of frame — large.** area-as-distance will be noisy
 
-## Implications for the sim noise model
+Implications for the sim noise model
+------------------------------------
 
 When the perception-in-the-loop retrain happens, the fake detector in the env
 should reproduce, at minimum:
@@ -47,7 +50,8 @@ should reproduce, at minimum:
 - No false positives on a clean scene but this was a plain bench; a
   cluttered room may differ. Re-check once mounted.
 
-## Still needs the camera mounted on G2
+Still needs the camera mounted on G2
+------------------------------------
 
 - Visibility cone: camera height, pitch, FOV → which ground distances are even
   in frame, and the blind wedge in front of the feet.
@@ -57,7 +61,8 @@ should reproduce, at minimum:
 - Motion blur / vibration effect while walking.
 - Low-light and backlit behaviour in the real room.
 
-## Low-light: auto-exposure lift (bench)
+Low-light: auto-exposure lift (bench)
+-------------------------------------
 
 Stock Himax tuning aims the OV5647 auto-exposure **dim** -- WPT/BPT target
 regs `0x3A0F`/`0x3A10`/`0x3A1B`/`0x3A1E` default `~0x32`/`0x24`. In a dim
@@ -78,7 +83,8 @@ exposure). Options if a fixed value isn't good enough: adaptive (read
 frame brightness, adjust), or gain instead of exposure (brighter without
 blur, noisier). Hardware-gated.
 
-## Camera orientation vs. detection
+Camera orientation vs. detection
+--------------------------------
 
 The OV5647's native readout is fixed; **physically rotating the module
 rotates the scene within the frame.** With the module in one orientation

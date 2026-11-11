@@ -6,14 +6,16 @@
 Load the helpers once with `source tools/g2_aliases.sh` (add that line to `~/.zshrc`). Every helper except `g2` and `g2rl` runs in a subshell, so it works
 from any directory and leaves you where you were. `g2help` prints the bare list. Commands in task order: [`cheatsheet.md`](cheatsheet.md).
 
-## environment
+environment
+-----------
 
 - `g2`: cd repo + pipeline venv
 - `g2rl`: cd RL dir + RL venv
 - `g2back`: return to the dir before g2/g2rl
 - `g2test`: run the pipeline test suite
 
-## camera capture + model train
+camera capture + model train
+----------------------------
 
 - `g2cam <name> [session]`: start the live capture preview at localhost:8080, saving to ~/Desktop/G2Memory/g2_face_capture/<name>/session_<n>/
 - `g2cam-stop`: stop the capture preview # stop the capture preview
@@ -31,7 +33,8 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 - `g2libstatus`: print the vision library manifest (images per class)
 - `g2auto [classes] [--dry-run]`: the FULL automated pipeline: for every pending raw session (curate -> dedup-against-library -> promote), then rebuild the 150/class optimized upload set. Capture (g2cam) is the only manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/, ready to import into SenseCraft. Idempotent -- safe to re-run any time, already-promoted sessions are skipped automatically.
 
-## vision runtime
+vision runtime
+--------------
 
 - `g2vision [labels]`: run the detection pipeline over serial, print live detections no arg -> uses VISION_LABELS / VISION_MIN_SCORE from .env (the deployed model) with arg -> overrides the label(s) for this run, e.g. g2vision person
 - `g2vision-demo`: mock feed, no hardware
@@ -40,13 +43,15 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 - `g2watchrun [--fast]`: watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of its own, not an approximation; it joins wherever the run is). Default = each episode at real speed, then the newest; --fast = follow live at training speed (about 4-5x real time). Drag or scroll to change the view: it is kept. Needs a run started after 2026-10-09 (older runs have no
 - `g2watchsim [TAG] [watch_trained args]`: (the old g2watchrun) a FRESH simulation of a run's newest checkpoint in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges. --calm = the flat scoring world instead. g2watchsim the run that wrote the newest checkpoint (the one in progress) g2watchsim v3_20m a given run; g2watchsim v3_20m --dr-push 0.35 adds rando
 
-## voice / conversation
+voice / conversation
+--------------------
 
 - `g2chat`: type to Claude, replies via `say` (needs ANTHROPIC_API_KEY)
 - `g2voice`: wake word + mic + Piper TTS (needs audio deps + models)
 - `g2audio`: devices / wake / stt / tts
 
-## memory
+memory
+------
 
 - `g2mem [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]`: inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi).
 - `g2pimem`: G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
@@ -75,18 +80,21 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 - `g2attach [status/list/none/head/arm/save ATTACHMENT POLICY [--trim T] [--payload P]]`: which attachment G2 wears on the neck, and the gait saved for each (docs/planned/attachments.md).
 - `g2floor [LABEL]`: show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs.
 
-## config introspection
+config introspection
+--------------------
 
 - `g2feat`: resolve G2_FEATURES; `g2feat --profiles` lists bring-up stages
 - `g2traits`: resolve G2_TRAITS -> prompt / behaviour / bonds
 - `g2diag`: list / summarize [sid] / tail [sid] / replay <sid>
 
-## robot serial link (HW)
+robot serial link (HW)
+----------------------
 
 - `g2serial`: ports / ping / send <cmd> / skills / rest
 - `g2power`: status / headless / interactive / governor <n>
 
-## operate G2 (Mac -> Pi)
+operate G2 (Mac -> Pi)
+----------------------
 
 - `g2ssh`: open a shell on the Pi.
 - `g2punt`: one punt attempt without the voice command (the same as saying "G2, punt"): stops the voice service on the Pi, runs `behavior.ball_chase --punts 1` (stand from rest, find the ball, walk to it, punch it once, rest), then starts the voice service again. Extra words go to the chase, e.g. g2punt --punt-max 3.5. G2 in rest, the ball in front of him; see docs/guides/punt.md.
@@ -108,7 +116,8 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 - `g2api [HOURS]`: Claude API calls, tokens and approximate cost on the Pi over the last HOURS (default 24), by source. Use it to watch cost.
 - `g2crash [N]`: why did the voice service or an exploration session crash? The last N (default 5) unclean ends, with the stage and the resources at the time.
 
-## bring-up and checks
+bring-up and checks
+-------------------
 
 - `g2doctor [--serial]`: the bring-up readiness checklist: .env, API key, models, dependencies, serial port, audio, disk. --serial also pings the board.
 - `g2bringup [--list/--restart/--from ID]`: the guided, resumable hardware bring-up sequence.
@@ -117,7 +126,8 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 - `g2bundle [--out DIR] [--base /docs]`: build the docs bundle (every page as site-ready Markdown, a navigation manifest and a search index) into build/docs-bundle for the website. CI builds and publishes it on every push; this is the local preview. Format: docs/guides/docs-bundle.md.
 - `g2docsgen`: regenerate the generated docs: the backlog, the shell-helpers page, the environment-variable reference, the cheat sheet's A to Z index and the results index. Run it after changing an item heading, an alias comment or the result files.
 
-## simulation and training
+simulation and training
+-----------------------
 
 - `g2train TAG [--steps N] [--force]`: start a training run with the full pre-run checklist (start_run.sh): a new tag, no run already going, no leftover viewers. Never start a 20M unasked.
 - `g2eta plan --steps 3e6 --tail stage / now --target 20e6 --tail final20m / check`: timing estimates read from the trainer's logs. Quote them (with a completion clock) whenever you launch anything.
@@ -126,7 +136,8 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 - `g2watch [trained/TAG_ppo]`: replay the newest finished policy (or the one named) in the PyBullet GUI. Needs your own terminal for the window.
 - `g2tb [stop]`: open TensorBoard for the training runs at localhost:6006 (starts it if needed); `g2tb stop` ends it.
 
-## docs
+docs
+----
 
 - `g2docs`: print the list of key docs (the full index is docs/README.md)
 - `g2standup [N]`: N (default 1) eased K stand-ups from rest (`g2stop voice` first: rests him and stops the voice service; hands near), swing and pack printed, then G2 is laid in rest again. Uses the Pi's deployed code and motion_feel numbers. `g2reset` starts the voice service again.

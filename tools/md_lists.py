@@ -58,7 +58,14 @@ def convert(text):
             i = j
             continue
         out.append(ln); i += 1
-    return '\n'.join(out), n
+    new = '\n'.join(out)
+    try:
+        import md_headings
+        new, h = md_headings.h2_to_setext(new)
+        n += h
+    except ImportError:
+        pass
+    return new, n
 
 
 if __name__ == '__main__':

@@ -4,7 +4,8 @@ Persistent conversation memory so G2 carries context across sessions. Plugs into
 the voice loop through one seam (`Memory.recall` / `Memory.record`); it is not
 coupled to movement or vision.
 
-## How it works
+How it works
+------------
 
 SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory:
 
@@ -60,7 +61,8 @@ Surfacing a fact bumps its `last_recalled` time, so once the injected set hits
 the cap, stale facts drop off it (they stay in the DB). Light decay without a
 scheduler.
 
-## Config (`.env`)
+Config (`.env`)
+---------------
 
 ```
 G2_MEMORY=1                                            # 0 to disable
@@ -69,7 +71,8 @@ G2_MEMORY_MAX_FACTS=30
 G2_MEMORY_RECALL=3
 ```
 
-## Inspect / edit it
+Inspect / edit it
+-----------------
 
 ```bash
 python -m pi_pipeline.memory facts                 # durable facts
@@ -93,7 +96,8 @@ In conversation: saying **"forget that"** deletes everything recorded since
 the wake word (`Memory.mark_session_start` / `forget_session`, driven by
 `voice/loop.py`). Nothing is stored until the wake word fires in the first place.
 
-## Later
+Later
+-----
 
 - Semantic recall (embeddings) if FTS keyword matching feels too literal —
   weigh the model/latency cost on the Pi first.

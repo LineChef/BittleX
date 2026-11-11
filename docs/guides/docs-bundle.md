@@ -7,7 +7,8 @@ kind: reference
 
 Every reader-facing documentation page in the repo is packaged, on every push, as a **bundle** of plain files that a website can read and render as its own pages. There is no server or API to run: the bundle is static files on GitHub Pages. This page describes how it is built and published, the file format, and how the React site (Vite) loads it. Build code: [`../../tools/build_docs_bundle.py`](../../tools/build_docs_bundle.py); the workflow: `.github/workflows/docs-bundle.yml`.
 
-## How it is built and published
+How it is built and published
+-----------------------------
 
 1. A push to `development` starts the `docs-bundle` GitHub Action.
 2. It runs the docs checks first (`check_docs.py`: broken links, stale generated pages). A failing check stops the build, so a broken page is never published.
@@ -17,7 +18,8 @@ Every reader-facing documentation page in the repo is packaged, on every push, a
 
 Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 
-## What is in the bundle
+What is in the bundle
+---------------------
 
 - `latest.json`: A tiny pointer: `version`, `built`, the names of the other files (`manifest`, `search`, `schema`), page and asset counts. Fetch this first; it changes whenever any page changes
 - `manifest.json`: The navigation tree (`nav`), every page's metadata (`pages`), the assets list, and the settings the links were built with (`base`, `assetsUrl`, `repo`, `branch`)
@@ -29,7 +31,8 @@ Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 
 A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `audience`, `kind`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. `summary` is the first paragraph as plain text, at most 220 characters; a longer one is cut at a word boundary and ends with `…`. `search.json`'s `text` is the opposite, a raw cut-off at 4,000 characters.
 
-## Semantic HTML
+Semantic HTML
+-------------
 
 Each page is also written as `pages/<route>.html`: a single `<article>` that carries `data-section`, `data-audience` and `data-kind`. It contains only plain tags, so the site styles it by tag and adds wrappers or classes where it needs them.
 
@@ -65,7 +68,8 @@ Routes: `docs/guides/cheatsheet.md` is `guides/cheatsheet`; a folder's `README.m
 
 **Links** inside pages are rewritten when the bundle is built: a link to another page becomes `<base>/<route>#anchor` (default base `/docs`), a link to an asset becomes `<base>/_assets/<repo path>`, and a link to a file that is not a page (a script, for example) becomes a GitHub link on the `development` branch. Serve the bundle's `assets/` folder at `<base>/_assets/` in the site, or change the links with `--base` and `--assets-url` at build time.
 
-## Order and groups in the navigation
+Order and groups in the navigation
+----------------------------------
 
 The order of the pages in the site's sidebar is the order of the rows in each folder's `README.md`: change the order of the rows and rebuild. A page the README does not list goes to the end, alphabetically. A `###` heading in a folder README makes a **sidebar group**: the pages linked under it carry a `group` field in the manifest's `nav` (for example `Operate` and `Configure` under Guides). Use a `###` heading only for a group; `##` headings are ordinary sections. Pages above the first `###` have no group and come first.
 
@@ -96,7 +100,8 @@ const rank = (p: PageEntry, first: string[]) => (first.includes(p.route) ? first
 
 Because the overrides are keyed by route, they survive a rebuild of the docs; a route that disappears is simply ignored.
 
-## Loading it from the React site (Vite)
+Loading it from the React site (Vite)
+-------------------------------------
 
 The site is a single-page app, so the simplest reliable approach is to **fetch the bundle at run time** from GitHub Pages, which allows cross-origin reads:
 
@@ -129,7 +134,8 @@ The site's navigation (Home, Status, Hardware, Walking, Pipeline) can point at t
 
 **Build-time alternative.** If you would rather have the docs shipped with the site (same origin, no run-time fetch), copy the bundle into the site's `public/docs-bundle/` before `vite build` and point `VITE_DOCS_BUNDLE_URL` at it; the deploy hook above rebuilds the site whenever the docs change. Prerendering the pages (for search engines) would need an extra step, such as a static-site plugin for Vite.
 
-## Keeping it healthy
+Keeping it healthy
+------------------
 
 - `python tools/check_docs.py` (alias `g2check`) must pass; the bundle build runs it.
 - `python tools/build_docs_bundle.py` prints a warning for any link whose target is missing; the count should stay at 0.

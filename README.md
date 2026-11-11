@@ -10,7 +10,8 @@ A robotics project that teaches a quadruped robot to:
 The full roadmap and decision log are in
 [`docs/project-plan.md`](docs/project-plan.md).
 
-## Project Goals
+Project Goals
+-------------
 
 - Locomotion: a *command-following* walking policy trained by reinforcement
   learning (simulation → sim-to-real), rather than switching between hand-scripted
@@ -40,7 +41,8 @@ The full roadmap and decision log are in
   control — deciding where to go, what to look at, and whether to approach
   something, from what it sees and remembers.
 
-## Hardware
+Hardware
+--------
 
 - Petoi Bittle X V2 (alloy servos): Core quadruped platform, built on OpenCat / BiBoard V1 (ESP32)
 - Raspberry Pi Zero 2 W: Runs the voice / memory / vision / Claude pipeline
@@ -50,7 +52,8 @@ The full roadmap and decision log are in
 Full parts list, costs, and vendor-doc specs: [`docs/hardware/parts-and-decisions.md`](docs/hardware/parts-and-decisions.md)
 and [`docs/hardware/specs.md`](docs/hardware/specs.md).
 
-## Project Status
+Project Status
+--------------
 
 The current state — what is deployed, what has been tested on the robot, open problems and next steps — is in
 **[`docs/STATUS.md`](docs/STATUS.md)**. Everything else:
@@ -60,7 +63,8 @@ The current state — what is deployed, what has been tested on the robot, open 
 - Roadmap and decisions: [`docs/project-plan.md`](docs/project-plan.md)
 - Index of all docs: [`docs/README.md`](docs/README.md)
 
-## Voice commands
+Voice commands
+--------------
 
 Say the wake word, "gee two" (or "hey buddy"), then the command. A short beep means he is listening, a lower boop means he has your words. The full list, with what each one does, is in
 **[`docs/guides/voice-commands.md`](docs/guides/voice-commands.md)**; the ones you will use most:
@@ -76,14 +80,16 @@ Say the wake word, "gee two" (or "hey buddy"), then the command. A short beep me
 
 Switches for sounds and behaviours: [`docs/guides/settings-switches.md`](docs/guides/settings-switches.md).
 
-## Walking policy
+Walking policy
+--------------
 
 The gait is a learned control layer over Bittle's built-in `wkF` walk: every control step (80 Hz) it reads the IMU, the
 gait-phase clock and recent history and outputs a bounded correction to the scripted joint angles, following speed and
 heading commands. What it learned, how it was trained and its limits: [`docs/rl/walking-policy.md`](docs/rl/walking-policy.md);
 how it does on the real robot: [`docs/STATUS.md`](docs/STATUS.md).
 
-## Repo Structure
+Repo Structure
+--------------
 
 ```
 rl_training/opencat-gym/   # Simulation-based RL training (based on ger01d/opencat-gym)
@@ -102,7 +108,8 @@ docs/       # Current status, project plan, backlog, run logs, guides, research 
 blueprints/ # Hardware build record + wiring diagrams
 ```
 
-## Setup
+Setup
+-----
 
 **RL training**: requires Python ≥ 3.10 (macOS ships an EOL 3.8, so this project
 uses a `.venv` built with Homebrew's `python@3.11`). See

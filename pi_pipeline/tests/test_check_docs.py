@@ -25,7 +25,7 @@ def test_clean_tree_has_no_errors(tmp_path):
         "README.md": "See [status](docs/STATUS.md) and [guide](docs/guides/g.md#setup).\n",
         "docs/STATUS.md": "# Status\n\nCurrent state.\n",
         "docs/README.md": "# Docs\n\n[g](guides/g.md)\n",
-        "docs/guides/g.md": "# G\n\n## Setup\n\nHello\n",
+        "docs/guides/g.md": "# G\n\nSetup\n-----\n\nHello\n",
     })
     errors, warnings = _run(root)
     assert errors == [] and warnings == []
@@ -92,3 +92,11 @@ def test_a_pipe_table_is_an_error_but_a_table_in_a_code_fence_and_plain_pipes_ar
     assert cd.table_lines("# T\n\nintro\n\n| a | b |\n|---|---|\n| x | y |\n") == [5]
     assert cd.table_lines("# T\n\n```\n| a | b |\n|---|---|\n```\n") == []
     assert cd.table_lines("# T\n\nUse a | b | c in the shell.\n- **x**: y | z\n") == []
+
+
+def test_a_section_heading_written_with_two_hashes_is_an_error_in_a_published_page():
+    import md_headings as mh
+    ok = "# T\n\nIntro.\n\nSection\n-------\n\nText\n"
+    assert [h for h in mh.parse_headings(ok) if h[1] == 2] == [(4, 2, "Section")]
+    bad = "# T\n\nIntro.\n\n## Section\n\nText\n"
+    assert mh.h2_to_setext(bad)[0] == ok

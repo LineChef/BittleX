@@ -18,7 +18,8 @@ so the RL policy can be rewarded for matching it (`FAC_IMITATION` in
 
 Rebuild: `python build_wkf_reference.py && python verify_wkf_reference.py`
 
-## Other decoded OpenCat skills
+Other decoded OpenCat skills
+----------------------------
 
 `build_skill_reference.py <name>` parses any built-in skill from
 `InstinctBittleESP.h` into the same `(N, 8)` rad / URDF-order format (gaits →

@@ -2,7 +2,8 @@
 
 Status: G2 can flip himself back over from fully on his back. This was confirmed on G2 on 2026-09-28, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for the hardware.
 
-## How it works (firmware)
+How it works (firmware)
+-----------------------
 
 Read from the OpenCat source (`PetoiCamp/OpenCat` `InstinctBittle.h`, `OpenCatEsp32` `reaction.h`):
 
@@ -14,14 +15,16 @@ Read from the OpenCat source (`PetoiCamp/OpenCat` `InstinctBittle.h`, `OpenCatEs
 
 More detail on the firmware path: [`petoi-firmware-reference.md`](petoi-firmware-reference.md).
 
-## Limits
+Limits
+------
 
 - Speed: self-righting is disabled for fast gaits such as trot, because the robot no longer knows it is flipped, so a fall at speed may not trigger it.
 - The push reflex only fires while standing, not during a walking gait. A stumble mid-walk is not covered by the firmware; the learned mid-gait catch is complementary.
 - With the Pi in the loop: `pi_pipeline`'s `RecoveryFSM` (`link/recovery.py`) has flags marked hardware-gated for a possible conflict with the firmware's own flip-triggered `rc`. It is built and tested but not wired in, so today the firmware handles recovery on its own. Retest self-righting with the Pi connected before wiring the FSM in.
 - The simulation cannot show it: Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model). Judge self-righting on the robot, not in the sim.
 
-## Testing the get-up moves on the pod payload
+Testing the get-up moves on the pod payload
+-------------------------------------------
 
 With the pod and the AI head on, G2 mostly cannot end up fully on his back (the camera stops him), so the case to test is a fall on his side or front. `pi_pipeline/gait/getup_test.py` runs one firmware get-up move per run from a side lie and reports from the IMU whether he got upright:
 
@@ -42,13 +45,15 @@ Place him on his side by hand first, on the floor, hands near; never on his back
 
 Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg and tilt 40 deg, into the legs' path with the AI head on; `rc` keeps the head straight for its flipping frames. Next when testing resumes: confirm whether the legs moved in test 2; then `s_rc --frame-s 0.4` (momentum), the firmware `rc` from the left side, and if none works, hand-guided teaching of a side roll (`gait/teach.py`).
 
-## What it means for the project
+What it means for the project
+-----------------------------
 
 - Expect to right G2 by hand sometimes, especially after fast falls and while training new gaits.
 - A more robust recovery (IMU flip detection plus a dedicated recovery behavior) remains a possible stretch goal. If it is attempted, test the stock `rc` and `rl` first on the fall types the walking policy produces, and re-author keyframes only if they are unreliable.
 - Never put G2 on his back as a test: the Pi and the BiBoard are exposed ([`../guides/operating-g2.md`](../guides/operating-g2.md)).
 
-## History of this page
+History of this page
+--------------------
 
 - Early research: the stock self-right was believed to be narrow: disabled for fast gaits, and one community project reported it does not self-right from a supine fall.
 - Simulation (Run 6): an RL policy that drives only the 8 walking joints did not learn to right the robot from a full tip-over (0% recovered). That is a simulation result: episodes ended at about 74° of tilt, below the firmware's 85° flip line, so the policy never saw the flipped state, and the scripted keyframes were not available as an action.
@@ -56,7 +61,8 @@ Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg a
 - Confirmation on G2: done on the project's own unit, as above.
 - Literature: most learned fall-recovery work is on robots with hip abduction (a roll joint), which Bittle lacks, so the self-righting half does not transfer. What does transfer is treating recovery as a separate skill with a switch, trained against harsh disturbances.
 
-## Sources
+Sources
+-------
 - Petoi Bittle product page and Doc Center (remote controller, balance and recovery behavior, the BiBoard V1 remote incompatibility).
 - `PetoiCamp/OpenCat` and `PetoiCamp/OpenCatEsp32` firmware source.
 - `MarcHesse/mhflocke` (a community project that reported no supine self-right; contradicted by the unit).

@@ -4,7 +4,8 @@ Simulation training for G2's walking gait: PyBullet, Stable-Baselines3 (PPO) and
 
 Everything is in `opencat-gym/`, a curated copy of [ger01d/opencat-gym](https://github.com/ger01d/opencat-gym) (MIT, commit `12b39ff`, see `opencat-gym/LICENSE`) that already targeted this hardware (`models/bittle_esp32.urdf`, Bittle/BiBoard ESP32), extended heavily since. Run everything from inside `rl_training/opencat-gym/`, because the scripts import `opencat_gym_env` as a local module.
 
-## Setup
+Setup
+-----
 
 The RL environment is the **repo-root `.venv`** (native arm64 Python 3.11), not a venv in this folder. Rebuilding it, from the repo root: `pybullet` has no macOS wheel and builds from source, which needs a workaround:
 
@@ -14,7 +15,8 @@ CPPFLAGS="-Dfdopen=fdopen" .venv/bin/pip install -r requirements.txt
 
 Commands in this folder use `../../.venv/bin/python`. Tests: `../../.venv/bin/python -m pytest -q test_*.py` (the `pi_pipeline` suite is separate and runs from the repo root).
 
-## Rules that apply to every run
+Rules that apply to every run
+-----------------------------
 
 - Every new run is a fresh candidate, not a continuation or fine-tune; nothing trains on top of a consolidated 20M run (a chain that starts fresh at S0 is fine).
 - Never launch a 20M-step run unless the user asks. Screening runs are capped at 3M steps.
@@ -23,7 +25,8 @@ Commands in this folder use `../../.venv/bin/python`. Tests: `../../.venv/bin/py
 - Give a timing estimate with a completion clock time when launching anything (`tools/eta.py`).
 - Intermediate checkpoints are not kept; a new run writes its own. Never put a run's `--tag` text in a shell command: it trips `any_training()`.
 
-## The scripts
+The scripts
+-----------
 
 - Environment and training: `opencat_gym_env.py` (the Gym env; every new mechanic is a flag that defaults off), `train.py` (PPO, curriculum and frontier callbacks, health checks), `g2_profile.py` (see below)
 - Chain runners (unattended; each has a plan doc): `phase_v3.py` (queue runner and scoring, reused by the others), `phase_v4.py` (screens, then the 20M), `phase_v5.py`, `phase_v6.py` (done and deployed), `phase_hs.py` (high-step creep (see below)
@@ -41,10 +44,12 @@ Commands in this folder use `../../.venv/bin/python`. Tests: `../../.venv/bin/py
 
 `opencat-gym/reference_gait/` holds the decoded firmware skills (`wkf_ref.npy` and about forty others) and their builders: [`opencat-gym/reference_gait/README.md`](opencat-gym/reference_gait/README.md). `opencat-gym/models/bittle_esp32.urdf` is the simulated robot.
 
-## `trained/`
+`trained/`
+----------
 
 Gitignored, except the small result files that back decisions (benchmark JSON, reports, the exported release policies) which are force-added. Final policies are `trained/<tag>_ppo.zip`; the released ones are `Release_Candidate<name>_ppo.onnx` with their sidecars. Never put a wildcard delete over this folder: the code reads switches from it (for example `v3_world2`).
 
-## Removed campaign scripts
+Removed campaign scripts
+------------------------
 
 Scripts for closed campaigns (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, and the old hardware-IMU retrain chains) were removed from the working tree on 2026-10-17. To recover one: `git show archive/rl-campaign-scripts-2026-10-17:rl_training/opencat-gym/<name>.py`.

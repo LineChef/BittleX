@@ -6,7 +6,8 @@ BiBoard/ESP32 firmware that runs on G2 (Bittle X). Captured so the
 knowledge isn't lost between sessions. Verify against the repo if firmware
 has moved on.
 
-## Repositories
+Repositories
+------------
 
 - `PetoiCamp/OpenCatEsp32` (aka `OpenCatEsp32-Quadruped-Robot`): **BiBoard/ESP32 firmware — this is G2's.**
 - `PetoiCamp/OpenCat`: NyBoard/AVR firmware (older boards)
@@ -22,7 +23,8 @@ data — vendored), `OpenCat.h` (token macros + config constants).
 (the lineage of `rl_training/opencat-gym`) and `ger01d/opencat-gym-sim2real`, plus
 forum MuJoCo/Isaac efforts. The fork is already the canonical community base.
 
-## Serial command tokens (`OpenCat.h` `T_*` macros)
+Serial command tokens (`OpenCat.h` `T_*` macros)
+------------------------------------------------
 
 Newline-terminated ASCII over UART. Confirmed set:
 
@@ -53,7 +55,8 @@ check for a `Voltage:` prefix, retry up to 4 attempts) rather than trusting
 one line no matter what. Not yet known which skills trigger this print or
 why the delay varies — flag if it recurs somewhere that matters.
 
-## Onboard voice-recognition module (`X<letter>` commands)
+Onboard voice-recognition module (`X<letter>` commands)
+-------------------------------------------------------
 
 BiBoard V1 carries a built-in offline voice-recognition module + speaker
 (`project-plan.md`'s parts notes), separate from the `T_*` command parser
@@ -143,7 +146,8 @@ Fixed in both files to send `gP`/`gp` instead, matching the actual
 actual hardware (nothing above has touched a real BiBoard) — that's step 13a
 of the bring-up sequence.
 
-## IMU
+IMU
+---
 
 - BiBoard V1 compiles support for **both MPU6050 and ICM42670** and picks
   whichever chip is physically present at runtime (`OpenCat.h` defines both
@@ -227,7 +231,8 @@ the stale 93-249 Hz reading (`docs/rl/hw1-log.md` Round 5) was abandoned
 once this closed out — not a wasted detour exactly, since it's what led
 to catching the reflash-worthy bug, but its premise no longer holds.
 
-## Onboard voice module + camera: EEPROM-persisted module state (`moduleManager.h`)
+Onboard voice module + camera: EEPROM-persisted module state (`moduleManager.h`)
+------------------------------------------------------------
 
 Separate from the serial tokens above — a status/enable table for
 BiBoard's extension modules, confirmed from `src/moduleManager.h`:
@@ -381,7 +386,8 @@ sim. Real-robot recovery = detect flip → scripted `rc` → repeat. To reproduc
 sim: raise/remove the tilt cutoff for a recovery window, and expose `rc_ref.npy`
 (below) as a scripted action or imitation target.
 
-## How OpenCat gaits are structured
+How OpenCat gaits are structured
+--------------------------------
 
 From `PetoiCamp/OpenCat` (AVR/NyBoard) and `PetoiCamp/OpenCatEsp32` (ESP32/BiBoard, the actual Bittle X firmware). Background for how the learned gait differs from the scripted ones.
 
@@ -404,7 +410,8 @@ From `PetoiCamp/OpenCat` (AVR/NyBoard) and `PetoiCamp/OpenCatEsp32` (ESP32/BiBoa
   bypassing the skill-array system or injecting learned frames in the same format
   — rather than selecting from `skillNameWithType`.
 
-## Skill keyframe format (`skill.h` `Skill::dataLen`)
+Skill keyframe format (`skill.h` `Skill::dataLen`)
+--------------------------------------------------
 
 `InstinctBittleESP.h` stores each skill as `const int8_t <name>[] PROGMEM = {…}`.
 
@@ -417,7 +424,8 @@ exceed 128, so multiply back on read. Petoi leg-column order
 `[FLs,FRs,BRs,BLs, FLk,FRk,BRk,BLk]`; skill names end `F` (forward) or `L`
 (turn-left); `R` variants are the L/R mirror (pure column swap, sagittal joints).
 
-## Extracted references (`reference_gait/build_skill_reference.py`)
+Extracted references (`reference_gait/build_skill_reference.py`)
+------------------------------------------------------------
 
 Generalises `build_wkf_reference.py` to any skill → `<name>_ref.npy`, shape
 `(100, 8)`, radians, URDF joint order — same as `wkf_ref.npy`, so any is a
@@ -438,7 +446,8 @@ largest limb-coordination difference from wkF, so it's the clearest yes/no on
 second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-spec.md`.
 
 
-## Pi UART (Serial-2) link — bring-up findings, 2026-09-30
+Pi UART (Serial-2) link — bring-up findings, 2026-09-30
+-------------------------------------------------------
 
 - The BiBoard ignores the Pi's UART until the Serial module is enabled: send
   `XS` once over USB. `X?` prints the module table (`S,A,T,L,D,I,B,U,G,C,Q` and a
@@ -457,7 +466,8 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
   exactly 5.0 Hz, so the camera on the Pi does not disturb the IMU (the
   camera-kills-IMU bug needs the BiBoard's own `XC` camera module).
 
-## IMU calibration (`gc`) — needed for the firmware's gyro balance, 2026-10-01
+IMU calibration (`gc`) — needed for the firmware's gyro balance, 2026-10-01
+------------------------------------------------------------
 
 - Symptom before calibrating with firmware gyro balance ON (`gB`), `kbalance` made G2
   push its FR foot out and tilt the body ~19° roll / ~11° pitch (IMU-measured, steady);
@@ -473,7 +483,8 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 - Anything using firmware balance (the scripted `kwkF` contender with gyro assist, voice
   skills, the `gB` that `run_gait` restores on exit) depends on this being calibrated.
 
-## More bring-up facts
+More bring-up facts
+-------------------
 
 - `X?` prints the module table; the BiBoard's `?` prints only the name and version.
 - `P` prints the battery voltage (`Voltage: 7.81 V`); readings lag a little and the pack read
@@ -487,7 +498,8 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 - While `gc` is running the IMU readings swing wildly and the body rocks; wait before reading it.
 
 
-## Standing wobble
+Standing wobble
+---------------
 
 Symptom: standing on the calibration stand, G2 is steady at first (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
 

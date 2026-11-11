@@ -9,7 +9,8 @@ Commands to run, one example per row: copy it and change the value. Every option
 
 Jump to: [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#walk-tests) · [Explore](#explore) · [Ball goal](#ball-goal-and-punts) · [Claw and camera](#claw-and-camera) · [Data](#data-and-review) · [Pi power](#pi-power-and-network) · [Voice and mic](#voice-and-mic) · [Say to G2](#things-to-say-to-g2) · [A to Z](#a-to-z)
 
-## Most used
+Most used
+---------
 
 - `g2rest`: rest G2 now
 - `g2standup`: one eased stand-up from rest, then rest again (`g2standup 5` for five)
@@ -25,7 +26,8 @@ Jump to: [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#wa
 - `g2deploy --once`: deploy the last commit to the Pi now (no flag: waits for the Pi to come online)
 - `g2ssh`: open a shell on the Pi
 
-## Stop and safety
+Stop and safety
+---------------
 
 - `"G2, emergency stop"`: freeze everything ("resume" releases)
 - `g2rest`: rest G2 when nothing is in control
@@ -37,7 +39,8 @@ Jump to: [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#wa
 
 Never put G2 on his back. Tests start on his feet, hands near. Never deploy while testing.
 
-## Walk tests
+Walk tests
+----------
 
 - `g2floor tile`: set the floor (every log records it)
 - `g2walk 3 hardwood`: three logged 12.5 s walks
@@ -47,7 +50,8 @@ Never put G2 on his back. Tests start on his feet, hands near. Never deploy whil
 - `g2walklog ~/g2_runs/x.csv`: summarize a walk log
 - `g2imu rest 20`: record the raw IMU for 20 s
 
-## Explore
+Explore
+-------
 
 - `g2explore start 300`: explore for 300 s
 - `g2explore stop`: end the session
@@ -56,7 +60,8 @@ Never put G2 on his back. Tests start on his feet, hands near. Never deploy whil
 - `g2explore heard`: what the listener heard
 - `g2explore report html`: open the last roam's report
 
-## Ball goal and punts
+Ball goal and punts
+-------------------
 
 Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab ([`goals.md`](goals.md)).
 
@@ -86,7 +91,8 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 - `g2puntset punt_max_in 3.5`: change one punt setting
 - `g2puntset nudge_gait policy`: small steps with the learned walk (default: scripted)
 
-## Claw and camera
+Claw and camera
+---------------
 
 - `g2claw calibrate` which way a positive pan turns the camera
 - `g2claw pictures`: straight, left, right pictures
@@ -103,7 +109,8 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 - `g2wallpic wall_straight 12`: take one wall picture
 - `g2wallreplay`: what G2 would do with each wall picture
 
-## Data and review
+Data and review
+---------------
 
 - `g2sync status` when each copy last worked
 - `g2sync run --force all`: copy everything from the Pi now
@@ -123,7 +130,8 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 - `g2api 24`: API calls and cost, last 24 h
 - `g2crash 3`: why the voice service crashed
 
-## Pi power and network
+Pi power and network
+--------------------
 
 - `g2power plugged`: Pi is on its charger: Wi-Fi power-save stays off
 - `g2power unplugged`: Pi is on its battery again
@@ -133,7 +141,8 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 - `g2deploy --once`: deploy now (no waiting)
 - `g2deploy --cancel`: stop a waiting deploy
 
-## Voice and mic
+Voice and mic
+-------------
 
 - `g2mic off 30`: wake word off for 30 minutes
 - `g2mic on`: wake word back on
@@ -145,7 +154,8 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 
 By voice: "G2, mic off for 20 minutes". The review page shows a **Mic on** button while it is off.
 
-## Things to say to G2
+Things to say to G2
+-------------------
 
 Wake with "gee two". The full list: [`voice-commands.md`](voice-commands.md).
 
@@ -160,7 +170,8 @@ Wake with "gee two". The full list: [`voice-commands.md`](voice-commands.md).
 - "mic off for 20 minutes": wake word off
 - "go to sleep" / "shut down": sleep / lie down and shut the Pi down (flip the PiSugar switch by hand)
 
-## A to Z
+A to Z
+------
 
 Every command on this page and in [`cheatsheet-advanced.md`](cheatsheet-advanced.md) (generated; `python tools/gen_cheatsheet_index.py` rewrites it).
 

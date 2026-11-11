@@ -17,7 +17,8 @@ capturing data for it.
 The runtime code is `pi_pipeline/vision/` (feed / avoidance / cliff-guard /
 scene). The SenseCraft single-class flow is [`../guides/train-vision-model.md`](../guides/train-vision-model.md).
 
-## Reviewing the pictures G2 takes
+Reviewing the pictures G2 takes
+-------------------------------
 
 Where the pictures live and how they flow from the Pi to the training data: [`picture-library.md`](picture-library.md).
 

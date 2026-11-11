@@ -26,6 +26,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_headings  # noqa: E402
 import md_render  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -198,22 +199,19 @@ def rewrite_links(text, src, pages, assets, base, assets_url, gh, warnings, bran
 
 
 def title_of(text, fallback):
-    for line in text.split("\n"):
-        if line.startswith("# "):
-            return line[2:].strip()
+    for _i, level, t in md_headings.parse_headings(text):
+        if level == 1:
+            return md_headings.unescape(t).strip()
     return fallback
 
 
 def headings_of(text):
-    hs, fenced = [], False
-    for line in text.split("\n"):
-        if FENCE.match(line.strip()):
-            fenced = not fenced
-            continue
-        m = None if fenced else re.match(r"^(#{2,3})\s+(.*)$", line)
-        if m:
-            t = re.sub(r"[`*]", "", m.group(2)).strip()
-            hs.append({"level": len(m.group(1)), "text": t, "id": slug(m.group(2))})
+    hs = []
+    for _i, level, raw in md_headings.parse_headings(text):
+        if level in (2, 3):
+            raw = md_headings.unescape(raw)
+            t = re.sub(r"[`*]", "", raw).strip()
+            hs.append({"level": level, "text": t, "id": slug(raw)})
     return hs
 
 
@@ -264,11 +262,12 @@ def groups_of(readme_text, readme_src, pages):
     """Sidebar groups: a `###` heading in a folder README labels the pages linked under it, until the next heading of level 2 or 3."""
     groups, current = {}, None
     srcdir = posixpath.dirname(readme_src)
-    for line in readme_text.split("\n"):
-        if re.match(r"^###\s+", line):
-            current = re.sub(r"[`*]", "", line[4:]).strip()
+    heads = {i: (lv, md_headings.unescape(t)) for i, lv, t in md_headings.parse_headings(readme_text)}
+    for idx, line in enumerate(readme_text.split("\n")):
+        if idx in heads and heads[idx][0] == 3:
+            current = re.sub(r"[`*]", "", heads[idx][1]).strip()
             continue
-        if re.match(r"^#{1,2}\s+", line):
+        if idx in heads and heads[idx][0] <= 2:
             current = None
             continue
         if current:

@@ -7,7 +7,8 @@ kind: overview
 
 The G2 project is built in phases. This page lists each phase, where it stands and what comes next. For the current state of the hardware, see [Current status](STATUS.md). For the list of abilities, see [Capabilities](capabilities.md).
 
-## The goal
+The goal
+--------
 
 Build a Petoi Bittle X quadruped, called G2, that:
 
@@ -18,7 +19,8 @@ Build a Petoi Bittle X quadruped, called G2, that:
 
 Walking, vision, voice and memory are separate systems that run side by side. They are not one controller. [How it works](how-it-works.md) explains each.
 
-## Phases
+Phases
+------
 
 - Repo setup and orientation: Done.
 - Walking policy training in simulation: Done. Several policies were trained, and one is deployed. New gait training starts only on explicit approval.
@@ -30,7 +32,8 @@ Walking, vision, voice and memory are separate systems that run side by side. Th
 - Memory: Working. Facts and past conversations persist on the Pi.
 - Integration: In progress. Exploration and the ball goal run on G2. A long run of the full application is still to do.
 
-## Decisions that shape the project
+Decisions that shape the project
+--------------------------------
 
 - Every new training run is a fresh candidate. A run is scored against the deployed policy and replaces it only if it is clearly better. Policies are never trained on top of a finished long run.
 - Difficulty never exceeds what a capable policy can pass. Each simulated hazard has a measured upper limit, and impossible episodes are treated as bugs.
@@ -39,7 +42,8 @@ Walking, vision, voice and memory are separate systems that run side by side. Th
 - Every stand-up is the slow, eased stand-up: G2 never uses the firmware's own quick stand-up.
 - The firmware is not forked: The software is an application on top of Petoi's OpenCat firmware.
 
-## What comes next
+What comes next
+---------------
 
 1. Prove that G2 stays upright at pose and turn changes. Falls there are the main open problem.
 2. Run the ball goal inside the voice service and compare it with the earlier standalone runs.

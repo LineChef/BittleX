@@ -2,12 +2,14 @@
 
 This section explains how G2's walking gait is trained in simulation, scored, exported and deployed to the robot. The gait is a small neural network that adds corrections to Petoi's scripted walk. Which policy is deployed and how it has done on G2 is on the [Current status](../STATUS.md) page.
 
-## Start here
+Start here
+----------
 
 - [Walking policy](walking-policy.md): What the learned gait does, what it cannot do and how it is built.
 - [Training pipeline](training-pipeline.md): The whole path from an idea to a file on G2: choose settings, train, score, export, promote and feed real data back.
 
-## Training and testing details
+Training and testing details
+----------------------------
 
 - [Passability audit](passability-audit.md): The rule that simulated difficulty never rises above what a capable policy can pass, and how each hazard's limit is measured.
 - [Skill learning method](skill-learning-method.md): The recipe for teaching G2 a new motor skill.

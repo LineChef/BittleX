@@ -3,7 +3,8 @@
 > **Moved verbatim from `docs/project-plan.md` on 2026-10-02** when the plan was trimmed to a roadmap. This is the full detail for
 > the finalized parts list, resolved and open hardware questions, and the power-awareness plan. Current state is in [`../STATUS.md`](../STATUS.md); the roadmap item is in [`../project-plan.md`](../project-plan.md).
 
-## Parts list (finalized)
+Parts list (finalized)
+----------------------
 
 - Petoi Bittle X V2 (alloy servos)
 - Raspberry Pi Zero 2 WH kit (pre-soldered headers, heatsink, mini-HDMI adapter, OTG cable)

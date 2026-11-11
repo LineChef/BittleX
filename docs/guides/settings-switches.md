@@ -2,7 +2,8 @@
 
 Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value' >> .env`, restart the service) or in the environment of a one-off command. Defaults are what the code does with no setting.
 
-## Sounds
+Sounds
+------
 
 - `G2_SPEAKER_SOUNDS`: Default: on for the Pi, off on a dev machine; What it does: `1` plays speaker sounds on any machine (audition only; the volume is a tiny fraction of full scale)
 - `G2_REFUSE_SOUND`: Default: on; What it does: the losing horn when he refuses a request (a gait he cannot switch to)
@@ -15,7 +16,8 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - `G2_ACK_TONE`: Default: `short_tone`; What it does: what acknowledges a command sent to Claude: `short_tone`, `ack_whistle`, `buzzer`, `off` (`star_trek_whistle` still works)
 - `G2_FOLLOW_UP_S`: Default: 3; What it does: seconds the mic stays open after a reply (0 = no window, so no closing notes); `G2_QUESTION_WINDOW_S` (3) after a question
 
-## Exploration and walls
+Exploration and walls
+---------------------
 
 - `G2_EXPLORE_ROAM_S`: Default: 600; What it does: the roam time of a voice-started exploration
 - `G2_EXPLORE_HANDOVER`: Default: on; What it does: `0` stops "explore" from handing over to an exploration session
@@ -34,14 +36,16 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - `G2_WALL_CAL`, `G2_WALL_LOG`, `G2_WALL_PICS`: Default: under `~/.local/share/g2/`; What it does: calibration file, look log, ring of near-wall pictures
 - `G2_WALL_PICS_DIR`: Default: `~/g2_wall_pics`; What it does: where `wall_pictures` saves the recognition shots
 
-## Power and battery
+Power and battery
+-----------------
 
 - `G2_SLEEP_AFTER_S`: Default: 300; What it does: seconds at rest before power-saving sleep (0 = off); the wake word wakes him with a yawn
 - `G2_BATTERY_LOW_V`, `G2_BATTERY_CRITICAL_V`: Default: 7.54, 7.46; What it does: G2 pack alarms at rest (about 30% and 20%); `G2_BATTERY_LOAD_LOW_V` 7.3 and `G2_BATTERY_LOAD_CRITICAL_V` 7.2 under load
 - `G2_PI_WARN_FRACTION`, `G2_PI_CRITICAL_FRACTION`: Default: 0.70, 0.80; What it does: Pi battery alarms as a share of the measured runtime (3.28 h); critical backs off to every 15 min
 - `G2_POWER_LOG`: Default: `~/.local/share/g2/power_log.jsonl`; What it does: the power diary
 
-## Walking and standing
+Walking and standing
+--------------------
 
 - `G2_STAND_RAMP_S`: Default: 0.8; What it does: the eased stand-up (`off` / 0 = the old single jump; tests turn it off)
 - `G2_TRANSITION_RAMP_S`: Default: 2.0; What it does: the longest eased move into a firmware skill's first frame (`link/transitions.py`)
@@ -76,7 +80,8 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - G2_FLOOR_PROMPT_S: Asked when the floor label is unknown or older than `G2_FLOOR_PROMPT_MAX_AGE_H` (default `1` hour); answer a floor ("tile") or "same"; no answer never blocks the roam
 
 
-## Exploration pictures, contact and one-sound-at-a-time
+Exploration pictures, contact and one-sound-at-a-time
+-----------------------------------------------------
 
 - `G2_SURVEY_CLAW`: Default: auto; What it does: with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) (see below)
 - `G2_AVOID_CHIRP`: Default: off; What it does: `1` brings back the soft chirp when he turns away from a wall (off by default)
@@ -107,7 +112,8 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - G2_RELEASE_VOICE: a line that needs synthesis during the session loads it first (about 10 s); `0` keeps it loaded
 
 
-## Locations, logs and limits 
+Locations, logs and limits
+--------------------------
 
 Where G2 keeps things, and the limits people occasionally change. Every variable the code reads, with its default, is listed in [`env-reference.md`](env-reference.md).
 

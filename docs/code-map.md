@@ -7,7 +7,8 @@ kind: reference
 
 Where each part of the code is documented. Each package has its own README next to the code; the docs pages explain how to use and operate the part. How the pieces fit: [`architecture.md`](architecture.md).
 
-## `pi_pipeline/`: runs on the Pi
+`pi_pipeline/`: runs on the Pi
+------------------------------
 
 - `voice/`: Does: Wake word, speech to text, Claude, text to speech; local commands; sounds; Code README: [`voice/README.md`](../pi_pipeline/voice/README.md); Docs: [`guides/voice-commands.md`](guides/voice-commands.md), [`guides/settings-switches.md`](guides/settings-switches.md), [`guides/swappable-llm.md`](guides/swappable-llm.md), [`guides/models.md`](guides/models.md)
 - `personality/`: Does: Traits that shape the prompt, behavior and cues; Code README: [`personality/README.md`](../pi_pipeline/personality/README.md); Docs: [`how-it-works.md`](how-it-works.md)
@@ -27,7 +28,8 @@ Where each part of the code is documented. Each package has its own README next 
 
 Package-level overview, setup and the list of modules built but not yet wired in: [`../pi_pipeline/README.md`](../pi_pipeline/README.md).
 
-## Other code
+Other code
+----------
 
 - `rl_training/opencat-gym/`: Does: Simulation training, benchmarks and export of the walking policy; Docs: [`rl/README.md`](rl/README.md)
 - `tools/`: Does: Docs checks, Mac-to-Pi operations, real-data pipeline, vision dataset tools, git hooks; Docs: [`../tools/README.md`](../tools/README.md), [`guides/shell-helpers.md`](guides/shell-helpers.md)

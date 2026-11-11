@@ -4,7 +4,8 @@
 
 Every `G2_*` variable the Pi code and the tools read: **273**, of which **35** are not yet described in any guide. Set them in the repo-root `.env` (on the Pi, the Pi's own `.env`). The defaults shown are the fallback written at the point of the read, which can be a name or an expression; the curated guide to the switches people change most is [`settings-switches.md`](settings-switches.md). Feature flags: [`feature-flags.md`](feature-flags.md).
 
-## Not described in any guide yet
+Not described in any guide yet
+------------------------------
 
 Add a line for each to `settings-switches.md` (or the guide for its subsystem), then regenerate this page.
 
@@ -44,7 +45,8 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 - `G2_VOICE_ROBOT_EFFECT`: Default at the read: `"1"`; Read in: `config.py`; Documented in: not documented
 - `G2_WAKE_PAUSE_FILE`: Default at the read: `""`; Read in: `wake_pause.py`; Documented in: not documented
 
-## All variables
+All variables
+-------------
 
 - `G2_ACK_TONE`: Default at the read: `"short_tone"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md)
 - `G2_ALIGN_YAW_STOP`: Default at the read: `"1"`; Read in: `ball_chase.py`; Documented in: not documented

@@ -20,7 +20,8 @@ Model status: a custom **3-class detector** (a household member + `dog` +
 obstacle / desk-edge detector (the edge one feeds `CliffGuard`), which is gated
 on the camera being physically mounted on the frame.
 
-## Modules
+Modules
+-------
 
 - `feed.py`: `Detection` + `DetectionFeed`: `MockDetectionFeed` (scripted frames, `approaching()` scenario builder) / `SerialDetectionFeed` (parses camera serial messages).
 - `avoidance.py`: `Avoider.decide(frame) -> AvoidanceAction` (`NONE`/`STOP`/`BACK_UP`/`TURN_LEFT`/`TURN_RIGHT`). Debounced; urgent hazards preempt the cooldown. `ACTION_SKILL` maps actions to robot skills.
@@ -31,7 +32,8 @@ on the camera being physically mounted on the frame.
 - cliff_guard.py: Zero-debounce stop, N clear scans to resume, turn *away* from the edge bearing, pivot-too-close or boxed-in → `FREEZE` (call a human). **Decision logic only** — the floor-vs-edge detector is stubbed (`MockEdgeFeed`) and every `CliffGuardConfig` value marked `HARDWARE-GATED` needs tuning on the real mounted camera.
 
 
-## Try it (no hardware)
+Try it (no hardware)
+--------------------
 
 ```bash
 python -m pi_pipeline.vision demo               # obstacle approaching dead ahead
@@ -42,14 +44,16 @@ python -m pi_pipeline.vision serial /dev/ttyACM0   # real feed (hardware)
 The demo prints each frame's scene summary and the avoidance decision, showing
 the escalation `none → turn → stop → back up` as the object closes in.
 
-## Detection model
+Detection model
+---------------
 
 Internally, `Detection` boxes are top-left, normalised `[0,1]`. `area` (`w*h`) is
 the closeness proxy — a forward-facing camera sees nearer things bigger;
 `center_x` gives bearing (`left` / `ahead` / `right`). Heuristic; revisit once
 real detections show how the camera's FOV and mounting angle map to distance.
 
-## Camera serial format (Grove Vision AI V2 / SenseCraft SSCMA)
+Camera serial format (Grove Vision AI V2 / SenseCraft SSCMA)
+------------------------------------------------------------
 
 Confirmed from the [SSCMA AT protocol](https://github.com/Seeed-Studio/SSCMA-Micro/blob/dev/docs/protocol/at_protocol.md).
 One JSON object per line, **921600 baud**:
@@ -69,7 +73,8 @@ One JSON object per line, **921600 baud**:
 
 `SerialDetectionFeed` parses exactly this.
 
-## Still to do
+Still to do
+-----------
 
 - Train a custom detection model in SenseCraft (cables, small household objects,
   table edges) and record the deploy workflow + its label list / input size.
@@ -87,7 +92,8 @@ One JSON object per line, **921600 baud**:
 - After vision works, revisit the locomotion policy with perception in the
   loop — the Phase 8 "Target capability" in the project plan.
 
-## `terrain_feature.py` (removed)
+`terrain_feature.py` (removed)
+------------------------------
 
 The walk policy's own terrain signal (a detection frame turned into `[present, dist_norm, bearing_norm, tall_flag]` for the policy's
 observation, mirrored in the sim by `opencat_gym_env._scan_terrain`) was removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d).

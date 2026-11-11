@@ -2,7 +2,8 @@
 
 How a policy trained in simulation reaches the real robot, how the on-Pi loop runs it, and how to switch, roll back and troubleshoot. Which policy is deployed and how it has done on G2: [`../STATUS.md`](../STATUS.md). What the learned gait does and its limits: [`../rl/walking-policy.md`](../rl/walking-policy.md). The Pi's OS setup comes first: [`pi-bring-up.md`](pi-bring-up.md). Safety rules before G2 moves: [`operating-g2.md`](operating-g2.md).
 
-## What runs where
+What runs where
+---------------
 
 - Mac: What: Trains the policy, exports it, validates the export, deploys; Code: `rl_training/opencat-gym/`, `tools/`
 - Pi: What: The 80 Hz control loop that runs the exported policy; Code: `pi_pipeline/gait/`
@@ -10,7 +11,8 @@ How a policy trained in simulation reaches the real robot, how the on-Pi loop ru
 
 Only two things travel to the Pi: `pi_pipeline/` and the exported policy, a `.onnx` file (under 1 MB) with its `.onnx.json` sidecar. `rl_training/` and `docs/` never do.
 
-## 1. The exported policy
+1\. The exported policy
+----------------------
 
 The trained network is a *residual*: its output, bounded to ±30° per joint, is added to the scripted `wkF` walk. Export keeps only the deterministic action path (observation of 278 values in, 8 joint offsets out; the value network and the exploration noise are dropped), so the file runs under `onnxruntime` on the Pi in under a millisecond per step.
 
@@ -24,7 +26,8 @@ The **sidecar** (`<name>.onnx.json`) travels with every policy and is read by bo
 
 Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and check parity with `verify_onnx.py` (ONNX versus the torch policy) and `validate_deploy.py` (drives the Pi-side `residual_policy.py` in lockstep with the sim: observation, action and rounded joint targets must match). Score a policy through G2's real control path with `benchmark_decathlon.py --hw i`.
 
-## 2. Promote and deploy
+2\. Promote and deploy
+---------------------
 
 The deployed policy is named by `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py`; every previous release stays on the Pi as a fallback.
 
@@ -34,7 +37,8 @@ The deployed policy is named by `DEFAULT_POLICY` in `pi_pipeline/gait/residual_p
 
 **Roll back** by setting `DEFAULT_POLICY` to the previous release file and running `tools/g2_deploy_when_online.sh --once`.
 
-## 3. The on-Pi loop
+3\. The on-Pi loop
+-----------------
 
 `pi_pipeline/gait/run_gait.py` runs the loop; `policy_walker.py` wraps the same loop as a background thread, which the voice service and exploration use as G2's default forward gait.
 
@@ -54,7 +58,8 @@ Guards on every walk: servo heat estimate and cutback (`thermal_guard.py`), jam 
 
 **Gait switching.** "Hi step" and "walk normally" (voice, from any mode) set a shared gait mode (`gait_mode.py`). A policy that lists the mode in its sidecar plays it with its learned correction; any other plays the gait's scripted base without a correction and says so.
 
-## 4. Running a walk
+4\. Running a walk
+-----------------
 
 From the Pi, in `pi_pipeline/.venv`, with G2 on his feet and your hands near:
 
@@ -68,7 +73,8 @@ python pi_pipeline/gait/run_gait.py --openloop --cycles 6                       
 
 `--help` lists the rest (foot trim and hold, `--send-every`, carpet and skill switching, battery and lift options). Every policy walk without `--log` is written automatically to `~/g2_runs/auto/<date>/` with a JSON sidecar (floor, policy, why it ended); set the floor with `g2floor <label>` first. Summaries: `python tools/walk_log_summary.py <log.csv>`. Bench-time speed of the step: `python pi_pipeline/gait/bench_real.py` (expect well under 12.5 ms, the 80 Hz budget).
 
-## 5. First time on new or repaired hardware
+5\. First time on new or repaired hardware
+-----------------------------------------
 
 The mapping and signs were verified on G2, but repeat these steps after a servo replacement, a firmware reflash or a different body:
 
@@ -78,7 +84,8 @@ The mapping and signs were verified on G2, but repeat these steps after a servo 
 4. Walk the policy at `--cmd 0.10` on a floor, and compare the logged joint traces with the policy output.
 5. Guided versions of these steps: `python -m pi_pipeline.bringup` and `python -m pi_pipeline.link.check_serial firstmove`.
 
-## Troubleshooting
+Troubleshooting
+---------------
 
 - The walk never starts or no IMU frames: The raw IMU lines; the yaw field once overflowed and made every line unparseable (fixed in `imu_parse.py`). [`operating-lessons.md`](operating-lessons.md)
 - Heading drifts: The foot trim for this policy and floor

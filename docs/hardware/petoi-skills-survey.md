@@ -8,7 +8,8 @@ Format: header `[period, expRoll, expPitch, ratio]` — `period > 1` = looping g
 `reference_gait/build_skill_reference.py <name>` → `<name>_ref.npy` (radians, URDF
 order), the same format the RL env / SkillSwitch consume.
 
-## High value for this project
+High value for this project
+---------------------------
 
 - `rc` (recover): what it is: scripted self-right, slow falls; use for G2: already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch.
 - `balance`: what it is: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below)
@@ -41,7 +42,8 @@ order), the same format the RL env / SkillSwitch consume.
   **No stock Bittle skill confirms a working two-legged stand** — if wanted, treat as untested, hardware-gated, same status as `cmh`/climb: verify for real once the body's here, don't assume from firmware alone either way.
 
 
-## Lower priority / situational
+Lower priority / situational
+----------------------------
 
 > **Decision 2026-09-15 — no flipping or rolling behavior, mounted-payload
 > risk.** G2 carries a Pi + PiSugar stack (~61–78 g, see
@@ -74,11 +76,13 @@ order), the same format the RL env / SkillSwitch consume.
 - `gpF/gpL` (gallop), `vtF` (vault), `bk*` (backward): extra locomotion; `bk_ref` already decoded. Gallop = a faster gait if top speed ever matters.
 - `kc` (kick), ~~`bx` (box)~~ (excluded, see note above), `toss`/`ts` — object interaction; relevant only if a manipulation/play feature is added.
 
-## Not relevant
+Not relevant
+------------
 
 - `*ArmF` / `*ArmL` (wkArmF, trArmF, crArmF, vtArmF, bkArmF), **`pick*` / `put*` / `gdb` arm variants**, **`lftF/lftL`, `hg` (hang), `hds`, `hsk`, `hu`, `knock`, `launch`, `lpov`, `lucky`, `ang`, `pd`, `ck`** — arm-equipped Bittle or unclear/one-off. G2 has no arm.
 
-## How to bring one in
+How to bring one in
+-------------------
 
 1. `python reference_gait/build_skill_reference.py <name>` → `<name>_ref.npy`.
 2. For a **locomotion** skill (carpet, gallop): treat like `tr_ref` — a SkillSwitch

@@ -10,7 +10,8 @@ No recognition model exists yet (the practice model was a dud — weak dataset).
 
 ---
 
-## Why recognition matters
+Why recognition matters
+-----------------------
 
 It's not a nice-to-have — the personality / bonds / memory design *depends* on
 G2 knowing who it's talking to: greet `dad` warmly, keep distance from a
@@ -21,7 +22,8 @@ detection labels.
 
 ---
 
-## Which kind of recognition
+Which kind of recognition
+-------------------------
 
 - Person detection (deployed now): Output: box around any human; Feasible on Grove Vision AI V2: ✅ one model, frame rate
 - Face detection: Output: box around any face; Feasible on Grove Vision AI V2: ✅ — but *less* useful than person detection for "someone's here" (a face only shows close + facing)
@@ -58,7 +60,8 @@ camera **mounted on G2** so frames are at the deployment POV.
 
 ---
 
-## Enrollment mode — "G2, meet X"
+Enrollment mode — "G2, meet X"
+------------------------------
 
 A **commanded** guided-capture routine (not autonomous — see Consent below).
 The user says "G2, meet Alex"; G2 talks Alex through a set of poses, capturing

@@ -7,7 +7,8 @@ kind: concept
 
 How the pieces of G2 fit together: the hardware, the software that runs on each side, and the seams between them. This page is the map; the detail pages it links to are the territory. What is deployed and working right now: [`STATUS.md`](STATUS.md). A plain-language tour: [`how-it-works.md`](how-it-works.md).
 
-## Two machines and a robot
+Two machines and a robot
+------------------------
 
 - Robot (Petoi BiBoard, ESP32): What runs: Petoi's OpenCat firmware: servo control, built-in skills (`kwkF`, `ksit`, `d` …), the IMU stream, its own voice module and buzzer; Code: not part of this project; reference: [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md)
 - Pi (Zero 2 W, on G2's back): What runs: Everything G2 decides: voice, memory, vision, behavior, the 80 Hz gait loop. Deployed with `rsync`; Code: `pi_pipeline/`
@@ -37,7 +38,8 @@ flowchart LR
   voice -. "API calls (sparingly)" .-> claude["Claude API"]
 ```
 
-## The design rule: mock behind every interface
+The design rule: mock behind every interface
+--------------------------------------------
 
 Every hardware-specific dependency sits behind a small interface with a mock or laptop implementation and a real one, so the whole pipeline runs and is tested on a dev machine with no hardware, and moving to the Pi is configuration:
 
@@ -48,7 +50,8 @@ Every hardware-specific dependency sits behind a small interface with a mock or 
 
 `pi_pipeline/app/` is the only place with real I/O wiring; everything else takes injected dependencies. The test suite needs no network, audio or API key.
 
-## The subsystems
+The subsystems
+--------------
 
 Each is an independent module; they reach each other only through small, deliberate seams.
 
@@ -68,7 +71,8 @@ Each is an independent module; they reach each other only through small, deliber
 
 Feature flags (`features.py`, set by `G2_FEATURES`) gate every major subsystem so bring-up can enable one thing at a time: [`guides/feature-flags.md`](guides/feature-flags.md). Environment switches: [`guides/settings-switches.md`](guides/settings-switches.md).
 
-## How a walk happens
+How a walk happens
+------------------
 
 1. A command arrives (voice, exploration, or a CLI walk) with a speed and heading.
 2. The gait loop builds an observation from the IMU stream and the last joint commands, runs the ONNX policy, and adds its residual (bounded to ±30°) to the scripted `wkF` joint targets.
@@ -76,11 +80,13 @@ Feature flags (`features.py`, set by `G2_FEATURES`) gate every major subsystem s
 4. Guards run on every tick: stand/fall, thermal (I²t servo heat estimate), jam, battery under load. A critical reading rests the legs.
 5. Joint commands go out through the link to the BiBoard. The stand-up that starts any walk uses an eased 0.8 s ramp.
 
-## How training reaches the robot
+How training reaches the robot
+------------------------------
 
 Simulation training in PyBullet with Stable-Baselines3 (`rl_training/opencat-gym/`) produces a policy; `export_onnx.py` writes the `.onnx` and a `.onnx.json` sidecar (residual scale, command cadence). Only that pair and `pi_pipeline/` are deployed to the Pi, never `rl_training/`. Real-robot logs flow back: Pi autolog, then ingest gates on the Mac, then numbered calibration snapshots that the next sim runs can use. Pipeline details: [`rl/training-pipeline.md`](rl/training-pipeline.md), [`rl/real-data-pipeline.md`](rl/real-data-pipeline.md), [`guides/gait-deployment.md`](guides/gait-deployment.md).
 
-## What is deliberately not here
+What is deliberately not here
+-----------------------------
 
 - No learned vision inside the walking policy (tried and closed); vision picks a scripted skill or slows the speed command from above the frozen gait.
 - No fork of the OpenCat firmware.

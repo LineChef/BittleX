@@ -4,7 +4,8 @@ Scripts that sit around the robot and the training code: documentation checks, M
 
 Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh), reference in [`../docs/guides/shell-helpers.md`](../docs/guides/shell-helpers.md)), the git hooks and the docs link to them by name. Run Python tools from the repo root with `pi_pipeline/.venv/bin/python tools/<name>.py`; the ones that reach the Pi need `G2_PI` set.
 
-## Documentation
+Documentation
+-------------
 
 - [`check_docs.py`](check_docs.py): Doc checks: broken links, facts in the wrong page, orphan pages, stale generated pages. The pre-commit hook runs it.
 - [`gen_backlog.py`](gen_backlog.py): Regenerates `docs/backlog.md` from the item headings.
@@ -14,7 +15,8 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 - [`md_to_html.py`](md_to_html.py): Turns one Markdown doc into a single self-contained HTML page.
 - [`make_petoi_edition.py`](make_petoi_edition.py): Builds the English edition of the XiaoZhi and Petoi head documentation for sending to Petoi (writes outside the repo).
 
-## Running G2 from the Mac
+Running G2 from the Mac
+-----------------------
 
 - [`g2_aliases.sh`](g2_aliases.sh): What it does: The `g2*` shell helpers (`g2`, `g2rl`, `g2pics`, `g2wifi`, …). `g2help` lists them.; Guide: [`shell-helpers.md`](../docs/guides/shell-helpers.md)
 - [`g2_deploy_when_online.sh`](g2_deploy_when_online.sh): What it does: Waits for the Pi to answer, then `rsync`s `pi_pipeline/` and the deployed policy and restarts the voice service. Refuses during an exploration or a walk.; Guide: [`pi-bring-up.md`](../docs/guides/pi-bring-up.md)
@@ -28,7 +30,8 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 - [`servo_static_test.py`](servo_static_test.py), [`servo_response_test.py`](servo_response_test.py), [`servo_step_test.py`](servo_step_test.py): What it does: Bench servo tests over the BiBoard's USB serial, using the firmware's position feedback.; Guide: [`servo-thermal.md`](../docs/hardware/servo-thermal.md)
 - [`g2_cleanup.py`](g2_cleanup.py): What it does: Lists (and with `--apply` deletes) the scratch files that pile up on the Mac and the Pi.; Guide: [`docs/README.md`](../docs/README.md)
 
-## Real-data pipeline
+Real-data pipeline
+------------------
 
 How G2's own walk logs become sim calibration: [`docs/rl/real-data-pipeline.md`](../docs/rl/real-data-pipeline.md).
 
@@ -36,7 +39,8 @@ How G2's own walk logs become sim calibration: [`docs/rl/real-data-pipeline.md`]
 - [`g2_calibrate.py`](g2_calibrate.py): Builds numbered sim-calibration snapshots from the usable runs.
 - [`g2_cal_auto.sh`](g2_cal_auto.sh), [`g2_bg_jobs.sh`](g2_bg_jobs.sh): The unattended calibration step and the 30-minute background loop that runs it with picture curation.
 
-## Vision dataset and pictures
+Vision dataset and pictures
+---------------------------
 
 The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.md`](../docs/guides/train-vision-model.md), the routine in [`docs/vision/capture-checklist.md`](../docs/vision/capture-checklist.md), the on-camera model recipe in [`docs/vision/custom-model-recipe.md`](../docs/vision/custom-model-recipe.md).
 
@@ -55,12 +59,14 @@ The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.m
 - [`vision_diag.py`](vision_diag.py): Runs the on-device detector through aggressive post-filtering to diagnose it.
 - [`gv2/`](gv2): Model-export helpers for the camera: `export_yolov8_gv2.sh`, `split_yolo_dataset.py`, `vela_config_we2.ini`.
 
-## Training support
+Training support
+----------------
 
 - [`eta.py`](eta.py): Timing estimates for training runs, read from the trainer's logs (`plan`, `now`, `check`). Read-only.
 - [`build_decathlon_report.py`](build_decathlon_report.py): Turns a decathlon result and its replays into a self-contained HTML report.
 - `v5_watchdog.sh`, `v6_watchdog.sh`: Keep a training chain's runner alive unattended; each stops on its own halt file. Both chains are finished; they are the templates for the next one ([`docs/rl/training-pipeline.md`](../docs/rl/training-pipeline.md)). The V3, V4 and high-step watchdogs were removed on 2026-10-17.
 
-## Git hooks
+Git hooks
+---------
 
 [`githooks/`](githooks), enabled with `git config core.hooksPath tools/githooks`: `pre-commit` (docs check, leftover-file warning, large-commit block, privacy terms), `commit-msg` (strips attribution lines) and the `post-*` hooks that keep a local backup of `CLAUDE.md`. Since 2026-10-18 `pre-commit` also runs `ruff check` (correctness rules only, config in `pyproject.toml`) on the staged `.py` files when ruff is installed in `pi_pipeline/.venv` (`requirements-dev.txt`).

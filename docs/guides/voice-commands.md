@@ -18,7 +18,8 @@ G2 never moves silently: every recognized local command and every Claude turn
 gets a short acknowledgement (a chirp + "heard" cue, then the spoken reply) so
 it is clear the command registered before anything happens.
 
-## Local commands
+Local commands
+--------------
 
 Checked in this priority order -- a higher row always wins if a phrase could
 match more than one (e.g. emergency stop beats everything).
@@ -59,7 +60,8 @@ A few short reproachful phrases ("leave me alone", "stop it", "be quiet", "shut
 up", "go away", "settle down", "calm down", "stop bothering me", ...) aren't
 commands -- they just nudge G2's mood toward subdued for a while.
 
-## Conversational skills (ask naturally, Claude picks the move)
+Conversational skills (ask naturally, Claude picks the move)
+------------------------------------------------------------
 
 - walk forward: walk forward (continuous gait)
 - walk left / turn left: walk while turning left
@@ -90,7 +92,8 @@ Claude picks it during a conversation.
 Claude will never invoke a calibration or factory-pose command by voice --
 those are blocked at the protocol level regardless of what's asked.
 
-## Diagnostics (ask naturally, Claude looks it up)
+Diagnostics (ask naturally, Claude looks it up)
+-----------------------------------------------
 
 A third tool, `diagnostics_query` (`pi_pipeline/voice/conversation.py`), lets
 Claude read G2's own diagnostic logs to answer questions instead of guessing.
@@ -117,7 +120,8 @@ from whatever *else* is in the log around that time, not the fall itself,
 until that integration lands (real fall-recovery testing needs real hardware
 anyway).
 
-## The BiBoard's own voice module (heard by the board, not the Pi)
+The BiBoard's own voice module (heard by the board, not the Pi)
+------------------------------------------------------------
 
 G2's BiBoard has a separate offline voice module with **no wake word**: it listens all the time and acts on its fixed phrases (40 in two languages, plus up to 10 recorded in learning mode). It
 does not go through the Pi's voice loop, so a phrase meant for the Pi can also trigger it. Details and the incident history: [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md).
@@ -134,7 +138,8 @@ service running (`g2-voice`) and G2 not mid-gait (raw tokens are skipped while a
 Other serial settings for the same module (sent by the Pi or `check_serial`, never spoken): `XAb` Chinese, `XAc` enable, `XAe` learning mode. If it answers "ok" but the body does not move, send `XA`
 and check the dial on the hat is on "Voice Command". Recovery when it is stuck defaulting to Chinese: `XAc`, `XAb`, `XAa` about 1.2 s apart (or say "bing bing").
 
-## Not a voice command, but related
+Not a voice command, but related
+--------------------------------
 
 G2 also acts on some things with no phrase to say at all -- the always-on
 Tier 0 "attentive" layer (turning toward a sound, following a face with its
@@ -143,7 +148,8 @@ run on their own, no wake word needed. See
 [`../capabilities.md`](../capabilities.md) for the full behaviour inventory.
 
 
-## The three sounds of an exchange
+The three sounds of an exchange
+-------------------------------
 
 - beep (one short bright note): he heard the wake word and is listening
 - boop (one lower, rounder note): G2 decides the speaker has finished and has the words
@@ -152,7 +158,8 @@ run on their own, no wake word needed. See
 On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`). The two falling notes play when the follow-up window closes: the mic stays open `G2_FOLLOW_UP_S` seconds after a reply (default 5; 0 = no window, so no closing notes), and 8 s (`G2_QUESTION_WINDOW_S`) after a reply that ends in a question.
 
 
-## G2's character sounds
+G2's character sounds
+---------------------
 
 - grunt (low "hmph"): Plays when: G2 is rebuffed ("shut up", "go away" and the like); Turn off: `G2_GRUNT=0`
 - losing horn (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip): Plays when: he refuses a request (today: a gait he cannot switch to), and when he tips over at any time, walking or standing (see below); Turn off: `G2_REFUSE_SOUND=0`
@@ -166,7 +173,8 @@ On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps
 
 Audition any of them on a dev machine: `G2_SPEAKER_SOUNDS=1 python -m pi_pipeline.voice.prompt_tones grunt|refuse|oof|sigh|yawn` (G2's level is a very small fraction of full scale; never pass a large `peak`).
 
-## Exploration mode wording
+Exploration mode wording
+------------------------
 
 Saying "explore" / "go ahead and look around": he says "Exploration mode.", then the Viking horn (about 2.7 s: a short lower note at 206 Hz, then a long note a fifth higher at 302.5 Hz that ends in a fade-out; rebuilt from measured recordings) plays; he needs about 30 s to hand over.
 
@@ -176,7 +184,8 @@ When the roam time runs out (`G2_EXPLORE_ROAM_S`, or `ROAM_S` of `g2_explore.sh 
 
 The robot's name is spoken as "gee two" (soft g, like the wake word). A hard-g spelling ("ghee two") is misheard by the Pi's recognizer as "the to online" (it sounds like "V2"); "gee two" is heard as "gee to online".
 
-## Switching gait
+Switching gait
+--------------
 
 - "hi step" / "high step" / "highstep" / "switch to high step" / "switch to hi step" / "switch to highstep" / "step mode": switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction.
 - "carpet mode" / "switch to carpet mode" / "carpet walk" / "carpet gait": switches to carpet mode

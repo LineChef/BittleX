@@ -4,7 +4,8 @@ Research + mitigation plan for the servo "thermal cliff": the sharp, non-linear
 torque collapse when a P1S servo (or its driver) crosses a current/temperature
 limit under sustained load. 
 
-## Status at a glance
+Status at a glance
+------------------
 
 - 0: What: `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed; State: In place
 - 1: What: `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop; State: **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos
@@ -23,7 +24,8 @@ limit under sustained load.
 
 ---
 
-## 1. What to expect on the hardware
+1\. What to expect on the hardware
+---------------------------------
 
 ### The P1S servo (×8 legs + 1 neck)
 
@@ -95,7 +97,8 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 
 ---
 
-## 2. Mitigation plan — layered
+2\. Mitigation plan — layered
+----------------------------
 
 ### Layer 0 — already in place
 
@@ -198,7 +201,8 @@ been structured.
 
 ---
 
-## 3. Sim testing plan
+3\. Sim testing plan
+-------------------
 
 1. Dynamic per-joint thermal model in the env (8 leg joints). Lumped
    1-node: `T_j += dt·(k_gen·τ_j² − k_diss·(T_j − T_amb))`, `T_amb` randomised
@@ -224,7 +228,8 @@ been structured.
 
 ---
 
-## 4. Shortcuts / what to skip
+4\. Shortcuts / what to skip
+---------------------------
 
 - Skip real thermistors: No spare ADC channels, no room, coreless servos
   don't have them. I²t estimation is the standard sensorless substitute and is
@@ -242,7 +247,8 @@ been structured.
 
 ---
 
-## 4b. Retuning checklist — `pi_pipeline/gait/thermal_guard.py`
+4b. Retuning checklist — `pi_pipeline/gait/thermal_guard.py`
+------------------------------------------------------------
 
 The guard is **built and wired** (`ThermalGuard` in `run_gait.py`, on by default,
 `--no-thermal-guard` to disable). Every constant in it is a **PLACEHOLDER** tuned
@@ -283,7 +289,8 @@ stack import is settled. And `set_feedback()` is dormant until `run_gait.py`
 actually reads `readAllFeedbackFast()` — the stall detector and the Petoi-style
 soft cutback have no teeth until then.
 
-## 5. Priority / sequencing
+5\. Priority / sequencing
+------------------------
 
 1. Bench test on hardware (when bring-up allows) → real trip time +
    cooldown constants. The one missing number.
@@ -300,7 +307,8 @@ the current gait / course work.
 
 ---
 
-## Sources
+Sources
+-------
 
 - [Petoi Bittle X specs](https://www.petoi.com/pages/bittle-x-robot-dog-with-arm-specifications) ·
   [Bittle servo set](https://www.petoi.com/products/quadruped-robot-dog-bittle-servo-set) ·

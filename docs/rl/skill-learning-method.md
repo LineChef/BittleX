@@ -10,7 +10,8 @@ hands back — a neural-net payload in place of a keyframe array.
 
 ---
 
-## 1. Author a scripted BASE motion
+1\. Author a scripted BASE motion
+--------------------------------
 
 A hand-designed keyframe sequence that captures the **structure** of the skill —
 its phases and mechanical logic. It does **not** have to work end-to-end; it's a
@@ -28,7 +29,8 @@ scaffold that gets the robot into the configurations from which the hard part is
 - Sanity-check the base **alone** (zero policy action) every iteration: render it,
   confirm it doesn't flip and reaches the setup state. Keep this in the loop.
 
-## 2. Policy = a BOUNDED residual on the base
+2\. Policy = a BOUNDED residual on the base
+------------------------------------------
 
 `joint_target = base(phase) + policy_action · RES_DEG`, position-controlled.
 
@@ -41,7 +43,8 @@ scaffold that gets the robot into the configurations from which the hard part is
 - The policy's real value is **closed-loop balance** — it takes the IMU every
   tick, which is the one thing the open-loop keyframe can't do.
 
-## 3. Build the right sim challenge
+3\. Build the right sim challenge
+--------------------------------
 
 A narrow task env (standalone PyBullet — do **not** subclass the walk env).
 
@@ -53,7 +56,8 @@ A narrow task env (standalone PyBullet — do **not** subclass the walk env).
   **ground-truth** from the sim for the first runs. Prove the motion is
   learnable, *then* wire the real detector.
 
-## 4. Iterate on the REWARD — this is most of the work
+4\. Iterate on the REWARD — this is most of the work
+---------------------------------------------------
 
 Watch what the policy actually does, name the failure mode, change one thing,
 rerun, write a one-line update. Hard-won rules:
@@ -79,7 +83,8 @@ rerun, write a one-line update. Hard-won rules:
 - Change ideally one reward knob per run; keep the runs short (300k–1M steps,
   ~5–15 min) so iteration is cheap.
 
-## 5. Deploy
+5\. Deploy
+---------
 
 Export to ONNX (`export_onnx.py`-style). Add a `GaitMode` for the skill; the
 `SkillSwitch` runs `skill_policy.predict(obs)` in place of a keyframe, via-stance
@@ -88,7 +93,8 @@ switch picks which net feeds the servos. Sub-ms either way.
 
 ---
 
-## Checklist per iteration
+Checklist per iteration
+-----------------------
 
 1. Zero-action base render — sane? not flipping?
 2. Train (short run, curriculum, one reward change).

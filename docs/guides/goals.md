@@ -5,7 +5,8 @@ for the next attempt (no Claude call), and writes it all down. Code: `pi_pipelin
 The first goal is **the ball punt** (the arm fitted, the green treat ball on the floor). A punt is judged by one straight picture about a second after the punch: the ball gone from
 in front of the claw, or at least 2 in farther away, counts as punted; still at the claw is a miss. Leave the ball where it rolls: the next attempt looks for it, then searches.
 
-## 1. Before a session
+1\. Before a session
+-------------------
 
 - The arm is fitted and G2 is on the floor, never a desk (there is no edge detector), with room around him and the ball in sight. Hands near.
 - Set the floor label (**"G2, the floor is hardwood"**): what he learns is kept per floor.
@@ -14,7 +15,8 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
   `ssh -t "$G2_PI"`, then `cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.claw_look --calibrate`. It saves `claw_pan_sign`.
   `--test` does one look around with the current settings.
 
-## 2. Start and stop
+2\. Start and stop
+-----------------
 
 - Start: **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt")
 - Old way: `g2goal run ball_punt --standalone`, or `G2_GOAL_INPROCESS=0` in the Pi's `.env`: the voice service is stopped, the session runs in its own process, the service is started again
@@ -30,7 +32,8 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
 
 He stands still for 5 s between attempts and rests at the end. Short cues: "target acquired", "searching", "punting", then "Got it." or "Missed."
 
-## 3. His suggestions
+3\. His suggestions
+------------------
 
 Most settings are his to change ("free"). A few belong to the operator: he may only suggest a change ("ask"; today only the lunge speed), and some he never touches ("fixed").
 When the voice service comes back after a session, he says each new suggestion, for example *"I have a suggestion from my practice at punt the ball: a lunge time of 0.1 s instead of 0.12 s, because I punched from 3.1 in but the ball only went 4 in. Say confirm, cancel, or review."* No wake word is needed for the answer.
@@ -39,7 +42,8 @@ When the voice service comes back after a session, he says each new suggestion, 
 - "cancel" (or "no"): dropped; he will not suggest that value again for a while
 - "review", or nothing: kept for later, in the report and in `g2goal suggestions`; he does not say it again. Later: `g2goal confirm ball_punt punch_lunge_s` or `g2goal cancel ...`
 
-## 4. Reading what he learned
+4\. Reading what he learned
+--------------------------
 
 ```bash
 g2goal report                # copy the journal from the Pi and open the report page (ball_punt by default); G2 off: the report from the Mac's copy
@@ -75,7 +79,8 @@ The tab (review page, `g2pics`) also changes things: a goal's size and start phr
 
 An edit is not sent at once. It waits in `~/Desktop/G2Memory/goals/pending_edits.json` on the Mac, shown in the tab as "pending" with a Cancel, and is sent to the Pi when the Pi is up and no goal session is running: at the start of `g2goal pull`, at the start of `g2goal run`, with `g2goal apply`, or the tab's Apply now button. A newer edit of the same thing replaces the older one. An edit the Pi refuses stays in the list with the reason; what was sent is listed under "Edits sent to G2". A session started by voice ("G2, ball goal") does not send them, so run `g2goal apply` first if you want them in.
 
-## 5. Telling him a score was wrong
+5\. Telling him a score was wrong
+--------------------------------
 
 Every attempt in the report has a number and a "verdict" column. If the score is wrong (the report says he hit the ball but it was still under the claw, or the finder misread
 it), say so from the Mac:
@@ -87,7 +92,8 @@ g2goal verdict ball_punt 8 right     # kept, and counted as agreement
 
 The report's "verdicts" tile shows how often the scoring agrees with the operator: that number says how far to trust what he learns.
 
-## 6. When he learns something bad
+6\. When he learns something bad
+-------------------------------
 
 He keeps a record for every value he tries ("punching from 3 in: 7 of 9 good"), works on one setting at a time, and keeps the value with the best record, so one lucky attempt
 cannot set a value. When a value still looks wrong, override it from the Mac:
@@ -103,7 +109,8 @@ g2goal overrides ball_punt                       # list the overrides
 Add `--floor tile` to any of them for one floor only (the default is everywhere). A pin beats a limit, a limit beats what he learned, and what he learned beats the punt settings
 file. Every override is in the report under "Overrides". `g2goal reset ball_punt --yes` still forgets everything a goal learned.
 
-## 7. What else teaches him
+7\. What else teaches him
+------------------------
 
 - Plain punts count too: A "G2, punt" or `g2punt` attempt is scored and added to the ball goal's records (shown as "Plain punt" in the report); nothing is changed by it.
 - A new floor or new hardware starts from his best elsewhere. His records are kept per attachment, floor and hardware epoch. Under new conditions he starts from his best
@@ -114,7 +121,8 @@ file. Every override is in the report under "Overrides". `g2goal reset ball_punt
   value starts failing.
 - The pack % is kept with every attempt (the report's "pack" column); he does not learn from it yet.
 
-## 8. Several goals
+8\. Several goals
+----------------
 
 - Turn away from walls is a standing goal: always on, never started. Every exploration and every ball chase that meets a wall dials it in, both ways: a bump (or turning but
   still touching) pushes his wall distances out; turning with lots of room to spare, or leaving a ball lying by a wall, pulls them in. Its settings:
@@ -127,7 +135,8 @@ file. Every override is in the report under "Overrides". `g2goal reset ball_punt
 - "G2, practise" (or "practice"): he picks what to practise from the stored order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
   goal session, or a 5-minute exploration roam for walls). "G2, practise walls" or "practise the punt" names one. `g2goal practise` shows his scores without moving him.
 
-## 8b. The "Identify new objects" goal
+8b. The "Identify new objects" goal
+-----------------------------------
 
 `g2goal run discover_objects`, or "G2, find new objects" / "G2, object goal". A session is 3 roams of about 3 minutes (10 minutes at most, `minutes` in the goal), in any room and with the head or the arm fitted. G2 explores; whenever something that matches no named object is in view (not a person, not the base of a wall) he takes the picture routine, and the pictures are filed as an unnamed candidate under the room he was told he is in (`you're in the kitchen`). Nothing is named by him: open `g2pics`, look at the new candidates on the Pictures tab and name or promote them, or answer when he asks "what am I looking at?".
 
@@ -139,7 +148,8 @@ What the first run showed: the hand-over run works, with two things to know. The
 
 Plain exploration feeds the goal too: every exploration of a minute or more is judged like a roam (new candidates, usable pictures) and starts with the goal's learned look settings (peek interval, fallback picture, pickiness; a value set by hand wins). The goal's own roams are not counted twice. When a goal session ends normally (all attempts, the target, the time), the "da naaaa" plays once; not after a fall, a stop, the battery or a silent board.
 
-## 9. Where things live on the Pi
+9\. Where things live on the Pi
+------------------------------
 
 - `~/.local/share/g2/goals.json`: changes to a goal (`g2goal set ball_punt --attempts 8 --control punt_max_in=fixed`); missing = the built-in goal
 - `~/.local/share/g2/goal_journal.jsonl`: every session, attempt (with its full trace), decision, suggestion answer

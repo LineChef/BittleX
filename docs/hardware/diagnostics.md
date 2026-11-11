@@ -6,7 +6,8 @@ pre-hardware.
 
 ---
 
-## Status at a glance
+Status at a glance
+------------------
 
 - Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`): **Built and in use**
 - Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`): **Built and in use**
@@ -17,7 +18,8 @@ pre-hardware.
 
 Package overview: [`../../pi_pipeline/diag/README.md`](../../pi_pipeline/diag/README.md).
 
-## What exists today
+What exists today
+-----------------
 
 - Per-module `logging`: `logging.getLogger("g2.link")`, `"g2.link.recovery"`,
   etc. Goes to stderr/console. Not captured, not correlated, no session index.
@@ -32,7 +34,8 @@ gait event against a link event, no crash context.
 
 ---
 
-## Design — four pieces
+Design — four pieces
+--------------------
 
 ### 1. Structured session log — `pi_pipeline/diag/`
 
@@ -99,7 +102,8 @@ A supervisor thread:
 
 ---
 
-## Failure taxonomy — predefined events
+Failure taxonomy — predefined events
+------------------------------------
 
 Anticipated failure modes, each emitted with structured context so one call
 gives you the event *and* the black box:
@@ -117,7 +121,8 @@ gives you the event *and* the black box:
 
 ---
 
-## Decision events — *why* G2 did something
+Decision events — *why* G2 did something
+----------------------------------------
 
 Debugging behaviour needs the *reason*, not just the action. Convention:
 
@@ -149,7 +154,8 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ---
 
-## Post-hoc tooling — `python -m pi_pipeline.diag`
+Post-hoc tooling — `python -m pi_pipeline.diag`
+-----------------------------------------------
 
 - `diag report [session | --kind explore] [--html out.html]` — one report per session (`diag/report.py`): the walks it ran (end reasons, late ticks, worst tick gap, floor), behaviour transitions, narration timing (decision to end of speech, synthesis, lines dropped as late), walks that did not stop in time, wake triggers (ignored, looked false), billed API calls, camera timeouts and supervised-worker restarts, every WARN+ event, and the profiler report when `G2_PROFILE=1`.
 
@@ -167,7 +173,8 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ---
 
-## Storage / transport
+Storage / transport
+-------------------
 
 - Local: `~/g2_logs/<session_id>/` — `events.jsonl`, `manifest.json`,
   `blackbox_*.csv`, plus the existing `run_gait` per-tick CSV as one more file.
@@ -177,7 +184,8 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ---
 
-## Phasing
+Phasing
+-------
 
 - Phase 1 — DONE, pre-hardware:
   `pi_pipeline/diag/` built (`f18230c`) — `Diag` JSONL logger + `DiagLogHandler`
@@ -224,7 +232,8 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 Phase 1 is not hardware-gated and pairs naturally with the ONNX-export /
 Pi-bring-up work already queued.
 
-## Disk-space warning 
+Disk-space warning
+------------------
 
 `pi_pipeline/util/disk.py` warns when the SD card passes `G2_DISK_WARN_PCT` (default 85%): the voice service checks at startup and every 30 minutes,
 logs a WARNING (journal) and writes a `disk.full` event to the diagnostics log, and repeats at most every 6 hours while it stays above; dropping
@@ -233,7 +242,8 @@ back below re-arms it. `python -m pi_pipeline.doctor` shows the same figure. The
 `~/g2_runs` and `~/g2_cap`; there is no automatic cleanup of them yet.
 
 
-## Crash forensics for the voice service and exploration sessions
+Crash forensics for the voice service and exploration sessions
+------------------------------------------------------------
 
 A native crash (segmentation fault in Vosk, PortAudio or onnxruntime) kills the process with no Python traceback, so `pi_pipeline/diag/crashwatch.py`
 leaves a record while the process runs and reads it at the next start. Files are in `~/.local/share/g2/crash/` (`G2_CRASH_DIR`):

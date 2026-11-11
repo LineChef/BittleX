@@ -2,7 +2,8 @@
 
 G2 wears one attachment on the neck at a time: the Petoi AI head, the Petoi robot arm, or nothing beyond the stock head. One setting says which is fitted. Switching it also switches the gait policy saved for that attachment, checks that the BiBoard firmware fits, and adds or removes the attachment's skills. Swaps are expected to be rare, but every one should work with one command. Code: [`pi_pipeline/attachments/`](../../pi_pipeline/attachments/__init__.py).
 
-## Switch
+Switch
+------
 
 1. Power G2 off and swap the hardware (each attachment's checklist is printed by `g2attach <name>`).
 2. For the arm: the BiBoard must run Petoi's **Bittle X+Arm** firmware and the claw must be calibrated (see [Firmware](#firmware)).
@@ -16,7 +17,8 @@ g2attach list        # every attachment, the firmware it needs, its saved gaits
 
 `g2attach` needs `G2_PI` like the other Pi helpers. On the Pi itself: `python -m pi_pipeline.attachments status | list | use NAME`.
 
-## How the setting is read
+How the setting is read
+-----------------------
 
 In this order: `G2_ATTACHMENT` in the environment (or `.env`), else the state file `~/.local/share/g2/attachment.json` that `g2attach` writes (moved with `G2_ATTACHMENT_FILE`), else `none`. An unknown name logs a warning and counts as `none`.
 
@@ -26,7 +28,8 @@ In this order: `G2_ATTACHMENT` in the environment (or `.env`), else the state fi
 
 **While nothing is saved for `none`, it is exactly the behaviour G2 had before attachments existed**: the policy is `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py` and the trim comes from `DEFAULT_TRIMS`. Tests pin this (`pi_pipeline/tests/test_attachments.py`).
 
-## Saved gaits
+Saved gaits
+-----------
 
 [`pi_pipeline/attachments/gait_profiles.json`](../../pi_pipeline/attachments/gait_profiles.json) holds, for each of `none`, `head` and `arm`:
 
@@ -47,7 +50,8 @@ Saving a gait:
 
 `tools/g2_deploy_when_online.sh` sends every policy a saved gait names, as well as `DEFAULT_POLICY`, so a swap never needs a new deploy.
 
-## Firmware
+Firmware
+--------
 
 Each attachment names the BiBoard firmware it needs: the first line of the BiBoard's `?` banner. The arm is a separate build of Petoi's firmware (compile-time option `ROBOT_ARM`, model "Bittle X+Arm": its own skill table, the claw on the tail joint, index 2, and a wider range for joint 1). At start-up the voice service and the app ask `?` when an attachment other than `none` is fitted; if the firmware does not fit, they log it and take the attachment's skills out. `python -m pi_pipeline.doctor --serial` shows the same check.
 
@@ -57,7 +61,8 @@ Each attachment names the BiBoard firmware it needs: the first line of the BiBoa
 
 The arm's skills (15, enabled for voice: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet, so a first run is made with a hand near. `hunt` and `showOff` are names the arm build is only inferred to redefine.
 
-## Behaviour switches
+Behaviour switches
+------------------
 
 A profile in `gait_profiles.json` can switch Pi behaviour off while its attachment is fitted. A missing key means on, so `none` and `head` behave as before.
 
@@ -79,7 +84,8 @@ The Pi never sets the lift servo itself, so a stand-up has to come through one o
 
 The arm has `easing`, `gait_switching` and `fall_recovery` off, `blending` on and  `gyro_balance` on; for its first hardware round it had `easing`, `gyro_balance`, `gait_switching`, `skills` and `fall_recovery` off and `blending` on. Turning one back on is a one-line profile edit and a deploy.
 
-## Open with the arm fitted
+Open with the arm fitted
+------------------------
 
 1. Done: the calibration was backed up before the reflash and survived it ([`../../blueprints/calibration.md`](../../blueprints/calibration.md)).
 2. Decided: the head does not accept the Bittle X+Arm firmware (it shifts every posture and swaps the gaits), so going back to the AI head is a reflash to plain Bittle X with the calibration checked.
@@ -87,6 +93,7 @@ The arm has `easing`, `gait_switching` and `fall_recovery` off, `blending` on an
 4. Weigh the arm and the camera (the sim's `arm` profile uses Petoi's spec-page estimate, 63 g, and 15 g); the first arm walking policy was trained on those figures.
 5. Run the arm's skill tokens on the bench before they are trusted.
 
-## What a setting cannot switch
+What a setting cannot switch
+----------------------------
 
 The flag controls software. The attachment's own hardware is physical: a powered AI head runs its own firmware whatever the Pi does, a reflash changes the BiBoard until the next reflash, and removing the Pi's own microphone and speaker (a later AI-head step) cannot be undone by a setting. Keep the head's transmit line unconnected and the BiBoard's voice module connected unless a decision says otherwise.

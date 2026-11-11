@@ -11,7 +11,8 @@ Related: `vision/capture-checklist.md` (the capture routine),
 
 ---
 
-## 0 · Prerequisites
+0 · Prerequisites
+-----------------
 
 - Grove Vision AI V2 + its camera, USB-C cable (data, not charge-only).
 - A **SenseCraft AI** account (`sensecraft.seeed.cc`) — free.
@@ -26,7 +27,8 @@ Related: `vision/capture-checklist.md` (the capture routine),
 
 ---
 
-## 1 · Put a base detection model on the module
+1 · Put a base detection model on the module
+--------------------------------------------
 
 Used only to generate pre-label boxes during capture — it is replaced by the
 trained model later.
@@ -51,7 +53,8 @@ PY
 
 ---
 
-## 2 · Camera orientation (do this ONCE, then lock it)
+2 · Camera orientation (do this ONCE, then lock it)
+---------------------------------------------------
 
 The sensor outputs its native orientation — often **90° rotated**. That matters:
 
@@ -69,7 +72,8 @@ contact sheet shows whether it is upside-down).
 
 ---
 
-## 3 · Capture a session
+3 · Capture a session
+---------------------
 
 Full detail incl. the **standard pose set** (run it every session): `vision/capture-checklist.md`. Short form:
 
@@ -109,7 +113,8 @@ one look, e.g. hair up; 2–3 the normal look).
 
 ---
 
-## 4 · Curate the raw batch
+4 · Curate the raw batch
+------------------------
 
 ```
 python tools/curate_captures.py \
@@ -142,7 +147,8 @@ Re-run with tweaked flags freely — it's non-destructive (raw frames kept).
 
 ---
 
-## 5 · Promote to the library, then combine for upload
+5 · Promote to the library, then combine for upload
+---------------------------------------------------
 
 Keep two folders (see `vision/capture-progress.md`): **`g2_capture_raw/`**
 (disposable — raw + curate output) and **`g2_vision_library/`** (KEEP — only
@@ -174,7 +180,8 @@ root (`<class>/session_*/curated/…`) if the library is skipped.
 
 ---
 
-## 6 · Train in SenseCraft
+6 · Train in SenseCraft
+-----------------------
 
 1. Models → Training → Image Object Detection: tab → **Image Collection
    Training** (NOT "Quick Training" — that has no upload).
@@ -250,7 +257,8 @@ household member / pet as another class in the same project over time.
 
 ---
 
-## 7 · Deploy + verify
+7 · Deploy + verify
+-------------------
 
 1. Training done → **Deploy to device** → connect module → flash (~1–2 min).
    (SenseCraft's "please flash first" on the preview after a dropped tab is a UI
@@ -268,7 +276,8 @@ household member / pet as another class in the same project over time.
 
 ---
 
-## 8 · Wire into G2
+8 · Wire into G2
+----------------
 
 `.env` (gitignored):
 ```
@@ -280,7 +289,8 @@ unrecognised person defaulted to `curious`.
 
 ---
 
-## Troubleshooting
+Troubleshooting
+---------------
 
 - "Resource busy" opening the serial port: SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB).
 - Few pre-labels (`raw pos` low in curate): Feed is sideways → Person Detection misses the subject. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those.
@@ -291,7 +301,8 @@ unrecognised person defaulted to `curious`.
 - Model flashes + runs (`inference: ~90ms` in Device Logger) but `boxes:[]` on every frame, any threshold: **Wrong architecture.** GV2 firmware only decodes the **Swift-YOLO** head. A standard Ultralytics YOLOv8 export runs but its detection tensor is unreadable → permanent empty boxes. Must train/export via SSCMA. See Capture progress.
 - Model confuses two people: Coarse at 192 px — more data per person, or move to face-embedding recognition (`vision/person-recognition.md` "upgrade path").
 
-## What lives where
+What lives where
+----------------
 
 - Capture routine → `vision/capture-checklist.md`
 - This end-to-end → here

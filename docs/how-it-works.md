@@ -11,7 +11,8 @@ The guiding design choice: these are **independent systems**, not one "brain." V
 
 ---
 
-## Walking
+Walking
+-------
 
 The goal: a four-legged robot that walks without every joint movement being hand-authored, so the gait can adapt instead of replaying a fixed animation.
 
@@ -32,7 +33,8 @@ The goal: a four-legged robot that walks without every joint movement being hand
 
 ---
 
-## Voice
+Voice
+-----
 
 The goal: talk to G2 and have him talk back, powered by Claude, with the robot able to move in response.
 
@@ -51,7 +53,8 @@ Where it runs: on the Pi, started at boot as a service. On a laptop the same cod
 
 ---
 
-## Memory
+Memory
+------
 
 The problem: Claude has no memory between calls. Every API request starts blank.
 
@@ -65,7 +68,8 @@ Keeping it tidy: when G2 has been idle a while (or is told to go to sleep), one 
 
 ---
 
-## Vision
+Vision
+------
 
 The hardware: a small camera module that runs object detection on itself, not on the Pi. It sends the Pi a running list of what it sees (labels and bounding boxes) over USB serial. For a picture, the Pi asks for one small frame.
 
@@ -81,7 +85,8 @@ The camera's firmware is frozen, which constrains which detection models can run
 
 ---
 
-## Behavior
+Behavior
+--------
 
 The goal: G2 does things on his own, not only when asked.
 
@@ -98,7 +103,8 @@ Composed into that one tick:
 
 ---
 
-## Link
+Link
+----
 
 What it is: the plumbing between the Pi and the robot's control board (the BiBoard, running Petoi's OpenCat firmware). They talk over a serial cable using short text commands: `kwkF` is walk forward, `ksit` is sit, `d` is lie down and relax.
 
@@ -108,7 +114,8 @@ What it handles: opening the connection and reconnecting after the cable is unpl
 
 ---
 
-## How they fit together
+How they fit together
+---------------------
 
 - Memory to Voice: one function pair. The voice loop asks memory for context before each Claude turn and hands it the result afterward.
 - Vision to Voice and Behavior: vision produces detections and plain-text scene summaries; it calls an injected "ask Claude" function and never imports voice code.

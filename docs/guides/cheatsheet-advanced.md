@@ -9,7 +9,8 @@ The commands you run rarely. The everyday ones are on [`cheatsheet.md`](cheatshe
 
 Jump to: [Setup](#setup) · [Pi commands](#commands-on-the-pi) · [Training](#training-and-policies) · [Bring-up](#bring-up-and-hardware) · [Board tokens](#board-tokens) · [Camera model](#camera-model) · [Docs and repo](#docs-and-repo) · [A to Z](#a-to-z)
 
-## Setup
+Setup
+-----
 
 Add this to `~/.zshrc` once, and set where the Pi is:
 
@@ -33,7 +34,8 @@ Every alias works from any directory and leaves you where you were, except `g2` 
 - `g2docs`: list the key docs
 - `g2ssh`: open a shell on the Pi
 
-## Commands on the Pi
+Commands on the Pi
+------------------
 
 Run these over `g2ssh` from `~/bittleX`, with the voice service stopped (`g2stop voice`) and G2 standing.
 
@@ -50,7 +52,8 @@ Run these over `g2ssh` from `~/bittleX`, with the voice service stopped (`g2stop
 
 Details: [`gait-deployment.md`](gait-deployment.md), [`punt.md`](punt.md), [`goals.md`](goals.md).
 
-## Training and policies
+Training and policies
+---------------------
 
 Run from anywhere; the RL venv is used automatically. Rules: [`../rl/training-pipeline.md`](../rl/training-pipeline.md). A fresh candidate each run, never a 20M unasked, screens capped at 3M.
 
@@ -74,7 +77,8 @@ python validate_deploy.py --onnx trained/<tag>_ppo.onnx            # must print 
 python promote_release.py --candidate trained/X.onnx --name ARM1 --attachment arm --attachment-only --payload-profile arm
 ```
 
-## Bring-up and hardware
+Bring-up and hardware
+---------------------
 
 - `g2doctor --serial`: readiness checklist: key, models, serial, audio, disk
 - `g2bringup`: guided, resumable hardware bring-up
@@ -100,7 +104,8 @@ Send with `g2serial send <token>`. Full reference: [`../hardware/petoi-firmware-
 - `XS`: enable Serial-2 (once; redo after a reflash)
 - `f`: servo feedback stream (USB only)
 
-## Camera model
+Camera model
+------------
 
 Build the detection model: capture, filter, add to the library, upload to SenseCraft. Walkthrough: [`train-vision-model.md`](train-vision-model.md); routine: [`../vision/capture-checklist.md`](../vision/capture-checklist.md).
 
@@ -112,7 +117,8 @@ Build the detection model: capture, filter, add to the library, upload to SenseC
 - `g2auto`: run the rest and build the upload set
 - `g2libstatus`: the library counts
 
-## Docs and repo
+Docs and repo
+-------------
 
 
 - `g2check`: docs checks (the pre-commit hook runs it)
@@ -123,6 +129,7 @@ Build the detection model: capture, filter, add to the library, upload to SenseC
 
 `git commit --no-verify` bypasses the hooks for a genuine false positive.
 
-## A to Z
+A to Z
+------
 
 The A to Z of every command is at the bottom of [`cheatsheet.md`](cheatsheet.md#a-to-z).

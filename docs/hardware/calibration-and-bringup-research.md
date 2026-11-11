@@ -8,7 +8,8 @@ findings only; anything already correctly captured elsewhere (e.g. BiBoard
 V1 vs V0 wiring, already right in `blueprints/wiring/g2-wiring-guide.html`) isn't
 repeated here.
 
-## 1. "Ships calibrated" is optimistic — it's actually "coarse-tuned"
+1\. "Ships calibrated" is optimistic — it's actually "coarse-tuned"
+------------------------------------------------------------
 
 `bringup.py` step 1 currently says Bittle X "ships calibrated; only
 fine-tune if movement looks off once it's together." The official unboxing
@@ -20,7 +21,8 @@ as optional/only-if-it-looks-wrong.
 routine pass, not a conditional one — go in planning to do it, not planning
 to skip it.
 
-## 2. Joints must be set to a specific "bootup posture" before power-on
+2\. Joints must be set to a specific "bootup posture" before power-on
+------------------------------------------------------------
 
 Confirmed from the official unboxing steps: joints need to be in the
 correct bootup posture *before* the battery is switched on, not just at
@@ -31,7 +33,8 @@ actual diagram at bring-up time** (`bittle-x.petoi.com/2-open-the-box`) to
 match the posture by eye before that first battery long-press — don't
 just power on however the joints happen to sit out of the box.
 
-## 3. Powering on with the robot "one side up" auto-enters calibration mode
+3\. Powering on with the robot "one side up" auto-enters calibration mode
+------------------------------------------------------------
 
 Robots manufactured after 2022 (which covers Bittle X V2) will boot
 directly into calibration mode if powered on while tilted onto one side.
@@ -56,7 +59,8 @@ recovery path if the app/serial link isn't working yet but a calibration
 check is needed — it needs nothing but the robot and a flat-ish surface to
 tilt it on.
 
-## 4. Do NOT attach legs before first entering calibration mode — for from-scratch calibration only
+4\. Do NOT attach legs before first entering calibration mode — for from-scratch calibration only
+------------------------------------------------------------
 
 The official joint-calibration doc has a specific warning: entering
 calibration mode with legs already mounted on the servo horns risks legs
@@ -72,7 +76,8 @@ swap) — in that specific case, detach the leg, enter calibration mode
 first, align, and only then re-attach, rather than powering on with a
 loose/misaligned leg already on.
 
-## 5. New-unit servo gears can feel "stuck" — this is a protection algorithm, not a fault
+5\. New-unit servo gears can feel "stuck" — this is a protection algorithm, not a fault
+------------------------------------------------------------
 
 If a leg doesn't move despite a correct, received command, the official
 docs say this is expected on a fresh unit: tight new gears can trigger a
@@ -86,7 +91,8 @@ seats properly, before assuming it's a wiring or command problem.
 range-of-motion pass if any single joint seems unresponsive or weak —
 before touching wiring, serial config, or firmware.
 
-## 6. Two small mechanical notes worth having on hand at assembly time
+6\. Two small mechanical notes worth having on hand at assembly time
+------------------------------------------------------------
 
 - Neck cable routing: route the neck cable from the knee side toward
   the shoulder side when reassembling/servicing — routing it the other way
@@ -98,7 +104,8 @@ before touching wiring, serial config, or firmware.
   (`project_carpet_mode` memory) — toe covers would be a confound, not a
   fix, for carpet slip.
 
-## What this changes in the plan
+What this changes in the plan
+-----------------------------
 
 Nothing structural — Phase 0's stand-only sequence
 (assemble → range-of-motion → calibrate → `firstmove` → `allmoves`) already
@@ -118,7 +125,8 @@ matches the official order. The concrete deltas:
       first" check to step 3's range-of-motion pass, before assuming a
       wiring/firmware problem (§5).
 
-## Sources
+Sources
+-------
 
 - [2 Open the Box — Bittle X User Manual](https://bittle-x.petoi.com/2-open-the-box)
 - [3 Assembling & Board Setup — Bittle X User Manual](https://bittle-x.petoi.com/3-assembling-and-board-setup)

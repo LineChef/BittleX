@@ -4,7 +4,8 @@ What G2 does on its own between conversations. Pure logic, driven by the
 `BehaviorParams` the `personality` produces — no I/O, mockable, same shape as
 `vision/avoidance.py` and `link/recovery.py`.
 
-## `BehaviorDriver` — the runtime that ties it together (`driver.py`)
+`BehaviorDriver` — the runtime that ties it together (`driver.py`)
+------------------------------------------------------------
 
 `BehaviorDriver.tick(DriverInputs) -> DriverTick` composes `ModeController` +
 `Explorer`/`Novelty` + `IdlePosture` + `SleepMode` + `MoodModel` + `Chirper` +
@@ -21,7 +22,8 @@ seen after an absence fires one excited hop. Emotive `CHIRP`s (one shared
 and sleep entry. `DriverTick` also carries `mood`, `sleep_state`, and
 `seek_attention`. Still no I/O — `bindings.py` maps the effects onto real sinks.
 
-## `BehaviorRuntime` — the loop that runs it (`runtime.py`)
+`BehaviorRuntime` — the loop that runs it (`runtime.py`)
+--------------------------------------------------------
 
 The Phase 10 integration seam. `BehaviorRuntime(driver, bindings, *,
 frame_source, sensors, recency, roster, hz)` ticks the driver at `hz` and
@@ -53,7 +55,8 @@ side by side and the voice loop just `post()`s events (`wake_word`,
 `conversation_ended`, `told_sleep`, `halt`, `release`, …).
 `python -m pi_pipeline.behavior` runs it against `MockBindings`.
 
-## `DriverBindings` — the binding layer (`bindings.py`)
+`DriverBindings` — the binding layer (`bindings.py`)
+----------------------------------------------------
 
 `DriverBindings.dispatch(tick)` routes each `Effect` kind to an injected sink
 (`actuator` / `tts` / `camera` / `cue` / `walker` / `head` / `power` /
@@ -64,7 +67,8 @@ end-to-end in tests. On hardware: supply the real sinks (`voice/actuator.py`,
 `voice/tts.py`, `voice/cues.py`, `pi_pipeline.power`, a frame grabber, the
 session log) + the input plumbing (vision frame, IMU state, mic events).
 
-## `ModeController` — the top-level switch
+`ModeController` — the top-level switch
+---------------------------------------
 
 ```
 CONVERSE   a conversation is active — preempts everything, no autonomous movement
@@ -81,7 +85,8 @@ The caller drives it: `on_conversation_start/end`, `on_activity()` (picked up,
 addressed, told to stop), `arm_explore()` / `disarm_explore()` (the voice
 command), and `update()` once per tick for the current `Mode`.
 
-## `AttentiveLook` — Tier 0, stationary curiosity (`attentive.py`)
+`AttentiveLook` — Tier 0, stationary curiosity (`attentive.py`)
+------------------------------------------------------------
 
 A frame + a clock in, a list of `Effect`s out (`HEAD` / `SKILL` / `CHIRP` — never
 `WALK`/`TURN`). The driver runs it in the IDLE branch while a posture holds
@@ -93,7 +98,8 @@ bow → curious chirp) → periodic head pan-scan. `vision_available=False` → 
 the sound reaction + periodic scan. Composes with `IdlePosture` (still settles)
 and the recognition hop (greets known people).
 
-## `ApproachTarget` — "come here" (`approach.py`)
+`ApproachTarget` — "come here" (`approach.py`)
+----------------------------------------------
 
 Armed by `DriverInputs.come_here` (voice "come here"). A one-shot directed walk:
 each tick emits `WALK` toward the largest person detection, `STOP` + a happy
@@ -101,7 +107,8 @@ chirp on arrival (`close_area`), or `STOP` + a confused chirp on give-up
 (`give_up_s` with no sighting). Disarms itself; the driver reports `Mode.APPROACH`
 while active. Cancelled by `told_stop` / pickup / wake word.
 
-## `PlaceMemory` — B11 spatial patterns (`place_memory.py`)
+`PlaceMemory` — B11 spatial patterns (`place_memory.py`)
+--------------------------------------------------------
 
 `observe(label, bearing)` on each Tier-1 investigate/approach; once the same
 label repeats in the same 4-way direction `min_sightings` times it emits a
@@ -110,7 +117,8 @@ the driver surfaces as `DriverTick.place_notes` and the runtime forwards to
 `on_observation` (→ `Memory.store.add_fact`). No timestamps — stable patterns
 only, matching what the memory store will accept.
 
-## `Explorer` — wander + investigate (Tier 1)
+`Explorer` — wander + investigate (Tier 1)
+------------------------------------------
 
 A detection `Frame` + a clock in, an `ExploreDecision` out (`WANDER` / `TURN` /
 `APPROACH` / `INVESTIGATE` / `HOLD`, with a `turn` in radians). The caller maps
@@ -121,7 +129,8 @@ Curiosity (via `BehaviorParams`) makes it linger longer on a find, range wider
 per leg, regain interest in seen things faster, and — above ~0.6 — actually
 walk up to a novel object instead of only turning to look at it.
 
-## `GesturePicker` — expressive Petoi behaviours (`gestures.py`)
+`GesturePicker` — expressive Petoi behaviours (`gestures.py`)
+------------------------------------------------------------
 
 The little "alive" moves, each a built-in OpenCat skill (`link/opencat.py`
 tokens, `_ref.npy` for sim). Pure logic + a clock; the caller sends the token
@@ -140,38 +149,44 @@ and waits for it to finish, gated on "safe to gesture" (sitting, level, no task)
 
 `Gesture.PLAY_BOW` is also the gait layer's INSPECT peer pose (`buttUp_ref`).
 
-## `Novelty` — what's been seen
+`Novelty` — what's been seen
+----------------------------
 
 Time-decayed record of detection labels and coarse heading bins. `revisit_secs`
 later, a thing is "novel" again; a long-unvisited direction pulls hardest.
 `is_novel_object()`, `stalest_heading()`.
 
-## `IdlePosture` — staged descent when idle (`idle_posture.py`)
+`IdlePosture` — staged descent when idle (`idle_posture.py`)
+------------------------------------------------------------
 
 ACTIVE → SIT → RESTING → WAKING. Sits after `sit_after_s` of quiet, lies down
 after more quiet (if `safe_to_rest`, not told to "stay", person-present stretches
 the timer), emits periodic PEEK life-signs while resting, rouses (not snaps)
 awake. Emits abstract `PostureAction`s.
 
-## `SleepMode` — deep idle below RESTING (`sleep_mode.py`)
+`SleepMode` — deep idle below RESTING (`sleep_mode.py`)
+-------------------------------------------------------
 
 AWAKE → DOZING → ASLEEP → ROUSING. Auto-sleeps after long continuous RESTING
 (person-present blocks the *auto* path, not the explicit command), `min_sleep_s`
 anti-thrash, wakes on IMU tap / wake word / loud sound. Emits `ENTER_SLEEP`
 (curl `kzz` + camera off + `power headless`) / `WAKE`.
 
-## `Enrollment` — "G2, meet <name>" (`enrollment.py`)
+`Enrollment` — "G2, meet <name>" (`enrollment.py`)
+--------------------------------------------------
 
 The capture FSM for teaching G2 a new face: greeting → guided capture prompts →
 done / abort, with quality nudges. Feeds the vision capture library.
 
-## `ThermalGovernor` — servo-thermal Layer 2 (`thermal_governor.py`)
+`ThermalGovernor` — servo-thermal Layer 2 (`thermal_governor.py`)
+------------------------------------------------------------
 
 Turns `ThermalGuard`'s per-joint tier into a behaviour decision: AMBER →
 throttle speed + soften gait + avoid-uphill hint; RED → hold a folded
 cooldown pose for a minimum, with hysteresis on de-escalation.
 
-## `chirps.py` — emotive buzzer vocabulary (B5)
+`chirps.py` — emotive buzzer vocabulary (B5)
+--------------------------------------------
 
 `ChirpMood` (happy / confused / alert / sleepy / question / greeting) →
 `b<tone> <ms> …` melodies via `opencat.beep`; `cue_chirp(stage)` for the voice

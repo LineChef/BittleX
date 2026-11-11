@@ -16,7 +16,14 @@ and nothing else; text it does not recognise is escaped, never passed through. `
 from __future__ import annotations
 
 import html
+import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_headings  # noqa: E402
+
+UNDER2, UNDER1 = md_headings.UNDER2, md_headings.UNDER1
 
 ALERTS = {"NOTE": "note", "TIP": "tip", "IMPORTANT": "important", "WARNING": "warning", "CAUTION": "caution"}
 FENCE = re.compile(r"^\s*(```|~~~)\s*([\w+-]*)\s*$")
@@ -132,7 +139,7 @@ def _blocks(lines: list[str], slugify=None) -> str:
             continue
         m = HEADING.match(ln)
         if m:
-            n, text = len(m.group(1)), m.group(2)
+            n, text = len(m.group(1)), md_headings.unescape(m.group(2))
             out.append(f'<h{n} id="{slugify(text)}">{inline(text)}</h{n}>')
             i += 1
             continue
@@ -164,6 +171,12 @@ def _blocks(lines: list[str], slugify=None) -> str:
             while i < len(lines) and "-->" not in lines[i]:
                 i += 1
             i += 1
+            continue
+        if i + 1 < len(lines) and (UNDER2.match(lines[i + 1]) or UNDER1.match(lines[i + 1])) and not ln.lstrip().startswith(("|", "<")):
+            text = md_headings.unescape(ln.strip())                  # a Setext heading: the title over `---` (level 2) or `===` (level 1)
+            n = 1 if UNDER1.match(lines[i + 1]) else 2
+            out.append(f'<h{n} id="{slugify(text)}">{inline(text)}</h{n}>')
+            i += 2
             continue
         para = [ln.strip()]
         i += 1

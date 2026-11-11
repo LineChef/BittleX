@@ -7,7 +7,8 @@ kind: guide
 
 This page specifies the constraints that apply whenever G2 moves, the ways to stop G2, and the power-on, sleep and shutdown behaviour. Commands are listed in the [cheat sheet](cheatsheet.md), operating constraints found in use are in [Operating notes](operating-lessons.md), and a printable two-page version of this page is [the quick guide](operating-g2-quick-guide.pdf).
 
-## Operating constraints
+Operating constraints
+---------------------
 
 - Orientation: G2 is never placed on his back. The Pi and the BiBoard are mounted on top and exposed. A fallen or flipped G2 is righted by hand.
 - Test start: Every test starts with G2 standing on the floor and a hand within reach. No test runs with G2 held in the air.
@@ -17,7 +18,8 @@ This page specifies the constraints that apply whenever G2 moves, the ways to st
 - Voice module commands: `Xa` and `XAd` are never sent to the BiBoard, because they disable its onboard voice commands without any visible error.
 - AI head: The head shares the BiBoard's serial port (G1) and issues commands when spoken to, by its button or its wake word "Hi, Jason". It is used only while G2 is idle or resting, never during a walk or an exploration. After a head session that moved G2, the BiBoard is power-cycled or the IMU stream is checked before the next walk, because the head can send `g` (the gyro toggle). Pi commands that start failing (the wrong-answer horn) indicate this state.
 
-## Stopping G2
+Stopping G2
+-----------
 
 - Any fault: Say **"emergency stop"** (also "freeze", "halt", "stop moving", "abort"). The stop latches: all motion is cut and G2 holds until released. Say **"resume"** (also "as you were", "carry on") to release.
 - Voice unavailable: Run `python -m pi_pipeline.app --halt` on the Pi, or `kill -USR1 <pid>` (the pid is in `/tmp/g2_app.pid`). Release with `--release` or `kill -USR2 <pid>`.
@@ -27,11 +29,13 @@ This page specifies the constraints that apply whenever G2 moves, the ways to st
 
 Emergency stop is a freeze, not a power-off. The voice loop checks for it before anything else, with no API call.
 
-## Bench mode
+Bench mode
+----------
 
 With G2 on the calibration stand, or while calibration, `check_serial` or an IMU probe is running, the app runs as `python -m pi_pipeline.app --bench`. Bench mode suppresses autonomous movement and replaces the voice actuator with a mock, so nothing else competes for the serial link. For pure diagnostics, the individual tools can be run without the app, because each opens the serial port itself.
 
-## Power, sleep and shutdown
+Power, sleep and shutdown
+-------------------------
 
 - Power on: Switch the PiSugar on, which boots the Pi and starts the `g2-voice` service, then switch G2's own pack on. G2 says "G2 online" when ready.
 - Movement: Every stand-up is the eased stand-up (a 0.8 s ramp). Every move into a firmware skill is eased from the known pose. A stop out of a stride is immediate.
@@ -39,13 +43,15 @@ With G2 on the calibration stand, or while calibration, `check_serial` or an IMU
 - Shut down: Say a short, clear "shut down" or "power down". G2 lies down, announces it, and shuts the Pi down after 6 s. Saying "cancel" or "wait" keeps the Pi on. The PiSugar keeps powering the halted Pi, so its switch is flipped by hand. G2's pack is switched off separately.
 - Locked movement: A systemd drop-in that replaces `--actuator serial` with `--actuator mock` for `g2-voice`, followed by a reload and restart, disables all movement.
 
-## Batteries
+Batteries
+---------
 
 - G2's pack is read through the firmware. G2 warns by voice when it is low and when it is critical. The walk loop reads the voltage under load and rests the legs on a critical reading. The thresholds are settings, listed in [Settings and switches](settings-switches.md).
 - The Pi's battery (PiSugar S) has no readout. Its warning counts uptime against the measured full-charge runtime. `python -m pi_pipeline.power runtime plugged` pauses the count while charging and `runtime unplugged` restarts it. A reboot clears both, so the Pi is rebooted after charging. See [Pi power](../hardware/pi-power.md).
 - Session start: Sessions start with both packs full. A block of testing ends when G2's pack passes about 30% at rest or the Pi's low alarm sounds.
 
-## Diagnosing a fault
+Diagnosing a fault
+------------------
 
 - No voice reply: Run `journalctl -u g2-voice -f` on the Pi, then see "Voice service and microphone" in [Operating notes](operating-lessons.md).
 - Walks stop starting: Read the raw IMU lines. A malformed IMU field makes every line unparseable.

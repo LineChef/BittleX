@@ -2,7 +2,8 @@
 
 The code that runs on the Raspberry Pi Zero 2 W mounted on G2: the voice conversation loop, persistent memory, vision, the 80 Hz gait loop, autonomous behavior, diagnostics and power management. It is independent of `rl_training/` (its own venv, no shared code). A map from the docs to each package: [`../docs/code-map.md`](../docs/code-map.md). How the pieces fit: [`../docs/architecture.md`](../docs/architecture.md). What works right now: [`../docs/STATUS.md`](../docs/STATUS.md).
 
-## Design
+Design
+------
 
 Every hardware-specific dependency sits behind a small interface with a **mock or laptop implementation and a real one**, so the whole pipeline runs and is tested on a dev machine with no hardware, and moving to the Pi is a configuration change:
 
@@ -14,7 +15,8 @@ Every hardware-specific dependency sits behind a small interface with a **mock o
 
 `app/` is the only place with real I/O wiring. Every major subsystem is gated by a feature flag (`features.py`, set with `G2_FEATURES`): [`../docs/guides/feature-flags.md`](../docs/guides/feature-flags.md).
 
-## Packages
+Packages
+--------
 
 
 ### Conversation
@@ -62,7 +64,8 @@ These modules have unit tests and a design, but no runtime module imports them y
   `behavior/punt_test.py`: one punch at each ball distance with the results in a CSV, for dialing the distance in by hand
 
 
-## Setup
+Setup
+-----
 
 ```bash
 python3.11 -m venv pi_pipeline/.venv
@@ -75,7 +78,8 @@ pip install -r pi_pipeline/requirements-vision.txt   # optional: Pillow, for too
 
 Copy `.env.example` to `.env` at the repo root and set `ANTHROPIC_API_KEY`. Set a spend limit on the key first: [`../docs/guides/api-setup.md`](../docs/guides/api-setup.md). The Pi's OS setup: [`../docs/guides/pi-bring-up.md`](../docs/guides/pi-bring-up.md). Voice models: [`../docs/guides/models.md`](../docs/guides/models.md).
 
-## Tests
+Tests
+-----
 
 ```bash
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
@@ -85,7 +89,8 @@ The suite needs no network, audio or key. One live-API check is skipped unless `
 
 Lint: `pi_pipeline/.venv/bin/ruff check` (from the repo root; installed by `requirements-dev.txt`). Correctness rules only (undefined names, mutable defaults, syntax errors; config in `pyproject.toml`); the pre-commit hook runs it on the staged `.py` files.
 
-## Run
+Run
+---
 
 ```bash
 python -m pi_pipeline.voice --mode text     # type instead of speaking; G2 replies via `say`; no audio deps

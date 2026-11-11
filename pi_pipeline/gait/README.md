@@ -2,7 +2,8 @@
 
 Everything that makes G2 walk on the real robot: the 80 Hz loop that runs the exported policy, the steering trim, the eased stand-up, the guards, the IMU speed and stall estimates, and the bench and logging tools. Deployment, sidecars and rollback: [`../../docs/guides/gait-deployment.md`](../../docs/guides/gait-deployment.md). What the learned gait does: [`../../docs/rl/walking-policy.md`](../../docs/rl/walking-policy.md). Which policy is deployed: [`../../docs/STATUS.md`](../../docs/STATUS.md).
 
-## The loop
+The loop
+--------
 
 - `run_gait.py`: The on-Pi control loop and its command line (`--cmd`, `--seconds`, `--log`, `--probe-imu`, `--openloop`, `--dry-run`, …). Sends `d` (rest) on any exit
 - `walk_start.py`: Checks before a policy walk: settle into a still stand after a firmware gait or skill, never start tilted past 30°, the opt-in speed ramp-in
@@ -15,14 +16,16 @@ Everything that makes G2 walk on the real robot: the 80 Hz loop that runs the ex
 - `imu_parse.py`: The shared parser for the BiBoard's IMU line (also used by `app/sensors.py`)
 - `wkf_ref.npy`, `creep_ref.npy`, `hsF_ref.npy`: Reference gait cycles: the scripted walk, the creep base and the high-step base
 
-## Steering, stand-up and gait modes
+Steering, stand-up and gait modes
+---------------------------------
 
 - `heading_hold.py`: Steers with the front feet outside the policy: a fixed per-policy trim (`DEFAULT_TRIMS`), and an optional closed-loop hold (`G2_FOOT_HOLD=fl`)
 - `standup.py`: The eased 0.8 s stand-up ramp used before every walk
 - `gait_mode.py`: The shared "which gait" state (`normal`, `hi step`), switched by voice from any mode
 - `skill_switch.py`, `skill_layer.py`: Vision picks a scripted keyframe skill on top of the frozen walk (`--skills`); no training involved
 
-## Guards and estimates
+Guards and estimates
+--------------------
 
 - `thermal_guard.py`: I²t servo heat estimate with GREEN, AMBER and RED tiers
 - `carpet.py`, `speed_estimate.py`: Carpet detection from a zero-velocity-update speed estimate
@@ -31,7 +34,8 @@ Everything that makes G2 walk on the real robot: the 80 Hz loop that runs the ex
 - `stillness.py`: Waits until G2 has stopped swaying before a picture
 - `jam_guard.py`: Vision-free jam reflex from servo strain. **Built and tested, not wired in** (see the package README)
 
-## Teaching, benchmarking and logging tools
+Teaching, benchmarking and logging tools
+----------------------------------------
 
 Each is a command-line module; run with `python -m pi_pipeline.gait.<name>` or `python pi_pipeline/gait/<name>.py` from the repo root.
 

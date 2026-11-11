@@ -2,7 +2,8 @@
 
 Two printed changes to G2's legs, both designed from simulator results and both printing as of 2026-10-24. Nothing here has been on G2 yet. The wide shoulder parts widen the track by 0.2 in per side; the paws are hinged clip-on feet that fit over the stock foot discs. This page records the design, the numbers behind it and what to check at installation. The simulator results are for the deployed walking policy (V7); they are evidence, not a hardware result.
 
-## Wide shoulder parts
+Wide shoulder parts
+-------------------
 
 - What: The two Petoi side shoulders, reprinted wider at the two servo ends only
 - Added width: 0.2 in (5.08 mm) per side. Track 2.76 in to 3.16 in.
@@ -15,7 +16,8 @@ Two printed changes to G2's legs, both designed from simulator results and both 
 
 Why 0.2 in: the joints all swing in the pitch plane, so the track can only be widened by a spacer. In the simulator (V7, 481 g, today's load) falls dropped from 8.1% to 2.3% with 0.2 in and 2.7% with 0.4 in, and the steep side slopes were fixed. At today's load 0.4 in is worse on 1 in step-downs (74% falls against 45% for 0.2 in; stock 70%) and on random ledges; it wins only at the 708 g one-pound goal (1.2% against 3.3% heavy-load falls). The simulator does not model servo torque, heat or shaft side load, and V7 is heading-blind, so turning is not tested.
 
-## Paw ("seated" design)
+Paw ("seated" design)
+---------------------
 
 - What: A printed foot shell that clips over the stock foot disc and pivots on it
 - Source and specs: `seated/wide_foot_part.scad` and `seated/SPECS.md` in the owner's prototypes folder (outside this repository); export with `openscad -o seated.stl -D show_pin=false wide_foot_part.scad`. SPECS.md holds the full dimension tables and the simulator notes.
@@ -48,7 +50,8 @@ The wider foot is `wing = 1.82` (extra width on each outer side only; the window
 
 These runs used the seated paw before the sole update. The new sole was confirmed on the CLpaw shape (same sole, free pivot), not re-run with the seated grip.
 
-## Install checklist
+Install checklist
+-----------------
 
 1. Weigh the printed shoulder pair and the four paws; record the masses here.
 2. Shoulders first, one change at a time. Check that each horn still seats on its spline, that the leg clears the body and that the servo cable has slack. Measure the track before and after (expected 3.16 in).
@@ -57,7 +60,8 @@ These runs used the seated paw before the sole update. The new sole was confirme
 5. First walk on his feet on the floor with hands near, V7 unchanged. Watch for loose shoulder screws after a few minutes, scrape and any paw that catches. Re-run the walk on each floor type before relying on it.
 6. Do not retrain for the wider body yet; that is a separate decision.
 
-## Not known
+Not known
+---------
 
 - Real print tolerances: nothing has been printed and fitted.
 - The flaps flexing during walking (rigid in the simulator) and how long the PETG flaps last; the bend runs across the print layers, the weak direction.
@@ -65,6 +69,7 @@ These runs used the seated paw before the sole update. The new sole was confirme
 - The opening in the sole, the seats and the hollow toe, which the simulator fills in (collision uses the paw's convex hull).
 - Whether servo load, heat or voltage change with the 0.2 in track (no servo model in the simulator).
 
-## Files
+Files
+-----
 
 The source files and STLs are not in this repository (the prototypes folder is outside it and ignored). A copy of the previous CLpaw and seated files, from before the 2026-10-23 sole update, is kept outside the repository in `~/.local/share/g2/paw_backups/2026-10-23_before_rank1/`.

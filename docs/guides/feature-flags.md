@@ -7,7 +7,8 @@ This is the mechanism behind the day-1 checklist.
 Source: `pi_pipeline/features.py`. Config: `G2_FEATURES` in `.env`.
 Inspect: `python -m pi_pipeline` (resolved set) · `python -m pi_pipeline --profiles`.
 
-## Configuring
+Configuring
+-----------
 
 ```
 G2_FEATURES=""                              # empty -> everything on (p9-full)
@@ -25,7 +26,8 @@ At startup each entry point calls `features.log_summary()` — the resolved set
 and any dependency adjustments go to the log **and** to `diag`, so every
 session records exactly what ran.
 
-## The flags
+The flags
+---------
 
 - foundation: Flag: `link`; Depends on: —; Meaning: BiBoard serial link
 - : Flag: `estop`; Depends on: —; Meaning: master safe-hold: forces all actuation/autonomy off
@@ -52,7 +54,8 @@ session records exactly what ran.
 - cross: Flag: `power_profile`; Depends on: —; Meaning: `off` / `interactive` / `headless`
 - : Flag: `diag`; Depends on: —; Meaning: black-box logging; kept on for bring-up
 
-## Dependency rules (`Features.resolve()`)
+Dependency rules (`Features.resolve()`)
+---------------------------------------
 
 Adjustments are applied and reported, never silent:
 
@@ -66,7 +69,8 @@ Adjustments are applied and reported, never silent:
 - notes-only: `wake_word` without `stt`; `explore` without `mode_controller`;
   `claude` without `stt`/`tts`
 
-## Bring-up profiles
+Bring-up profiles
+-----------------
 
 Each = the previous + one layer, so a regression is isolated to the layer just
 added:
@@ -86,7 +90,8 @@ Bring-up: assemble → `p0-link`, work through the day-1 checklist for that laye
 then advance. Move `gait` to `policy` only after `scripted` is validated on the
 stand and floor.
 
-## Wiring status
+Wiring status
+-------------
 
 `features.py` is consulted at these entry points; the rest is follow-up as each
 subsystem reaches hardware bring-up.

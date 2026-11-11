@@ -15,6 +15,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_headings  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PAGES = [("cheatsheet.md", "docs/guides/cheatsheet.md"), ("cheatsheet-advanced.md", "docs/guides/cheatsheet-advanced.md")]
@@ -38,16 +41,18 @@ def rows(root: str = ROOT):
     out = []
     for fname, rel in PAGES:
         heading, fence = "", False
-        for n, line in enumerate(open(os.path.join(root, rel)).read().splitlines(), 1):
+        body = open(os.path.join(root, rel)).read()
+        heads = {i: md_headings.unescape(t) for i, _lv, t in md_headings.parse_headings(body)}          # ATX and Setext headings, by line index
+        for n, line in enumerate(body.splitlines(), 1):
+            if n - 1 in heads:
+                heading = heads[n - 1]
+                continue
             if line.strip() == START:                     # everything after this is the generated index itself
                 break
             if line.startswith("```"):
                 fence = not fence
                 continue
             if fence:
-                continue
-            if line.startswith("#"):
-                heading = line.lstrip("#").strip()
                 continue
             m = ROW.match(line)
             if m:

@@ -7,7 +7,8 @@ Every model G2 uses, where it lives, where it came from and under what terms. Mo
 - The detector on the camera: Lives in: the camera module's flash; Fetched by: trained in this project: [`../vision/custom-model-recipe.md`](../vision/custom-model-recipe.md)
 - The walking policy: Lives in: `rl_training/opencat-gym/trained/` (exported `.onnx` plus sidecar), deployed to the Pi; Fetched by: [`gait-deployment.md`](gait-deployment.md)
 
-## Voice models (`models/`)
+Voice models (`models/`)
+------------------------
 
 - `vosk/` (`vosk-model-small-en-us-0.15`): Role: Speech recognition and the wake-word grammar; one model shared by both; Source: [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models); Size (bytes): about 40 MB zip; SHA-256: `am/final.mdl`: `75370a0137f9daf8f469dedd7daa4513ae7a621f03240c6e512e2b50b656a7b6`; Verified against: the host lists no checksum, so this is a local record only; License: Apache 2.0, per the host's model list
 - `piper/en_US-ryan-low.onnx` (+ `.onnx.json`): Role: G2's default voice; 16 kHz, light enough for the Pi Zero 2 W. The robot effect is applied on top; Source: [`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/ryan/low); Size (bytes): 63,104,526; SHA-256: `8d21a085cc4c0010f1f3e91d5008c8691277ccfa744eb0d747becd33a3444baf`; Verified against: the Git LFS pointer on the host (oid and size), checked at download; License: CC BY-NC-SA 4.0 (dataset: RyanSpeech)
@@ -19,11 +20,13 @@ License note: the RyanSpeech voice data is licensed CC BY-NC-SA 4.0: attribution
 
 The Pi's models are fetched on the Pi by the same script ([`../../pi_pipeline/voice/README.md`](../../pi_pipeline/voice/README.md) "Models for voice mode"); the deploy script copies only `pi_pipeline/` and the policy files, never `models/`.
 
-## Choosing and switching the voice
+Choosing and switching the voice
+--------------------------------
 
 `PIPER_MODEL_PATH` in the Pi's `.env` selects the voice (`models/piper/en_US-ryan-low.onnx` by default); `G2_VOICE_STYLE` picks the robot effect. Other voices are plain downloads of `<name>.onnx` and `<name>.onnx.json` from the repo above into `models/piper/`; try one with `python -m pi_pipeline.voice.check_audio tts "text" --model models/piper/<name>.onnx`. Notes on the voices tried (alan, amy, hfc_male, since removed): [`../../pi_pipeline/voice/README.md`](../../pi_pipeline/voice/README.md). Benchmark a voice on the Pi first: `python -m pi_pipeline.benchmark_pi --all-voices`.
 
-## If a model is missing
+If a model is missing
+---------------------
 
 - Voice mode fails to start, "model not found": `bash pi_pipeline/fetch_models.sh` (idempotent: skips what exists)
 - `models/` looks empty after a fresh clone: Expected: it is gitignored. Run the script

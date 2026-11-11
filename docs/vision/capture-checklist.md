@@ -5,7 +5,8 @@ Companion: [`person-recognition.md`](person-recognition.md) (why),
 `tools/curate_captures.py` (the filter), `scratchpad/face_preview.py` (live
 preview + capture).
 
-## 0 · Ask for the tag name
+0 · Ask for the tag name
+------------------------
 
 **Before anything else, ask the user what name to tag this batch with.**
 That name is used everywhere: the capture folder, the curated folder, the YOLO
@@ -14,7 +15,8 @@ class, and later `VISION_LABELS` + `G2_BONDS`. Lower-case, short, no spaces
 person (`count_completed_sessions` from `behavior/enrollment.py`, or count
 `session_*/` dirs).
 
-## 1 · Check the rig
+1 · Check the rig
+-----------------
 
 - Camera enumerated: `ls /dev/cu.usbmodem*`. Port free (close SenseCraft/Chrome
   tabs — the in-app "disconnect" does NOT release WebSerial).
@@ -27,12 +29,14 @@ person (`count_completed_sessions` from `behavior/enrollment.py`, or count
   failed on near-black frames. Capture under the lighting that's actually on
   when G2 is used, not the empty-room worst case.
 
-## 2 · Prep the folder
+2 · Prep the folder
+-------------------
 
 `~/Desktop/G2Memory/g2_face_capture/<name>/session_<k>/` (or the Desktop root for a
 quick one-off). Clear any stale `*.jpg`/`*.json` first.
 
-## 3 · Capture (live preview)
+3 · Capture (live preview)
+--------------------------
 
 - `g2cam <name> <session>` (or `python tools/camera_preview.py`), open
   `http://localhost:8080`. Saves `<name>_NNNN.jpg` + `<name>_NNNN.json` (the
@@ -72,7 +76,8 @@ Per-session variation: session 1 can be one look (e.g. hair up); sessions
 2–3 the person's normal look. Each session in a different room / lighting if you
 can.
 
-## 4 · Curate
+4 · Curate
+----------
 
 ```
 python tools/curate_captures.py <session_dir> <session_dir>/curated \
@@ -86,21 +91,24 @@ python tools/curate_captures.py <session_dir> <session_dir>/curated \
 - Report the count: curate prints *usable positives + negatives this session* and the *running total toward ~100* across the person's curated sessions -- always call that out so the current standing is known.
 - Re-run with tweaked flags as needed — it's non-destructive (raw frames kept).
 
-## 5 · Iterate / accumulate
+5 · Iterate / accumulate
+------------------------
 
 - 3 sessions per person, different rooms/lighting/clothes. Session 1 can be one
   look (e.g. hair up), 2–3 the normal look.
 - After each session, note it done. When all 3 curated folders exist, combine
   them for the upload.
 
-## 6 · Handoff to training
+6 · Handoff to training
+-----------------------
 
 Combine all `session_*/curated/` → upload to SenseCraft (multi-class: add this
 person to the existing interaction dataset) → the YOLO `.txt` pre-labels mean
 you mostly assign the class name → train → deploy → add to `VISION_LABELS` +
 `G2_BONDS`. Full detail in `person-recognition.md`.
 
-## Notes
+Notes
+-----
 
 - Pre-label region: `--label-region face` tightens the YOLO pre-label box to the face (from the Person box) -- the *image stays full-frame*. Do NOT crop the training images: an object detector must see faces *within* a scene to learn to localise them. `--face-crops` writes face crops to `crops/` only for a possible future classifier/embedder.
 - Resolution ceiling: frames pulled over serial (`AT+INVOKE`) are the model-input frame, ~240 px max -- no raw high-res JPEG this way. Set sensor capture to 480 (`G2_CAM_RES=1` for `face_preview.py`) for a cleaner 240 downscale. Graininess past that is low light, not resolution; the detector runs at 192 px regardless.

@@ -13,7 +13,8 @@ BiBoard, Grove Vision AI camera.
 Everything below needs only the Pi + card + power (+ the PiSugar for the last
 bit). None of it needs the robot.
 
-## 0. Connectors / adapters to have on hand (order ahead)
+0\. Connectors / adapters to have on hand (order ahead)
+------------------------------------------------------
 
 From the repo's hardware research (`docs/hardware/specs.md`, `pi-power.md`) —
 what is physically needed to join the three boards:
@@ -36,7 +37,8 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 
 ---
 
-## 0. The headline facts that shape every choice
+0\. The headline facts that shape every choice
+---------------------------------------------
 
 - 512 MB RAM, soldered, not expandable: the whole voice stack (Vosk ~300 MB runtime + Piper/onnxruntime + Python) barely fits; swap is mandatory, running voice+vision together is doubtful, PyTorch is a bad idea (see §7)
 - 4× Cortex-A53 @ 1 GHz (ARMv8, aarch64): must run **64-bit** Pi OS for ML wheels; compiles are slow; real-time TTS/STT is not guaranteed — must be measured
@@ -47,7 +49,8 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 
 ---
 
-## 1. Flash the card (on the Mac, with Raspberry Pi Imager)
+1\. Flash the card (on the Mac, with Raspberry Pi Imager)
+--------------------------------------------------------
 
 1. Install **Raspberry Pi Imager** (`brew install --cask raspberry-pi-imager` or from raspberrypi.com).
 2. Choose OS → **Raspberry Pi OS Lite (64-bit)**. *Lite* = no desktop (the Pi runs headless). *64-bit* is non-negotiable for the ML packages. Stay on **Bookworm**, not the newer Trixie — Trixie has had headless-Wi-Fi regressions ([industrialmonitordirect](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)).
@@ -65,7 +68,8 @@ Why the Imager and not hand-editing files: Bookworm reads this bundle via
 and a `wpa_supplicant.conf` in /boot" method **no longer works**
 ([skyboo.net](https://skyboo.net/2024/02/preparing-headless-sd-card-for-raspberry-pi-zero-2-w-without-raspberry-pi-imager/)).
 
-## 2. First boot + SSH in
+2\. First boot + SSH in
+----------------------
 
 1. Card into the Pi, micro-USB power into the **PWR** port (the inner one on the
    Zero 2 W; the outer is USB-data). Plain USB PSU for now, not the PiSugar.
@@ -87,7 +91,8 @@ Then check for an MDM / endpoint-security agent on the Mac (a Jamf framework was
 the cause once, not the router). Full order of checks:
 [`gait-deployment.md`](gait-deployment.md) troubleshooting.
 
-## 3. Kill Wi-Fi power-save (do this before anything heavy)
+3\. Kill Wi-Fi power-save (do this before anything heavy)
+--------------------------------------------------------
 
 ```bash
 sudo tee /etc/NetworkManager/conf.d/wifi-powersave-off.conf >/dev/null <<'EOF'
@@ -104,7 +109,8 @@ iw dev wlan0 get power_save     # want: "Power save: off"
 Without this, SSH sessions freeze for seconds-to-forever whenever the CPU is
 busy — which is *all the time* once training/inference runs.
 
-## 3a. Away from home: a backup Wi-Fi network (phone hotspot)
+3a. Away from home: a backup Wi-Fi network (phone hotspot)
+----------------------------------------------------------
 
 The Pi remembers every network NetworkManager has saved and joins the highest-priority one in range (home = 100, from the Imager).
 Save a backup *while the Pi is still reachable*:
@@ -121,7 +127,8 @@ and WPA2-Enterprise networks can't be joined headlessly. Claude replies need int
 Helper: `tools/g2_wifi.sh` (alias `g2wifi`). If the Pi can join nothing, it has no fallback access point; plug in the Imager
 SD card route (§2) or a keyboard/monitor to recover.
 
-## 4. Swap / zram (needed — see §0)
+4\. Swap / zram (needed — see §0)
+--------------------------------
 
 Bookworm ships **no** `dphys-swapfile` by default and `zram-generator` is the
 modern path ([linuxconfig](https://linuxconfig.org/how-to-enable-zram-on-raspberry-pi)).
@@ -158,7 +165,8 @@ free -h ; swapon --show
 (High `swappiness` is counter-intuitive but correct *when the primary swap is
 zram*: cold pages should be compressed into RAM early, not cause an out-of-memory kill.)
 
-## 5. Serial for the BiBoard link (config only, no robot yet)
+5\. Serial for the BiBoard link (config only, no robot yet)
+----------------------------------------------------------
 
 Default: `/dev/ttyS0` = mini-UART on GPIO 14/15, `/dev/ttyAMA0` = the PL011,
 wired to the Bluetooth modem. Mini-UART's baud is tied to the core clock and
@@ -195,7 +203,8 @@ Nothing to test until the BiBoard is wired (RX↔TX crossed, GND↔GND, and per 
 plan the Pi's 5 V pin stays **unconnected** — it's powered from the PiSugar).
 `pi_pipeline`'s `check_serial ports` / `ping` come later.
 
-## 6. PiSugar S — simpler than the tutorials imply
+6\. PiSugar S — simpler than the tutorials imply
+-----------------------------------------------
 
 The PiSugar **S** (not 2, not 3) "functions are almost entirely hardware-based,
 does not support I²C communication, and can only detect whether an external
@@ -219,7 +228,8 @@ So:
   I²C **disabled** and the PiSugar's auto-boot / button features work fine.
   Only revisit if a future Grove I²C sensor hangs off the Pi directly.
 
-## 6b. Heatsink — left OFF; install only if it throttles
+6b. Heatsink — left OFF; install only if it throttles
+-----------------------------------------------------
 
 The WH kit's pin-fin heatsink (small aluminium block, top is a grid of square
 pins) is **not fitted**. There's no screw/clip point — it mounts by peeling the
@@ -237,7 +247,8 @@ but `0x0` (bit 0 / 0x1 = under-voltage, bit 3 / 0x8 = currently throttled). Most
 likely trigger is Phase 8 (vision + STT/TTS co-resident on the Pi), not the gait
 loop. 30-second peel-and-stick when needed.
 
-## 7. Deploy `pi_pipeline` to the Pi
+7\. Deploy `pi_pipeline` to the Pi
+---------------------------------
 
 `pi_pipeline/` is already a real codebase (link/ voice/ vision/ memory/ + a test
 suite), currently developed and tested on the Mac. Getting it onto ARM: **copy
@@ -326,7 +337,8 @@ PyTorch on the Pi — export the policy to **ONNX** and infer via the
 `onnxruntime` that's already there for Piper. Revisit only if that proves
 insufficient. (Moot until Phase 6 anyway; RL is paused for hardware.)
 
-## 8. Benchmark the real Pi — `pi_pipeline/benchmark_pi.py`
+8\. Benchmark the real Pi — `pi_pipeline/benchmark_pi.py`
+--------------------------------------------------------
 
 Built and smoke-tested on the Mac. Run over SSH once `pi_pipeline` is installed:
 
@@ -381,7 +393,8 @@ time", and numbers to decide voice-only vs voice+vision co-residency.
 
 ---
 
-## 9. Security hardening — G2 is a mic + camera on the home network
+9\. Security hardening — G2 is a mic + camera on the home network
+------------------------------------------------------------
 
 The robot's SD card holds the API key (`.env`), the memory DB (names, prefs,
 conversation history), and the household roster (`.env` `G2_BONDS`). Treat a
@@ -429,7 +442,8 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
 
 ---
 
-## Open questions — status after this research
+Open questions — status after this research
+-------------------------------------------
 
 - Serial device name on the Zero 2 W?: `/dev/ttyS0` (mini-UART) by default; **switch to `/dev/ttyAMA0` / `serial0`** via `dtoverlay=disable-bt` for a stable 115200 link. Config file is `/boot/firmware/config.txt` on Bookworm.
 - Can a Pi Zero 2 W run `model.predict()` fast enough?: The MLP is trivial; **run it as ONNX, not PyTorch** (torch's RAM cost is the real problem). Fast enough is very likely; benchmark in §8 when Phase 6 comes.
@@ -441,7 +455,8 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
 - Bookworm vs Trixie?: **Bookworm 64-bit Lite** — Trixie had headless-Wi-Fi regressions.
 - Does the Pi need I²C enabled?: No. Leaving it off also sidesteps the PiSugar auto-boot/I²C clash.
 
-## Sources
+Sources
+-------
 - Headless Bookworm / Imager: [zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/), [skyboo.net](https://skyboo.net/2024/02/preparing-headless-sd-card-for-raspberry-pi-zero-2-w-without-raspberry-pi-imager/), [industrialmonitordirect (Trixie vs Bookworm)](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)
 - Wi-Fi power-save: [Pi forum](https://forums.raspberrypi.com/viewtopic.php?t=357629), [crox.net](https://blog.crox.net/archives/129-Disable-WiFi-Power-Management-on-Raspbian-12-Network-Manager.html)
 - zram / swap: [linuxconfig](https://linuxconfig.org/how-to-enable-zram-on-raspberry-pi), [Pi My Life Up](https://pimylifeup.com/raspberry-pi-zram/), [Pi forum (Zero 2 swap)](https://forums.raspberrypi.com/viewtopic.php?t=396095)

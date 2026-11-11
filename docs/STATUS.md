@@ -9,7 +9,8 @@ G2 is a Petoi Bittle X quadruped that walks with a learned gait, listens and tal
 
 The longer story of how each part works is in [How it works](how-it-works.md); the full list of abilities is in [Capabilities](capabilities.md).
 
-## At a glance
+At a glance
+-----------
 
 - Walking: Works on hardwood floors. Tile and carpet are not solved.
 - Voice conversation: Works. Wake word, spoken commands, Claude replies, speech out.
@@ -18,7 +19,8 @@ The longer story of how each part works is in [How it works](how-it-works.md); t
 - Ball goal (punting a ball): Works some of the time. Falls during turns are the main problem.
 - Falls: The biggest open problem. G2 sometimes tips over at pose and turn changes.
 
-## What G2 is made of
+What G2 is made of
+------------------
 
 - Body: A Bittle X V2 with a BiBoard control board, running Petoi's OpenCat firmware.
 - Brain: A Raspberry Pi Zero 2 W in a printed pod on G2's back. It runs the voice, memory, vision and walking software, and talks to the BiBoard over a serial cable. Details in [As built](hardware/as-built.md).
@@ -27,7 +29,8 @@ The longer story of how each part works is in [How it works](how-it-works.md); t
 - Neck attachment: A claw arm is fitted, with its camera on the claw. It replaced the Petoi AI Head that was fitted earlier. Wider shoulders are fitted. G2 now weighs a little over 530 g with all of it. How attachments change the settings: [Attachments](guides/attachments.md).
 - Power: G2 runs on its own battery pack. The Pi runs on a small PiSugar pack that lasts about three hours.
 
-## What works
+What works
+----------
 
 ### Walking
 
@@ -52,7 +55,8 @@ G2 can wander a room, turn away from walls, react to bumps, stop to take picture
 
 G2 can be given a goal: find a ball, walk up to it and punt it. A session is up to ten attempts, and G2 adjusts its approach between attempts based on what worked. More on this in [Goals](guides/goals.md). Results are mixed. Early sessions scored well, and later ones dropped. Part of the cause was a default turn speed far lower than the real turn speed, which made turns overshoot. The corrected default is deployed and has not been tested on G2.
 
-## What is deployed
+What is deployed
+----------------
 
 Everything below is on the Pi.
 
@@ -70,7 +74,8 @@ Everything below is on the Pi.
 - Battery alarms: Voice warnings for both G2's pack and the Pi's runtime.
 - Sounds: One at a time, through an audio gate, at one global volume.
 
-## Tested on the real robot
+Tested on the real robot
+------------------------
 
 - Walking: Six steady hardwood runs with the first policy. The next policies were tested on hardwood and over a quarter-inch ramped threshold with no falls. V7, with the pod and head, did three 12-second walks with no falls.
 - Poses and transitions: Stand, sit, rest and stand-from-sit are smooth with firmware balance off. The wave flipped G2 twice.
@@ -84,7 +89,8 @@ Everything below is on the Pi.
 
 The walls goal, "G2, practise", the spoken goal suggestions and operator overrides, the policy walk toward a ball with self-measured pace, vision reflexes while walking, the full application over a long period, the teach tool, the recognition labelling pictures, the per-leg wall look, conversation mode as a hardware test, and the pose read before stand-up.
 
-## Known limitations
+Known limitations
+-----------------
 
 1. Falls at transitions: Most falls happen in turns and pose changes. Of 154 logged ball-goal attempts, 18 recorded a fall, 13 of them in turns, and most falls are never logged. Safeguards exist (a pose gate, a steady check, calm stops, the claw look as the only look) but none has had a valid test round. Voided rounds were caused by a drill bug, a voice-module move and a silent board.
 2. Legs going limp: After about ten seconds standing still, the leg servos can lose strength. The leading explanation is the servos' overload protection, worst on the back legs, which carry the raised arm. A sag check from the motion sensor now re-stands G2. It is untested on the robot.
@@ -102,14 +108,16 @@ The walls goal, "G2, practise", the spoken goal suggestions and operator overrid
 14. Ledges: No policy crosses step-ups above 0.3 in in simulation.
 15. Minor: An unexplained ticking from the board during some walks, and a stiffer, louder back-left shoulder servo.
 
-## Open decisions
+Open decisions
+--------------
 
 - The Petoi AI Head is an extra voice model started by its button. Claude stays the main brain and nothing is integrated for now.
 - Claude descriptions of survey pictures (one billed call per picture) are on hold.
 - A new 20-million-step training run: starts only on explicit approval and never on top of a finished long run.
 - Gait comparisons on G2 are not run. Policies are compared in simulation only.
 
-## What happens next
+What happens next
+-----------------
 
 Testing follows a simple rule: collect data from normal runs first, then run a targeted test only where the logs cannot answer the question.
 

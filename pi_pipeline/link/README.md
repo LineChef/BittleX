@@ -5,7 +5,8 @@ Shared plumbing: `voice`'s `SerialActuator` uses it, `vision` maps avoidance
 decisions to skills that go through it, and RL sim-to-real deployment will stream
 joint commands over it.
 
-## Modules
+Modules
+-------
 
 - `serial_link.py`: `SerialLink` — lazy open, auto-reconnect on drop, `send()` never raises (logs + returns `""`). `list_ports()`.
 - `opencat.py`: Command-string builders (`skill`, `move_joints`, `beep`), constants (`REST`, `ENTER_SERIAL2_MODE`, `RECOVER`/`ROLL_OVER`/`BALANCE`/`STAND`), and `is_safe()` (blocks calibration). No I/O.
@@ -15,7 +16,8 @@ joint commands over it.
 - recovery.py: IMU roll+pitch in, a `RecoveryAction` out (`NONE` / `RECOVER` / `ROLL_THEN_RECOVER` / `DROP_RECOVER` / `SETTLE` / `GIVE_UP`). Pure logic, no serial I/O; `ACTION_COMMANDS` maps actions to `k…` strings. Once down, classifies the **fall pose** (`FallPose`: nose-down / tail-down / left / right side / back — `fsm.pose`) and fires the maneuver for it; on failure **escalates** `pose skill → roll+recover → dropRec → give up`. HW-gated bits (roll/pitch sign, one-sided `rc`, firmware auto-recover conflict) are `RecoveryConfig` flags with safe defaults + `HARDWARE-GATED` comments.
 
 
-## Diagnostics
+Diagnostics
+-----------
 
 ```bash
 python -m pi_pipeline.link.check_serial ports        # list serial ports (works on any machine)
@@ -28,7 +30,8 @@ python -m pi_pipeline.link.check_serial rest         # 'd' — lie down, relax s
 Configured by `G2_SERIAL_PORT` / `G2_SERIAL_BAUD` (`.env`). Likely `/dev/ttyS0`
 on the Pi Zero 2 W.
 
-## Command reference (what is used)
+Command reference (what is used)
+--------------------------------
 
 Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (2026-09-07 —
 `docs/hardware/petoi-firmware-reference.md`) + project Phase 4 notes:
@@ -51,7 +54,8 @@ Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (2026-09-07 
 
 Blocked from the pipeline: `c`, `cd` (calibration / factory).
 
-## Bring-up checklist (when hardware arrives)
+Bring-up checklist (when hardware arrives)
+------------------------------------------
 
 1. `check_serial ports` → find the device, set `G2_SERIAL_PORT`.
 2. On the BiBoard, enable Serial-2 mode (`XS`, or edit `OpenCat.h` + reflash).

@@ -3,7 +3,8 @@
 > **Moved verbatim from `docs/project-plan.md`** when the plan was trimmed to a roadmap. This is the full detail for
 > the ordered day-1 bring-up sequence (the executable version is `python -m pi_pipeline.bringup`). Current state is in [`../STATUS.md`](../STATUS.md); the roadmap item is in [`../project-plan.md`](../project-plan.md).
 
-## When the hardware arrives — ordered bring-up
+When the hardware arrives — ordered bring-up
+--------------------------------------------
 
 The phases above are grouped by system; this is the sequence to actually work
 through once the Bittle X + BiBoard land (the Pi bring-up is already done — see

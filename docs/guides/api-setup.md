@@ -7,7 +7,8 @@ kind: guide
 
 G2 talks through the Claude API, which bills per use. This page covers two layers of protection: limits set in the Anthropic console, and limits inside G2's own software. The console limits are the hard stop, because Anthropic enforces them and a bug in G2 cannot get around them. G2's own limits are faster, and they warn before the hard stop is reached. Set up both.
 
-## In the Anthropic console
+In the Anthropic console
+------------------------
 
 Do these once, before the key is first used.
 
@@ -19,7 +20,8 @@ Do these once, before the key is first used.
 6. Bookmark the key's console page so revoking a lost or exposed key takes minutes.
 7. Record the expiry, if the key has one. Add `ANTHROPIC_API_KEY_EXPIRES=YYYY-MM-DD` to `.env`. G2 logs a warning as the date approaches (`G2_API_KEY_EXPIRY_WARN_DAYS`, default 30) and an error once it has passed, so an expired key is never a silent non-reply. Update both the console expiry and this date when the key is rotated.
 
-## Inside G2
+Inside G2
+---------
 
 ### Usage tracking
 

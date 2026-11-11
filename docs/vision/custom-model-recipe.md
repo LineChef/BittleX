@@ -16,7 +16,8 @@ Repo tooling for this flow: **`tools/gv2/`** —
 
 ---
 
-## Core constraint: the device firmware is frozen at Jan 2025
+Core constraint: the device firmware is frozen at Jan 2025
+----------------------------------------------------------
 
 The Grove Vision AI V2's on-device firmware (`SSCMA-Micro`, latest release tag
 `20250102`) does the pre/post-processing around the `.tflite` you flash — the
@@ -45,7 +46,8 @@ object**.
 
 ---
 
-## Paths tried this session and their outcomes
+Paths tried this session and their outcomes
+-------------------------------------------
 
 - Ultralytics YOLOv8, `ultralytics==8.4.146`, `format=saved_model` (NHWC): toolchain: new ultralytics; on-device result: **`boxes:[]`** — 8.4.x LiteRT/ai-edge-torch export ≠ 8.2.8 graph
 - YOLO26 (`yolo26_GV2.ipynb`): toolchain: ultralytics; on-device result: trained fine, **0 detections** — firmware has no YOLO26 decode
@@ -62,7 +64,8 @@ while stock Swift-YOLO works — "is the toolchain ahead of the firmware decode?
 
 ---
 
-## The working recipe: `ultralytics==8.2.8`, exported locally on Apple Silicon
+The working recipe: `ultralytics==8.2.8`, exported locally on Apple Silicon
+------------------------------------------------------------
 
 **2026-09-09 — this produced the first model the device actually decodes.**
 3-class (`<you>`, `dog`, `cat`), YOLOv8n @ 192px, mAP@50 0.907 (`<you>` 0.995,
@@ -143,7 +146,8 @@ so every class + the negatives pool appears in val. Do **not** use
 
 ---
 
-## The re-labelling pipeline (this is reusable — the key fix)
+The re-labelling pipeline (this is reusable — the key fix)
+----------------------------------------------------------
 
 The `dog`/`cat` library images had **no boxes** (captured, never labelled;
 training used `combine_for_upload.py --box-fallback` = a whole-frame box, which
@@ -183,7 +187,8 @@ without SenseCraft's preview.
 
 ---
 
-## Fallback: Edge Impulse (structurally immune to the firmware problem)
+Fallback: Edge Impulse (structurally immune to the firmware problem)
+------------------------------------------------------------
 
 EI is an officially supported target and compiles a **complete firmware binary**
 (`.uf2`, drag-and-drop) — its own inference + post-processing baked in, **does
@@ -201,7 +206,8 @@ Take this route if pinned-8.2.8 YOLOv8 also floods.
 
 ---
 
-## Also worth knowing
+Also worth knowing
+------------------
 
 - Local serial flashing (skip SenseCraft cloud): `python-sscma` —
   `sscma.cli flasher model_int8_vela.tflite 0x400000`, then set class names with
@@ -223,7 +229,8 @@ Take this route if pinned-8.2.8 YOLOv8 also floods.
 
 ---
 
-## Cleanup — ALWAYS the last step
+Cleanup — ALWAYS the last step
+------------------------------
 
 Colab uploads the whole training set to the runtime VM. As soon as a model is
 flashed and confirmed on the device, and the local keepers exist under
@@ -239,7 +246,8 @@ there's no reason to leave them on a third-party VM once the model is built.
 
 ---
 
-## Adding `<spouse>` later (the 4-class model)
+Adding `<spouse>` later (the 4-class model)
+-------------------------------------------
 
 Run the **Full process** table again, changed only at:
 - step 1–3: capture `<spouse>` (~140 raw, `capture-session-checklist.md`),

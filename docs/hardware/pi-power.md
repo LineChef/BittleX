@@ -1,6 +1,7 @@
 # Powering the Raspberry Pi and managing power
 
-## Status at a glance
+Status at a glance
+------------------
 
 The decision: the Pi has its own battery (a PiSugar S 1200 mAh), and the BiBoard link is data only (TX, RX and GND). Drawing the Pi from G2's shared pack caused reduced motion and brownout risk. The first half of this page is the research that led there.
 
@@ -13,7 +14,8 @@ The decision: the Pi has its own battery (a PiSugar S 1200 mAh), and the BiBoard
 
 Package overview: [`../../pi_pipeline/power/README.md`](../../pi_pipeline/power/README.md). Operator view: [`../guides/operating-g2.md`](../guides/operating-g2.md).
 
-## The problem
+The problem
+-----------
 
 Bittle X's BiBoard can power a mounted Raspberry Pi through the same 2×5 GPIO
 socket used for serial communication — Petoi's own FAQ confirms this is the
@@ -51,7 +53,8 @@ the PiSugar stack-height case-fit question, since a bare Pi already fits
 Petoi's stock `Bittle_Cover_with_hole_for_Pi.stl` back cover). PiSugar removes
 the open question entirely rather than fixing a confirmed one.
 
-## Choosing a Pi power source
+Choosing a Pi power source
+--------------------------
 
 **Considered and ruled out:**
 
@@ -76,7 +79,8 @@ the open question entirely rather than fixing a confirmed one.
   phone charging), with UPS auto-boot / safe-shutdown — useful for recovering
   cleanly from unattended runs
 
-## The GPIO / mounting conflict — resolved
+The GPIO / mounting conflict — resolved
+---------------------------------------
 
 Initial concern: since Bittle X also connects to the Pi via the GPIO header,
 would PiSugar and Bittle X's connections physically conflict?
@@ -86,7 +90,8 @@ underside (bottom copper pads), while Bittle X connects via the top-side 40-pin
 header pins. They contact opposite faces of the board, so both can be connected
 simultaneously.
 
-## The power-sourcing conflict — resolved
+The power-sourcing conflict — resolved
+--------------------------------------
 
 Remaining concern: if both PiSugar and Bittle X's board can supply 5V to the Pi at
 the same time, does that create an electrical conflict?
@@ -100,7 +105,8 @@ is to **wire Bittle X to the Pi's serial / data pins only (RX / TX / GND) — no
 the 5V power pin** — letting PiSugar be the sole power source. This removes the
 shared-power question entirely.
 
-## Resolved — data-only wiring confirmed
+Resolved — data-only wiring confirmed
+-------------------------------------
 
 2026-09-14: BiBoard V1's Pi connector is a discrete 5-pin header (TX2,
 RX2, GND, +5V, +5V), each pin its own solder pad — not a rigid block that
@@ -127,7 +133,8 @@ operation (exploring, navigating, reacting) is a *working* state — you can't
 save power there by gating what autonomy depends on. During active autonomy the
 only levers are the clean set (efficient gait, disabled peripherals).
 
-## Rest pose (servo pack)
+Rest pose (servo pack)
+----------------------
 
 Power, lowest → highest: **REST (`d`) < sit (`ksit`) < stand (`kup`)**.
 - REST: legs folded, body on the frame, servos de-energized, ≈ 0 draw.
@@ -139,7 +146,8 @@ Power, lowest → highest: **REST (`d`) < sit (`ksit`) < stand (`kup`)**.
 Resume cost: REST → walking is ~1–2 s + a rebalance; stand → walking is instant.
 So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 
-## Power log and measured runtime
+Power log and measured runtime
+------------------------------
 The voice service keeps a power diary at `~/.local/share/g2/power_log.jsonl` (`G2_POWER_LOG`), one fsynced line per event: `start` / `stop` (with whether the OS was shutting down), `sleep` / `wake` (with the reason), a heartbeat `alive` every minute (awake or asleep), and `runtime` at the next start.
 
 After the Pi goes quiet, the last line says whether G2 was asleep or awake and when he was last alive. Read it with `python -m pi_pipeline.power log [N]`; `python -m pi_pipeline.power stats` summarises the sleeps (how many, how long, what woke him, the share of the time asleep).
@@ -152,7 +160,8 @@ It enters the estimate only when you confirm it was a full charge run to empty (
 
 Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
-## Measures
+Measures
+--------
 
 - Disable unused peripherals (onboard LEDs runtime; audio + camera-LED via boot config): Buildable now?: **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`); Autonomy impact: none; Rule: boot lines go in `config.txt` at Pi setup (pi-set-up.md)
 - Wi-Fi power-save when headless (`iw dev wlan0 set power_save on`): Buildable now?: **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()`; Autonomy impact: +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).**; Rule: on in autonomous mode; off when a human is actively connected
@@ -166,7 +175,8 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 - Sleep / idle mode — servos REST, vision off, governor down, Wi-Fi power-save on: **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake word, anti-thrash min-sleep hold), wired into `BehaviorDriver.tick()` with real effect dispatch (power-profile switch + camera off in `bindings.py`), 146 lines of tests
 
 
-## NOT "no performance impact" — real tradeoffs (flagged, not recommended as free)
+NOT "no performance impact" — real tradeoffs (flagged, not recommended as free)
+------------------------------------------------------------
 
 - Weighting `FAC_POWER` harder in training — trades agility/speed for current.
 - Lower control rate (80 → 50 Hz) — robustness risk.
@@ -176,7 +186,8 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 - Battery-aware slowdown at low voltage — deliberately sacrifices performance
   to extend runtime.
 
-## Next
+Next
+----
 
 - DONE: disable-unused (`pi_pipeline.power`), Wi-Fi power-save toggle,
   CPU-governor helper — `python -m pi_pipeline.power status|headless|interactive`
@@ -202,7 +213,8 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
 ---
 
-## Sources
+Sources
+-------
 
 - [Petoi FAQ](https://www.petoi.com/pages/faq) — confirms BiBoard can power + communicate with Pi via the 2×5 socket, recommends Pi 3A+/Zero
 - Petoi BiBoard V0 Guide — power circuit details

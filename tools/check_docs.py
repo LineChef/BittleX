@@ -10,6 +10,7 @@ ERRORS (exit 1, block the commit):
   * a hard-coded test count ("679 tests", "599 passing") in a page that must not carry one
   * the currently deployed policy's name (read from DEFAULT_POLICY in the code) in a page that must not name it
   * docs/backlog.md out of date with the item headings it is generated from (tools/gen_backlog.py)
+  * a `##` section heading in a published page (owner, 2026-11-11: sections are a title line over `---`; tools/md_headings.py converts)
   * a markdown pipe table (owner, 2026-11-11: no tables in the docs; write a bulleted list, one bullet per row; tools/md_lists.py converts)
 WARNINGS (printed, never fail):
   * readability of a page published on the docs site: a line over 700 characters, an attribution tag such as
@@ -27,6 +28,9 @@ import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_headings  # noqa: E402
 
 SKIP_DIRS = {".git", ".venv", "node_modules", ".pytest_cache", "__pycache__", "trained", "build"}  # build/ = local docs-bundle output
 # pages that must not carry hard-coded counts / the current policy name (everything else is a log, a record, or generated)
@@ -131,17 +135,11 @@ def anchors_of(path):
         text = open(path, encoding="utf-8", errors="ignore").read()
     except OSError:
         return out
-    infence = False
-    for line in text.splitlines():
-        if FENCE_RE.match(line):
-            infence = not infence
-            continue
-        m = None if infence else re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
-        if m:
-            s = slug(m.group(1))
-            n = seen.get(s, 0)
-            seen[s] = n + 1
-            out.add(s if n == 0 else f"{s}-{n}")
+    for _i, _level, heading in md_headings.parse_headings(text):
+        s = slug(md_headings.unescape(heading))
+        n = seen.get(s, 0)
+        seen[s] = n + 1
+        out.add(s if n == 0 else f"{s}-{n}")
     for m in re.finditer(r'<a\s+(?:name|id)="([^"]+)"', text):
         out.add(m.group(1))
     return out
@@ -237,6 +235,10 @@ def check(root, files):
                     errors.append(f"{f}:{i}: hard-coded test count '{m.group(0)}' -- don't quote counts, run pytest")
                 if policy and policy in line and f != "docs/STATUS.md":
                     errors.append(f"{f}:{i}: names the deployed policy '{policy}' -- say 'the deployed policy' and link docs/STATUS.md")
+        if published(f) and f not in GENERATED_PAGES:
+            for i, level, _t in md_headings.parse_headings(text):
+                if level == 2 and re.match(r"^##\s", text.split("\n")[i]):
+                    errors.append(f"{f}:{i + 1}: a `##` section heading in a published page -- write the title on its own line over a line of `---` (python tools/md_headings.py {f} converts it)")
         if published(f):
             warnings += readability_warnings(f, text)
         if f.startswith("docs/") and not f.startswith(("docs/plan-detail/", "docs/rl/", "docs/archive/", "docs/planned/", "docs/guides/", "docs/hardware/", "docs/research/")) and f != "docs/README.md" \

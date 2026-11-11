@@ -7,7 +7,8 @@ Everything needed to dial in the punt is on this page.
 - Distances are **inches from the camera to the ball**. The camera sits on the claw, so the jaws are about 1 in nearer than the camera reading.
 - The values G2 uses live in **one file on the Pi**, read at the start of every run: change a value, run again, no deploy needed (section 4).
 
-## 1. Before every attempt
+1\. Before every attempt
+-----------------------
 
 1. The Pi is on and has the current code (`g2deploy --once` from the Mac after a commit; see the end of this page).
 2. G2 is lying in **rest** on the surface being tested, with a clear patch in front of him. On a desk, keep the nearest edge well away: he walks toward the ball and will not see an edge.
@@ -16,7 +17,8 @@ Everything needed to dial in the punt is on this page.
 5. The pack is charged (the run stops by itself under 30%; a dead pack drops the board).
 6. A hand near G2. Stop any time with section 3.
 
-## 2. Run one attempt
+2\. Run one attempt
+------------------
 
 By voice (G2 must be listening): say **"G2, punt"**. He says "Punting.", the voice service steps aside, and one attempt runs. He rests at the end and the voice service comes back.
 Other phrases that work: "punt it", "punt the ball", "go punt", "do a punt", "punt test".
@@ -57,7 +59,8 @@ PYTHONPATH=. python -m pi_pipeline.behavior.punt_test --distances 2.5 3 3.5 4 --
 For each distance it says where to put the ball, shows what the finder reads (to be checked against a tape measure), waits for Enter, punches once, and asks how far the ball
 went and whether the claw hit it first. Every punch is a row in `~/g2_punt_tests.csv` on the Pi. Afterwards `sudo systemctl start g2-voice`.
 
-## 3. Stop an attempt
+3\. Stop an attempt
+------------------
 
 - From the Mac: `g2puntstop`.
 - By voice: "G2, emergency stop" (the voice service may be stopped during a run; if so use the Mac command).
@@ -66,7 +69,8 @@ went and whether the claw hit it first. Every punch is a row in `~/g2_punt_tests
 
 What is heard: **"target acquired"** when he sees the ball (again), **"searching"** when he starts looking for it, **"punting"** right before the lunge.
 
-## 4. The settings: what they are, where they live, how to change them
+4\. The settings: what they are, where they live, how to change them
+------------------------------------------------------------
 
 The file: `~/.local/share/g2/punt_settings.json` on the Pi. A missing file, or a missing line in it, means the default. It lives outside the repo, so **a deploy does not overwrite it**.
 It is read at the **start of every run** (voice or not), so a change takes effect on the next attempt.
@@ -129,7 +133,8 @@ Back to the defaults: delete the file (`rm ~/.local/share/g2/punt_settings.json`
 The list of settings, their limits and their descriptions is `SPEC` in `pi_pipeline/behavior/punt_settings.py`. The punch's own key poses (the shape of the lunge) are `punch_keys()` in `ball_chase.py`.
 After editing code on the Mac: commit, then `g2deploy --once` (below). Do not edit the code on the Pi: the next deploy replaces it.
 
-## 5. Reading an attempt
+5\. Reading an attempt
+---------------------
 
 Each attempt ends with a line like:
 
@@ -143,7 +148,8 @@ ATTEMPT: punted at (2.7, 6.7) (in, deg) after 4 looks; walk steps (ball in, seco
 
 Measured so far: a ball 2.6 in from the camera threw 18 in straight ahead (claw hits it first); 4.5 to 5 in was just out of reach; 6 to 7 in too far; the first desk attempt punched at 2.7 in. The finder is only accurate to about 1 in at close range.
 
-## 6. A way to dial it in
+6\. A way to dial it in
+----------------------
 
 1. Start at the defaults, ball about 12 in ahead. Run one attempt.
 2. Look at the `punted at` distance and what the punch did: did the claw hit the ball first, did it go straight, how far.
@@ -160,14 +166,16 @@ Measured so far: a ball 2.6 in from the camera threw 18 in straight ahead (claw 
 - The punch is weak or slow: lower `punch_lunge_s`
 - He turns away from the ball: the ball is out of his view or too far to the side: start it straight ahead
 
-## 7. If something does not work
+7\. If something does not work
+-----------------------------
 
 - The board does not answer / G2 goes limp: check the plug between the Pi and the BiBoard first (it comes undone in falls), then the pack.
 - "G2, punt" does nothing: the speech recognizer may not have heard the word; run `g2punt` from the Mac instead. The voice service's log: `ssh "$G2_PI" journalctl -u g2-voice -n 40`.
 - After a run the voice service is not back: `ssh "$G2_PI" sudo systemctl start g2-voice` (or `g2reset`).
 - Pictures: every picture with the ball found is saved with its box for the future ball detector (`g2pics`, Named: greenball).
 
-## 8. Deploying a code change to the Pi
+8\. Deploying a code change to the Pi
+------------------------------------
 
 From the repo root on the Mac, after committing (it ships the last commit):
 

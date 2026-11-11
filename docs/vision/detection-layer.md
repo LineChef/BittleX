@@ -30,7 +30,8 @@ Status: person-detection model deployed + validated end-to-end; the
 
 ---
 
-## The hard constraint
+The hard constraint
+-------------------
 
 **The module runs exactly one model at a time. No concurrent inference.**
 Confirmed on hardware: `AT+MODELS?` returns a single slot; switching
@@ -50,7 +51,8 @@ noisy), 0 false positives on a clean scene, 240 px frame, centre-format boxes.
 
 ---
 
-## Option A — one combined model
+Option A — one combined model
+-----------------------------
 
 Classes from several domains in a single model: `person`, `dad`, `mom`, `dog`,
 `mug`, `keyboard`, … all scored every frame.
@@ -62,14 +64,16 @@ Classes from several domains in a single model: `person`, `dad`, `mom`, `dog`,
   classes is architecturally wrong: different cadence, different
   false-positive bias, different retraining cycles.
 
-## Option B — specialized models, swapped by mode
+Option B — specialized models, swapped by mode
+----------------------------------------------
 
 - Pro: each model tuned for its job; small and fast.
 - Con: ~1–2 min swap → **mode-gated, not reactive**; needs a model-manager.
 
 ---
 
-## Recommended architecture
+Recommended architecture
+------------------------
 
 Three models, selected by `ModeController`:
 
@@ -107,7 +111,8 @@ A thin `pi_pipeline/vision/model_manager.py`:
 
 ---
 
-## Do this first — dataset-quality threshold experiment
+Do this first — dataset-quality threshold experiment
+----------------------------------------------------
 
 The 2026-09-06 practice run only proved "37 dark frames = far below the floor."
 Before committing effort per person/class, find the floor:
@@ -124,7 +129,8 @@ overlay + a capture button, pulls JPEGs over serial via `AT+INVOKE=-1,0,0`).
 
 ---
 
-## Build order
+Build order
+-----------
 
 1. Dataset-quality experiment (above) — cheap, unblocks all estimates.
 2. Interaction model (B15) — core to personality/bonds/memory; see
@@ -139,7 +145,8 @@ Priority if forced to choose: **safety > recognition > objects.**
 
 ---
 
-## Consumers (mostly built)
+Consumers (mostly built)
+------------------------
 
 - `vision/feed.py` `SerialDetectionFeed`: Uses: parses INVOKE → `Detection`; State: built; auto-starts inference; `VISION_LABELS` names classes
 - `vision/avoidance.py` `Avoider`: Uses: box area → closeness, `center_x` → bearing; State: built; thresholds need real-detection + stopping-distance calibration
@@ -150,7 +157,8 @@ Priority if forced to choose: **safety > recognition > objects.**
 
 ---
 
-## Open questions
+Open questions
+--------------
 
 - Headless `.tflite` flash from the Pi over serial — command sequence?
 - Real multi-slot on this firmware, or always single?

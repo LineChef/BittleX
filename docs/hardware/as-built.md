@@ -2,7 +2,8 @@
 
 What G2 is made of, how it is connected, and what it weighs. This is the summary; each row links to the page that holds the detail and the evidence. The physical build record (wiring, soldering, mounting, calibration) is in [`../../blueprints/`](../../blueprints/README.md). What is working and what has been tested: [`../STATUS.md`](../STATUS.md).
 
-## Parts
+Parts
+-----
 
 - Body: What it is: Petoi Bittle X V2, alloy feedback servos; Notes: 8 leg joints (shoulder and knee on each of four legs); no roll-axis actuation; Detail: [`specs.md`](specs.md)
 - Control board: What it is: Petoi BiBoard V1: ESP32-U4WDH, 4 MB flash, 520 KB SRAM; Notes: Runs OpenCat firmware; carries the IMU, a buzzer-only speaker and an offline voice-recognition module; Detail: [`petoi-firmware-reference.md`](petoi-firmware-reference.md)
@@ -18,7 +19,8 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 - Case: clicks on, no tools. It replaces the earlier velcroed PiSugar case on a modified cover
 
 
-## Connections
+Connections
+-----------
 
 - Pi to BiBoard: 5-pin header (TX2, RX2, GND, +5V, +5V); only TX, RX and GND are wired, so the two power systems stay separate. UART at 115200 on `/dev/serial0`. BiBoard module flags set: Serial-2 and the onboard voice module
 - AI head to BiBoard: Servo in the stock head's servo port
@@ -31,7 +33,8 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 
 Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html).
 
-## Mass and balance
+Mass and balance
+----------------
 
 - Base robot: about 254 g
 - Payload (Pi, PiSugar, camera, speaker, mic, wiring, pod): **185 g** as weighed (the simulation model uses 135 g). The earlier mount's payload was 168 g, roughly 100 × 40 × 38 mm
@@ -41,7 +44,8 @@ Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../..
 
 The measurements and the sim's payload model: [`specs.md`](specs.md) "Weight distribution, standing".
 
-## Known hardware characteristics
+Known hardware characteristics
+------------------------------
 
 - Servo heat: the leg servos overheat under sustained load; an estimator and cutback guard it. [`servo-thermal.md`](servo-thermal.md)
 - Self-righting: the built-in self-right is limited; G2 is never put on his back, because the Pi and the BiBoard are exposed. [`self-righting.md`](self-righting.md)

@@ -2,7 +2,8 @@
 
 This page lists the operating constraints and standing practice that follow from how G2's hardware and services behave. Current state: [Status](../STATUS.md). Switches: [Settings and switches](settings-switches.md). Commands: [Cheat sheet](cheatsheet.md). Safety rules: [Operating G2](operating-g2.md).
 
-## Deploying and stopping
+Deploying and stopping
+----------------------
 
 - Deploy only when idle: New code is not deployed to the Pi, and `g2-voice` is not restarted, during an exploration, a walk or a test. The deploy script refuses during an exploration or a walk. `bash tools/g2_explore.sh status` shows the state, and a dry run (`rsync -an --itemize-changes ... pi_pipeline/ $G2_PI:bittleX/pi_pipeline/`) shows whether the Pi matches the repository.
 - Stop controlling services safely: `bash tools/g2_safe_stop.sh voice|explore` rests or stands G2 first. A plain service stop mid-stride is not supported.
@@ -10,7 +11,8 @@ This page lists the operating constraints and standing practice that follow from
 - After a fall: The session halts and `EmergencyStop` re-sends rest. Ending the session (`bash tools/g2_explore.sh stop`) stops any twitching. `SerialLink.send` never waits, because the link is shared and a wait starves the walk loop.
 - Deploying when the Pi comes online: `tools/g2_deploy_when_online.sh --max-hours 24` waits for the Pi and deploys once, `--once` deploys now, and `--cancel` disarms the wait.
 
-## Voice service and microphone
+Voice service and microphone
+----------------------------
 
 - One microphone stream for the life of the process. The stream is never closed (`voice/wake_word.py`). Closing the handed-over `sounddevice` stream crashes PortAudio, and opening a second stream fails with "Device unavailable". Follow-up listening windows use the same stream.
 - Microphone level: Speech at 10 cm measures about 20 to 55 RMS with an offset near −900. The Google voiceHAT card has no mixer controls, so `voice/mic_gain.py` removes the offset and applies ×20 gain (`G2_MIC_GAIN`). `python -m pi_pipeline.voice.check_audio mic 15` measures it, with `g2-voice` stopped first.
@@ -22,7 +24,8 @@ This page lists the operating constraints and standing practice that follow from
 - IMU line health: The firmware IMU line must still parse after the BiBoard has been on for hours. An overflowing yaw field makes every IMU line unparseable.
 - Sound levels: A sound's `peak` is a fraction of full scale (0.0225), so a large value clips at full volume. Speaker sounds play only on the Pi (`G2_SPEAKER_SOUNDS`), and tests set it to 0.
 
-## Hardware session practice
+Hardware session practice
+-------------------------
 
 - Floor label: The floor G2 stands on is set first (`g2floor <label>`). The ingest gates accept a label up to 72 h old.
 - Test start: Every test starts with G2 on his feet and a hand within reach. Each run starts on an explicit go, and distances are measured with a tape in inches.
@@ -50,14 +53,16 @@ Processing is not automatic. The Pi's autolog skips any walk started with `--log
 
 Calibration approval is automatic through statistical gates ([Real-data pipeline](../rl/real-data-pipeline.md)), and `g2cal revert` undoes it.
 
-## Defaults
+Defaults
+--------
 
 - Camera roll: No camera roll correction is applied, because a fixed correction could throw other readings off. Left and right turning can be slightly off until the pace is measured.
 - Sleep: Sleep mode is on by default, after 5 minutes at rest. The mic stays open 3 s after a reply (`G2_FOLLOW_UP_S`) and 3 s after a question (`G2_QUESTION_WINDOW_S`).
 - Units: Measurements are shown in inches and the battery as a percent.
 - Random turns. Most random turns are meant to be switched off, with G2 bouncing around like a robot vacuum, once wall avoidance is reliable on several wall types (Wall check plan).
 
-## Working in the repository
+Working in the repository
+-------------------------
 
 - A command chain that must stop on a failing test uses `&&` before committing, because `;` continues past a failure.
 - A failing pytest assertion can print a settings object. Tests compare plain numbers, and full-suite output is filtered for `sk-ant` before it is shared.
