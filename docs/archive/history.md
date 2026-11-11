@@ -61,7 +61,7 @@ ahead of this point.
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
   export toolchain until `ultralytics==8.2.8` was pinned and a local arm64 export used)
-  is in [`docs/vision/custom-model-recipe.md`](../vision/custom-model-recipe.md),
+  is in `docs/guides/train-vision-model.md`,
   with tooling in `tools/gv2/`.
 - Pre-hardware prep: a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are

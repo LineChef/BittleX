@@ -3,7 +3,7 @@
 The module only returns pictures when asked: `AT+INVOKE=1,0,0` runs one inference and replies with the detections AND a base64 JPEG
 (`AT+INVOKE=-1,0,1`, used by the detection feed, returns detections only). `CameraSnapshotter` keeps the port open and the module idle,
 and grabs a frame on demand. Only one process can own the camera port, so this is used by the voice service, not alongside the app's
-vision feed. The picture is returned as-is: the module is mounted so its raw output is upright (docs/vision/detector-bench.md).
+vision feed. The picture is returned as-is: the module is mounted so its raw output is upright (docs/vision/detection-layer.md, "Measured detector behaviour").
 
     python -m pi_pipeline.vision.snapshot --out /tmp/look.jpg"""
 from __future__ import annotations

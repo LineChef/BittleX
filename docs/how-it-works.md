@@ -81,7 +81,7 @@ The hardware: a small camera module that runs object detection on itself, not on
 
 **Recognition is by instance, not category.** The detector knows a handful of specific things. For everything else there is a second system that fingerprints a photo crop and compares it with a library of earlier ones: a close match means "the same thing again," nothing close means "something new," which joins the library unnamed until someone names it. It runs only in moments G2 is already standing still, caps its disk use, and never uploads anything. The pieces exist and are tested; wiring them into exploration is not finished.
 
-The camera's firmware is frozen, which constrains which detection models can run: [`vision/custom-model-recipe.md`](vision/custom-model-recipe.md). Index: [`vision/README.md`](vision/README.md).
+The camera's firmware is frozen, which constrains which detection models can run: [Vision model training](guides/train-vision-model.md#device-constraints-and-the-working-recipe). Index: [`vision/README.md`](vision/README.md).
 
 ---
 

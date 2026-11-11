@@ -4,13 +4,12 @@ Everything about G2's camera, the on-device detection model, and building /
 capturing data for it.
 
 - [`picture-library.md`](picture-library.md): What happens to a picture G2 takes while exploring, which folder holds what, and which parts can be rebuilt. The pictures are local only: trainingdata/ is gitignored, nothing is uploaded, and the repository holds none of
-- [`custom-model-recipe.md`](custom-model-recipe.md): **Start here for a model.** The reproducible custom-detection-model recipe — why the frozen Jan-2025 camera firmware breaks modern export toolchains, the `ultralytics==8.2.8` + local-arm64-export path, `tools/gv2/`, the 12-step process.
-- [`detection-layer.md`](detection-layer.md): Architecture: one model slot, three roles (safety / interaction / objects), a model-manager that swaps by mode.
+- [`detection-layer.md`](detection-layer.md): Architecture: one model slot, three roles (safety / interaction / objects), a model-manager that swaps by mode, and the measured on-device detector behaviour.
 - [`person-recognition.md`](person-recognition.md): B15 — individual recognition + the "G2, meet X" enrollment flow.
-- [`detector-bench.md`](detector-bench.md): Measured on-device detector behaviour (rate, latency, dropout, noise) + confirmed firmware facts.
 
 ### Capturing data and models
 
+- [Vision model training](../guides/train-vision-model.md): Start here for a model: the capture, curate, train and deploy walkthrough, and why the frozen camera firmware limits which models run.
 - [`capture-checklist.md`](capture-checklist.md): The routine to run for every capture session.
 - [`downloaded-models.md`](downloaded-models.md): **Models downloaded from the internet (outside the repo):** source, size, SHA-256, what each was checked against, who approved it, and what those checks do and do not show
 

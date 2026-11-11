@@ -27,7 +27,7 @@ Parameters
 
 - Light metering: The light is metered every 30 s everywhere, not before every picture.
 - Exposure balancing is always on for a picture.
-- Detection model: One model slot, frozen firmware that decodes only the Swift-YOLO head ([Custom model recipe](../vision/custom-model-recipe.md)).
+- Detection model: One model slot, frozen firmware that decodes only the Swift-YOLO head ([Vision model training](../guides/train-vision-model.md#device-constraints-and-the-working-recipe)).
 
 Constraints
 -----------

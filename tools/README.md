@@ -40,7 +40,7 @@ How G2's own walk logs become sim calibration: [`docs/rl/real-data-pipeline.md`]
 Vision dataset and pictures
 ---------------------------
 
-The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.md`](../docs/guides/train-vision-model.md), the routine in [`docs/vision/capture-checklist.md`](../docs/vision/capture-checklist.md), the on-camera model recipe in [`docs/vision/custom-model-recipe.md`](../docs/vision/custom-model-recipe.md).
+The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.md`](../docs/guides/train-vision-model.md), the routine in [`docs/vision/capture-checklist.md`](../docs/vision/capture-checklist.md), the on-camera model recipe in `docs/vision/custom-model-recipe.md`.
 
 - [`camera_preview.py`](camera_preview.py): Live camera preview and on-demand capture for the Grove Vision AI V2.
 - [`curate_captures.py`](curate_captures.py): Filters a raw capture batch into a training-ready set (score, de-dup, rotate, pre-label).

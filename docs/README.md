@@ -36,7 +36,7 @@ Under the hood
 
 - How each subsystem behaves, with its settings and how to verify it: [Specification](specification/README.md)
 - How the robot, the Pi and the dev machine fit together: [Architecture](architecture.md)
-- Where each package of code is documented: [Code map](code-map.md)
+- Where each package of code is documented: [Architecture, Code map](architecture.md#code-map)
 - How the walking policy is trained and deployed: [Gait training](rl/README.md)
 - The phases of the project and what comes next: [Roadmap](project-plan.md)
 

@@ -605,7 +605,7 @@ Then compare training paths: (a) fresh SenseCraft, (b) fine-tune from a
 person-aware Swift-YOLO checkpoint (SSCMA/Colab), (c) multi-class `person` +
 `self` SenseCraft project. Module currently holds the dud model — redeploy
 "Person Detection" from the library to get real detections back.
-Measured detector behaviour + firmware facts: `docs/vision/detector-bench.md`.
+Measured detector behaviour + firmware facts: `docs/vision/detection-layer.md`.
 
 **Implementation plans (2026-09-06):**
 - Person recognition + **enrollment mode** ("G2, meet X"): the enrollment FSM is

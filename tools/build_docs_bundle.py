@@ -74,7 +74,7 @@ def nav_title_problems(nodes, depth=0):
 # Top-level order and sidebar groups (a top-level node's `group`): what a newcomer reads first, then how to build and run G2, then the internals.
 TOP_LAYOUT = [("Start here", ["how-it-works", "capabilities", "STATUS", "project-plan"]),
               ("Build and operate", ["guides", "hardware", "vision", "blueprints"]),
-              ("Under the hood", ["architecture", "code-map", "rl", "code"]),
+              ("Under the hood", ["architecture", "rl", "code"]),
               ("About", ["about", "legal"])]
 # Working notes stay in the repo but never reach the site: plans, backlogs, history, outside-project reviews, run logs.
 EXCLUDED_DIRS = ("docs/plan-detail/", "docs/planned/", "docs/archive/", "docs/research/", "docs/rl/real-walk-data/", "docs/hardware/build-logs/")

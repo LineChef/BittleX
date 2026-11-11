@@ -24,7 +24,6 @@
    [
     "architecture",
     "rl",
-    "code-map",
     "code"
    ]
   ],
@@ -114,9 +113,7 @@
    [
     "vision/detection-layer",
     "vision/picture-library",
-    "vision/person-recognition",
-    "vision/custom-model-recipe",
-    "vision/detector-bench"
+    "vision/person-recognition"
    ]
   ],
   [
