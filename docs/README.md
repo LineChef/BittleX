@@ -24,7 +24,7 @@ Build and operate G2
 - Look up a command: [Cheat sheet](guides/cheatsheet.md)
 - See every spoken command: [Voice commands](guides/voice-commands.md)
 - Set up the Raspberry Pi: [Pi bring-up](guides/pi-bring-up.md)
-- Bring the hardware up step by step: [Bring-up sequence](guides/bring-up-sequence.md)
+- Bring the hardware up step by step: Bring-up sequence
 - Change settings and switches: [Settings and switches](guides/settings-switches.md)
 - Understand what G2 is made of: [As built](hardware/as-built.md)
 - Follow the wiring, mounting and calibration record: [Blueprints](../blueprints/README.md)

@@ -255,7 +255,7 @@ All variables
 - `G2_ROUTE_MAX_WORDS`: Default at the read: `25`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md)
 - `G2_RUNS_DIR`: Default at the read: `"~/g2_runs"`; Read in: `config.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_SERIAL_BAUD`: Default at the read: `115200`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)
-- `G2_SERIAL_PORT`: Default at the read: `"/dev/serial0"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md)
+- `G2_SERIAL_PORT`: Default at the read: `"/dev/serial0"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)
 - `G2_SHUTDOWN_CONFIRM_S`: Default at the read: `6.0`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)
 - `G2_SHUTTER`: Default at the read: —; Read in: `wall_pictures.py`, `shutter.py`; Documented in: [`.env.example`](../../.env.example)
 - `G2_SIDE_MAX_WORDS`: Default at the read: `14`; Read in: `config.py`; Documented in: [`settings-switches.md`](settings-switches.md)
@@ -277,7 +277,7 @@ All variables
 - `G2_STOP_MIN_CONF`: Default at the read: `"0.5"`; Read in: `wake_word.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_STREAM`: Default at the read: `"1"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)
 - `G2_STT_COMMAND_GRAMMAR`: Default at the read: `"1"`; Read in: `stt.py`; Documented in: not documented
-- `G2_STT_SILENCE_S`: Default at the read: `0.5`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md)
+- `G2_STT_SILENCE_S`: Default at the read: `0.5`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)
 - `G2_SURVEY_AFTER_WALL`: Default at the read: `"1"`; Read in: `driver.py`; Documented in: [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md)
 - `G2_SURVEY_CHECK`: Default at the read: `"1"`; Read in: `survey.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_SURVEY_CLAW`: Default at the read: `""`; Read in: `claw_survey.py`; Documented in: [`settings-switches.md`](settings-switches.md)
@@ -306,7 +306,7 @@ All variables
 - `G2_WAKE_MAX_BEFORE`: Default at the read: `""`; Read in: `wake_word.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_WAKE_MIN_CONF`: Default at the read: `"0.6"`; Read in: `wake_word.py`; Documented in: [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md), [`voice.md`](../specification/voice.md)
 - `G2_WAKE_PAUSE_FILE`: Default at the read: `""`; Read in: `wake_pause.py`; Documented in: not documented
-- `G2_WAKE_WORD`: Default at the read: `"gee two"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`pi-bring-up.md`](pi-bring-up.md)
+- `G2_WAKE_WORD`: Default at the read: `"gee two"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example), [`pi-bring-up.md`](pi-bring-up.md)
 - `G2_WALK_RAMP_S`: Default at the read: `"0"`; Read in: `run_gait.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_WALL_CAL`: Default at the read: `"~/.local/share/g2/wall_calibration.json`; Read in: `wall_distance.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_WALL_DRYRUN`: Default at the read: `"1"`; Read in: `explore_session.py`; Documented in: [`settings-switches.md`](settings-switches.md)

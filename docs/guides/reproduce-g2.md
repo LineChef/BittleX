@@ -45,7 +45,7 @@ This page is the single ordered path for building G2 and bringing up its softwar
 6\. Link and first movement
 --------------------------
 
-- Steps: With G2 standing on the floor and a hand near, run `python -m pi_pipeline.link.check_serial` for the port and ping checks, then `firstmove` (one joint at a time) and `allmoves` (the full sweep, which logs voltage and latency). `python -m pi_pipeline.bringup` runs the same sequence step by step ([Bring-up sequence](bring-up-sequence.md)).
+- Steps: With G2 standing on the floor and a hand near, run `python -m pi_pipeline.link.check_serial` for the port and ping checks, then `firstmove` (one joint at a time) and `allmoves` (the full sweep, which logs voltage and latency). `python -m pi_pipeline.bringup` runs the same sequence step by step, one prompt per step.
 - Check: Every skill plays, the voltage log stays above the low-battery line, and no command is refused except the deliberately disabled moves ([Disabled moves](../hardware/disabled-moves.md)).
 
 7\. The first walk

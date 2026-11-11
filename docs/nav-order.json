@@ -54,7 +54,6 @@
    [
     "guides/reproduce-g2",
     "guides/pi-bring-up",
-    "guides/bring-up-sequence",
     "guides/gait-deployment",
     "guides/api-setup"
    ]
@@ -90,7 +89,6 @@
    "Robot",
    [
     "hardware/as-built",
-    "hardware/parts-and-decisions",
     "hardware/specs"
    ]
   ],
@@ -107,9 +105,7 @@
   [
    "Reference",
    [
-    "hardware/petoi-firmware-reference",
-    "hardware/petoi-skills-survey",
-    "hardware/calibration-and-bringup-research"
+    "hardware/petoi-firmware-reference"
    ]
   ]
  ],

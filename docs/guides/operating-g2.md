@@ -58,4 +58,4 @@ Diagnosing a fault
 - Unexpected ticks or chirps from the board: Run `python -m pi_pipeline.link.noise_log 60` to read the noise log.
 - Loud, stiff or hot servo: Stop the walk and rest G2. The servo-heat guard and its logs are described in [Servo thermal](../hardware/servo-thermal.md).
 - After the fact: `python -m pi_pipeline.diag summarize` reports the latest session, and `diag replay SESSION --around HH:MM:SS` replays a moment. See [Diagnostics](../hardware/diagnostics.md).
-- First power-on of new hardware: Run `python -m pi_pipeline.doctor [--serial]` and the guided `python -m pi_pipeline.bringup`. See [Bring-up sequence](bring-up-sequence.md).
+- First power-on of new hardware: Run `python -m pi_pipeline.doctor [--serial]` and the guided `python -m pi_pipeline.bringup`, which walks through the bring-up steps. See [Reproducing G2](reproduce-g2.md).

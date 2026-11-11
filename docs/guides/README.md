@@ -27,7 +27,6 @@ Step-by-step instructions for running, configuring and setting up G2. Start with
 
 ### Set up
 
-- [`bring-up-sequence.md`](bring-up-sequence.md): The ordered day-1 hardware bring-up (executable version: `python -m pi_pipeline.bringup`).
 - [`pi-bring-up.md`](pi-bring-up.md): Headless Pi Zero 2 W OS setup runbook.
 - [`gait-deployment.md`](gait-deployment.md): The sim→real path (ONNX export, on-robot loop, bring-up steps).
 

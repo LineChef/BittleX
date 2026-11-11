@@ -44,7 +44,7 @@ Send with a lowercase `k` prefix (e.g. `kpickF`), like any OpenCat skill.
 A token without a direction suffix (`kpick`, `kput`, `ktoss`) picks one of the directions at random. `hunt`, `showOff` and `clap`
 have no directional variants.
 
-`hunt` and `showOff` are also names in the stock Bittle skill table ([`petoi-skills-survey.md`](../hardware/petoi-skills-survey.md)); the
+`hunt` and `showOff` are also names in the stock Bittle skill table (`petoi-skills-survey.md`); the
 arm build presumably redefines them. This is an inference, not stated on the page. Check before relying on either name.
 
 ## Voice commands (BiBoard voice module)
@@ -239,4 +239,4 @@ BiBoard connector/pin the claw servo uses. Resolve these from Petoi's shop page 
 - It changes the mass and front/rear balance, which the gait policy is trained against (payload study:
   [`specs.md`](../hardware/specs.md) and the proposed-build weights). The arm's weight is not published, so that needs a measurement.
 - The arm build is a separate firmware, and a firmware change interacts with the BiBoard flashing and calibration state; see
-  [`calibration-and-bringup-research.md`](../hardware/calibration-and-bringup-research.md).
+  `calibration-and-bringup-research.md`.

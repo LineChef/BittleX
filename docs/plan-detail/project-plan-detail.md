@@ -16,8 +16,8 @@ live (one home per fact; see [`maintaining-docs.md`](../maintaining-docs.md)):
 - Full detail behind a phase (moved here verbatim 2026-10-02): [`plan-detail/`](./)
 - Open work by ID: [`backlog.md`](../backlog.md)
 - Dated data and findings: the logs: [`rl/real-walk-log.md`](../rl/real-walk-log.md), [`rl/hw1-log.md`](../rl/hw1-log.md), …
-- Parts list and hardware decisions: [`hardware/parts-and-decisions.md`](../hardware/parts-and-decisions.md)
-- Day-1 bring-up sequence: [`guides/bring-up-sequence.md`](../guides/bring-up-sequence.md) (executable: `python -m pi_pipeline.bringup`)
+- Parts list and hardware decisions: `hardware/parts-and-decisions.md`
+- Day-1 bring-up sequence: `guides/bring-up-sequence.md` (executable: `python -m pi_pipeline.bringup`)
 
 Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 🔧 in progress · ⬜ not started.
 
@@ -50,7 +50,7 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
 ## Hardware (parts, power, enclosure)
 
 Parts list (as finalized), resolved questions (independent Pi power via the PiSugar S, BiBoard V1 is an ESP32-U4WDH, spec sheet) and
-the battery-awareness plan: [`hardware/parts-and-decisions.md`](../hardware/parts-and-decisions.md). Vendor specs: [`hardware/specs.md`](../hardware/specs.md).
+the battery-awareness plan: `hardware/parts-and-decisions.md`. Vendor specs: [`hardware/specs.md`](../hardware/specs.md).
 Build record and wiring: [`../blueprints/README.md`](../../blueprints/README.md).
 
 Open:
@@ -236,7 +236,7 @@ The behavior runtime (`BehaviorDriver`, `BehaviorRuntime`, `app/`) is built and 
 - Full integration (Phase 10) is the hardest, messiest part.
 - No flipping or rolling tricks (decided 2026-09-15): the Pi + PiSugar stack rides on a printed standoff that is not impact-rated and shifts the
   moment of inertia; `flip`/`flipD`/`flipF`/`bf`/`tbl`/`rl` (as a trick)/`bx`/`lucky`/`excited` are excluded from any voice or `perform_skill` set while that mount
-  is in use. Detail: [`hardware/petoi-skills-survey.md`](../hardware/petoi-skills-survey.md).
+  is in use. Detail: `hardware/petoi-skills-survey.md`.
 - Never put G2 on its back for a test: the Pi and BiBoard are exposed.
 
 ## Community & support

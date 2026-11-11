@@ -71,7 +71,7 @@ ahead of this point.
 A full inventory of what G2 can do, with per-item status, is in
 [`docs/capabilities.md`](../capabilities.md). For a plain-language tour of how
 each part works, see [`docs/how-it-works.md`](../how-it-works.md). The ordered
-day-1 bring-up sequence is in [`docs/guides/bring-up-sequence.md`](../guides/bring-up-sequence.md).
+day-1 bring-up sequence is in `docs/guides/bring-up-sequence.md`.
 
 
 ---

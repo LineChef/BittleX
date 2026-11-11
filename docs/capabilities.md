@@ -76,6 +76,6 @@ Tools for people running G2
 ---------------------------
 
 - Shell helpers for the common tasks, listed in the [Cheat sheet](guides/cheatsheet.md) and [Shell helpers](guides/shell-helpers.md).
-- A guided hardware bring-up and a readiness checklist. See [Bring-up sequence](guides/bring-up-sequence.md).
+- A guided hardware bring-up and a readiness checklist. See Bring-up sequence.
 - A review page for naming the pictures G2 takes while exploring.
 - Reports on each session: walks, speech delay, wake-word triggers, API use and problems.
