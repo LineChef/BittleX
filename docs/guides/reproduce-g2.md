@@ -17,7 +17,7 @@ This page is the single ordered path for building G2 and bringing up its softwar
 --------------------
 
 - Inputs: The parts from stage 1 and Petoi's assembly guide.
-- Steps: Follow the [assembly sequence](../../blueprints/assembly-sequence.md) top to bottom. The detail pages are the [wiring guide](../../blueprints/wiring/g2-wiring-guide.html), [mounting](../../blueprints/mounting.md) and [calibration](../../blueprints/calibration.md).
+- Steps: Follow the [assembly sequence](../../blueprints/assembly-sequence.md) top to bottom. The detail pages are the [wiring guide](../../blueprints/wiring.md), [mounting](../../blueprints/mounting.md) and [calibration](../../blueprints/calibration.md).
 - Check: After calibration, `kbalance` stands G2 level on a flat floor, and the Pi stack sits in the pod without touching the legs.
 
 3\. Firmware

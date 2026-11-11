@@ -36,3 +36,15 @@ def test_callouts_quotes_code_numbered_lists_links_and_escaping():
 def test_raw_html_in_the_markdown_is_escaped_never_passed_through():
     h = r.render("<script>alert(1)</script> text\n")
     assert "<script>" not in h and "&lt;script&gt;" in h
+
+
+def test_an_image_alone_in_a_paragraph_is_a_figure_with_its_caption_and_size():
+    h = r.render('# T\n\nIntro.\n\n![Rear view](/a/b.png "The rear")\n\nAn ![inline](x.png) image.\n', images=lambda s: {"width": 1400, "height": 1000} if s == "/a/b.png" else None)
+    assert '<figure><img src="/a/b.png" alt="Rear view" width="1400" height="1000" loading="lazy" decoding="async"><figcaption>The rear</figcaption></figure>' in h
+    assert '<p>An <img src="x.png" alt="inline"> image.</p>' in h
+
+
+def test_a_small_svg_is_inlined_with_prefixed_ids_and_an_accessible_name():
+    svg = '<?xml version="1.0"?><svg viewBox="0 0 10 10"><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/></svg>'
+    h = r.render("# T\n\nIntro.\n\n![Diagram](/d.svg \"A diagram\")\n", images=lambda s: {"svg": svg})
+    assert '<figure><svg role="img" aria-label="Diagram" viewBox="0 0 10 10">' in h and 'id="f' in h and "url(#f" in h and "<?xml" not in h

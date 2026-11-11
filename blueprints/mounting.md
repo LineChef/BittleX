@@ -2,9 +2,11 @@
 
 How the Pi, the PiSugar S battery, the camera, the speaker and the microphone are attached to G2's frame. G2 carries the **Bittle X Pi add-on** (v0.24) on the **Bittle X Platform** (v3.2), a case designed for this project's parts.
 
-The design, the print files and the full build guide are in the separate project: [Bittle X Platform and Pi add-on](https://beetlebugorg.github.io/bittlex/) (3D viewer: [`/viewer/`](https://beetlebugorg.github.io/bittlex/viewer/)). This page records what G2 uses and where things sit; the project holds the step-by-step assembly, so it is not copied here.
+The design, the print files and the full build guide are in the separate project: [Bittle X Platform and Pi add-on](https://beetlebug.org/bittlex/) (3D viewer: [`/viewer/`](https://beetlebug.org/bittlex/viewer/)). This page records what G2 uses and where things sit; the project holds the step-by-step assembly, so it is not copied here.
 
-Wiring is in [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html); the parts and their weights in [`../docs/hardware/as-built.md`](../docs/hardware/as-built.md).
+![The Pi add-on pod on the platform cover of G2](images/addon-on-robot.png "The add-on on the robot: the port windows in the panel and the speaker grille, with the microphone holes in the right side near the front. Image: Jeremy Collins, CC BY 4.0.")
+
+Wiring is in [wiring guide](wiring.md); the parts and their weights in [`../docs/hardware/as-built.md`](../docs/hardware/as-built.md).
 
 What is on G2 now
 -----------------
@@ -35,10 +37,29 @@ G2 now also carries the **Petoi AI Head** (42 g, Petoi's figure; it replaces the
 
 The sim uses these numbers ([`../docs/hardware/specs.md`](../docs/hardware/specs.md)).
 
+Renders of the add-on
+---------------------
+
+![The add-on pod on the Bittle X robot](images/addon-on-robot-model.png "The add-on pod on the robot (model view). Image: Jeremy Collins, CC BY 4.0.")
+
+![The add-on seen from the rear right](images/addon-rear.png "The rear of the pod, with the speaker grille on the right wall. Image: Jeremy Collins, CC BY 4.0.")
+
+![The top panel with its two port openings](images/addon-top-openings.png "The top panel: one opening for HDMI and the power switch, and one for the Pi power, data USB, PiSugar charge and the PiSugar button. Image: Jeremy Collins, CC BY 4.0.")
+
+![The front of the pod where it meets the platform cover](images/addon-front-notch.png "The front notch, which keeps the head camera cable and the Grove plug space clear. Image: Jeremy Collins, CC BY 4.0.")
+
+![The pod open, seen from the right](images/addon-open-right.png "The pod with the panel off, seen from the right: the Pi and PiSugar stack, the amp and the wires. Image: Jeremy Collins, CC BY 4.0.")
+
+![The pod open, seen from the left](images/addon-open-left.png "The pod with the panel off, seen from the left. Image: Jeremy Collins, CC BY 4.0.")
+
+![A cross-section through the pod](images/addon-section.png "A section through the pod, showing how the stack sits between the platform cover and the panel. Image: Jeremy Collins, CC BY 4.0.")
+
+![The pod parts pulled apart](images/addon-exploded.png "The pod exploded: panel, body, door, the stack and the platform cover. Image: Jeremy Collins, CC BY 4.0.")
+
 Wiring in the pod
 -----------------
 
-G2's own wiring guide ([`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html), I²S build log) is the source of truth for the pins and is not changed by the pod. The project's build guide shows the same pins except the amp ground on pin 14 (G2's is on pin 9); the table below is the project's, for comparison.
+G2's own [wiring guide](wiring.md) is the source of truth for the pins and is not changed by the pod. The project's build guide shows the same pins except the amp ground on pin 14 (G2's is on pin 9); the table below is the project's, for comparison.
 
 - Mic 3V / mic GND: 1 / 9
 - Amp V (5 V) / amp G: 2 / 14
@@ -49,6 +70,17 @@ G2's own wiring guide ([`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.ht
 - Amp DIN: 40
 
 The mic's SEL is on pin 39 (a ground, left channel), as before. All wire lengths and the route of every wire are in the project's build guide ("Wire table").
+
+The platform cover
+------------------
+
+The platform cover replaces the stock back cover and carries four pegs that the add-on slides onto and locks.
+
+![Plan view of the platform cover with its four pegs and keep-out areas](images/platform-plan-view.png "The platform cover seen from above: the four pegs, the keep-out areas and the measured positions (millimetres). Image: Jeremy Collins, CC BY 4.0.")
+
+![The keyhole in the add-on mount plate and a section through a peg](images/platform-keyhole-and-peg.png "The keyhole in the add-on mount plate (top view) and a section through a peg on the mount plate. Image: Jeremy Collins, CC BY 4.0.")
+
+![The starter plate on the platform cover](images/platform-starter-plate.png "The starter plate fitted on the platform cover. Image: Jeremy Collins, CC BY 4.0.")
 
 Measurements that any mount has to respect
 ------------------------------------------
@@ -63,6 +95,8 @@ Measurements that any mount has to respect
 Back touch sensor
 -----------------
 
+![Top view of the robot with the back touch sensor areas outlined in red](images/platform-touch-areas.png "The back touch sensor areas on a Bittle X V2 (red outlines), most of which the add-on covers. Image: Jeremy Collins, CC BY 4.0.")
+
 On a Bittle X V2 the back touch sensor is a flexible circuit glued inside the cover top; the add-on covers most of its touch areas, and the project advises disabling back-touch mode (serial command `Xb`) while an add-on is on the robot. G2's touch sensors are not enabled, so nothing needs to be done. Do not send `Xa` or `XAd` to the BiBoard voice module (see the project rules).
 
 Open items
@@ -71,6 +105,28 @@ Open items
 - [ ] The front/rear weight split with the pod and the AI head, and a weighing of the whole robot with both (the sim says about 51% on the front paws and 480 g; the AI head's size, position and mass inside the sim are estimates, and its mass is added in full although the stock head it replaces is part of the 254 g base).
 - [ ] The camera's real field of view from its new position and height. Its orientation is unchanged from the old mount.
 - [ ] Mic gain and speaker loudness in the new positions (the mic moved to the wall, the speaker faces a rear grille).
+
+3D viewer and print files
+-------------------------
+
+- 3D viewer: The project's interactive viewer shows the whole robot with the add-on, turns the head and walks through the build. [The robot with the add-on](https://beetlebug.org/bittlex/viewer/), [exploded](https://beetlebug.org/bittlex/viewer/#view=exploded), [the wires in 3D](https://beetlebug.org/bittlex/viewer/#view=wires), [from the top](https://beetlebug.org/bittlex/viewer/#view=top), [from the front](https://beetlebug.org/bittlex/viewer/#view=front), [from the rear](https://beetlebug.org/bittlex/viewer/#view=rear)
+- Single parts in the viewer: [Add-on body](https://beetlebug.org/bittlex/viewer/#part=body&focus), [Top panel](https://beetlebug.org/bittlex/viewer/#part=panel&focus), [Camera mount](https://beetlebug.org/bittlex/viewer/#part=camera_mount&focus), [Platform cover with pegs](https://beetlebug.org/bittlex/viewer/#part=cover&focus)
+- Platform print files:
+  - [cover_pegs_foot.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_platform/stl/print/cover_pegs_foot.stl)
+  - [cover_pegs.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_platform/stl/print/cover_pegs.stl)
+  - [starter_plate.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_platform/stl/print/starter_plate.stl)
+- Add-on print files:
+  - [pod_body.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_body.stl)
+  - [pod_panel.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_panel.stl)
+  - [pod_button.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_button.stl)
+  - [pod_camera_mount.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_camera_mount.stl)
+  - [pod_camera_base_low.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_camera_base_low.stl)
+  - [pod_camera_cradle_low.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_camera_cradle_low.stl)
+  - [pod_logo_red.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_logo_red.stl)
+  - [pod_logo_white.stl](https://github.com/LineChef/G2bittlex/blob/main/bittle_pi_addon/stl/print/pod_logo_white.stl)
+- Guides and packages: [Add-on build guide (PDF)](https://beetlebug.org/bittlex/files/addon/bittle_pi_addon_guide.pdf), [Platform peg spec (PDF)](https://beetlebug.org/bittlex/files/platform/bittle_peg_spec.pdf), and the zipped packages on the [project page](https://beetlebug.org/bittlex/)
+
+Each STL link opens GitHub's own 3D view of the file, with a Raw button to download it. The print files are the ones G2 uses, from the G2 fork of the project. The project page publishes newer packages.
 
 Licenses
 --------

@@ -31,7 +31,7 @@ Connections
 - AI head to BiBoard: Grove cable in G1 (UART2) with all four wires, so the head shares UART2 with the Pi and can send firmware commands (skills, rest, `g` = gyro toggle) when it is spoken to. The operating rules for this arrangement are in [`../guides/operating-g2.md`](../guides/operating-g2.md). A lower-risk alternative is power without the data lines, through a spare Grove cable or adapter with only +5 V and GND (the head's own cable is one molded plug)
 
 
-Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html).
+Pinouts and the wire map: [wiring guide](../../blueprints/wiring.md).
 
 Mass and balance
 ----------------

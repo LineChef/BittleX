@@ -61,3 +61,13 @@ Working in the repository
 - The privacy hook flags personal names in docs and docstrings, so tracked files use placeholders.
 - Committing is local. `git push origin development` is a deliberate step, because the repository is public.
 - Capture folders, `trained/` files and the memory database are looked at before deleting, because they are not all reproducible.
+
+Images
+------
+
+- Where: Images for published pages live in `blueprints/images/` (the build record) and `docs/images/` (everything else). Photos are allowed, and a photo is checked for anything private before it is committed. GIFs are never committed.
+- Format: Diagrams are SVG, drawn by hand or generated from the measurements in the docs. Renders and photos are PNG or JPEG. An SVG has no script, `foreignObject`, event handler or reference to anything outside the file.
+- Size: A raster image is at most 300 KB (resize or recompress it), and all the images together stay under 5 MB. `python tools/check_docs.py` fails on a breach.
+- Markup: `![Alt text](images/pod-rear.png "Caption")` on a line of its own becomes a figure with a caption. Alt text says what the picture shows, and the caption carries the credit for a picture that is not ours.
+- Credits: A picture from another project keeps its licence. `blueprints/images/SOURCES.json` lists each file's source project, path, commit and licence, and the figure caption names the author.
+- The bundle: Each image is exported as an asset with its pixel size and the pages that use it. A small SVG is written into the page HTML, so the site's CSS reaches it. See [the bundle guide](guides/docs-bundle.md), "Images".

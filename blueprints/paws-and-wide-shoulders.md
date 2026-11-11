@@ -5,6 +5,10 @@ Two printed changes to G2's legs, both designed from simulator results and both 
 Wide shoulder parts
 -------------------
 
+![The pair of wide shoulder parts seen from above and to the side](images/wide-shoulders-iso.png "The two wide side shoulders, reprinted wider at the servo ends only (model view).")
+
+![One wide shoulder part seen from above](images/wide-shoulders-top.png "The wide shoulders from above: each is cut inside the screw-hole pads and the servo end moves out 0.2 in.")
+
 - What: The two Petoi side shoulders, reprinted wider at the two servo ends only
 - Added width: 0.2 in (5.08 mm) per side. Track 2.76 in to 3.16 in.
 - Construction: Each end is cut at |X| = 33.0 mm (inside the screw-hole pads) and |Z| >= 31 mm. The outer part (servo seat and screw holes) moves out by 5.08 mm, and the gap is filled with the shoulder's own cross-section at the cut. Servo height, fore-aft position and shaft angle do not change.
@@ -18,6 +22,12 @@ Why 0.2 in: the joints all swing in the pitch plane, so the track can only be wi
 
 Paw ("seated" design)
 ---------------------
+
+![The paw seen from above and to the side](images/paw-iso.png "The hinged clip-on paw, seated design (model view).")
+
+![The paw seen from the side](images/paw-side.png "The paw from the side: a low, wide sole over the stock foot disc.")
+
+![A foot disc seated in the paw frame](images/paw-foot-in-frame.png "The foot seated in the paw frame (model view).")
 
 - What: A printed foot shell that clips over the stock foot disc and pivots on it
 - Source and specs: `seated/wide_foot_part.scad` and `seated/SPECS.md` in the prototypes folder (outside this repository); export with `openscad -o seated.stl -D show_pin=false wide_foot_part.scad`. SPECS.md holds the full dimension tables and the simulator notes.
@@ -72,4 +82,4 @@ Not known
 Files
 -----
 
-The source files and STLs are not in this repository (the prototypes folder is outside it and ignored). A copy of the previous CLpaw and seated files, from before the sole update, is kept outside the repository in `~/.local/share/g2/paw_backups/2026-10-23_before_rank1/`.
+The source files and STLs are not in this repository (the prototypes folder is outside it and ignored), and these two designs are not yet in the case project's published 3D viewer or on GitHub, so the renders above are their public record. The renders are made from the STLs with OpenSCAD by `tools/render_blueprints.py`. A copy of the previous CLpaw and seated files, from before the sole update, is kept outside the repository in `~/.local/share/g2/paw_backups/2026-10-23_before_rank1/`.

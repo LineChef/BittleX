@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the docs bundle: every documentation page in the repo as site-ready content for a React (or any) front end. Stdlib only.
 
-    python tools/build_docs_bundle.py [--out build/docs-bundle] [--base /docs] [--repo-url URL] [--branch development] [--no-check]
+    python tools/build_docs_bundle.py [--out build/docs-bundle] [--base /docs] [--assets-url URL] [--repo-url URL] [--branch development] [--no-check]
 
 Reads git-tracked files only (nothing gitignored, no CLAUDE.md, no training data can reach it) and writes:
 
@@ -26,6 +26,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import img_info  # noqa: E402
 import md_headings  # noqa: E402
 import md_render  # noqa: E402
 
@@ -43,6 +44,7 @@ NAV_TITLES_FILE = os.path.join(ROOT, "docs", "nav-titles.json")
 NAV_TOP_WORDS, NAV_TOP_CHARS, NAV_CHILD_WORDS, NAV_CHILD_CHARS = 2, 22, 4, 30
 
 
+INLINE_SVG_MAX = 30 * 1024          # an SVG figure up to this size is written into the page's HTML so the site's CSS and dark mode reach it
 NAV_ORDER_FILE = os.path.join(ROOT, "docs", "nav-order.json")
 
 
@@ -401,7 +403,7 @@ def build_nav(entries, bodies, pages):
     return ordered
 
 
-def build(out, base, gh, branch, check=True):
+def build(out, base, gh, branch, check=True, assets_url=None):
     if check:
         r = subprocess.run([sys.executable, os.path.join(HERE, "check_docs.py")], cwd=ROOT, capture_output=True, text=True)
         if r.returncode != 0:
@@ -410,8 +412,9 @@ def build(out, base, gh, branch, check=True):
     tracked = [f for f in git("ls-files").splitlines() if f]
     pages = {p: route_for(p) for p in tracked if is_page(p) and not is_excluded(p) and os.path.exists(os.path.join(ROOT, p))}
     assets = {p for p in tracked if is_asset(p) and os.path.exists(os.path.join(ROOT, p))}
-    assets_url = f"{base}/_assets"
+    assets_url = (assets_url or f"{base}/_assets").rstrip("/")
     warnings, entries, bodies, search = [], {}, {}, []
+    image_users = {}
     if os.path.exists(out):
         shutil.rmtree(out)
     os.makedirs(os.path.join(out, "pages"))
@@ -433,7 +436,28 @@ def build(out, base, gh, branch, check=True):
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         open(dest, "w", encoding="utf-8").write(text)
         entries[route]["html"] = "pages/" + (route or "index") + ".html"
-        open(os.path.join(out, entries[route]["html"]), "w", encoding="utf-8").write(md_render.render(text, section=section, audience=audience, kind=kind, slugify=slug))      # the same page as semantic HTML (tools/md_render.py)
+        used = []
+        for m_ in re.finditer(r"!\[[^\]]*\]\(" + re.escape(assets_url) + r"/([^)\s]+)", text):
+            if m_.group(1) not in used:
+                used.append(m_.group(1))
+        for u_ in used:
+            image_users.setdefault(u_, []).append(route)
+        if used:
+            entries[route]["images"] = used
+
+        def image_lookup(src, _assets_url=assets_url):
+            if not src.startswith(_assets_url + "/"):
+                return None
+            repo = src[len(_assets_url) + 1:]
+            full = os.path.join(ROOT, repo)
+            wh = img_info.image_size(full)
+            info = {"width": wh[0], "height": wh[1]} if wh else {}
+            if repo.lower().endswith(".svg") and os.path.getsize(full) <= INLINE_SVG_MAX:
+                svg = open(full, encoding="utf-8", errors="replace").read()
+                if not img_info.svg_problems(svg):
+                    info["svg"] = svg
+            return info
+        open(os.path.join(out, entries[route]["html"]), "w", encoding="utf-8").write(md_render.render(text, section=section, audience=audience, kind=kind, slugify=slug, images=image_lookup))      # the same page as semantic HTML (tools/md_render.py)
         digest.update(src.encode() + text.encode())
         search.append({"route": route, "title": title, "section": entries[route]["section"],
                        "headings": [h["text"] for h in entries[route]["headings"]], "text": plain_text(raw)[:4000]})
@@ -447,7 +471,13 @@ def build(out, base, gh, branch, check=True):
         shutil.copyfile(os.path.join(ROOT, a), dest)
         data = open(dest, "rb").read()
         digest.update(a.encode() + data)
-        asset_list.append({"path": a, "kind": os.path.splitext(a)[1].lstrip(".").lower(), "size": len(data)})
+        rec = {"path": a, "kind": os.path.splitext(a)[1].lstrip(".").lower(), "size": len(data)}
+        wh = img_info.image_size(dest)
+        if wh:
+            rec["width"], rec["height"] = wh
+        if a in image_users:
+            rec["usedBy"] = sorted(set(image_users[a]))
+        asset_list.append(rec)
     privacy = os.path.join(ROOT, ".gitprivacy-terms")
     if os.path.exists(privacy):
         # whole-word match; a term written with a capital is matched with that capital (a name), so the same word in lowercase is not a hit
@@ -500,11 +530,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=os.path.join(ROOT, "build", "docs-bundle"))
     ap.add_argument("--base", default="/docs", help="the URL path the site serves the docs under")
+    ap.add_argument("--assets-url", default=None, help="where the bundle's assets/ folder is served (default <base>/_assets); an absolute URL such as https://host/BittleX/assets makes every image link work without a route in the site")
     ap.add_argument("--repo-url", default=None)
     ap.add_argument("--branch", default="development")
     ap.add_argument("--no-check", action="store_true")
     a = ap.parse_args()
-    manifest, warnings = build(a.out, a.base.rstrip("/"), repo_url(a.repo_url), a.branch, check=not a.no_check)
+    manifest, warnings = build(a.out, a.base.rstrip("/"), repo_url(a.repo_url), a.branch, check=not a.no_check, assets_url=a.assets_url)
     for w in warnings:
         print("warning:", w)
     print(f"bundle {manifest['version']}: {len(manifest['pages'])} pages, {len(manifest['assets'])} assets, {len(warnings)} warning(s) -> {a.out}")

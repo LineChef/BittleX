@@ -128,3 +128,8 @@ def test_every_title_in_the_nav_titles_file_fits_and_every_route_in_the_order_fi
         for _label, routes in groups:
             seen += routes
     assert len(seen) == len(set(seen)), "a route is listed twice in docs/nav-order.json"
+
+
+def test_an_asset_url_can_be_absolute_and_an_image_link_follows_it():
+    out = B.rewrite_links("![x](../images/a.png)", "docs/rl/README.md", PAGES, {"docs/images/a.png"}, "/docs", "https://h/BittleX/assets", "https://example.org/r", [])
+    assert "(https://h/BittleX/assets/docs/images/a.png)" in out

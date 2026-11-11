@@ -9,9 +9,9 @@
 #      handled separately by the commit-msg hook (message files aren't
 #      staged, so this hook never sees them).
 #   3. Unstage any staged GIF unconditionally, and any other staged image
-#      file outside docs/ -- no GIFs (replay/training footage) ever get
-#      committed anywhere in the repo (see CLAUDE.md); docs/ is the one
-#      place real images (hardware photos, diagrams we make) belong.
+#      file outside docs/ and blueprints/images/ -- no GIFs (replay/training footage) ever get
+#      committed anywhere in the repo (see CLAUDE.md); docs/ and blueprints/images/ are the
+#      places real images (hardware photos, diagrams we make) belong.
 #   4. Doc checks (tools/check_docs.py): broken relative links, hard-coded test counts or the deployed
 #      policy name in the wrong page, a stale generated docs/backlog.md.
 #   5. Commit hygiene: BLOCK a commit that adds more than 150 files or any file over 5 MB (override: G2_ALLOW_BIG_COMMIT=1), and WARN
@@ -51,12 +51,12 @@ fi
 
 image_pattern='\.(png|jpg|jpeg|webp|bmp)$'
 staged_images="$(git diff --cached --name-only --diff-filter=ACM \
-  | grep -iE "$image_pattern" | grep -v '^docs/' || true)"
+  | grep -iE "$image_pattern" | grep -vE '^(docs/|blueprints/images/)' || true)"
 if [ -n "$staged_images" ]; then
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     git reset -q -- "$f"
-    echo "pre-commit: unstaged image file (not under docs/): $f"
+    echo "pre-commit: unstaged image file (not under docs/ or blueprints/images/): $f"
   done <<< "$staged_images"
 fi
 

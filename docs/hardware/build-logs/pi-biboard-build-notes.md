@@ -1,6 +1,6 @@
 # Pi, PiSugar and BiBoard build notes
 
-Step-by-step build history for connecting PiSugar, the Pi Zero 2 W and BiBoard: parts list, Pi port orientation, PiSugar orientation, BiBoard header preparation, the three-wire link, and the original annotated photos. The wiring as a reference is in [`wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html); mounting is in [`mounting.md`](../../../blueprints/mounting.md); the microphone and amplifier build is in [`i2s-audio-build-log.md`](i2s-audio-build-log.md).
+Step-by-step build history for connecting PiSugar, the Pi Zero 2 W and BiBoard: parts list, Pi port orientation, PiSugar orientation, BiBoard header preparation, the three-wire link, and the original annotated photos. The wiring as a reference is in [wiring guide](../../../blueprints/wiring.md); mounting is in [`mounting.md`](../../../blueprints/mounting.md); the microphone and amplifier build is in [`i2s-audio-build-log.md`](i2s-audio-build-log.md).
 
 ## Before you start
 
@@ -137,7 +137,7 @@ see exactly which pin goes where:
 - 10: Signal: GPIO15, RXD (green); BiBoard 5-pin socket: TX2 (10)
 - 2: Signal: 5 V; BiBoard 5-pin socket: not wired (skip)
 
-The two +5V pins on BiBoard's socket stay unused. The drawn version of this table is in [`../wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
+The two +5V pins on BiBoard's socket stay unused. The drawn version of this table is in [wiring guide](../../../blueprints/wiring.md).
 
 Why TX and RX cross: one device's "I'm sending" line has to reach the
 other device's "I'm listening" line. Pi TXD carries the Pi's outgoing data,
@@ -187,7 +187,7 @@ Full pinout, both boards:
 Only pins 2, 6, 8, 10 are used in this build (Step 3) — the rest shown for
 context, since G2's own future GPIO use is unplanned:
 
-Pins used: 6 (GND), 8 (GPIO14, TXD) and 10 (GPIO15, RXD); pin 2 (5V) is not used. The full 40-pin map is in [`../wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
+Pins used: 6 (GND), 8 (GPIO14, TXD) and 10 (GPIO15, RXD); pin 2 (5V) is not used. The full 40-pin map is in [wiring guide](../../../blueprints/wiring.md).
 
 Pi pin numbers are standard across every 40-pin Raspberry Pi, including the
 Zero 2 W. BiBoard's pin order is confirmed from Petoi's own official

@@ -1,0 +1,222 @@
+[
+ {
+  "file": "addon-on-robot.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 102049,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/02_addon.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-rear.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 101758,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/03_rear.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-top-openings.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 42602,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/04_top.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-front-notch.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 94300,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/05_front_notch.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-open-right.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 128992,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/06_open.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-open-left.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 134346,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/07_open_left.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-section.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 46942,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/08_section.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-wires-3d.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 120035,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/09_wires.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-exploded.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 50423,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/10_exploded.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-wires-top.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 79958,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/11_wires_top.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-wires-closeup.png",
+  "width": 1400,
+  "height": 1000,
+  "bytes": 132477,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/12_wires_left.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "wire-routing-top.png",
+  "width": 1440,
+  "height": 800,
+  "bytes": 99168,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/13_routing_top.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "wire-routing-side.png",
+  "width": 1440,
+  "height": 660,
+  "bytes": 127884,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/14_routing_side.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "wiring-module-biboard-serial.png",
+  "width": 1628,
+  "height": 1100,
+  "bytes": 202989,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/15_wiring_0.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "wiring-module-amp.png",
+  "width": 1628,
+  "height": 1100,
+  "bytes": 202458,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/15_wiring_1.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "wiring-module-mic.png",
+  "width": 1628,
+  "height": 1100,
+  "bytes": 218023,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/15_wiring_2.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "wiring-module-speaker.png",
+  "width": 1628,
+  "height": 1100,
+  "bytes": 94056,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/15_wiring_3.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "addon-on-robot-model.png",
+  "width": 1200,
+  "height": 900,
+  "bytes": 133366,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_pi_addon/doc/cover.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "platform-keyhole-and-peg.png",
+  "width": 1840,
+  "height": 784,
+  "bytes": 153542,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_platform/doc/keyhole.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "platform-touch-areas.png",
+  "width": 860,
+  "height": 500,
+  "bytes": 266181,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_platform/doc/petoi_touch_areas.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "platform-plan-view.png",
+  "width": 1760,
+  "height": 1152,
+  "bytes": 161309,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_platform/doc/plan.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ },
+ {
+  "file": "platform-starter-plate.png",
+  "width": 1400,
+  "height": 950,
+  "bytes": 117180,
+  "source_project": "LineChef/G2bittlex (Bittle X Platform and Pi add-on, Jeremy Collins)",
+  "source_path": "bittle_platform/doc/r2_starter.png",
+  "source_commit": "",
+  "license": "CC BY 4.0 (Jeremy Collins). The Petoi and PiSugar models shown keep their own terms."
+ }
+]

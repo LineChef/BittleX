@@ -72,5 +72,6 @@
  "specification/perception": "Vision",
  "specification/behavior": "Behavior",
  "specification/goals": "Goals",
- "specification/power": "Power"
+ "specification/power": "Power",
+ "blueprints/wiring": "Wiring"
 }

@@ -50,6 +50,17 @@ Each page is also written as `pages/<route>.html`: a single `<article>` that car
 
 **Audience and kind.** `audience` is who a page is for (`visitor`, `builder` or `contributor`) and `kind` is what it is (`overview`, `guide`, `reference` or `concept`). A page sets them in optional front matter (a `---` block at the top with `audience:` and `kind:` lines, removed from the published Markdown); without it the section's default applies. A site can use them for badges and filters.
 
+Images
+------
+
+Pictures are exported as assets and rendered in the page HTML.
+
+- Asset entry: Each image under `docs/` and `blueprints/` is an `assets` entry with `path`, `kind`, `size`, and, for an image, `width` and `height` in pixels (an SVG's viewBox) and `usedBy`, the routes of the pages that show it. The file is served at `<base>/_assets/<path>`.
+- Page entry: `images` lists the repo paths of the images a page shows, in order of first use.
+- Figures: An image alone on a line, written as a bang, the alt text in square brackets, then the file and a quoted caption in parentheses, becomes `<figure><img src alt width height loading="lazy"><figcaption>Caption</figcaption></figure>`. An image inside a sentence stays a plain `<img>`.
+- Inline SVG: An SVG of up to 30 KB is written into the page as `<figure><svg role="img" aria-label="Alt">...</svg><figcaption>`, so the site's CSS, including dark mode, reaches it. Its ids are prefixed so two figures cannot collide. A larger SVG stays an `<img>`.
+- Serving: The site serves the bundle's `assets/` folder at `<base>/_assets/`. Without that route every image is a broken link.
+
 Navigation titles and order
 ---------------------------
 
@@ -73,7 +84,7 @@ Summaries keep underscores in code names the same way. Required and optional fie
 
 Routes: `docs/guides/cheatsheet.md` is `guides/cheatsheet`; a folder's `README.md` is the folder route; `docs/README.md` is the home page (`""`); `blueprints/...` keeps its path; code READMEs live under `code/` (`code/pi_pipeline/voice`); the repository README is `about`.
 
-**Links** inside pages are rewritten when the bundle is built: a link to another page becomes `<base>/<route>#anchor` (default base `/docs`), a link to an asset becomes `<base>/_assets/<repo path>`, and a link to a file that is not a page (a script, for example) becomes a GitHub link on the `development` branch. Serve the bundle's `assets/` folder at `<base>/_assets/` in the site, or change the links with `--base` and `--assets-url` at build time.
+**Links** inside pages are rewritten when the bundle is built: a link to another page becomes `<base>/<route>#anchor` (default base `/docs`), a link to an asset becomes `<assets-url>/<repo path>` (`<base>/_assets/<repo path>` unless `--assets-url` gives another place, such as an absolute URL where the bundle's `assets/` folder is published), and a link to a file that is not a page (a script, for example) becomes a GitHub link on the `development` branch. Serve the bundle's `assets/` folder at `<base>/_assets/` in the site, or change the links with `--base` and `--assets-url` at build time.
 
 Order and groups in the navigation
 ----------------------------------

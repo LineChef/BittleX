@@ -130,6 +130,13 @@
         "navTitle": {
           "type": "string",
           "description": "The short title the navigation shows for this page (docs/nav-titles.json). `title` is the page's full title. The page's nav node `title` equals `navTitle`"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Repo paths of the images this page shows with `![alt](file)`, in order of first use; each is an `assets` entry"
         }
       },
       "additionalProperties": false
@@ -204,6 +211,21 @@
         "size": {
           "type": "integer",
           "description": "Bytes"
+        },
+        "width": {
+          "type": "integer",
+          "description": "Pixel width of an image asset (an SVG's viewBox width), from its file header. Absent for non-images"
+        },
+        "height": {
+          "type": "integer",
+          "description": "Pixel height of an image asset"
+        },
+        "usedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Routes of the pages that show this image with `![alt](file)`"
         }
       },
       "additionalProperties": false

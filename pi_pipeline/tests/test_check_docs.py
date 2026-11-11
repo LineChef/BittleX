@@ -100,3 +100,13 @@ def test_a_section_heading_written_with_two_hashes_is_an_error_in_a_published_pa
     assert [h for h in mh.parse_headings(ok) if h[1] == 2] == [(4, 2, "Section")]
     bad = "# T\n\nIntro.\n\n## Section\n\nText\n"
     assert mh.h2_to_setext(bad)[0] == ok
+
+
+def test_images_need_alt_text_a_small_size_and_a_safe_svg(tmp_path):
+    (tmp_path / "docs" / "guides").mkdir(parents=True)
+    (tmp_path / "docs" / "guides" / "g.md").write_text("# G\n\nIntro.\n\n![](x.png)\n\n![ok](y.png)\n")
+    (tmp_path / "docs" / "images").mkdir()
+    (tmp_path / "docs" / "images" / "big.png").write_bytes(b"0" * (cd.RASTER_MAX + 1))
+    (tmp_path / "docs" / "images" / "bad.svg").write_text("<svg><script>x()</script></svg>")
+    out = cd.image_errors(str(tmp_path), ["docs/guides/g.md"])
+    assert any("no alt text" in e for e in out) and any("big.png" in e and "KB" in e for e in out) and any("bad.svg" in e and "script" in e for e in out)

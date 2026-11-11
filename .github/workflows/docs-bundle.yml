@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Build the bundle (runs the docs checks first; fails on a broken link or a stale generated page)
-        run: python tools/build_docs_bundle.py --out build/docs-bundle --branch development
+        run: python tools/build_docs_bundle.py --out build/docs-bundle --branch development --assets-url https://linechef.github.io/BittleX/assets
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/docs-bundle

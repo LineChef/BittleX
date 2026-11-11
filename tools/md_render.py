@@ -11,7 +11,12 @@ and nothing else; text it does not recognise is escaped, never passed through. `
       aside[data-callout]                from `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`; its first child is <h4>Note</h4>
       blockquote                         any other block quote
       pre[data-lang] > code              a fenced code block
+      figure > img[src][alt][width][height][loading], figcaption     an image alone in a paragraph; the figcaption is its markdown title (`![Alt](file.png "Caption")`)
+      figure > svg[role="img"][aria-label]                           a small SVG file is inlined so the site's CSS reaches it (see `images` below)
       code, a[href], img[src][alt], em, strong, hr
+
+`render(..., images=fn)`: `fn(src)` returns None for an image it knows nothing about, or a dict with optional `width`, `height` and `svg` (the file's text, already checked). With it, a figure's
+image gets `width` and `height` (no layout shift) and an SVG with `svg` text is inlined, its ids prefixed so two figures cannot collide.
 """
 from __future__ import annotations
 
@@ -118,7 +123,32 @@ def _list(lines: list[str], i: int, base: int) -> tuple[str, int]:
     return "<ul>" + "".join(f"<li>{lead_html(t)[0]}{c}</li>" for _sp, t, c in items) + "</ul>", i
 
 
-def _blocks(lines: list[str], slugify=None) -> str:
+IMG_ONLY = re.compile(r'^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$')
+_FIG_N = [0]
+
+
+def _figure(m, images) -> str:
+    alt, src, caption = m.group(1), m.group(2), m.group(3)
+    info = images(src) if images else None
+    cap = f"<figcaption>{inline(caption)}</figcaption>" if caption else ""
+    if info and info.get("svg"):
+        _FIG_N[0] += 1
+        svg = info["svg"]
+        pre = f"f{_FIG_N[0]}-"
+        svg = re.sub(r'\bid="([^"]+)"', lambda x: f'id="{pre}{x.group(1)}"', svg)
+        svg = re.sub(r'(href|xlink:href)="#([^"]+)"', lambda x: f'{x.group(1)}="#{pre}{x.group(2)}"', svg)
+        svg = re.sub(r"url\(#([^)]+)\)", lambda x: f"url(#{pre}{x.group(1)})", svg)
+        svg = re.sub(r"^<\?xml[^>]*>\s*|<!DOCTYPE[^>]*>\s*", "", svg.strip())
+        svg = re.sub(r"<svg\b[^>]*>", lambda x: re.sub(r'\s(?:role|aria-label)="[^"]*"', "", x.group(0)), svg, count=1)
+        svg = re.sub(r"<svg\b", f'<svg role="img" aria-label="{html.escape(alt, quote=True)}"', svg, count=1)
+        return f"<figure>{svg}{cap}</figure>"
+    dims = ""
+    if info and info.get("width") and info.get("height"):
+        dims = f' width="{info["width"]}" height="{info["height"]}"'
+    return f'<figure><img src="{html.escape(src, quote=True)}" alt="{html.escape(alt, quote=True)}"{dims} loading="lazy" decoding="async">{cap}</figure>'
+
+
+def _blocks(lines: list[str], slugify=None, images=None) -> str:
     slugify = slugify or slug
     out, i = [], 0
     while i < len(lines):
@@ -157,7 +187,7 @@ def _blocks(lines: list[str], slugify=None) -> str:
             if am and am.group(1).upper() in ALERTS:
                 kind = ALERTS[am.group(1).upper()]
                 quote = quote[1:]
-            inner = _blocks(quote, slugify)
+            inner = _blocks(quote, slugify, images)
             if kind:
                 out.append(f'<aside data-callout="{kind}"><h4>{kind.capitalize()}</h4>{inner}</aside>')
             else:
@@ -185,6 +215,10 @@ def _blocks(lines: list[str], slugify=None) -> str:
             para.append(lines[i].strip())
             i += 1
         text = " ".join(para)
+        fm = IMG_ONLY.match(text)
+        if fm:
+            out.append(_figure(fm, images))
+            continue
         sp = lead_split(text)
         if sp and len(sp[0]) <= 40 and sp[0][:1].isupper():
             out.append(lead_html(text)[0])
@@ -193,7 +227,7 @@ def _blocks(lines: list[str], slugify=None) -> str:
     return "".join(out)
 
 
-def render(markdown: str, *, section: str = "", audience: str = "", kind: str = "", slugify=None) -> str:
+def render(markdown: str, *, section: str = "", audience: str = "", kind: str = "", slugify=None, images=None) -> str:
     """`slugify` is the anchor function (the bundle passes its own, so the heading ids match the manifest's `headings`)."""
     attrs = "".join(f' data-{k}="{html.escape(v, quote=True)}"' for k, v in (("section", section), ("audience", audience), ("kind", kind)) if v)
-    return f"<article{attrs}>" + _blocks(markdown.split("\n"), slugify) + "</article>\n"
+    return f"<article{attrs}>" + _blocks(markdown.split("\n"), slugify, images) + "</article>\n"
