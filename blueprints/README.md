@@ -8,7 +8,7 @@ The physical build record for G2: how the hardware was assembled and wired, with
 - [`paws-and-wide-shoulders.md`](paws-and-wide-shoulders.md): The printed 0.2 in wide shoulder parts and the hinged clip-on paws (printing, not yet installed): design, simulator evidence, install checklist, what is unknown.
 - [`calibration.md`](calibration.md): The servo calibration procedure (bracket alignment per leg, `kbalance` verification) and what to redo after a servo replacement.
 
-- wiring/g2-wiring-guide.html: Part 1 PiSugar to Pi to BiBoard (stack, exact pins, power-on checklist), Part 2 everything wired into the Pi (40-pin header map, wire map, mic and amp, the AI head). Open it in a browser. A printable PDF is [`wiring/g2-wiring-guide.pdf`](wiring/g2-wiring-guide.pdf); the page is also published as a [live Artifact](https://claude.ai/artifact/EYPDHBAgbLyTk9qSvaP6rB).
+- wiring/g2-wiring-guide.html: Part 1 PiSugar to Pi to BiBoard (stack, exact pins, power-on checklist), Part 2 everything wired into the Pi (40-pin header map, wire map, mic and amp, the AI head). Open it in a browser. The page prints cleanly from a browser.
 
 
 The dated build logs (the Pi, PiSugar and BiBoard connection; the microphone and speaker) are in [`../docs/hardware/build-logs/`](../docs/hardware/README.md#build-logs).

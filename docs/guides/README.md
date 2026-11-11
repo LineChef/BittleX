@@ -7,7 +7,7 @@ Step-by-step instructions for running, configuring and setting up G2. Start with
 - [`cheatsheet.md`](cheatsheet.md): Quick reference for the everyday commands: one copyable example per row, grouped by task, with an A to Z index.
 - [`cheatsheet-advanced.md`](cheatsheet-advanced.md): The rarely used commands: setup, commands on the Pi, training and policies, bring-up and BiBoard tokens, the camera model, docs and repo.
 - [`reproduce-g2.md`](reproduce-g2.md): The single ordered build path from parts to a walking, talking robot, with a check at the end of each stage.
-- [`operating-g2.md`](operating-g2.md): **Start here for day-to-day use.** Safety rules, how to stop G2, bench mode, power on and off, batteries, first checks. Printable version: [`operating-g2-quick-guide.pdf`](operating-g2-quick-guide.pdf).
+- [`operating-g2.md`](operating-g2.md): **Start here for day-to-day use.** Safety rules, how to stop G2, bench mode, power on and off, batteries, first checks.
 - [`operating-lessons.md`](operating-lessons.md): Lessons and standing practice from the hardware sessions: deploying and stopping safely, the voice service and microphone, session data processing, background jobs.
 - [`voice-commands.md`](voice-commands.md): Every voice command G2 responds to — local commands + conversational skills, plus G2's character sounds.
 - [`exploration-mode.md`](exploration-mode.md): How exploration mode works: starting it, legs, picture stops, wall steering and hit detection, sounds, ending it, where the logs are.

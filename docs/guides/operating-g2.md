@@ -5,7 +5,7 @@ kind: guide
 
 # Operating G2: safety and day-to-day control
 
-This page specifies the constraints that apply whenever G2 moves, the ways to stop G2, and the power-on, sleep and shutdown behaviour. Commands are listed in the [cheat sheet](cheatsheet.md), operating constraints found in use are in [Operating notes](operating-lessons.md), and a printable two-page version of this page is [the quick guide](operating-g2-quick-guide.pdf).
+This page specifies the constraints that apply whenever G2 moves, the ways to stop G2, and the power-on, sleep and shutdown behaviour. Commands are listed in the [cheat sheet](cheatsheet.md), operating constraints found in use are in [Operating notes](operating-lessons.md).
 
 Operating constraints
 ---------------------
