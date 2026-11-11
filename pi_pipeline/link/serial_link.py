@@ -57,6 +57,17 @@ def gyro_gaits_on() -> bool:
     return os.environ.get("G2_GYRO_GAITS", "").strip().lower() in ("1", "on", "true", "yes")
 
 
+class _NoWalkLog:
+    def note(self, command):
+        pass
+
+    def close(self):
+        pass
+
+
+_NO_WALK_LOG = _NoWalkLog()
+
+
 class SerialLink:
     def __init__(
         self,
@@ -82,6 +93,8 @@ class SerialLink:
         self._imu = collections.deque(maxlen=64)
         self._other = collections.deque(maxlen=64)      # non-IMU lines seen by poll_imu(), see pop_other()
         self._fb = collections.deque(maxlen=16)         # `f` servo-feedback rows: a stream (~5 rows/s) that runs until the next command, never a reply
+        from ..telemetry.scripted_walks import ScriptedWalkLog
+        self._scripted_walks = ScriptedWalkLog()
 
     @staticmethod
     def _diag(level: str, name: str, **kv) -> None:
@@ -146,6 +159,10 @@ class SerialLink:
             except Exception:  # noqa: BLE001
                 pass
             self._ser = None
+        try:
+            (getattr(self, "_scripted_walks", None) or _NO_WALK_LOG).close()
+        except Exception:  # noqa: BLE001
+            pass
 
     # --- messaging --------------------------------------------------------
 
@@ -214,6 +231,7 @@ class SerialLink:
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
             self._last_sent_t = time.monotonic()
             command_log.sent(command)             # and every command (not the joint streams), with who sent it (link/command_log.py)
+            (getattr(self, "_scripted_walks", None) or _NO_WALK_LOG).note(command)    # a scripted gait is one `scripted_walk` auto-log run, ended by the next motion command (telemetry/scripted_walks.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
             if command[:1] == "k" and transitions.kind(command.strip()) != "gait":      # (never around a gait, before or behind it: any `gb` next to `kwkF` stopped the walk, 2026-10-25 hardware; the gyro is already off from the stand-up or the last posture)
