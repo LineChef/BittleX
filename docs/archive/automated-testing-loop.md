@@ -38,7 +38,7 @@ The goal is set per loop at kickoff. Historically:
   ```
   If the merge conflicts, stop and hand back — do not resolve conflicts inside
   the loop.
-- One commit per round: on the branch — the reward/env change plus its
+- One commit per round on the branch — the reward/env change plus its
   `docs/rl/<campaign>-log.md` entry (one file per campaign, not per round) — so any round is individually
   recoverable.
 - The loop never merges to `development` itself. After the results are reviewed,
@@ -52,7 +52,7 @@ The goal is set per loop at kickoff. Historically:
 
 The loop must never be an unstoppable long process.
 
-- Longest uninterruptible unit = one training run: (~35–40 min for 2M steps).
+- Longest uninterruptible unit = one training run (~35–40 min for 2M steps).
 - Session interrupt: stops work between or during steps. A training run keeps
   writing checkpoints; `pkill -f train.py` ends it losing nothing past the last
   checkpoint.
@@ -84,12 +84,12 @@ The loop must never be an unstoppable long process.
 6. Train: `./start_run.sh <tag> --steps 2000000`. Tag scheme:
    `<loop>_r<N>` (e.g. `walk_r1`). Every run needs a unique tag.
 7. Re-evaluate: the new checkpoint against the current best.
-8. Score: with the loop's composite metric. Promote the round if it beats the
+8. Score with the loop's composite metric. Promote the round if it beats the
    best by a margin; on two non-improving rounds in a row, revert to the
    last-good config and change levers.
 9. Log: a round entry in `docs/rl/<campaign>-log.md` (one file per campaign): what changed, why,
    before/after metrics, diagnosis, keep/revert decision.
-10. Commit: to `auto-gait-iteration`.
+10. Commit to `auto-gait-iteration`.
 11. Post an update: this round's result vs. the previous, the diagnosis, and
     the next change — then launch the next run immediately. Don't wait for a
     reply.

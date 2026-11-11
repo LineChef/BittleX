@@ -170,7 +170,7 @@ Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
 
 One measurement, the rest assumed. **Do not look these up again; re-weigh and edit this table if anything changes.**
 
-- Whole G2: with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
+- Whole G2 with case, Pi stack, camera, microphone and speaker: Mass: **422 g**; Basis: **measured** (one weighing); In the sim (`PAYLOAD_PROFILE=case`): total = 301 + 86 + 15 + 20
 - Base robot (Bittle X V2, alloy servos, battery): Mass: about 301 g (superseded: 254 g, see the 2026-10-15 section below); Basis: assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare.; In the sim (`PAYLOAD_PROFILE=case`): URDF links
 - Camera cluster (Grove Vision AI V2 + OV5647 + case + cable): Mass: 15 g; Basis: estimate; Seeed publishes no weight for the module; In the sim (`PAYLOAD_PROFILE=case`): front body at (0.055, 0, 0.020) m, 15 +/- 5 g
 - Speaker + amp (NS4168 kit): Mass: 20 g; Basis: estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit; In the sim (`PAYLOAD_PROFILE=case`): rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g
@@ -306,7 +306,7 @@ an edge, and weigh the printed parts and the cell once they exist.
 - RAM: **512 MB** LPDDR2
 - Radios: 2.4 GHz Wi-Fi b/g/n, BT 4.2 + BLE
 - I/O: microSD, mini-HDMI, micro-USB OTG, CSI-2 camera, unpopulated 40-pin header
-- Lifecycle: in production until at least Jan 2030
+- Lifecycle in production until at least Jan 2030
 
 - → **512 MB RAM is the hard ceiling** for anything on-Pi — local Whisper/VLM are
   borderline-to-infeasible (matches the pidog-embodiment benchmarks noted in

@@ -89,10 +89,10 @@ A single function, `BehaviorDriver.tick()`, reads the current inputs (detections
 
 Composed into that one tick:
 
-- Exploration: , in two tiers: an always-on stationary "attentive" tier (look at things, react, scan) and a voice-armed "roam" tier that walks, with wall avoidance, a hit detector from the IMU, and picture stops;
-- idle posture: (sit, then lie down, with small signs of life) and **sleep mode**;
+- Exploration, in two tiers: an always-on stationary "attentive" tier (look at things, react, scan) and a voice-armed "roam" tier that walks, with wall avoidance, a hit detector from the IMU, and picture stops;
+- idle posture (sit, then lie down, with small signs of life) and **sleep mode**;
 - a **thermal governor** that backs off when servos run hot;
-- emergency stop: , which outranks everything.
+- emergency stop, which outranks everything.
 
 **Personality** is a set of composable traits (curiosity, mood, bonds and others) that each shape both the prompt Claude sees and the behavior parameters. Guide to exploration: [`guides/exploration-mode.md`](guides/exploration-mode.md).
 

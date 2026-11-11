@@ -94,7 +94,7 @@ Existing `FAC_CLEARANCE * paw_clearance` term does the rest.
   value path train; it is not deployed, harmless).
 - log_std: RESET to `log(0.3)` at init and leave trainable. The converged base
   std is ~0 → zero exploration for the new skill → Run A cannot learn without this.
-- Parity check (before any training): with adapter zeroed, `action_mean` must
+- Parity check (before any training) with adapter zeroed, `action_mean` must
   equal base `action_mean` to < 1e-5 over N random obs. Mirror the check loop in
   `graft_terrain_policy.py`.
 - Smoke: ~2k steps `DummyVecEnv`; assert base params unchanged and adapter

@@ -56,7 +56,7 @@ the same combo at cycle 3). Underlying local files, if needed again:
 Two more direct user-requested experiments tried on top of UPDATE 11's
 promoted checkpoint (lead-margin front pull):
 
-1. Rear-leg walking gait: (true alternation, 0.75x per-step amplitude,
+1. Rear-leg walking gait (true alternation, 0.75x per-step amplitude,
    same as tried before but now layered on the lead-margin baseline instead
    of the 5-seed-reliable one): genuinely interesting but NOT a clean win --
    it's a real trade, not an improvement. Seeds 7005/7006 (which FAILED
@@ -66,7 +66,7 @@ promoted checkpoint (lead-margin front pull):
    comparison: `/Users/markjohnson/Desktop/crawl_climb_combo_success.gif`
    (seed 7005, succeeds) and `crawl_climb_combo_fail.gif` (seed 7000,
    flips at cycle 3) -- both on Desktop.
-2. Concurrent pull+rear-tuck timing: ("in concert," merging the front
+2. Concurrent pull+rear-tuck timing ("in concert," merging the front
    pull and the stepping leg's tuck phase into one shared loop instead of
    fully sequential) -- tried TWICE now on two different baselines. First
    attempt (on the narrower 25mm-margin, non-alternating baseline): 0/5,
@@ -219,7 +219,7 @@ substantive approaches in sequence (each tested directly, not guessed):
 2. Multi-stage gradual un-crouch toward a fixed knee target (25deg) ->
    avoided a flip but landed tilted 44-47deg across all 3 seeds. Reverted --
    this was the state committed at the end of UPDATE 4.
-3. Fresh front-anchor re-plant: (re-probe FL/FR with the paw already on
+3. Fresh front-anchor re-plant (re-probe FL/FR with the paw already on
    the platform, `do_slide=False`, instead of trusting the stale anchor
    captured early in the climb): revealed something important -- tilt was
    ALREADY fine (9.4deg) at this point, unchanged from before any un-crouch
@@ -724,7 +724,7 @@ User's diagnosis: jerky transitions between movements were knocking already-
 solid front footing off the platform, forcing the sequence to restart. Two
 fixes:
 
-1. `_with_front_ik` rate-limited: (`RATE_LIMIT_DEG=4.0` per call): even
+1. `_with_front_ik` rate-limited (`RATE_LIMIT_DEG=4.0` per call): even
    though the anchor target is static, PyBullet's IK solver can jump between
    qualitatively different joint solutions near some configurations -- a
    real discontinuous snap despite a continuous cartesian target. Clamping
@@ -882,7 +882,7 @@ so far is the only way found to reliably get all 4 paws on top.
      residual is not a safe replacement for full IK override anywhere in the
      current pipeline's dynamic phases.** Reverted everywhere.
 
-2. Rear-leg extension-for-leverage phase: , added right after FL+FR are
+2. Rear-leg extension-for-leverage phase, added right after FL+FR are
    secured (matches user's point 2 + the "plant front feet before standing
    tall" sequencing): rear hip +35°, rear knee +20°, force-ramped in
    (1.0->3.0 over 40 steps, not a snap). **This one is a clean, validated
@@ -914,7 +914,7 @@ so far is the only way found to reliably get all 4 paws on top.
      edge -- meaning way more propulsion than needed, at the cost of not
      looking much like a controlled step.
 
-4. Alternating single-leg stepping: (user's point 4: one leg extended
+4. Alternating single-leg stepping (user's point 4: one leg extended
    while the other steps). Implemented (cyc%2 alternation, firm
    `SUPPORT_FORCE` on the planted leg). **Tried extensively, never got it to
    work reliably**, in multiple isolated configurations:
@@ -933,7 +933,7 @@ so far is the only way found to reliably get all 4 paws on top.
      with 3-4 other simultaneous changes the way tonight did it (a repeated
      lesson this session -- isolate one variable at a time).
 
-5. Farther front-leg reach margin: (point 1): swept directly.
+5. Farther front-leg reach margin (point 1): swept directly.
    45mm (original) works. 60mm is the largest value that still finds
    contact reliably. 75mm exceeds the leg's physical reach envelope
    entirely (zero contact, every time). **60mm is a validated, safe
@@ -941,7 +941,7 @@ so far is the only way found to reliably get all 4 paws on top.
    the other simultaneous changes during debugging -- worth re-adding once
    the rest of the pipeline is stable again.
 
-6. Initial single-leg lean during FL's probe: (matches "one leg fully
+6. Initial single-leg lean during FL's probe (matches "one leg fully
    extended to lean the body" for the very first foot placement -- a NEW
    observation from the user, distinct from point 4's alternating-during-
    stepping): extend RB_HIP during FL's own probe via the existing
@@ -952,7 +952,7 @@ so far is the only way found to reliably get all 4 paws on top.
    like the reach-margin change, was reverted during tonight's isolation
    pass and needs to be re-added and re-tested cleanly.
 
-7. Hip-rotation push: (a direct test of the user's "tall stance IS the
+7. Hip-rotation push (a direct test of the user's "tall stance IS the
    leverage" reframing): after the rear-extend phase, apply `cmh`'s own
    stance/push delta (ticks 6-21, RB_HIP 31->46°ish) as a ONE-TIME rotation
    with the front rigidly anchored on the now-ELEVATED ledge (reasoning:

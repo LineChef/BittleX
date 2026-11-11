@@ -39,12 +39,12 @@ should reproduce, at minimum:
   stale between updates (≈5 control ticks per detection).
 - ~50 ms latency: shift the signal back ~1 control step.
 - ~17 % random whole-detection dropout: even when the feature is in view.
-- Bearing noise small: (σ ≈ 2 % of frame), **distance/size noise large**
+- Bearing noise small (σ ≈ 2 % of frame), **distance/size noise large**
   (σ ≈ 8 % of frame → distance-from-area ≈ ±20–30 %).
 - Confidence near threshold: → detections flicker at range; model a
   probability-of-detection that falls off with distance (needs mounted-camera
   measurement to set the curve).
-- No false positives on a clean scene: but this was a plain bench; a
+- No false positives on a clean scene but this was a plain bench; a
   cluttered room may differ. Re-check once mounted.
 
 ## Still needs the camera mounted on G2

@@ -191,14 +191,14 @@ finding is.
    to know if 137°/s is even the right number to gate against (H13).
 
 ### Hardware-gated (needs a real G2 to measure against)
-3. Characterize G2's actual servo step response: (τ, speed ceiling) once
+3. Characterize G2's actual servo step response (τ, speed ceiling) once
    hardware arrives, the same way BittleJuice's `deploy/bittle_io/`
    measurement suite does — servo type may differ (alloy vs. plastic gears
    per both BittleJuice's and bittle-mujoco's explicit caveats that this
    changes the numbers), so their 33ms/137°/s can't be assumed for G2
    without checking. Add to `docs/planned/hardware-gated-backlog.md` as a new
    H-item once this doc is reviewed.
-4. If #3 shows a real mismatch: , model servo response lag properly (fit
+4. If #3 shows a real mismatch, model servo response lag properly (fit
    filter + actuator together, per their explicit warning against
    double-counting) rather than just clamping velocity — this needs real
    measurement data to fit against, so it can't happen before hardware.

@@ -7,7 +7,7 @@ One day of work on getting G2 (with the pod payload) to walk on carpet. **Result
 - Carpet: about 1/4 inch cut pile on a springy cushion pad; a fingertip presses in about 1/4 inch. Hardwood for comparison.
 - V7 (the deployed trot) fell on 6 of 6 first steps, always to G2's **right**, in 1 to 1.5 s, at 0.10 and 0.05 m/s, with the firmware balance on or off. (The firmware balance does not act during a policy walk, so it made no difference.)
 - On hardwood V7 had 0 falls in 23 walks, with a first-step right lean of about 9 degrees that it recovers from.
-- Mechanism, from rear, front and side video: as the left legs lift, the weight goes onto the right pair, which sinks into the pile, and the tall pod carries the body over. **On carpet the give under a loaded foot makes the weight shift much larger than on hardwood.** (Owner's observation, which fits all the data.)
+- Mechanism, from rear, front and side video as the left legs lift, the weight goes onto the right pair, which sinks into the pile, and the tall pod carries the body over. **On carpet the give under a loaded foot makes the weight shift much larger than on hardwood.** (Owner's observation, which fits all the data.)
 - Petoi's own `kcarpetF` also fell to the right with the pod on its first try (about 2 s).
 
 ## The sim carpet model
@@ -42,15 +42,15 @@ One day of work on getting G2 (with the pod payload) to walk on carpet. **Result
 
 ## Sim versus real: what the dial-in found
 
-- Open-loop replay of the logged joint commands: (`replay_carpet.py`) is almost blind to the pad settings: tip times were the same for every stiffness, depth and grip. Only servo strength moved the match. Not a usable fit.
+- Open-loop replay of the logged joint commands (`replay_carpet.py`) is almost blind to the pad settings: tip times were the same for every stiffness, depth and grip. Only servo strength moved the match. Not a usable fit.
 - A flat weak servo (0.06) with the pod 16 mm right made the carpet policy fall as fast as the real G2 (96% at 1.5 s), but a policy cannot be trained there: it fails even on a hard floor, where the real G2 walks. So it stood in for something carpet-specific.
 - Carpet stall (`CARPET_STALL`, new): a stance leg loses that fraction of its servo strength while its paw is in the pad. Stall 0.7 at normal strength reproduced the real fall time (67% at 1.9 s) with the hard floor untouched. **Policies trained under it learn to stand still** (0 in walked): fixed-stall runs, and runs where the stall grows with the carpet level, all ended standing or falling. The stall model is a hypothesis, not a measurement.
 - A deeper, softer pad (25 mm, K 30) got closest to the real timing without stall (100% falls at 2.9 s); training on it did not help.
 
 ## What was tried as a different base gait
 
-- The scripted crawl: (`reference_gait/build_creep_reference.py`, the offsets re-ordered): worked as an open-loop test when held; a training probe on it was started and cancelled early, so **no crawl policy was ever scored**.
-- Petoi's carpet reference as the imitation base: (`G2E_SKILL_REF=carpet`) with body-bounce, soft-landing and stronger tilt penalties: 100% falls, 0 to 1 in walked, carpet level stuck at 0. A policy imitating that reference does not learn to walk on it in the sim (it walks in place there too).
+- The scripted crawl (`reference_gait/build_creep_reference.py`, the offsets re-ordered): worked as an open-loop test when held; a training probe on it was started and cancelled early, so **no crawl policy was ever scored**.
+- Petoi's carpet reference as the imitation base (`G2E_SKILL_REF=carpet`) with body-bounce, soft-landing and stronger tilt penalties: 100% falls, 0 to 1 in walked, carpet level stuck at 0. A policy imitating that reference does not learn to walk on it in the sim (it walks in place there too).
 
 ## Ideas that were not tried
 

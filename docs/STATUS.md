@@ -104,10 +104,10 @@ The walls goal, "G2, practise", the spoken goal suggestions and operator overrid
 
 ## Open decisions
 
-- The Petoi AI Head: is an extra voice model started by its button. Claude stays the main brain and nothing is integrated for now.
-- Claude descriptions of survey pictures: (one billed call per picture) are on hold.
+- The Petoi AI Head is an extra voice model started by its button. Claude stays the main brain and nothing is integrated for now.
+- Claude descriptions of survey pictures (one billed call per picture) are on hold.
 - A new 20-million-step training run: starts only on explicit approval and never on top of a finished long run.
-- Gait comparisons on G2: are not run. Policies are compared in simulation only.
+- Gait comparisons on G2 are not run. Policies are compared in simulation only.
 
 ## What happens next
 

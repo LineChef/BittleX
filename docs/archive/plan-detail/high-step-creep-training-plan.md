@@ -60,12 +60,12 @@ nohup bash ../../tools/hs_watchdog.sh > /dev/null 2>&1 &   # (re)start: the runn
   parameters); the runner copies it to `pi_pipeline/gait/creep_ref.npy`.
 - Scorer: `hs_probe.py` (calm 20 s flat walks: falls, speed, heading, front/rear paw lift, body height, rear knee; a step-up ladder 7.5-25 mm, 15 s episodes, judged foot by foot:
   success = not fallen, all four paws on the top surface, body at least 0.10 m past the edge).
-- Env knobs: (`opencat_gym_env.py`, all off by default; lever `hs_creep` in `g2_profile.py`): the creep base and its cadence (`G2E_SKILL_REF=creep`,
+- Env knobs (`opencat_gym_env.py`, all off by default; lever `hs_creep` in `g2_profile.py`): the creep base and its cadence (`G2E_SKILL_REF=creep`,
   `G2E_PHASE_RATE_NOM_CMD=0.035`, commands 0.028-0.045 m/s); trot-shaping terms off (foot phase, gait symmetry); stability turned down (upright 3 -> 1.5, rate 0.1 -> 0.05);
   anti-crouch (body floor 74 mm, one-sided; rear-knee posture floor); swing clearance targets front 25 mm / rear 22 mm, one-sided (a higher step is free), weighted so it matters;
   step-ups only (`G2E_FR_LEDGE_UP_ONLY`); 15 s hazard episodes; V6's ledge terms (stall cost halved, progress at the edge, height-scaled crossing bonus, front lift once per episode);
   new: **all four paws up** pays 150 once per episode, **touching the step face** costs 0.5 per step.
-- Pi side: (built, not deployed): `residual_policy.py` reads `base_ref` and `phase_rate_nom_cmd` from the policy sidecar, so the Pi plays the creep exactly as training did
+- Pi side (built, not deployed): `residual_policy.py` reads `base_ref` and `phase_rate_nom_cmd` from the policy sidecar, so the Pi plays the creep exactly as training did
   (test: `pi_pipeline/tests/test_residual_policy_sidecar.py`). Switching V6 <-> this policy by voice is later work (`gait_mode.py` points "hi step" at `hsF` today).
 
 ### Bug sweep before training (2026-10-12, 10:30 PM)
@@ -117,10 +117,10 @@ Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4
   passing candidate in round B and a score that weights all four feet up over falls (training fixes falls, not clearance).
 - Every stage: flat falls at most 5%, speed at least 0.025 m/s, body at least V6's minus 1 mm, rear knee at least V6's minus 5 deg. A stage failing this is retried
   once with seed 43; a second failure halts before the 20M.
-- Stage step-up targets: (reported in the decisions, not gating; the 20M keeps training step-ups): S1 60% success at 10 mm, S2 50% at 12.5 mm.
-- 20M safety: at 4M, 6M and 10M, more than 25% falls on the calm walk stops the run for review.
+- Stage step-up targets (reported in the decisions, not gating; the 20M keeps training step-ups): S1 60% success at 10 mm, S2 50% at 12.5 mm.
+- 20M safety at 4M, 6M and 10M, more than 25% falls on the calm walk stops the run for review.
 - Pick: safe on flat ground first, then the highest 80% step-up ceiling, then the mean ladder success, then fewer flat falls.
-- Ledge top 25 mm: (decision): the open-loop creep got all four feet onto 15 mm and its front feet onto 20 mm, and the paw reach is far beyond 25 mm; the frontier curriculum only
+- Ledge top 25 mm (decision): the open-loop creep got all four feet onto 15 mm and its front feet onto 20 mm, and the paw reach is far beyond 25 mm; the frontier curriculum only
   samples a size once the one below passes, so the top limits the ramp without forcing impossible episodes.
 
 ## 6. Success criteria (set before the run; the report checks each)
@@ -128,7 +128,7 @@ Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4
 - Minimum: 80% step-up success at 12.5 mm (0.49 in)
 - Target: 80% at 15 mm (0.59 in), about double V6
 - Stretch: 60% at 20 mm (0.79 in)
-- Flat ground: at most 5% falls on calm walks, at least 0.025 m/s, no crouch
+- Flat ground at most 5% falls on calm walks, at least 0.025 m/s, no crouch
 - Clearance: rear paw lift at least 2x V6's; front paw lift at least 1.25x V6's
 - Higher than V6: 80% step-up ceiling above V6's
 

@@ -25,7 +25,7 @@ detection labels.
 
 - Person detection (deployed now): Output: box around any human; Feasible on Grove Vision AI V2: ✅ one model, frame rate
 - Face detection: Output: box around any face; Feasible on Grove Vision AI V2: ✅ — but *less* useful than person detection for "someone's here" (a face only shows close + facing)
-- Per-individual detection: (the near-term plan): Output: `dad`, box, 0.7; Feasible on Grove Vision AI V2: ✅ one model, frame rate — **coarse** at 192–240 px, confuses similar faces, retrain to add anyone
+- Per-individual detection (the near-term plan): Output: `dad`, box, 0.7; Feasible on Grove Vision AI V2: ✅ one model, frame rate — **coarse** at 192–240 px, confuses similar faces, retrain to add anyone
 - True face recognition (detect → embedding → gallery match): Output: vector per face, match against a few enrolled photos, **no retrain to add people**; Feasible on Grove Vision AI V2: ⚠️ two models — module runs one at a time → face-detect on module + embed on the **Pi**, event-driven (module can't stream a frame *and* detections)
 
 Near-term: per-individual detection. One `interaction` model with classes
@@ -70,7 +70,7 @@ frames the whole time, across **3 separate sessions** for lighting/pose variety.
    to know you. This is session 2 of 3, one more after this. Stay in front of me
    and follow along."* (Session count comes from how many completed sessions the
    person already has.)
-2. Scripted pose steps: , each = a spoken prompt + a capture window:
+2. Scripted pose steps, each = a spoken prompt + a capture window:
    - session 1 — basics: look at me / face close / back up / turn head / step out
    - session 2 — angles + light: face me (different light) / look left-right /
      chin up-down / step left / step right / step out

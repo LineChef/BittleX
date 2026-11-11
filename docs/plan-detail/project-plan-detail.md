@@ -234,7 +234,7 @@ The behavior runtime (`BehaviorDriver`, `BehaviorRuntime`, `app/`) is built and 
 - Hardware debugging is a different skill than web debugging — no stack traces; a fault could be code, wiring, power, or the hardware itself.
 - RL gaits look rougher than an animal's, especially early; sim-to-real rarely works first try — expect a gap and iteration.
 - Full integration (Phase 10) is the hardest, messiest part.
-- No flipping or rolling tricks: (decided 2026-09-15): the Pi + PiSugar stack rides on a printed standoff that is not impact-rated and shifts the
+- No flipping or rolling tricks (decided 2026-09-15): the Pi + PiSugar stack rides on a printed standoff that is not impact-rated and shifts the
   moment of inertia; `flip`/`flipD`/`flipF`/`bf`/`tbl`/`rl` (as a trick)/`bx`/`lucky`/`excited` are excluded from any voice or `perform_skill` set while that mount
   is in use. Detail: [`hardware/petoi-skills-survey.md`](../hardware/petoi-skills-survey.md).
 - Never put G2 on its back for a test: the Pi and BiBoard are exposed.

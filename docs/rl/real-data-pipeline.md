@@ -30,8 +30,8 @@ Every run gets a sidecar with: kind, policy name, commands, git commit, hardware
 
 ## Hardware epochs and surfaces
 
-- Epoch: (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
-- Surface: (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
+- Epoch (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
+- Surface (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
   Grout depth is unmeasured; the logs will show how often feet catch. Snags are not detected on the robot today, so they appear in the log only as IMU and command signatures; a hand label would make them usable for hazard rates (offered to the user, not built).
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
@@ -77,7 +77,7 @@ Hardware drift is not a stable property of G2 (it moved from about +142 to about
 
 Snags will be frequent on kitchen tile (feet catching on grout lines) and the user will not label them (no voice notes, no per-event labels). The sensor is the limit: the IMU gives a fresh frame only every 200 ms, so a brief catch may show in one frame or only through the policy's
 reaction; the logged joint angles are commands, not measurements. The approach, in order:
-1. Look at distributions first: , before building any detector, and keep turns, pick-ups and ordinary gait impacts from being mistaken for snags.
+1. Look at distributions first, before building any detector, and keep turns, pick-ups and ordinary gait impacts from being mistaken for snags.
 2. Periodicity: grout lines recur at the tile size, so at about 0.1 m/s disturbances should recur every (tile size / speed) seconds; a regular beat in roll and pitch spikes locked to that period is strong evidence. Needs the tile size (asked, not yet known).
 3. Floor comparison: the same policy on hardwood is the baseline; extra spikes, stalls and policy-correction jumps on tile are the snag effect, with no labels needed. A same-day, same-battery hardwood control walk makes this clean (asked).
 4. Policy reaction: a catch should make the policy's correction jump (logged at 80 Hz).
@@ -105,7 +105,7 @@ The table below is the earlier rule, kept for history.
 
 **Training launches.** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
 1. Automatic when idle: a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is running on the Mac (no training, benchmark or other test in progress, so nothing gets a random slowdown), at most one per snapshot, and its result is reported. The harm check (benchmark scoring, no training) follows the same idle-only rule.
-2. Always before a 20M: when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first, on an otherwise idle Mac (reused if one already finished for that snapshot), and its result is reported before the 20M starts.
+2. Always before a 20M when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first, on an otherwise idle Mac (reused if one already finished for that snapshot), and its result is reported before the 20M starts.
 When the user launches a run, it uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
 
 ## Symmetry rule (approved 2026-10-07)

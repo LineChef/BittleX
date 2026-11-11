@@ -12,8 +12,8 @@ Agreed with the user 2026-10-31. Backlog item [B28](behavior-ideas.md#b28--goals
   report need no command.
 - The user reads the learning data to judge its quality (see "Reading the data").
 - Local first: G2 judges his attempts on the Pi with no API call (see "Local reasoning or a Claude call"). No Claude calls to start; looked at again later if it makes sense.
-- Free is the default: for any setting the user does not name; the free / ask / fixed split below is agreed.
-- The walk is the default gait policy: (the attachment's saved gait) for everything except the dialing-in steps close to the ball, which use Petoi's scripted walk (`nudge_gait`, a fixed setting G2 never changes; user, 2026-11-04). The long walk is never switched.
+- Free is the default for any setting the user does not name; the free / ask / fixed split below is agreed.
+- The walk is the default gait policy (the attachment's saved gait) for everything except the dialing-in steps close to the ball, which use Petoi's scripted walk (`nudge_gait`, a fixed setting G2 never changes; user, 2026-11-04). The long walk is never switched.
 - Searching: a claw look (the arm points the camera), turns, back-ups and back-ups with turns are all his to order; the claw look comes first by default.
 - Lining up: small turns checked with the camera after each one.
 - He measures his own pace and turn rates from the camera and times his moves with them.
@@ -23,8 +23,8 @@ Agreed with the user 2026-10-31. Backlog item [B28](behavior-ideas.md#b28--goals
 
 He never invents a movement and Claude never steers him in real time. He chooses:
 
-1. the approach: , from a short fixed list per goal;
-2. the settings: of that approach, each with a lowest and highest value set in code;
+1. the approach, from a short fixed list per goal;
+2. the settings of that approach, each with a lowest and highest value set in code;
 3. when to try again, change something, or stop, inside the session budget.
 
 The safety layers stay underneath and no goal reaches them: emergency stop, the fall guard, the battery gate, the refused moves, the attachment profile, the thermal guard.
@@ -33,7 +33,7 @@ The safety layers stay underneath and no goal reaches them: emergency stop, the 
 
 Every setting an approach exposes is marked as one of:
 
-- free: (the default): G2 changes it on his own, one step at a time, inside its bounds;
+- free (the default): G2 changes it on his own, one step at a time, inside its bounds;
 - ask: G2 may conclude it should change; he says the suggestion when the voice service comes back after the session, and the user answers confirm, cancel or review;
 - fixed: set by the user or the code, never by G2.
 
@@ -187,7 +187,7 @@ call (one per session, through `MemoryCallGate`) can be added later if the revie
 
 ## Reading the data
 
-- The journal: (`goal_journal.jsonl` on the Pi) holds everything: attempts, outcomes, every decision with its "because" and the attempt numbers behind it, the notes.
+- The journal (`goal_journal.jsonl` on the Pi) holds everything: attempts, outcomes, every decision with its "because" and the attempt numbers behind it, the notes.
 - `g2goal pull`: copies it to the Mac (like `g2pics pull`).
 - `python -m pi_pipeline.goals report --html out.html`: builds one page per goal:
   - the latest session: one row per attempt (settings, outcome, numbers), and the decisions between them;
@@ -196,7 +196,7 @@ call (one per session, through `MemoryCallGate`) can be added later if the revie
 
   Claude Code can publish it as a private page to read on the phone. The verdicts can be kept on that page later if they turn out to be worth feeding back.
 - `python -m pi_pipeline.diag report`: gets a goal section, so a session's walks, camera faults and falls sit next to its attempts.
-- `g2goal history` / `g2goal explain`: on the Pi: the same data as text. `g2goal reset GOAL` throws away what a goal has learned (the journal is kept).
+- `g2goal history` / `g2goal explain` on the Pi: the same data as text. `g2goal reset GOAL` throws away what a goal has learned (the journal is kept).
 
 What to look for when judging the learning: does the success rate rise across sessions on the same floor; do the values he keeps hold their record in the next session; is the record for the setting he works on growing toward one value; do the
 notes match what you saw; is any setting drifting to one end of its bounds (a sign the rule is wrong, or the goal is out of reach).

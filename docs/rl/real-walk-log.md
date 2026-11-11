@@ -126,12 +126,12 @@ the rest pose is right when the leg first drops into it; (2) the firmware step g
   not a measured temperature).
 - Roll swing is large and steady: std 5.9-7.0 deg, range about -19 to +9 deg, pitch std ~3.5 in
   every V2.1 run. The sim body rolls ~4 deg std in the same replay (see "Sim vs real").
-- Heading drifts right: (log yaw positive = right; includes hand corrections). Run 1 (before the
+- Heading drifts right (log yaw positive = right; includes hand corrections). Run 1 (before the
   IMU calibration) was a steady ~10 deg/s right turn (+132 deg); later runs wander a few degrees
   because the user steered them back; hands-off run 6 drifted +16 deg. (Corrected 2026-10-06: the loop
   does feed the rebased yaw to the policy, since `79da931`, but with the opposite sign to the sim's and V2.1
   ignores it, so nothing holds a heading; see [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) §1.1.)
-- Distance is consistent run to run: ; drift is the part that varies.
+- Distance is consistent run to run; drift is the part that varies.
 - Policy command bias (from the logs): averaged over the hard-floor runs V2.1 commands the
   back-left shoulder ~+7.5 deg and back-right knee ~-7.8 deg off the scripted pose (the uneven
   diagonal correction the sim notes describe).
@@ -247,13 +247,13 @@ get below ~63 mm at knees x2.
 
 ### Candidate sim changes for the next training run (evidence, not yet applied)
 
-1. Carpet needs a pile model: (H10): the sim floor is flat with nothing above it to catch a swinging
+1. Carpet needs a pile model (H10): the sim floor is flat with nothing above it to catch a swinging
    foot. Real pile 6.4 mm; commanded V2.1 foot lift 15-21 mm still fails; real clearance is smaller.
-2. Real roll swing is ~1.7x the sim's: (std 6-7 vs ~4 deg): more body-roll disturbance / lateral
+2. Real roll swing is ~1.7x the sim's (std 6-7 vs ~4 deg): more body-roll disturbance / lateral
    randomization may be warranted.
 3. Heading has no feedback in the real loop and drifts run to run: consider heading-drift
    randomization (a small constant leg-length/stride asymmetry) in training, or a yaw-hold on the Pi.
-4. Sim travels less than real: for the same commands (~16%): worth a friction / foot-slip check.
+4. Sim travels less than real for the same commands (~16%): worth a friction / foot-slip check.
 5. IMU bias: the IMU zero moved ~4 deg in roll between calibrations at rest; training uses +-2 deg
    (`IMU_BIAS_DEG`). One data point, not enough to change the default yet.
 6. Re-set the payload model to the measured final build (H2) before the next run.
@@ -271,9 +271,9 @@ spot between runs (`tools/g2_baseline.sh`, runner `gait/baseline_runs.py`). Logs
 - 5: roll mean / std (deg): +1.0 / 5.9; roll range: -10 .. +11; pitch std: 2.2; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +34 +69 +101 +136
 - 6: roll mean / std (deg): +1.3 / 6.0; roll range: -9 .. +10; pitch std: 2.5; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +15 +44 +64 +103
 
-- No falls, no stops: ; the policy step took about 1.85 ms on average. The user saw a clear drift to the right on every walk; the yaw trace agrees
+- No falls, no stops; the policy step took about 1.85 ms on average. The user saw a clear drift to the right on every walk; the yaw trace agrees
   (runs 2-6: +103 to +176 deg over 12.7 s, mean about +142, so roughly 8-14 deg/s).
-- Against the temporary mount: (six runs 2026-10-01/02, roll std 6.6-7.0, pitch std about 3.5): roll swing is about 12% lower (5.7-6.2) and pitch swing about
+- Against the temporary mount (six runs 2026-10-01/02, roll std 6.6-7.0, pitch std about 3.5): roll swing is about 12% lower (5.7-6.2) and pitch swing about
   one third lower (1.9-2.7). The drift to the right is unchanged. The sim's roll std is 3.6-4.1 (open-loop replay), so the roll gap is still about 1.5x.
 - Battery under load: 9 readings during the walks, 8.07 to 8.45 V (diag event `gait/battery.load`); the pack sat at 8.51 V before and 8.34 V after. So walking
   sags a full pack by about 0.3-0.45 V. The sag on a nearly empty pack is not measured; G2 browned out walking at a resting 7.58 V (2026-10-06, 12:12 AM).
@@ -289,8 +289,8 @@ G2 put back at the start spot each run. Pack under load 7.8-8.1 V (not a full ch
 - After, series B (ABBA: the yaw sign alternated, order sealed from the user): Runs (deg): NEW sign: +80, +64, +29, -5 / OLD sign: +15, +46, +37, +49; Mean: NEW +42, OLD +37
 
 - The drift fell from about +142 to about +35-40 deg per 12.7 s after the servo swap and recalibration.
-- The yaw-sign fix is not what cured it: with the pre-fix sign (OLD, `G2_POLICY_YAW_SIGN=+1`) the mean is +37 vs +42 with the corrected sign; within-group spread is about +-27 deg, so a 5 deg gap is noise. (The first reading, that the fix and the swap could not be told apart, was right to be cautious; the interleaved test separates them.)
-- Run-to-run spread is large: (-5 to +80 deg) with no steady trend in series B (series A drifted upward, +18 to +77, which did not repeat). The user's eye and the IMU agree: runs called "super straight" were +29 and -5; runs called "curved" were +37 and more. Roll std 4.9-5.4 deg and pitch std 2.3-2.7 are unchanged from before the swap.
+- The yaw-sign fix is not what cured it with the pre-fix sign (OLD, `G2_POLICY_YAW_SIGN=+1`) the mean is +37 vs +42 with the corrected sign; within-group spread is about +-27 deg, so a 5 deg gap is noise. (The first reading, that the fix and the swap could not be told apart, was right to be cautious; the interleaved test separates them.)
+- Run-to-run spread is large (-5 to +80 deg) with no steady trend in series B (series A drifted upward, +18 to +77, which did not repeat). The user's eye and the IMU agree: runs called "super straight" were +29 and -5; runs called "curved" were +37 and more. Roll std 4.9-5.4 deg and pitch std 2.3-2.7 are unchanged from before the swap.
 - Distances (user, series A): 4 ft 11 in, 4 ft 10 in, 4 ft 12 in for the first three (the rest curved and were not measured).
 - Series A early runs looked like the policy visibly steering back on course; the ABBA test shows that is not a sign effect.
 - Conclusion: the old servo 8 fault caused most (about 100 of the ~140 deg) of the drift. About +40 deg +- 27 remains, which is consistent with V2.1's small learned
@@ -319,7 +319,7 @@ built on it is [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md). Raw res
   - Nothing pushed it off course in training.
   - Heading is only available inside the orientation quaternion.
   - The quadratic heading penalty is nearly flat near straight.
-- Fixed anyway on 2026-10-06: (`run_gait.POLICY_YAW_SIGN`, `c292431`): any policy that does learn heading would otherwise steer the wrong
+- Fixed anyway on 2026-10-06 (`run_gait.POLICY_YAW_SIGN`, `c292431`): any policy that does learn heading would otherwise steer the wrong
   way. Logs keep the firmware convention (+ = right).
 
 **What causes it, as far as the data goes: an asymmetry V2.1 learned in the sim.**
@@ -437,7 +437,7 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 - -0.30 (-0.28): runs: 3, 4, 9, 10; net yaw per run: -56, -24, -31, -65; mean: -44 deg (-3.5 deg/s); sd: 17
 
 - The lever still works, and the signs are right: more negative u turns G2 further left. No falls at -0.30; the back-right foot landing flat was not reported (the user did not track the runs).
-- Authority flattens beyond -0.2: from 0 to -0.19 the turn changes by -9.2 deg/s (about 48 deg/s per unit of u), from -0.19 to -0.28 by only -2 deg/s (about 22 deg/s per unit): the joint-range clamp (`heading_hold.JOINT_RANGE_DEG`) limits the stride change. So raising the limit from 0.20 to 0.30 buys about 2 more deg/s of left turn.
+- Authority flattens beyond -0.2 from 0 to -0.19 the turn changes by -9.2 deg/s (about 48 deg/s per unit of u), from -0.19 to -0.28 by only -2 deg/s (about 22 deg/s per unit): the joint-range clamp (`heading_hold.JOINT_RANGE_DEG`) limits the stride change. So raising the limit from 0.20 to 0.30 buys about 2 more deg/s of left turn.
 - The cancel point is about u = -0.16 now (drift +7.6 deg/s); the old estimate was -0.19 at +3.3 deg/s... the drift at u = 0 is about 2x what it was after the servo swap. The u = 0 runs did not keep rising this time (111, 108, 98, 64).
 - Run-to-run spread at a fixed u is about 17-22 deg per 12.5 s (+-1.5 deg/s), so a fixed correction lands anywhere in a 40 deg band; only feedback can narrow it.
 
@@ -544,7 +544,7 @@ right-positive:
 - Authority is large: u = +0.2 swings the walk by about 120 deg (about 10 deg/s) from the u = 0 drift, more than enough to cancel it. The response is not linear: from
   0 to +0.2 it is about -600 deg per unit u, from -0.2 to 0 only about -120. The zero crossing of the drift is near u = +0.15 in the old sign (-0.15 in the
   corrected sign, where u > 0 = longer LEFT strides = a right turn).
-- The drift itself grew through the evening: (u = 0 runs: +44 deg in the first pilot run, +65 mean over the A/B, +90 here), so a fixed offset is not enough
+- The drift itself grew through the evening (u = 0 runs: +44 deg in the first pilot run, +65 mean over the A/B, +90 here), so a fixed offset is not enough
   and the feedback (integral) term is needed on top of any feed-forward.
 - Fix: `heading_hold.apply_stride_difference` now scales the left swing by (1 + u) and the right by (1 - u), so the controller's own logic is unchanged (a
   rightward error gives a negative u, which is longer right strides, a left turn). The unit tests pin the sign. Anything written from the sim's `steer_probe`
@@ -610,7 +610,7 @@ Three V2.1 walks of 18 s with the front-left hold on, the stricter release (the 
 
 ### Hold tuning, voice and exploration checks (2026-10-07 evening, 8:37 to 10:00 PM)
 
-- Feed-forward trim A/B: (4 V2.1 25 s walks, hold on, feed-forward 0 / -0.25 alternating; the lane ends at a wall about 2 m out, so every contact after about 22 s is the wall, not the hold): before the wall the yaw sat at +9..+19 deg in both settings and the trim averaged -0.35..-0.5 either way; no clear benefit, feed-forward stays 0 (`G2_FOOT_HOLD_FF`, `--foot-hold-ff`).
+- Feed-forward trim A/B (4 V2.1 25 s walks, hold on, feed-forward 0 / -0.25 alternating; the lane ends at a wall about 2 m out, so every contact after about 22 s is the wall, not the hold): before the wall the yaw sat at +9..+19 deg in both settings and the trim averaged -0.35..-0.5 either way; no clear benefit, feed-forward stays 0 (`G2_FOOT_HOLD_FF`, `--foot-hold-ff`).
 - Faster release: The first hold let go of the trim slowly; after G2 was seen curving left late in a walk the trim now drops at 1.2 per second once the heading is at or past the target or turning back at more than 3 deg/s (1 deg/s cleared the integral on a noisy 5 Hz rate and left a +25..+30 deg standing offset). 18 s batches: yaw at the end +18..+31 deg, trim mean -0.26..-0.45, no walk swung left, none fell. The tape (see "Tape ground truth" above) put G2 within 15 cm of the line.
 - Voice walk with the hold: the auto log of a "walk forward" shows `foot_hold: fl`, trim down to -0.36, yaw +10 deg after 5 s. Walk-turn-walk was not run as a hardware test: the voice cannot hand a running walk over to a firmware turn cleanly, and every walk builds a fresh hold with the heading at its first frame as zero, the hold is idle during a firmware turn (code check, `run_gait.py` lines 552 and 588).
 - Voice "look" and naming pose sequence: The first voice look took its picture standing still: the actuator's `perform()` takes skill names and logged `unknown skill 'kbuttUp'` for each raw token. Fixed with `perform_token`; verified on G2 (9:22 PM look, five namings 9:37 to 9:41 PM: `kbuttUp`, `ksit`, `kup`, then the picture). Five dishwasher pictures saved from a few angles.

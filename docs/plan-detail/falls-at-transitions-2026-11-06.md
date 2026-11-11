@@ -12,15 +12,15 @@
 
 ## What we know
 
-- Logged falls: (goal journal, 154 attempts): 18 fell; 13 of the 18 were during a turn (`search_turn` 9, `turn` 3, `wall_turn` 1), 7 of the 9 `search_turn` falls started right after a look or claw look, 1 plain walk. Median pack at a fall 66% vs 75% otherwise (weak), so a pack gate was rejected (servo sag is common; it would stop most runs).
+- Logged falls (goal journal, 154 attempts): 18 fell; 13 of the 18 were during a turn (`search_turn` 9, `turn` 3, `wall_turn` 1), 7 of the 9 `search_turn` falls started right after a look or claw look, 1 plain walk. Median pack at a fall 66% vs 75% otherwise (weak), so a pack gate was rejected (servo sag is common; it would stop most runs).
 - The logged count is a floor: Most falls end an attempt without being recorded (owner, 2026-11-06). Compare variants on IMU tilt swings and near falls, not only on logged falls.
-- Two stops out of a turn: (`kwkL` for about 1 s, then an immediate `kbalance`, over within a second) on 2026-11-06 fit "walking to a pose".
-- The drill's own falls: (do not count them against any variant): the first drill sent a turn from the attention pose without standing him up (fixed); a BiBoard voice-module move (`pee`) started on its own mid-round; one round ran with the BiBoard silent (no IMU frames, firmware "did not answer"), so the guards did nothing and "10 clean" was void.
-- Valid baseline so far: (no guards): about 3 falls in about 10 cycles, all in the attention pose, the stand-up from it, or the claw look, not in the turns.
-- `both`: (pose gate and calm stop): one valid round, fell going into the attention pose in cycle 2 (before the "steady before a pose change" check existed). The next `both` round was void (silent board).
-- Leg check: (`SerialRobot.leg_check`, log `~/.local/share/g2/leg_check.jsonl`): every logged stand-up read all eight leg joints at their stand angles, so a lost joint command is not the cause of the odd leg angles seen on stand-up. The Pi gets no servo position feedback (`f` is echo-only over the UART and leans him), so a servo that was commanded right but lags can only be seen through the IMU tilt.
-- The BiBoard's own voice module starts moves: (`not_from_pi` in the command log: 127 rows in 3 days, including `pee`, `hi`, `ck`, `bx`, `fiv`, `wkArmF`). Some falls may be those. Sending `Xa`/`XAd` to silence it breaks its voice commands (rule), so use a quiet room for tests.
-- Claw partly open at rest: (new on 2026-11-06): nothing in the code commands the gripper joint (the claw look drives joints 0 and 1). Read the commanded angle of the claw joint at rest with `j`: closed on the board but open in the hand = mechanical (horn slipped, jolted by falls); open on the board = send a close.
+- Two stops out of a turn (`kwkL` for about 1 s, then an immediate `kbalance`, over within a second) on 2026-11-06 fit "walking to a pose".
+- The drill's own falls (do not count them against any variant): the first drill sent a turn from the attention pose without standing him up (fixed); a BiBoard voice-module move (`pee`) started on its own mid-round; one round ran with the BiBoard silent (no IMU frames, firmware "did not answer"), so the guards did nothing and "10 clean" was void.
+- Valid baseline so far (no guards): about 3 falls in about 10 cycles, all in the attention pose, the stand-up from it, or the claw look, not in the turns.
+- `both` (pose gate and calm stop): one valid round, fell going into the attention pose in cycle 2 (before the "steady before a pose change" check existed). The next `both` round was void (silent board).
+- Leg check (`SerialRobot.leg_check`, log `~/.local/share/g2/leg_check.jsonl`): every logged stand-up read all eight leg joints at their stand angles, so a lost joint command is not the cause of the odd leg angles seen on stand-up. The Pi gets no servo position feedback (`f` is echo-only over the UART and leans him), so a servo that was commanded right but lags can only be seen through the IMU tilt.
+- The BiBoard's own voice module starts moves (`not_from_pi` in the command log: 127 rows in 3 days, including `pee`, `hi`, `ck`, `bx`, `fiv`, `wkArmF`). Some falls may be those. Sending `Xa`/`XAd` to silence it breaks its voice commands (rule), so use a quiet room for tests.
+- Claw partly open at rest (new on 2026-11-06): nothing in the code commands the gripper joint (the claw look drives joints 0 and 1). Read the commanded angle of the claw joint at rest with `j`: closed on the board but open in the hand = mechanical (horn slipped, jolted by falls); open on the board = send a close.
 
 ## Built for the odd leg (lower priority than the transition falls; it is rare)
 

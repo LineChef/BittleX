@@ -55,7 +55,7 @@ the open question entirely rather than fixing a confirmed one.
 
 **Considered and ruled out:**
 
-- Standard phone-style USB power banks: (Vida IT 5000 mAh, VIYISI, FLEXTAIL) —
+- Standard phone-style USB power banks (Vida IT 5000 mAh, VIYISI, FLEXTAIL) —
   electrically fine (5V / 2A+, micro-USB or USB-A output) but physically
   bulky / heavy relative to Bittle X's small frame, and optimized for steady
   phone-charging current rather than the "peaky" current draw a moving robot
@@ -154,8 +154,8 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
 ## Measures
 
-- Disable unused peripherals: (onboard LEDs runtime; audio + camera-LED via boot config): Buildable now?: **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`); Autonomy impact: none; Rule: boot lines go in `config.txt` at Pi setup (pi-set-up.md)
-- Wi-Fi power-save when headless: (`iw dev wlan0 set power_save on`): Buildable now?: **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()`; Autonomy impact: +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).**; Rule: on in autonomous mode; off when a human is actively connected
+- Disable unused peripherals (onboard LEDs runtime; audio + camera-LED via boot config): Buildable now?: **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`); Autonomy impact: none; Rule: boot lines go in `config.txt` at Pi setup (pi-set-up.md)
+- Wi-Fi power-save when headless (`iw dev wlan0 set power_save on`): Buildable now?: **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()`; Autonomy impact: +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).**; Rule: on in autonomous mode; off when a human is actively connected
 - idle-REST timeout: send `d` after N s of no command: Buildable now?: **BUILT** — `behavior/idle_posture.py`'s `IdlePosture` (ACTIVE→SIT→RESTING staged descent, mood-scaled timeouts, person-present multiplier, "stay" override, `safe_to_rest` gating, wired into `BehaviorDriver.tick()`, 109 lines of tests); Autonomy impact: Was already behaviour-aware from the start — exploring holds ACTIVE with no descent (`exploring=True` short-circuits it), a conversation holds SIT and never lies down; Rule: done; see `docs/guides/voice-commands.md` / `capabilities.md`
 - On-demand vision: gate the Grove Vision AI V2: Buildable now?: **Not built — only a binary on/off exists**, tied to sleep-mode entry/exit (`EffectKind.CAPTURE`). The rate-scaling ambition below has zero implementation, not even stubbed — just an unused `kind` param on the `CAPTURE` effect anticipating it; Autonomy impact: **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move; Rule: "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep. **This is the one remaining open design question.**
 - Sleep / idle mode: servos REST, vision off, governor down, Wi-Fi power-save on: Buildable now?: **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake (see below); Autonomy impact: Wake triggers already cover the risk noted here — IMU tap / loud sound / wake word all wake it; Rule: done
@@ -184,7 +184,7 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
   machine (`SleepMode`), both fully built + wired + tested (corrected 2026-09-16;
   an earlier version of this doc listed these as still needing a focused
   design session — they don't, that work already landed).
-- Focused-session TODO: on-demand vision rate-scaling only — the camera
+- Focused-session TODO on-demand vision rate-scaling only — the camera
   currently just goes on/off with sleep mode, not scaled to activity level as
   originally scoped above.
 - Hardware-gated: a real power budget from an inline current meter (the

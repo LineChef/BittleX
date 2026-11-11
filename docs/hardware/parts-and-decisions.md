@@ -39,7 +39,7 @@
   **4 MB**, SRAM **520 KB** (Petoi pages citing "16 MB / WROOM-32D" describe
   BiBoard V0). Board also carries a **6-axis IMU (no magnetometer; G2's board carries an ICM42670, and the firmware supports the MPU6050 on other units)**, an
   onboard offline voice-recognition module, and a speaker.
-- Full vendor-doc spec sheet: for every part — with the "why it matters" for
+- Full vendor-doc spec sheet for every part — with the "why it matters" for
   each — is in [`docs/hardware/specs.md`](specs.md).
   Key downstream effects: no magnetometer ⇒ favour **yaw-rate** over absolute
   heading in the RL reward (Phase 3); the vision module can stream **detections

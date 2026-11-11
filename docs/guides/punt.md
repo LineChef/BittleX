@@ -137,8 +137,8 @@ Each attempt ends with a line like:
 ATTEMPT: punted at (2.7, 6.7) (in, deg) after 4 looks; walk steps (ball in, seconds): [(13.0, 2.2), (13.0, 2.3)]
 ```
 
-- `punted at (2.7, 6.7)`: when he punched, the finder read the ball 2.7 in away and 6.7° to the right of straight ahead. **This is the number to tune against**: compare it with how the punch went.
-- `walk steps`: for each long walk, how far away the ball was when he started it and how long he walked. If the ball distance is the same before and after a walk, that walk did not move him (known issue: the first walk after a stand-up sometimes covers nothing).
+- `punted at (2.7, 6.7)` when he punched, the finder read the ball 2.7 in away and 6.7° to the right of straight ahead. **This is the number to tune against**: compare it with how the punch went.
+- `walk steps` for each long walk, how far away the ball was when he started it and how long he walked. If the ball distance is the same before and after a walk, that walk did not move him (known issue: the first walk after a stand-up sometimes covers nothing).
 - If the run was started by voice, read it with `ssh "$G2_PI" journalctl -u g2-punt --no-pager -n 60`.
 
 Measured so far: a ball 2.6 in from the camera threw 18 in straight ahead (claw hits it first); 4.5 to 5 in was just out of reach; 6 to 7 in too far; the first desk attempt punched at 2.7 in. The finder is only accurate to about 1 in at close range.

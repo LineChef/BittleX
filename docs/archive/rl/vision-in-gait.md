@@ -89,7 +89,7 @@ doesn't start from zero:
 
 ## What would reopen this
 
-- A real forward sensor: (depth / ToF / a mounted obstacle+edge detector) —
+- A real forward sensor (depth / ToF / a mounted obstacle+edge detector) —
   the current camera can't drive any of it.
 - The **adapter skill probe** ([`adapter-skill-probe-spec.md`](../../planned/adapter-skill-probe-spec.md))
   is the reserved route for *one* genuinely-learned skill (frozen base + a small

@@ -53,12 +53,12 @@ when no build is set. The arm on stock legs: 5.5 / 7 / 10 mm 67 / 33 / 0%: top 0
 
 ## Training (unattended runner `phase_arm2.py`)
 
-1. Baselines: in the new-leg world, 100 episodes a test: ARM1X unchanged, and Petoi's scripted arm walk.
+1. Baselines in the new-leg world, 100 episodes a test: ARM1X unchanged, and Petoi's scripted arm walk.
 2. Two 3M screens: `arm2_ctrl` (the recipe) and `arm2_ev15` (a slope bin counts after 15 outcomes, was 30: ARM1X's slope frontiers waited on evidence).
    Rule, set before the results: `arm2_ev15` is adopted if its flat-ground falls are 0, its mean ladder falls no more than the control's + 0.005, its ladder success
    no less than the control's - 0.02 and its roll no more than the control's + 0.5 deg.
-3. S0 to S3: (9M), fresh, with what was adopted.
-4. Two 20Ms: from S3, seeds 42 and 7, no plateau stop, progress checks every 2M (the snag ladder included).
+3. S0 to S3 (9M), fresh, with what was adopted.
+4. Two 20Ms from S3, seeds 42 and 7, no plateau stop, progress checks every 2M (the snag ladder included).
 5. Pick: final and avg5 of each 20M scored in full; no flat-ground falls first, then the lowest mean ladder falls. Exported as `trained/ARM2cand_ppo.onnx` with its
    sidecar (`legs: arm_wide_clpaw`).
 6. Verdict: against ARM1X on the new legs, reported only: no flat-ground falls; ladder falls no higher; roll no more than + 0.5 deg; heading no more than + 5 deg and
@@ -115,7 +115,7 @@ No falls either way; flat-ground speed, roll and heading unchanged. Every differ
 - [ ] **Side photo standing in the walking pose:** level with the claw and square-on, with a coin or ruler next to the claw at the same distance from the camera. Gives the claw's
       real reach ahead of the pod and its height off the floor (the sim's 1.25 in was measured on stock legs; the paws and the new pose may change it). The reach is the one
       size the rest-pose photos could not give.
-- [ ] **Front photo standing**, the same way: is the claw centred, and are the jaws closed while walking?
+- [ ] **Front photo standing**, the same way is the claw centred, and are the jaws closed while walking?
 - [ ] **Weights (kitchen scale, grams):** G2 in full (the sim assumes about 553 g), the coiled cable alone, and if the arm comes off easily, the arm with the camera. The sim
       assumes 78 g of arm and camera, varied by plus or minus 20%.
 - [ ] **How springy the arm is:** push the claw gently up, down and sideways with a finger and say how far it moves (in) and whether it springs back. A slow-motion phone
@@ -125,7 +125,7 @@ No falls either way; flat-ground speed, roll and heading unchanged. Every differ
 - [ ] **Does the claw touch the floor while walking?** Scuff marks, or watching a few walks. The sim keeps it 1.25 in up.
 
 - [ ] **The paws' pivot (CLpaw):** how stiff it is by hand (flops freely, drags a little, or holds its angle), the angle it rests at when lifted, and whether it springs back toe-up or toe-down. The sim has a free pivot with no spring (`G2E_PAW_PIN_DAMP`, `G2E_PAW_SPRING_K`, `G2E_PAW_REST_DEG` all 0; checked only at 1.8 and 3.6 mN.m of grip). A video of one foot lifting would do.
-- [ ] **The lift-servo angle while walking** (the claw's carrying height): which direction raises the claw and how many inches one degree gives, from two or three photos at set angles (`python -m pi_pipeline.attachments walk-lift N`, below). The setting exists and defaults to the firmware's own angle.
+- [ ] **The lift-servo angle while walking** (the claw's carrying height) which direction raises the claw and how many inches one degree gives, from two or three photos at set angles (`python -m pi_pipeline.attachments walk-lift N`, below). The setting exists and defaults to the firmware's own angle.
 
 Each answer goes into this section with its date; what changes in the sim follows from it (the claw position, the arm's weight, a sprung arm if it bounces).
 

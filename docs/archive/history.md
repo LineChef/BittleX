@@ -20,7 +20,7 @@ module's language setting, both since redone (see
 below was built and validated software-only or with the hardware mocked,
 ahead of this point.
 
-- RL locomotion: (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
+- RL locomotion (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
   pipeline. The gait is a learned *residual* on Bittle's scripted `wkF` walk,
   IMU-corrected every control step, conditioned on speed/heading commands and the
   mounted Pi/camera payload. **Deployed policy (2026-09-23): `hw1_20m`**, trained
@@ -51,7 +51,7 @@ ahead of this point.
   scripted (no sensor needed for that first step) before exploring a learned
   residual. See [`docs/rl/`](../rl/) and
   [`docs/planned/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md) H7.
-- Companion pipeline: (`pi_pipeline/`) — voice conversation, persistent
+- Companion pipeline (`pi_pipeline/`) — voice conversation, persistent
   memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
   state machine, the on-robot gait loop, the autonomous behaviour layer
   (explore mode, idle-REST staged descent), a servo thermal guard, a

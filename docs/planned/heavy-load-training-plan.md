@@ -32,20 +32,20 @@ The sim's servo strength (`MOTOR_FORCE` 0.2) has never been checked under a heav
 5. Disturbances stay on: shoves, servo faults, rough floor. A heavy top load is exactly when a shove tips him.
 
 ## Step 3: training (standing rules: fresh from S0, 3M cap on screens, 20M only on the user's go)
-- Three 3M screens, each a fresh run: (about 25 min each, about 1.5 h for all three; times from `tools/eta.py`):
+- Three 3M screens, each a fresh run (about 25 min each, about 1.5 h for all three; times from `tools/eta.py`):
   - A: the load range only.
   - B: A plus the load input.
   - C: B plus the load-scaled stability, heat and slip rewards and the speed scaling.
 - Gate for each screen: learnable (fewer falls and less roll than V7 at the heaviest load), and no regression at today's 227 g payload (V5 benchmark mean falls within noise of V7).
-- Staged chain like V6: , using the winning screen, fresh from S0: flat foundation under load, terrain under load, slopes and the ledges only up to what passes under load.
-- One 20M consolidation run: (about 2 h 20 min of training) only on the user's go.
+- Staged chain like V6, using the winning screen, fresh from S0: flat foundation under load, terrain under load, slopes and the ledges only up to what passes under load.
+- One 20M consolidation run (about 2 h 20 min of training) only on the user's go.
 
 ## Step 4: how it is judged (sim)
 - A new **load ladder benchmark:** payload 227 / 300 / 380 / 454 g, crossed with the calm 12.5 s walk, 5 and 10 deg cross-slopes, downhill, shoves, rubble and a 15 mm ledge.
 - Measured at each load: falls, roll and pitch steadiness, peak tilt, speed against the command, drift, time at the servo force limit, servo heat after 60 s, body height.
 - Compared against V7 and the scripted walk at every load.
 - `passability_audit.py` confirms the heaviest load stays passable on every cell used in training.
-- Promotion bar: at 454 g, clearly fewer falls and less roll than V7; at 227 g, no worse than V7. Promotion and deployment stay the user's call.
+- Promotion bar at 454 g, clearly fewer falls and less roll than V7; at 227 g, no worse than V7. Promotion and deployment stay the user's call.
 
 ## Step 5: on G2
 - The same weight ladder as step 1, one walk per step on hardwood, each on the user's reply.
@@ -62,12 +62,12 @@ The sim's servo strength (`MOTOR_FORCE` 0.2) has never been checked under a heav
 
 Attempt 1 (a fresh run with a random load range and a load input) was not better than V7; its terrain curriculum stalled under the mixed loads. The user then set the goal more
 precisely: make the default walk steadier with **today's** payload, with headroom up to 1 lb for the arm. Changes, all approved by the user:
-- Training on top of V7: , a one-time exception to the rule against training on a finished 20M, with the trainer's fine-tune learning rate and the action noise reset to std 0.15.
-- Weight as in V7: (+-18% on G2's own parts), plus: half the episodes at today's payload, the rest with up to 227 g more in the block, the cap rising from 0 over the first 6M.
+- Training on top of V7, a one-time exception to the rule against training on a finished 20M, with the trainer's fine-tune learning rate and the action noise reset to std 0.15.
+- Weight as in V7 (+-18% on G2's own parts), plus: half the episodes at today's payload, the rest with up to 227 g more in the block, the cap rising from 0 over the first 6M.
 - A small crouch: 1.5 mm lower at today's payload, growing to 4 mm (0.16 in) at 1 lb. No paw-height penalty in training (crouching and high paw lift together could make the
   gait unstable); paw lift is a pass rule instead.
-- 12.5 s obstacle episodes: (the obstacles stay where they were), slower commands only with extra weight (60% at 1 lb).
-- Up to 20M: , checked every 2M at 100 episodes per cell; cut off once three checks in a row do not improve the today's-payload score (not before 12M).
+- 12.5 s obstacle episodes (the obstacles stay where they were), slower commands only with extra weight (60% at 1 lb).
+- Up to 20M, checked every 2M at 100 episodes per cell; cut off once three checks in a row do not improve the today's-payload score (not before 12M).
 - Rules, finalists and pass bar: `rl_training/opencat-gym/phase_heavy2.py` docstring. Nothing is promoted or deployed without the user.
 - Control run (added before any result, user-approved): after the fine-tune is scored, the same fine-tune of V7 without the weight changes (no extra load, no crouch, no
   slower commands; same 12.5 s obstacle runs, noise reset and learning rate), for as many steps as the fine-tune ran. It answers whether V7 improves just from a second pass over

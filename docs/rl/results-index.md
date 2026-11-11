@@ -136,7 +136,7 @@ Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail
 
 ## `joint`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +69.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +70.
 
 - `joint_cmd_run20m.json`: Size: 239 KB; Cited by: not cited
 - `joint_cmd_scripted.json`: Size: 25 KB; Cited by: not cited
@@ -192,7 +192,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`history.md`](../ar
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md), [`as-built.md`](../hardware/as-built.md) +15.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`reproduce-g2.md`](../guides/reproduce-g2.md), [`settings-switches.md`](../guides/settings-switches.md) +16.
 
 - `pod_report/pod.json`: Size: 313 KB; Cited by: not cited
 

@@ -51,12 +51,12 @@ push for every contender.
 battery droop and servo warm-up hit everyone equally. One battery charge per
 session; note the surface temperature (servo torque drifts with heat).
 
-- forward speed: (m/s): how: lay out a 1.0–1.5 m lane; time from start line to finish line (phone stopwatch or video frame count); notes: for SCR use its natural speed; for RL command the speed that *matches* SCR's measured speed **and** also RL's own "cruise" (0.10) — report both
-- heading drift: (deg): how: lateral offset at the finish line ÷ lane length, → `atan`; notes: + or − (which way it curves)
+- forward speed (m/s): how: lay out a 1.0–1.5 m lane; time from start line to finish line (phone stopwatch or video frame count); notes: for SCR use its natural speed; for RL command the speed that *matches* SCR's measured speed **and** also RL's own "cruise" (0.10) — report both
+- heading drift (deg): how: lateral offset at the finish line ÷ lane length, → `atan`; notes: + or − (which way it curves)
 - fall rate: how: falls ÷ N runs on that condition; notes: a "fall" = body on the ground / needs manual reset
 - recovery (C6 only): how: of the shoves that caused a visible stagger, fraction where it caught and kept walking without a fall; eyeball time-to-resettle (video); notes: this is H4's real answer too
-- gait quality: (0–3): how: video review: 3 = clean diagonal trot, feet clearing, low body bounce; 0 = dragging / stumbling / hopping; notes: score blind if you can (rename clips)
-- power / endurance: (proxy): how: PiSugar S has no telemetry — use an inline USB power meter on the BiBoard 5 V feed if you have one, else: time to first brown-out walking continuously on C1, one run each; notes: rough; a tie-breaker, not a headline
+- gait quality (0–3): how: video review: 3 = clean diagonal trot, feet clearing, low body bounce; 0 = dragging / stumbling / hopping; notes: score blind if you can (rename clips)
+- power / endurance (proxy): how: PiSugar S has no telemetry — use an inline USB power meter on the BiBoard 5 V feed if you have one, else: time to first brown-out walking continuously on C1, one run each; notes: rough; a tie-breaker, not a headline
 - the "can't" column: how: does the contender do it *at all*: hold a commanded speed (creep 0.04 / fast 0.14), stand on command, walk backward, hold heading to <5°?; notes: SCR structurally can't; RL's whole value proposition
 
 Log raw runs (a notebook row per run: contender, condition, run #, time, offset,
@@ -97,11 +97,11 @@ pass doesn't move it, fall back.
 The head-to-head answers "does it transfer." The ID tooling answers "*why*, and
 what to fix" — run it in the same session:
 
-1. `sysid_collect.py`: (Pi) — runs a fixed calibration sequence (defined
+1. `sysid_collect.py` (Pi) — runs a fixed calibration sequence (defined
    static poses held under gravity + a slow open-loop `wkF` cycle) while logging
    the `V` IMU stream + every command sent. Also `run_gait.py --log` during the
    H1 walks.
-2. `sysid_replay.py`: (Mac) — replays that exact command sequence **open-loop**
+2. `sysid_replay.py` (Mac) — replays that exact command sequence **open-loop**
    in the sim env (feed the recorded joint targets straight to the servos, no
    policy) and diffs the resulting body-tilt / angular-rate trajectories against
    the real IMU log. The gap = the sim-to-real gap, per metric, no joint

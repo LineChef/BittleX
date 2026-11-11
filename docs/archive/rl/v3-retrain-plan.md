@@ -14,8 +14,8 @@ Tuning runs stay possible later if the result needs them, but none are planned.
 
 - Queue order now: S3 (running), then the seed replicates (`kind: replicate`, `G2E_SEED` 43 and 44: control, S1, S2 at each), then the combined S1+S2 recipe at seeds 42, 43 and 44, then S4-S10, K3 and the stage chain (no pause after the replicates: the user asked to run straight through; decisions made along the way are in [`v3-decisions-log.md`](v3-decisions-log.md)), then the `report` job, then the `hardware_checkin` pause, then the 20M. Replicate runs are not screens: they never feed K3's lever list, and they are read by hand (the runner prints no verdict). `train.py` takes the PPO seed from `G2E_SEED` (default 42).
 - World change (2026-10-07): the payload was weighed (168 g, 100 x 40 x 38 mm block) and modeled as `case2`; it is the default in `g2_profile.RECIPE` from the runner restart on. Earlier runs (C0, S1-S3, `v3_r_c0_s43`) used the old split and are history. The control is now `v3_w2_c0`. See [`v3-decisions-log.md`](v3-decisions-log.md).
-- Benchmark version 5: (`benchmark_v4.py`, module name unchanged): adds the difficulty-level ladder (`--ladder`). Training's per-category levels (terrain, ledge, slope, fault) are scored on the finished policy at levels 0.25 / 0.5 / 0.75 / 1.0 plus a +10% hard rung, in the final stage's world (`g2_profile.env_for(..., stage="s6_full_strength")`), with the training probe's own score, relative score and 0.80 threshold. The T and N cells are unchanged, so version 4 results compare cell for cell.
-- The `report` job: (`phase_v3.do_report`, `v3_report.py`) runs right before the hardware check-in: V2.1, the control (`v3_c0b`), K3 and the last finished stage are scored on all cells plus the ladder (about 10 min each), then `trained/v3_report/pre20m_report.html` is written (promotion check against V2.1, ladder charts, every cell, straightness, seed replicates, training history, caveats). Publish it as an Artifact for review before deciding on the 20M. Test it without the real policies: `python v3_report.py --demo --out /tmp/x.html`.
+- Benchmark version 5 (`benchmark_v4.py`, module name unchanged): adds the difficulty-level ladder (`--ladder`). Training's per-category levels (terrain, ledge, slope, fault) are scored on the finished policy at levels 0.25 / 0.5 / 0.75 / 1.0 plus a +10% hard rung, in the final stage's world (`g2_profile.env_for(..., stage="s6_full_strength")`), with the training probe's own score, relative score and 0.80 threshold. The T and N cells are unchanged, so version 4 results compare cell for cell.
+- The `report` job (`phase_v3.do_report`, `v3_report.py`) runs right before the hardware check-in: V2.1, the control (`v3_c0b`), K3 and the last finished stage are scored on all cells plus the ladder (about 10 min each), then `trained/v3_report/pre20m_report.html` is written (promotion check against V2.1, ladder charts, every cell, straightness, seed replicates, training history, caveats). Publish it as an Artifact for review before deciding on the 20M. Test it without the real policies: `python v3_report.py --demo --out /tmp/x.html`.
 
 ### Hand-off, evening of 2026-10-06 (read this first in a new session)
 
@@ -31,13 +31,13 @@ Watchers (Monitor) expire after 30 min: re-arm one on `trained/phase_v3.log`. Pr
 1. V2.1's right drift is mostly hardware: the replaced FL shoulder servo cut it from about +142 to about +36 deg per 12.5 s; the Pi yaw sign made no difference. A scripted firmware turn gait (`kwkL` / `kwkR`, no policy) shows the same bias (-12.1 / +18.6 deg/s, so a steady +3.3 deg/s rightward push).
 2. The sim cannot turn the firmware turn gaits (7% / 3% of the real rate), so the turning gate FAILED: Y4 / Y6 / S5 are off, turns stay firmware tokens.
 3. The Pi-side heading hold's lever has the OPPOSITE sign on G2 from the sim: longer RIGHT strides turn G2 LEFT. The first A/B (hold on +82 deg vs off +65) steered into the drift. Fixed-stride-difference walks (old sign: u = -0.2 / 0 / +0.2 gave +115 / +90 / -29 deg) and a sweep near the cancel point (new sign: u = -0.10 / -0.15 / -0.20 gave +64 / +11 / +1 deg) measured it. The code now defines u > 0 as longer LEFT strides = a right turn (`heading_hold.py`, tests pin it). Never take a stride-steering direction from the sim (the sim's own sign is still unexplained).
-4. Large stride differences are unsafe: at u of -0.25 to -0.38 the back-right leg lands flat on the floor (near a fall). `heading_hold.JOINT_RANGE_DEG` now clamps the scaled shoulders / hips to the reach the unscaled walk uses plus 6 deg. Keep |u| <= 0.25-0.30 and watch.
+4. Large stride differences are unsafe at u of -0.25 to -0.38 the back-right leg lands flat on the floor (near a fall). `heading_hold.JOINT_RANGE_DEG` now clamps the scaled shoulders / hips to the reach the unscaled walk uses plus 6 deg. Keep |u| <= 0.25-0.30 and watch.
 5. The drift GREW through the evening (+44 -> +65 -> +90 -> +178 deg per 12.5 s at u = 0) while the resting pack fell from 8.20 V to 7.93 V, so every closed-loop iteration chased a moving target. Closed-loop runs (feed-forward -0.17..-0.29, kp 0.01, ki 0.001, limit 0.25-0.38) never settled: the output sat at its limit, and the user saw hard left turns late in several runs. The integral term wound up (now clamped, `i_lim`), and the controller's gains were designed for a lever 4x weaker than the real one. The yaw log agreed with what the user saw at fixed u = 0 (right) and u = -0.28 (straight, then left from the 6th step), but not in iterations 3-4; the log's final yaw also jumps when G2 is picked up at the end of a run (ask what was seen; the fall guard only trips at 60 deg of tilt).
 6. Other changes: G2 now rests after every run (`run_gait` restores balance first and sends the rest last; the old order left him standing); logs are line-buffered; both low-battery alarms are set to about 50% on the Pi only (`G2_BATTERY_LOW_V=8.0`, `G2_PI_WARN_FRACTION=0.50`) and were heard; the BiBoard's onboard voice module reacts to spoken commands during tests (one stray command made G2 fall).
 
 **Next steps, in order.**
 1. User charges the pack (full is about 8.3-8.4 V; check with `check_serial send P` after stopping `g2-voice`) and reboots the Pi (its battery count restarts at boot).
-2. Charged-pack recheck: (the TODO box below): `bash tools/g2_baseline.sh start 12 recheck --const-u=0,-0.20,-0.28 --hold-umax 0.30 --reset-s 10 --lead-s 5`; the user calls left / right / straight per run; compare with the logs.
+2. Charged-pack recheck (the TODO box below): `bash tools/g2_baseline.sh start 12 recheck --const-u=0,-0.20,-0.28 --hold-umax 0.30 --reset-s 10 --lead-s 5`; the user calls left / right / straight per run; compare with the logs.
 3. Dial the correction in, one run at a time with an adjustment between runs: `python3 tools/g2_dial_iter.py hold N FF KP KI UMAX` (or `const N U`) prints the result of one run; start from the measured cancel point (about u = -0.19 on a charged pack, to be re-measured), keep UMAX <= 0.30, KP about 0.01, KI small, and ask what the user saw. Goal: a straight path every time (final heading within about +-10 deg, small spread), at one battery level. Only then decide whether the hold goes into the sim (the user is unsure it should).
 4. Remaining Phase 0 items: six scripted `wkF` walks (`run_gait.py --openloop --cycles 10 --log ...`), the full-charge V2.1 baseline repeat (`g2_baseline.sh start 6 <label>`), distance taped; the servo step / static tests need the Pi off the lid (USB).
 5. Parked: FL shoulder still stops about 44 deg going up (new servo, not mechanical), BR knee reading, FL knee short going up, the sim's steering sign, carpet (own session).
@@ -60,7 +60,7 @@ The direct servo readings on the new servo (USB to the Mac) are next; then the r
 - Investigation, plan, ramp fix, 4 torch threads, the yaw-sign fix (deployed to the Pi, `g2-voice` restarted).
 - Servo step-test tool (`tools/servo_step_test.py`); the Phase 2 code: `g2_profile.py`, `benchmark_v4.py`, `phase_v3.py` (rehearsed end to end on
   tiny jobs: training, parallel scoring, pass/fail, combo, stage chain, resume), `mirror.py`, and all levers behind flags (inert when off, checked).
-- Two findings that changed the plan: (§1.3, §2.3): (1) the sim's 137 deg/s servo-speed limit is the dominant sim-vs-G2 gap: at ~250 deg/s the
+- Two findings that changed the plan (§1.3, §2.3): (1) the sim's 137 deg/s servo-speed limit is the dominant sim-vs-G2 gap: at ~250 deg/s the
   sim's roll swing matches G2's and V2.1 turns RIGHT; (2) `drift_probe.py` did not force the command, so its speeds were wrong (now fixed; the old
   JSONs are marked superseded). Also: the trot-symmetry term and the joint-smoothness terms are inert, so R5 was revised.
 - Mirror-loss cost measured: 757 steps/s vs 892 plain (+18% time) after restructuring to one forward pass; a test checks the single pass equals SB3's.
@@ -83,7 +83,7 @@ The direct servo readings on the new servo (USB to the Mac) are next; then the r
 ### 1.1 The yaw-sign mismatch is real but doesn't explain the drift
 - The Pi fed the policy yaw with the opposite sign to the sim's (firmware + = right, PyBullet + = left). V2.1 doesn't use heading
   (yawflip / yawzero sim tests: +9.4 / +8.4 / +9.1 deg, identical joints), so this didn't cause the turn.
-- Fixed anyway: (`run_gait.POLICY_YAW_SIGN`, `c292431`), because a heading-aware policy would steer the wrong way. Offline replay of
+- Fixed anyway (`run_gait.POLICY_YAW_SIGN`, `c292431`), because a heading-aware policy would steer the wrong way. Offline replay of
   the six 10-06 walks reproduces 100% of the logged commands, so the Pi ran V2.1 exactly.
 
 ### 1.2 What the drift is, as far as the data goes
@@ -201,9 +201,9 @@ the phase slow-down and imitation fade (PPO diverged); a stride reward (gamed).
 - Loss: a small PPO subclass (flag-gated, e.g. `G2E_MIRROR_LOSS=<weight>`) adds `w · ||μ(M_s(s)) - M_a(μ(s))||²` on the policy mean,
   plus `w_v · (V(M_s(s)) - V(s))²`, to the PPO loss. Data augmentation was rejected: it needs probabilities for samples the policy never
   took, which can destabilize PPO. The exported ONNX keeps the same inputs/outputs; the Pi is untouched.
-- Joint permutation: (URDF order 0 FLsh 1 FLel 2 FRsh 3 FRel 4 BRhip 5 BRkn 6 BLhip 7 BLkn): `[2,3,0,1,6,7,4,5]`, no sign flips (all
+- Joint permutation (URDF order 0 FLsh 1 FLel 2 FRsh 3 FRel 4 BRhip 5 BRkn 6 BLhip 7 BLkn): `[2,3,0,1,6,7,4,5]`, no sign flips (all
   joints share one sign convention; the `wkF` mirror check above used no sign change).
-- Observation mirror: (layout: `state_robot` = quat(4) [x,y,z,w], roll/pitch rate(2), proj_grav(3), time phase(1), tilt history(12×2
+- Observation mirror (layout: `state_robot` = quat(4) [x,y,z,w], roll/pitch rate(2), proj_grav(3), time phase(1), tilt history(12×2
   roll,pitch), ang_acc(2), cmd(2) [fwd, yaw]; then `angle_history` 30 frames × 8 joints):
   - quat → (-x, y, -z, w) (mirror across the body's x-z plane: roll and yaw flip, pitch stays)
   - rates (r, p) → (-r, p)
@@ -296,7 +296,7 @@ screens, fewer scoring episodes (all change quality).
 
 - Calm-walk bar for every round: calm falls ≤ min(0.15, C0 + 0.05); speed ≥ 90% of C0. 24-episode fall rates carry about ±15 points of
   noise; don't chase small differences.
-- K3 = every passing lever together: (fresh 3M). It must beat C0 on the levers' targets with no regression. If it fails, run K1 (passing
+- K3 = every passing lever together (fresh 3M). It must beat C0 on the levers' targets with no regression. If it fails, run K1 (passing
   yaw levers S1-S6) and K2 (passing smoothness levers S7-S10) to find the group, then drop the lever whose removal recovers it (one 3M run
   per suspect). R7 only if K3 still drifts on long walks.
 
@@ -359,7 +359,7 @@ re-tuned (+60-70 min each); the 20M stops at a gait check and a fallback is take
 moment calibration ends. A phase that overruns moves everything after it by the same amount.
 
 ## 5b. Decisions and status, evening of 2026-10-06 (user)
-- Pi-side heading hold: (`pi_pipeline/gait/heading_hold.py`, `--heading-hold`, off by default): the first 16-run A/B on G2 (hold on drifted +82 deg, off +65) steered the
+- Pi-side heading hold (`pi_pipeline/gait/heading_hold.py`, `--heading-hold`, off by default): the first 16-run A/B on G2 (hold on drifted +82 deg, off +65) steered the
   wrong way: the stride-difference lever has the OPPOSITE sign on the real G2 from the sim (fixed-u walks, `real-walk-log.md` "The stride-difference lever has the
   opposite sign..."). Sign fixed in the code; next is a round that dials the correction in (feed-forward near the measured cancel point plus the feedback) until the
   walk is a straight line, then it can go into the sim for **scoring only** (the sim's own steering sign must be understood first).
@@ -407,7 +407,7 @@ moment calibration ends. A phase that overruns moves everything after it by the 
 - `pi_pipeline/gait/run_gait.py`: `POLICY_YAW_SIGN` (deployed to the Pi 2026-10-06).
 
 ## 7. Gotchas
-- The heading lever's sign: on the real G2 LONGER RIGHT strides turn him LEFT (measured 2026-10-06); `steer_probe.py` / the sim say the opposite. Never take the direction of a stride-length steering effect from the sim; measure it with fixed-u walks first.
+- The heading lever's sign on the real G2 LONGER RIGHT strides turn him LEFT (measured 2026-10-06); `steer_probe.py` / the sim say the opposite. Never take the direction of a stride-length steering effect from the sim; measure it with fixed-u walks first.
 - Scripts that start `SubprocVecEnv` workers must run from a file, not stdin (workers re-import `__main__`).
 - `G2E_` env vars set training knobs (`_g2e` in the env). `DR_EVAL_FULL` is a module attribute, not an env var.
 - `G2E_CMD_PATH=` (empty) means the default `""` (ideal path); `drift_probe.py` only sets defaults it doesn't find in the environment.

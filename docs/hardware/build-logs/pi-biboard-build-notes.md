@@ -31,10 +31,10 @@ edge, three ports along the bottom:
 
 *(Image not included: third-party artwork. See [the vendor's page](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).)* Top-down port map of the Raspberry Pi Zero 2W: 40-pin GPIO header along the top edge with pins 2 (5V, not used), 6 (GND), 8 (GPIO14/TXD), 10 (GPIO15/RXD) called out; microSD slot on the left edge; mini-HDMI, a micro-USB "USB" data-only port, and a micro-USB "PWR IN" port along the bottom edge; unused CSI camera port on the right edge
 
-- PWR IN: is the micro-USB port at the far end of the bottom edge,
+- PWR IN is the micro-USB port at the far end of the bottom edge,
   farthest from the mini-HDMI — silkscreen reads `PWR IN`. This is where a
   bench power supply goes.
-- USB: is the middle micro-USB port, for data only (keyboard, USB-gadget
+- USB is the middle micro-USB port, for data only (keyboard, USB-gadget
   mode). **Powering the Pi through this port is the #1 first-timer
   mistake** — it may not boot, or boot erratically. The two ports are
   physically identical; only the tiny silkscreen text tells them apart.

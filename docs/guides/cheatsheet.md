@@ -88,7 +88,7 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 
 ## Claw and camera
 
-- `g2claw calibrate`: which way a positive pan turns the camera
+- `g2claw calibrate` which way a positive pan turns the camera
 - `g2claw pictures`: straight, left, right pictures
 - `g2claw test`: one look around
 - `g2claw hold`: do the legs hold 20 s
@@ -105,7 +105,7 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 
 ## Data and review
 
-- `g2sync status`: when each copy last worked
+- `g2sync status` when each copy last worked
 - `g2sync run --force all`: copy everything from the Pi now
 - `g2sync now goals`: copy one thing (goals, pictures, memorydb, logs...)
 - `g2pics`: the review page: pictures, facts, goals
@@ -138,7 +138,7 @@ Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab (
 - `g2mic off 30`: wake word off for 30 minutes
 - `g2mic on`: wake word back on
 - `g2micon`: same as `g2mic on`
-- `g2mic status`: on or off, time left
+- `g2mic status` on or off, time left
 - `g2chat`: talk to Claude by typing
 - `g2voice`: the voice loop on this Mac
 - `g2audio devices`: audio diagnostics

@@ -211,7 +211,7 @@ reflash. Full story, in order:**
    **`B10_251121`** — read as a 2025-11-21 build, ~10 months older than
    the `main`-branch source review (2026-09-07/09-20). Strong
    circumstantial evidence the stale build had different IMU timing.
-4. Separately that same night: , found and fixed a real firmware bug
+4. Separately that same night, found and fixed a real firmware bug
    (below) requiring a full flash erase + reflash to Petoi's *current*
    official firmware via the Desktop App.
 5. After the reflash, re-ran `--probe-imu`: exactly 5.0 Hz (25 lines /
@@ -352,8 +352,8 @@ Desktop App release newer than 1.2.9.
 - `IMU_EXCEPTION_LIFTED` (-2): `pitch < -50°` or `pitch > 75°`
 - `IMU_EXCEPTION_KNOCKED` (-3): Z-axis accel shock vs previous frame
 - `IMU_EXCEPTION_PUSHED` (-4): X/Y accel shock ≈ 4.9 g (X) / 7.3 g (Y)
-- `IMU_EXCEPTION_FREEFALL` (-6): —
-- `IMU_EXCEPTION_TURNING` (-7): —
+- `IMU_EXCEPTION_FREEFALL` (-6) —
+- `IMU_EXCEPTION_TURNING` (-7) —
 
 `gFactor = GRAVITY / 8192 ≈ 0.00122`.
 
@@ -370,7 +370,7 @@ if (gyroBalanceQ) {
 
 - Fires **only if gyro assist is on** (`gyroBalanceQ`).
 - Runs skill `rc` **once**, same skill for supine and side falls (no differentiation).
-- No retry / give-up logic: if still flipped after `rc` finishes, the exception
+- No retry / give-up logic if still flipped after `rc` finishes, the exception
   re-triggers next tick → effectively "keep trying `rc`" until upright or gyro off.
 
 **Sim-fidelity gap (why self-right failed to train — see `self-righting-research.md`):**
@@ -459,7 +459,7 @@ second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-
 
 ## IMU calibration (`gc`) — needed for the firmware's gyro balance, 2026-10-01
 
-- Symptom before calibrating: with firmware gyro balance ON (`gB`), `kbalance` made G2
+- Symptom before calibrating with firmware gyro balance ON (`gB`), `kbalance` made G2
   push its FR foot out and tilt the body ~19° roll / ~11° pitch (IMU-measured, steady);
   with balance OFF (`gb`) the same pose was level (roll -0.4°, pitch 1.7°). So the
   legs/servo calibration were fine and balance was chasing a wrong IMU zero. The
@@ -494,7 +494,7 @@ Symptom: standing on the calibration stand, G2 is steady at first (roll/pitch no
 **Measured with `gait/stand_log.py`** (passive: IMU print `gP` plus a `P` voltage read, no motion commands; the `g2-voice` service stopped so only one process uses the port). Logs: `~/g2_runs/stand01..05*.csv` on the Pi.
 - Episodes: roll up to ~4-6 degrees and pitch up to ~9-11 degrees peak-to-peak; one sustained run settled into a steady cycle at **about 1.9 Hz** (roll, pitch and the accelerometer all agree), pitch ~±5 degrees by the accelerometer. At 5 Hz sampling, 1.9 Hz could also be an alias of ~3.1 Hz.
 - It is **real body motion**, not an IMU glitch: a tilt computed from the accelerometer alone (gravity direction, independent of the firmware's fusion) swings as much or more than the fused roll/pitch.
-- Not the battery: (7.86-7.94 V throughout) and **not the Pi's periodic `P` read** (the service was off).
+- Not the battery (7.86-7.94 V throughout) and **not the Pi's periodic `P` read** (the service was off).
 - A/B with firmware gyro balance off (`gb`): calm from the first second, and a deliberate nudge (6.7 degrees peak-to-peak) died out in under 10 seconds. With balance on, comparable nudges ring for 40+ seconds.
 - Conclusion: the balance feedback loop, fed by an IMU that updates at 5 Hz (see the IMU rate notes above), is marginally stable and locks into a limit cycle once disturbed; some starts (a stand-up from rest) disturb it without any touch.
 - Side notes: the firmware's accumulated yaw counter can jump by exactly 360 degrees mid-episode (an unwrap artifact; the wrapped yaw is unchanged), and the front-left shoulder servo's faults (see `rl/real-walk-log.md`) may make it easier to excite but are not needed to explain it.

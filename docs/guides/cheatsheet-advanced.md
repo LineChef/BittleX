@@ -79,7 +79,7 @@ python promote_release.py --candidate trained/X.onnx --name ARM1 --attachment ar
 - `g2doctor --serial`: readiness checklist: key, models, serial, audio, disk
 - `g2bringup`: guided, resumable hardware bring-up
 - `g2serial ports`: list serial ports
-- `g2serial ping`: is the BiBoard answering
+- `g2serial ping` is the BiBoard answering
 - `g2serial firstmove`: guided first movement, one joint at a time
 - `g2serial allmoves`: full movement sweep
 - `g2app --serial`: the whole robot as one program

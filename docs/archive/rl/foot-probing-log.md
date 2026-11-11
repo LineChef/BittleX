@@ -96,9 +96,9 @@ tuning problem
 Traced the full approach gait cycle step by step (tilt, load state, and
 distance-to-edge every step). The FL paw has exactly two "unloaded and
 roughly level" windows before crossing the edge:
-- Early: (~t=4-8, paw 25-30mm from the edge): level (tilt 3-4°),
+- Early (~t=4-8, paw 25-30mm from the edge): level (tilt 3-4°),
   unloaded -- this is what the proactive trigger fires on.
-- Late: (~t=78+, paw 5-18mm from the edge, much closer): also unloaded,
+- Late (~t=78+, paw 5-18mm from the edge, much closer): also unloaded,
   but tilt has already climbed to 10-18° by then (ordinary within-stride
   postural oscillation, unrelated to the ledge) -- too late for the <5°
   safety condition that makes the trigger "proactive" in the first place.

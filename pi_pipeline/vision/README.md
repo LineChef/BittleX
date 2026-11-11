@@ -84,7 +84,7 @@ One JSON object per line, **921600 baud**:
   anything else here: a miss is a fall.
 - Wire `Avoider` decisions to the actuator and `narrate` to the voice loop in the
   Phase 10 runtime.
-- After vision works, revisit the locomotion policy: with perception in the
+- After vision works, revisit the locomotion policy with perception in the
   loop — the Phase 8 "Target capability" in the project plan.
 
 ## `terrain_feature.py` (removed)

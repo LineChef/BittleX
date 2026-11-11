@@ -90,7 +90,7 @@ questions, and every leg offset above was unchanged. In the arm build the calibr
 - 0 claw pan: -14
 - 1 claw lift: 0
 - 2 claw open: 1 (Auto)
-- 8 to 15 legs: as in the table above
+- 8 to 15 legs as in the table above
 
 ## After the legs were removed and refitted
 

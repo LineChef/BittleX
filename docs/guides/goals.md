@@ -112,19 +112,19 @@ file. Every override is in the report under "Overrides". `g2goal reset ball_punt
   pace and turn rates start from the old values the same way.
 - A settled setting is left alone: When one value clearly beats the values next to it, he moves on to the next setting his failures point at; it is looked at again if that
   value starts failing.
-- The pack %: is kept with every attempt (the report's "pack" column); he does not learn from it yet.
+- The pack % is kept with every attempt (the report's "pack" column); he does not learn from it yet.
 
 ## 8. Several goals
 
-- Turn away from walls: is a standing goal: always on, never started. Every exploration and every ball chase that meets a wall dials it in, both ways: a bump (or turning but
+- Turn away from walls is a standing goal: always on, never started. Every exploration and every ball chase that meets a wall dials it in, both ways: a bump (or turning but
   still touching) pushes his wall distances out; turning with lots of room to spare, or leaving a ball lying by a wall, pulls them in. Its settings:
   `python -m pi_pipeline.behavior.wall_settings` (the file `~/.local/share/g2/wall_settings.json`); `g2goal report walls` shows what he learned.
 - Walls come first: While chasing the ball he never gets closer than `chase_wall_in` (10 in to start, learned, never below 4 in) to a wall, turns away at it, and leaves a ball
   lying nearer a wall than that (the attempt ends "ball by the wall" and does not count against the punt). A bump while walking stops the walk.
-- Calibrating the wall reading: (`python -m pi_pipeline.vision.wall_distance calibrate`, voice service stopped) is optional: he learns against the reading as it is. After a new
+- Calibrating the wall reading (`python -m pi_pipeline.vision.wall_distance calibrate`, voice service stopped) is optional: he learns against the reading as it is. After a new
   calibration his records start fresh and his settings carry over to the same real distances, so he adjusts to it on his own.
 - The order: `g2goal priority` shows it, `g2goal priority walls ball_punt` sets it (highest first).
-- "G2, practise": (or "practice"): he picks what to practise from the stored order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
+- "G2, practise" (or "practice"): he picks what to practise from the stored order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
   goal session, or a 5-minute exploration roam for walls). "G2, practise walls" or "practise the punt" names one. `g2goal practise` shows his scores without moving him.
 
 ## 8b. The "Identify new objects" goal

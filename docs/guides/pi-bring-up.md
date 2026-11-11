@@ -20,7 +20,7 @@ what is physically needed to join the three boards:
 
 - PiSugar S → Pi Zero 2 W: What connects: pogo pins on the PiSugar mate to the copper pads on the **underside** of the Pi; it clips to the Pi's back with the **standoffs/screws in the PiSugar box**; What to buy: **nothing extra** — no cable, no soldering. Charge it via its **own micro-USB** (have a USB-A→micro-USB cable). Does *not* touch the 40-pin header, so it coexists with the BiBoard wiring.
 - Pi → BiBoard (serial, data-only): What connects: 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays (see below); What to buy: **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them), and possibly a **5-pin header** to solder onto BiBoard if it's not already populated
-- microSD → computer: (for flashing): What connects: writing the Pi OS image; What to buy: a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**.
+- microSD → computer (for flashing): What connects: writing the Pi OS image; What to buy: a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**.
 
 - Pi → BiBoard (serial, data-only): 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power) — BiBoard's 5-pin header has two +5V pins, both also left unconnected. Confirmed pinout: [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos of exactly where to solder: `blueprints/build-logs/pi-biboard-build-notes.md`.
 - Pi → BiBoard (serial, data-only): **Check the Bittle X box first** — Petoi sometimes includes a BiBoard↔Pi cable, which would cover this already.
@@ -40,9 +40,9 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 
 - 512 MB RAM, soldered, not expandable: the whole voice stack (Vosk ~300 MB runtime + Piper/onnxruntime + Python) barely fits; swap is mandatory, running voice+vision together is doubtful, PyTorch is a bad idea (see §7)
 - 4× Cortex-A53 @ 1 GHz (ARMv8, aarch64): must run **64-bit** Pi OS for ML wheels; compiles are slow; real-time TTS/STT is not guaranteed — must be measured
-- Wi-Fi `brcmfmac` with power-save: on by default** (Bookworm)**: SSH stalls or drops under CPU load until it is disabled. Do this first; the fault is hard to diagnose later ([forum](https://forums.raspberrypi.com/viewtopic.php?t=357629))
+- Wi-Fi `brcmfmac` with power-save on by default** (Bookworm)**: SSH stalls or drops under CPU load until it is disabled. Do this first; the fault is hard to diagnose later ([forum](https://forums.raspberrypi.com/viewtopic.php?t=357629))
 - Bookworm = NetworkManager, config lives in `/boot/firmware/` not `/boot/`: old `wpa_supplicant.conf` / `ssh` file tricks are dead; use the Imager ([zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/))
-- PiSugar S: is a *dumb* UPS — no I²C, no battery %, no voltage query: can only sense "external power present"; battery monitoring must be external or skipped; the fancier PiSugar 2/3 are what the tutorials assume ([PiSugar docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series))
+- PiSugar S is a *dumb* UPS — no I²C, no battery %, no voltage query: can only sense "external power present"; battery monitoring must be external or skipped; the fancier PiSugar 2/3 are what the tutorials assume ([PiSugar docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series))
 - serial on the Zero 2 W defaults to the flaky mini-UART** (`/dev/ttyS0`); the good PL011 is tied to Bluetooth**: for a reliable BiBoard link, disable BT and take the PL011 — done in config, no robot needed
 
 ---
@@ -206,7 +206,7 @@ So:
 - No `pisugar-power-manager` software: worth installing — it's built for the
   2/3, which expose battery % over I²C at `0x57`/`0x75`. On the S it has nothing
   to read.
-- No battery-percentage or low-battery signal: for the code. A "G2 is getting low"
+- No battery-percentage or low-battery signal for the code. A "G2 is getting low"
   warning needs an external ADC on a Grove analog pin; otherwise sessions are
   simply time-boxed. (Matches the plan's existing note.)
 - Physical setup: charge it full over its own micro-USB; pogo-pins mate to the
@@ -371,10 +371,10 @@ raise `gpu_mem`, and reboot. An SPI screen needs neither. The voice model is als
   ×real-time (synth_seconds / audio_seconds — want < 1.0).
 - Claude API: round-trip latency for a minimal `messages.create` from the
   Pi's network, 5 samples, p50/p95. (Just HTTPS — the SDK installs clean.)
-- Serial: (later, needs BiBoard) round-trip of a no-op token.
+- Serial (later, needs BiBoard) round-trip of a no-op token.
 - Thermals / Wi-Fi: `vcgencmd measure_temp` and an `ssh`-liveness ping while
   `stress-ng --cpu 4 --timeout 120s` runs — confirms §3 actually took.
-- ONNX policy: (later): load the exported policy, time 1000 `run()` calls.
+- ONNX policy (later): load the exported policy, time 1000 `run()` calls.
 
 Deliverable of the bench: a go/no-go on "voice pipeline runs on this Pi in real
 time", and numbers to decide voice-only vs voice+vision co-residency.

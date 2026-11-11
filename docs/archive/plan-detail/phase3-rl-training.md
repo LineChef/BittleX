@@ -44,7 +44,7 @@ leave no shippable gait — worst case is a wasted overnight.
   `gait-v7-stumble-catch` remain the reference gaits until a real-hardware
   head-to-head. Established that big-stumble recovery can't be reward-tuned
   further on this control setup.
-- Sim benchmark, learned vs scripted: (`benchmark_gaits.py`,
+- Sim benchmark, learned vs scripted (`benchmark_gaits.py`,
   [`docs/archive/rl/gait-benchmark.md`](../rl/gait-benchmark.md)): on flat ground the learned
   gaits win — `phase3-gait` covers ~4× the distance of open-loop `wkF` keyframes.
   On obstacle courses the scripted keyframes are hard to beat; `phase3-gait` does
@@ -119,7 +119,7 @@ leave no shippable gait — worst case is a wasted overnight.
   campaigns running.** (Note: the detailed day-to-day between 2026-09-05 and
   this entry lives in the dated `docs/rl/*.md` logs, not backfilled here —
   this is a rollup of today specifically.)
-  - `RESIDUAL_SCALE_DEG` widened 22 -> 30: (fresh 20M run, `run20m_resid30_ppo`),
+  - `RESIDUAL_SCALE_DEG` widened 22 -> 30 (fresh 20M run, `run20m_resid30_ppo`),
     full Stage 3 benchmark suite run against the prior `run20m_ppo` base
     (decathlon, gaits-vs-scripted, recovery probe, action-trace, leg-tinting
     replays — published report). Close overall, but resid30 wins decisively
@@ -132,7 +132,7 @@ leave no shippable gait — worst case is a wasted overnight.
     [`docs/archive/rl/resid30-log.md`](../rl/resid30-log.md) have the full report and
     reasoning; `run20m_ppo` kept in `trained/` as the prior-base reference
     point, not deleted.
-  - Gait-friction campaign: (why the residual spends ~4-8deg even on calm
+  - Gait-friction campaign (why the residual spends ~4-8deg even on calm
     flat ground): amplitude-scaling the reference pose by commanded speed
     tried and **reverted after two rounds**, both clear regressions (residual
     usage roughly doubled, then still ~1.5x worse even with a much narrower

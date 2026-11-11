@@ -10,7 +10,7 @@ Approved by the user 2026-10-10 (levels 1 to 3; level 4, reflection that changes
 
 ## Guardrails
 
-- One memory-processing Claude call per session: (user, 2026-10-10), across the memory tidy-up and the reflection together: `MemoryCallGate` (`memory/call_log.py`). The pass that asks first gets it; the other waits. The gate reopens when someone talks to G2 again or the voice service restarts (every exploration hand-over restarts it).
+- One memory-processing Claude call per session (user, 2026-10-10), across the memory tidy-up and the reflection together: `MemoryCallGate` (`memory/call_log.py`). The pass that asks first gets it; the other waits. The gate reopens when someone talks to G2 again or the voice service restarts (every exploration hand-over restarts it).
 - A record of every attempt: `~/.local/share/g2/memory_calls.jsonl` (kind, called / skipped / failed, mode, counts, reason). `python -m pi_pipeline.memory calls [--days N]` prints calls per day. The billed request is also in the API log (sources `consolidate`, `reflect`).
 - Dry run first: `G2_REFLECT=dry` is the default. The call is made, the notes it would save go to `reflections_dry.jsonl`, nothing is saved. Read them (`python -m pi_pipeline.memory reflect` shows a fresh dry run), then set `G2_REFLECT=on` in the Pi's `.env`, or save one pass with `reflect --apply`.
 - Notes pass two filters: the ordinary fact filter (no dates, times, schedules) and a stricter one: the note must be about G2 ("I ..."), short, not a time of day or routine, not a near-duplicate of one he has. Nothing about where or when a person was.

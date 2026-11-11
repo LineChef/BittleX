@@ -6,8 +6,8 @@ Status: G2 can flip himself back over from fully on his back. This was confirmed
 
 Read from the OpenCat source (`PetoiCamp/OpenCat` `InstinctBittle.h`, `OpenCatEsp32` `reaction.h`):
 
-- `rc`: is the recover skill: a 4-frame keyframe skill that drives the shoulders to about −88° and the knees to about +100° to throw the body over, then settles to a low crouch. Serial token `krc`.
-- `rl`: is a roll-over maneuver (back to belly): 6 frames. Serial token `krl`.
+- `rc` is the recover skill: a 4-frame keyframe skill that drives the shoulders to about −88° and the knees to about +100° to throw the body over, then settles to a low crouch. Serial token `krc`.
+- `rl` is a roll-over maneuver (back to belly): 6 frames. Serial token `krl`.
 - Other stock recovery poses: `lnd` (landing), `knock`, `dropRec`, `lifted` and `dropped`.
 - The trigger is the IMU, not the infrared remote (which Bittle X V2 does not support). While gyro balance is on, `dealWithExceptions()` watches for `IMU_EXCEPTION_FLIPPED` (past about 85° of tilt), plays a fall sound and loads `rc`.
 - A scripted **push reflex** (`IMU_EXCEPTION_PUSHED`) sidesteps or steps back after a shove, and `IMU_EXCEPTION_OFFDIRECTION` turns in place to correct heading drift.
@@ -17,7 +17,7 @@ More detail on the firmware path: [`petoi-firmware-reference.md`](petoi-firmware
 ## Limits
 
 - Speed: self-righting is disabled for fast gaits such as trot, because the robot no longer knows it is flipped, so a fall at speed may not trigger it.
-- The push reflex only fires while standing: , not during a walking gait. A stumble mid-walk is not covered by the firmware; the learned mid-gait catch is complementary.
+- The push reflex only fires while standing, not during a walking gait. A stumble mid-walk is not covered by the firmware; the learned mid-gait catch is complementary.
 - With the Pi in the loop: `pi_pipeline`'s `RecoveryFSM` (`link/recovery.py`) has flags marked hardware-gated for a possible conflict with the firmware's own flip-triggered `rc`. It is built and tested but not wired in, so today the firmware handles recovery on its own. Retest self-righting with the Pi connected before wiring the FSM in.
 - The simulation cannot show it: Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model). Judge self-righting on the robot, not in the sim.
 

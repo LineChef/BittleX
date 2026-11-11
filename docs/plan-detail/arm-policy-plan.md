@@ -39,15 +39,15 @@ Note: the user judged G2 at his limit at 481 g (2026-10-21); the arm build is ab
 
 ## Training (unattended runner `phase_arm.py`, a copy of `phase_pod.py`)
 
-1. Build and preflight: (about 1 h of work, then `preflight.py` must pass): the `arm` profile in `opencat_gym_env.py`, the runner, a sim
+1. Build and preflight (about 1 h of work, then `preflight.py` must pass): the `arm` profile in `opencat_gym_env.py`, the runner, a sim
    playback check that the claw box sits where intended.
-2. Two 3M screens: on the `arm` payload, one after the other (about 26 min each):
+2. Two 3M screens on the `arm` payload, one after the other (about 26 min each):
    - `armwk`: the arm walk base, the V7 recipe. The candidate recipe.
    - `armctl`: today's `wkF` base, the V7 recipe. The control: shows whether the arm walk base helps with the claw.
 
    Gate for `armwk` (standing screening rule): it learns, and it does not fall more on flat ground than the control. If it fails, the chain
    runs on whichever screen passed, and the report says so.
-3. The V6/V7 chain: on the passing recipe, fresh from S0: S0 2M, S1 3M, S2 3M, S3 1M, a flat-ground check, then the 20M (about 4 h in all).
+3. The V6/V7 chain on the passing recipe, fresh from S0: S0 2M, S1 3M, S2 3M, S3 1M, a flat-ground check, then the 20M (about 4 h in all).
    The 20M is part of tonight's training per the user ("train the new walking policy tonight").
 4. Pick, export, score: average of the last 5 checkpoints, exported to ONNX with the sidecar (`base_ref: wkArm`, `payload_profile: arm`,
    residual scale, command cadence). Scored against **V7 in the same claw world** (V7 is the policy G2 would run with the arm today), 100
@@ -174,32 +174,32 @@ from the platform project's model). No length specs for the arm are published.
 
 ### Hardware, 2026-10-25 (H4 to H6, hardwood, battery 100% then 88%)
 
-- H4, Petoi's walk: (`kwkF`, 10 s): 4 ft 4 in and 4 ft 5 in (0.13 m/s), 5 to 7 in off line; roll swing 3.3 to 3.7 deg; cycle about 0.5 s (from the IMU roll period).
+- H4, Petoi's walk (`kwkF`, 10 s): 4 ft 4 in and 4 ft 5 in (0.13 m/s), 5 to 7 in off line; roll swing 3.3 to 3.7 deg; cycle about 0.5 s (from the IMU roll period).
 - H5, the arm walk from the Pi at the training pace (1.25 s cycle): 1 ft 7 in in 7.5 s (0.064 m/s, the sim's figure), 1 in off line.
-- H6, ARM1: (cmd 0.10): one fall at the stand-up, then no falls; roll swing 9 to 11 deg (sim 3.5), 20 to 26 deg left; the front right leg limped (not during Petoi's
+- H6, ARM1 (cmd 0.10): one fall at the stand-up, then no falls; roll swing 9 to 11 deg (sim 3.5), 20 to 26 deg left; the front right leg limped (not during Petoi's
   walk). The user saw the cause: ARM1 put its front feet much further out (front shoulders 62 to 63 deg against Petoi's 55). Why: the sim played the base at
   cmd / 0.10, and Petoi's walk moves only 0.064 m/s at that rate, so the policy closed a 56% speed gap with a longer reach.
-- ARM1R: (the fix: `G2E_PHASE_RATE_NOM_CMD` 0.064, so a 0.10 command plays the base 1.56x faster; promoted for the arm and deployed 8:02 AM): front shoulders
+- ARM1R (the fix: `G2E_PHASE_RATE_NOM_CMD` 0.064, so a 0.10 command plays the base 1.56x faster; promoted for the arm and deployed 8:02 AM): front shoulders
   56 deg, back 75, yaw +12 deg, no fall. The user: more stable than ARM1, still a lot of roll. The reward had almost nothing against roll and a soft imitation term.
-- Weights: (user): 532 g with the arm (sim 502 g); front feet 288 g, back 259 g (52.6% front; the sim matched). **Claw height** standing: 1.25 in (sim 22 to 26 mm).
+- Weights (user): 532 g with the arm (sim 502 g); front feet 288 g, back 259 g (52.6% front; the sim matched). **Claw height** standing: 1.25 in (sim 22 to 26 mm).
 
 ### Hardware, 2026-10-25 later (turns, claw, stand-up)
 
-- H7, Petoi's turns: (`kwkL` / `kwkR`, 5 s): no falls, roll within +-3 deg; left turn 6 deg/s (the user saw it turn left), right turn about 5 deg/s.
-- Claw bench: (standing): `kpickD` and `kputD` ran clean (`kpickD` tilts the body under 5 deg; `kputD` raises the nose about 9 deg). Decoded from the skill table: `pickD` is a pick for something right under the jaws (the legs crouch, the jaws drop to the floor); `pickF` is the forward lunge (arm to 75, front legs fold). With the 3 in treat ball under the jaws, `kpickD` tried to grab it but the jaws were too low (the crouch) and did not open wide enough. The claw opens at least to 125 with no strain; the user thinks the widest setting might just straddle the ball. Claw height standing: 1.25 in (user); ball about 3 in against an opening of about 2.75 in.
+- H7, Petoi's turns (`kwkL` / `kwkR`, 5 s): no falls, roll within +-3 deg; left turn 6 deg/s (the user saw it turn left), right turn about 5 deg/s.
+- Claw bench (standing): `kpickD` and `kputD` ran clean (`kpickD` tilts the body under 5 deg; `kputD` raises the nose about 9 deg). Decoded from the skill table: `pickD` is a pick for something right under the jaws (the legs crouch, the jaws drop to the floor); `pickF` is the forward lunge (arm to 75, front legs fold). With the 3 in treat ball under the jaws, `kpickD` tried to grab it but the jaws were too low (the crouch) and did not open wide enough. The claw opens at least to 125 with no strain; the user thinks the widest setting might just straddle the ball. Claw height standing: 1.25 in (user); ball about 3 in against an opening of about 2.75 in.
 - Arm stood at the wrong angle (found today): the Pi never sets the arm's lift servo. After `rest` it sits at 59 to 61 (claw on the floor), and a Pi walk that began from rest walked with the claw reaching forward. The arm build's own `kbalance` sets it to 0. With the arm at 0 the ARM1R walk (cmd 0.10, 12.5 s) went 4 ft 5 in, 5 in off line, roll spread 6.2 deg against 7.2 before; the user: the rocking was better.
-- Stand-ups fell front right: (about four times this morning, the front right leg giving way; the user checked it for heat, play and weakness and a bench sweep of all four legs looked fine, so it is how the stand-up moves). The firmware `kbalance` lifts all eight leg joints at once with the claw out ahead. The arm build now stands up in order (`standup.stand_sequenced`, profile `poses.stand_via` = `sequenced`): the rear legs first, the front legs starting when the rear is half way (a fast start), the lift servo easing 60 to 0 inside the same `i` commands, `kbalance` last; 2.7 s, level (pitch +1.2 deg) in the first run, and the user: it looked good. Used by the walk loops (`ramp_to_stand`) and the link's stand-up.
-- The Pi-to-BiBoard plug comes undone during falls: (user): the board then answers some commands and not others, or none. If the board does not answer, check the plug first.
-- Fall recovery is off for the arm: (`fall_recovery: false`): the scripted self-right, roll-over and drop-recover moves are refused.
+- Stand-ups fell front right (about four times this morning, the front right leg giving way; the user checked it for heat, play and weakness and a bench sweep of all four legs looked fine, so it is how the stand-up moves). The firmware `kbalance` lifts all eight leg joints at once with the claw out ahead. The arm build now stands up in order (`standup.stand_sequenced`, profile `poses.stand_via` = `sequenced`): the rear legs first, the front legs starting when the rear is half way (a fast start), the lift servo easing 60 to 0 inside the same `i` commands, `kbalance` last; 2.7 s, level (pitch +1.2 deg) in the first run, and the user: it looked good. Used by the walk loops (`ramp_to_stand`) and the link's stand-up.
+- The Pi-to-BiBoard plug comes undone during falls (user): the board then answers some commands and not others, or none. If the board does not answer, check the plug first.
+- Fall recovery is off for the arm (`fall_recovery: false`): the scripted self-right, roll-over and drop-recover moves are refused.
 - Open: the servo angle scale of the arm firmware (P1S, 290 deg range, against the P1L the stock build drives): the arm looked right at lift 90, the legs were not measured; a knee move tipped the body under 1 deg, too little to test a 7% difference. A phone level on a straight leg, or two photos of a knee, would settle it.
 
 ### Fetch the green ball: what was built and measured (2026-10-25)
 
-- The ball: (the cat's treat ball): about 3 in across; the claw opens to about 2.75 in (up to angle 125, no strain), so it cannot be grabbed (tested standing at 95 and at 125). `kpickF` (the forward lunge) hits it and throws it **about 18 in straight ahead**; that is the cat game. `kpickD` crouches the legs and drops the jaws too low for a ball. Roll in the lunge up to +15 to +18 deg (the earlier test +-1.6).
+- The ball (the cat's treat ball): about 3 in across; the claw opens to about 2.75 in (up to angle 125, no strain), so it cannot be grabbed (tested standing at 95 and at 125). `kpickF` (the forward lunge) hits it and throws it **about 18 in straight ahead**; that is the cat game. `kpickD` crouches the legs and drops the jaws too low for a ball. Roll in the lunge up to +15 to +18 deg (the earlier test +-1.6).
 - Punt calibration: a ball 2.6 in from the camera is a good punt (the claw hits it first); 4.5 in is too far. Punt range in the code: 2 to 3.5 in from the camera.
-- Finding the ball: (`vision/ball_finder.py`, plain numpy, no model, no scipy on the Pi): the green channel stands out from red and blue (55 to 85 on the ball, 19 or less elsewhere); blobs, the biggest round one. Distance from its size (330 / diameter in px inches), direction from its position. On correctly exposed pictures: 19 of 23 found (the 4 misses are the ball in a patch of direct sun, which goes pale), 3 false alarms in 19 pictures without the ball (the flat green card and the ring). Ball size at 6 / 12 / 24 / 36 in: 50 / 27 / 16 / 8 px across.
+- Finding the ball (`vision/ball_finder.py`, plain numpy, no model, no scipy on the Pi): the green channel stands out from red and blue (55 to 85 on the ball, 19 or less elsewhere); blobs, the biggest round one. Distance from its size (330 / diameter in px inches), direction from its position. On correctly exposed pictures: 19 of 23 found (the 4 misses are the ball in a patch of direct sun, which goes pale), 3 false alarms in 19 pictures without the ball (the flat green card and the ring). Ball size at 6 / 12 / 24 / 36 in: 50 / 27 / 16 / 8 px across.
 - Pictures: 88 with the ball and 19 without, in `training_data/greenball/` (session_1 was taken with the camera's exposure balancing off by mistake: later frames overexposed, 31 of 54 usable; session_2 with it on, rule: never take a picture with it off) and in the review page (`g2pics`: Named: greenball, greenball-noball). 25 of the 73 first-set files are cut off by 16 bytes (the camera's usual truncation). 50 ball pictures were promoted to the training data automatically; the no-ball ones are kept out. The trained "ball" class needs 300+ varied pictures: the chase saves each picture with the ball found, with its box, once every 2 s (approved by the user).
-- The chase: (`behavior/ball_chase.py`): stop, look, step: turn toward the ball (Petoi's turn, 6 deg/s), walk up to it (`kwkF`, 3 s at most), punt (`kpickF`), look where it went, search toward the side it was last seen, back up after three punts that do not move it; never gives up on its own (stop file `~/.local/share/g2/ball_chase_stop`, Ctrl-C, a fall, or a battery under 30% or unreadable). (Since 2026-10-31 the walks are the policy walk, not `kwkF`, timed from the pace G2 measures himself; the search adds claw looks and back-ups; close to the ball he lines up with small turns; the chase is also the first goal: [`../planned/goals-plan.md`](../planned/goals-plan.md).) Dry run on the Pi: sensible decisions. Live 5 steps: the walks did not close the distance (20 in before and after) and the back left leg was out in the pictures; suspected cause, the link's `gb` right after each skill cutting the firmware walk short (to test: the same walk with and without it). Not yet fixed.
+- The chase (`behavior/ball_chase.py`): stop, look, step: turn toward the ball (Petoi's turn, 6 deg/s), walk up to it (`kwkF`, 3 s at most), punt (`kpickF`), look where it went, search toward the side it was last seen, back up after three punts that do not move it; never gives up on its own (stop file `~/.local/share/g2/ball_chase_stop`, Ctrl-C, a fall, or a battery under 30% or unreadable). (Since 2026-10-31 the walks are the policy walk, not `kwkF`, timed from the pace G2 measures himself; the search adds claw looks and back-ups; close to the ball he lines up with small turns; the chase is also the first goal: [`../planned/goals-plan.md`](../planned/goals-plan.md).) Dry run on the Pi: sensible decisions. Live 5 steps: the walks did not close the distance (20 in before and after) and the back left leg was out in the pictures; suspected cause, the link's `gb` right after each skill cutting the firmware walk short (to test: the same walk with and without it). Not yet fixed.
 - Battery: the pack died during the chase and nothing warned: the voice service's battery watch only runs while the service does, and it is stopped for every hardware test. `power.battery.motion_gate` (fail safe: under 30% or an unreadable voltage is not ok) is used by the chase; tests for it are in; not yet deployed to the Pi after the last change. Always read the battery percent before a hardware test.
 
 ## ARM1X: the claw world as measured, a training system that keeps learning (user, 2026-10-25, plan approved)
@@ -211,16 +211,16 @@ entropy bonus. Changes (runner `phase_armx.py`, log `trained/phase_armx.log`):
 
 - The world: 532 g (`build_limits.json`), the claw 9 mm higher (`opencat_gym_env.ARM_LOWER_DZ`; standing 31 to 35 mm), the `armsmall` recipe (imitation
   sharpness 8, roll and roll-rate terms, residual 15 deg; its 3M screen: roll 2.2 deg, side-hill 8 deg falls 7 / 12%, but less crossing of clutter).
-- Per-build tops: (`build_limits.json`): step-ups 15 mm on the arm. The top caps the training ramp, is where a hazard counts as trained, and is the top of the
+- Per-build tops (`build_limits.json`): step-ups 15 mm on the arm. The top caps the training ramp, is where a hazard counts as trained, and is the top of the
   scorers' ladder; the old top is scored as a separate "beyond this build" row, outside the means.
-- Trained and stuck hazards: (`G2E_FR_TRAINED_SHARE` 0.05): a hazard passing at its top for 6 updates in a row drops to 5% of its share (practice over its whole
+- Trained and stuck hazards (`G2E_FR_TRAINED_SHARE` 0.05): a hazard passing at its top for 6 updates in a row drops to 5% of its share (practice over its whole
   range) and goes back to full share if its recent success falls 0.15 under the bar. A hazard below its top that has not moved for 3M steps is logged STUCK.
-- The eval: (`G2E_EVAL_FR`): 16 clean episodes, then each hazard at half and all of its own top; the plateau rule uses the hazards not yet trained.
-- The plateau rule: (`G2E_PLATEAU_SMOOTH`): three-eval means against the best earlier three-eval mean, the curriculum over the same windows, a hazard turning
+- The eval (`G2E_EVAL_FR`): 16 clean episodes, then each hazard at half and all of its own top; the plateau rule uses the hazards not yet trained.
+- The plateau rule (`G2E_PLATEAU_SMOOTH`): three-eval means against the best earlier three-eval mean, the curriculum over the same windows, a hazard turning
   trained counts as progress. Off in this 20M (log only: "WOULD STOP"), so the run goes the full 20M.
-- Screens: (3M each, rule set before the results in `phase_armx.adopt`): control, PPO batch 512 x 5, entropy bonus 0.005, back paws at 20 mm in mid-swing.
+- Screens (3M each, rule set before the results in `phase_armx.adopt`): control, PPO batch 512 x 5, entropy bonus 0.005, back paws at 20 mm in mid-swing.
   Then S0 to S3 and the full 20M with what was adopted, pick final or avg5, export `ARM1Xcand`, compare with ARM1R and Petoi's walk in the same world.
-- The claw stays at its walking pose (lift 0): at 1.25 in standing and about 1 in at the lowest point of a walk it clears a 15 mm step; a 20 mm step would want
+- The claw stays at its walking pose (lift 0) at 1.25 in standing and about 1 in at the lowest point of a walk it clears a 15 mm step; a 20 mm step would want
   about 10 deg of lift, only once the legs can do 20 mm.
 
 ### ARM1X result (sim, 2026-10-25, 2:53 PM) and promotion
@@ -248,7 +248,7 @@ Surface set to desk; the new code (commit 002fd40: the punch with the claw shut,
 
 ## Queued until the ball testing is done (user, 2026-10-25: no work on walking or standing before then)
 
-- Stand-up "needs more work": (user, 2026-10-25 4:3x PM): fixed so far, the second stand-up (the firmware `kbalance` after the sequence replayed it) and the jerky arm pull-back (1.6 s lift, 3 deg a step); more feedback to be added here as it comes.
+- Stand-up "needs more work" (user, 2026-10-25 4:3x PM): fixed so far, the second stand-up (the firmware `kbalance` after the sequence replayed it) and the jerky arm pull-back (1.6 s lift, 3 deg a step); more feedback to be added here as it comes.
 - The arm servo angle scale on the legs (P1S 290 deg against P1L 270 deg), unmeasured.
 - Walking: ARM1X repeat runs (one run so far, 1 in off line), the sim-hardware roll gap, a foot trim if needed.
 - Raising the slope evidence (30 to 15 episodes) and the snag hazard for the next training run; the trained ball class; the wall estimator for the claw camera; the dim-room picture set.

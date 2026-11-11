@@ -119,7 +119,7 @@ mechanically," not a guess.
    [`blueprints/mounting.md`](../../blueprints/mounting.md).)*
 
 **Phase 1 — the Pi is now physically wired to the frame**
-4. Weigh the final build: on a kitchen scale, with the Pi + PiSugar S + camera
+4. Weigh the final build on a kitchen scale, with the Pi + PiSugar S + camera
    + mount actually on the robot. Weigh the **camera cluster and the PiSugar S
    battery separately** (the battery is >½ the current spine estimate; if it
    mounts somewhere distinct, it needs its own sim body). Balance each piece on

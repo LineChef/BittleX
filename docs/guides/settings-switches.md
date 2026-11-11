@@ -103,7 +103,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 - `G2_NARRATE_START_QUIET_S`: Default: 8; What it does: no narration for the first seconds of an exploration
 - `G2_WALL_STEER`: Default: on; What it does: `0` turns the wall turn-away off (used to let him walk into a wall and test the hit sequence)
 
-- G2_SURVEY_CLAW: with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) instead of the bow, the sit and the check pose; `1` forces it, `0` brings the old looks back
+- G2_SURVEY_CLAW with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) instead of the bow, the sit and the check pose; `1` forces it, `0` brings the old looks back
 - G2_RELEASE_VOICE: a line that needs synthesis during the session loads it first (about 10 s); `0` keeps it loaded
 
 
@@ -153,7 +153,7 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 - G2_GOAL_INPROCESS: goal sessions (`g2ball`, "G2, ball goal") run inside the running voice service, borrowing its serial link, IMU stream and camera, so the port to the BiBoard is never closed. `0` = the old hand-over: the service is stopped, the session runs on its own, the service is started again (also `g2goal run GOAL --standalone`). Needs a serial link and a camera in the service, else it falls back by itself
 - G2_DROP_FRAGMENTS: a turn of one or two filler words ("yeah", "ah", "the") right after the wake word is dropped with no reply and no saved record, and in the follow-up window (no question asked) a single word or filler pair is dropped too. `0` turns the filter off. Half of the wake triggers logged in one week were false, which is why it exists
 - G2_PLACES: short summaries reach the prompt when a room is mentioned or asked about. `python -m pi_pipeline.memory place list` shows it
-- G2_GOAL_LESSONS: by default the notes stay in the journal and ONE `goal_summary` fact per goal is kept, shown in chat only when the ball, a goal or practice comes up
+- G2_GOAL_LESSONS by default the notes stay in the journal and ONE `goal_summary` fact per goal is kept, shown in chat only when the ball, a goal or practice comes up
 - G2_PROMPT_CACHE: the part of every Claude request that never changes (tool list and system prompt, about 2,500 tokens) is cached and billed at a tenth of the input price on a hit: `1h`, `5m` or `off`. The mood, narration and gait hints sit after the cached part so changing one never resets it. `g2api` shows the tokens read from the cache
 - G2_RECALL_MAX_CHARS: Over it the lowest-ranked facts go first, then past moments; the core facts stay. `0` = no limit. Notes are sent with their own request only, never repeated in the history
 - G2_API_DAILY_USD: A warning in the log at 80%; at the ceiling G2 says he has used up his thinking budget and makes no more Claude calls until midnight (moves and stop words still work). `0` = no ceiling. The busiest day so far cost $0.44. `g2api` ends with today's figure

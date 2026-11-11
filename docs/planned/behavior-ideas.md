@@ -166,7 +166,7 @@ for G2 specifically: the successful proprioceptive-locomotion literature
 relies on real-time joint-torque sensing at full gait rate, e.g. ANYmal's
 IMU+encoders+torque-sensor stack, and G2 only has real-time IMU — the
 Bittle X V2's confirmed position-feedback servos are too slow and PWM-wire-
-disruptive for control-rate use, see [`specs.md`](../hardware/specs.md#servo-position-feedback-researched-2026-09-01)).
+disruptive for control-rate use, see [`specs.md`](../hardware/specs.md#servo-position-feedback)).
 But a *slow, deliberate* probe-then-decide action is a different, smaller
 problem: pause, extend a leg toward where the next foothold should be,
 check whether it met resistance around the expected point (or reached past
@@ -517,7 +517,7 @@ vision + avoidance + voice + link together — a good capstone. Add it as anothe
 
 **Explore mode is built as two tiers** (design session 2026-09-10; see
 `project-plan.md` Phase 10):
-- Tier 0 "attentive": (`behavior/attentive.py`) — stationary, always-on
+- Tier 0 "attentive" (`behavior/attentive.py`) — stationary, always-on
   life-signs layer on IDLE: gaze-follow a person, react to novelty (look → peer
   bow → curious chirp), periodic head scan, greet known people. No walking.
 - Tier 1 "roam": `Mode.EXPLORE` (`ModeController` + `Explorer` + `Novelty`),
@@ -654,14 +654,14 @@ this entry stands.
 - Preempts everything: explore mode, patrol, go-to-object, even a direct
   voice command to keep walking. Sits above the personality/behavior layer, not
   inside it.
-- The light classification path: (`vision/scene.py`'s `classes()`, floor vs.
+- The light classification path (`vision/scene.py`'s `classes()`, floor vs.
   edge — no box regression) rather than full object detection: faster, simpler,
   and every frame counts here.
 - On trigger: hard stop, back away from the triggering direction, re-orient
   toward the confirmed-floor side.
 
 **Making the classifier actually reliable:**
-- Custom-train it on the real desk: , not a generic "table edge" model — the
+- Custom-train it on the real desk, not a generic "table edge" model — the
   camera's actual mounted height/angle, multiple times of day, and deliberately
   including tricky cases (an object near the edge, glare, a shadow crossing the
   boundary).
@@ -834,7 +834,7 @@ fact ("the dog is often to the left") via the runtime's `on_observation` seam �
 `Memory.store.add_fact`. Direction-relative-to-usual-spot only — no graph, no
 coordinates, no timestamps. The place *graph* + landmarks below are still TODO.
 
-- Places: at a spot, capture the view and store a scene description in the
+- Places at a spot, capture the view and store a scene description in the
   memory DB ("kitchen: checkerboard floor, fridge base on the right, dark
   doorway ahead"). Match a fresh view against stored ones to re-localize.
   Matching, cheapest first: Claude compares descriptions → perceptual hash of
@@ -928,8 +928,8 @@ feet: `hsF` is a knee-folded crouch (17.8 mm clearance against 13.5 mm for the n
    work: the user poses the leg, Claude nudges single joints by command (`i`) until the user approves the pose, and that pose is the keyframe.
 2. Record one leg's step: Servos relaxed, the user moves one front leg through the step (lift, reach, plant) and the Pi saves the joint
    angles as keyframes; then a back leg the same way.
-3. Build the 4-leg cycle: from those shapes with the normal walk's phase timing (as the `hs*` variants were built from `wkF`).
-4. Sim check: (`gait_probe.py`): clearance, sway, falls and the ledge ladder; tune the timing until it stands up open loop.
+3. Build the 4-leg cycle from those shapes with the normal walk's phase timing (as the `hs*` variants were built from `wkF`).
+4. Sim check (`gait_probe.py`): clearance, sway, falls and the ledge ladder; tune the timing until it stands up open loop.
 5. On G2: short floor walks, judged by eye; then it replaces `hsF` behind the "hi step" voice mode (`gait/gait_mode.py`).
 6. Later: a base for a trained high-step mode (fresh candidate, never on top of a finished 20M).
 

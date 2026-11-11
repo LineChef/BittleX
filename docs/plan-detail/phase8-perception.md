@@ -84,7 +84,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
   (SenseCraft-trained "floor" vs. "edge ahead"), not a dedicated sensor. Use the
   module's `classes()` output for that — a boxless classification path, lighter
   than object detection.
-- Vision module limits: (vendor docs — full detail in
+- Vision module limits (vendor docs — full detail in
   [`docs/hardware/specs.md`](../hardware/specs.md)):
   - Detections *or* a raw frame, never both at once. The `Avoider` reflex
     (needs the detection stream) and `scene.narrate` (needs a frame for Claude)
@@ -182,7 +182,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       - Turning → firmware: Heading changes use the scripted `kbk`/`wkL`
         turn gaits (they work on the real robot), triggered by the behaviour
         layer. `AvoidanceAction.TURN_*` map to these.
-      - Vision-while-walking → the `Avoider` reflex: (`pi_pipeline/vision/
+      - Vision-while-walking → the `Avoider` reflex (`pi_pipeline/vision/
         avoidance.py`), which sets the *speed command* the RL walk policy already
         tracks. Added 2026-09-07: `AvoidanceAction.SLOW` (obstacle ahead but not
         near → `ACTION_SPEED_SCALE` 0.4) for anticipatory slowing. Sequence as an

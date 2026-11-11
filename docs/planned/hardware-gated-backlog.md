@@ -59,7 +59,7 @@ bodies** so the fore/aft CoM split is right:
   values (kitchen scale; balance each sub-assembly on an edge for its CoM), then
   a from-scratch 20M run — or a clean `--finetune-lr` continuation from
   `run20m_ppo` if the delta is small. Re-run the decathlon payload-on.
-- Cheap-ish: and high-value — a wrong payload model is a direct sim-to-real error.
+- Cheap-ish and high-value — a wrong payload model is a direct sim-to-real error.
 
 ## H3 — Clean re-run of the 4a ledge test  🟡  ⚪
 
@@ -84,7 +84,7 @@ setup, not the reward: this, and the original Run 6/7 conclusion.
 - Trigger: the H1 head-to-head shows real servo torque supports active
   recovery *better than sim predicted* — i.e. the ceiling was a sim artefact, not
   physics. (If hardware confirms the ceiling is real, this stays closed forever.)
-- Work: from-scratch 20M-class run with the diagonal-support catch bonus +
+- Work from-scratch 20M-class run with the diagonal-support catch bonus +
   loosened in-recovery residual baked in from step 0, not bolted on. Gated on the
   green-light checklist ([[project_longrun_trigger]]).
 - Measure with `benchmark_recovery.py` (payload off — the payload masks recovery
@@ -286,7 +286,7 @@ mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
   (behaviour-layer duty-cycle governor + cooldown pose). Ship first.
 - The one missing number: real trip time + cooldown rate from a single
   bench test once hardware is up — calibrates `k_gen`/`k_diss`/`T_trip`.
-- Specifically re-evaluate `_MAX_CONTINUOUS_S`: (the 8-min "take a break"
+- Specifically re-evaluate `_MAX_CONTINUOUS_S` (the 8-min "take a break"
   backstop in `thermal_guard.py`). It is NOT a thermal estimate — just a blind
   floor. Once the heat estimator is calibrated, check whether it reliably
   catches the danger case on its own; if so, **raise `_MAX_CONTINUOUS_S` a lot
@@ -364,10 +364,10 @@ commanded angle and recent joint history, and have the sim call it in place of i
 
 ## Do-now sim tasks (not hardware-gated)
 
-- Get-up sim replay: (H9) — watch the existing scripts in PyBullet.
+- Get-up sim replay (H9) — watch the existing scripts in PyBullet.
 - ONNX export + numerical-parity check: export `run20m_ppo`, confirm the
   exported policy matches the PyTorch one step-for-step before the Pi arrives.
-- Diagnostics / black-box logging — Phase 1: (`pi_pipeline/diag/`) — structured
+- Diagnostics / black-box logging — Phase 1 (`pi_pipeline/diag/`) — structured
   session log + ring buffer + manifest + summarize/replay tooling so hardware
   failures are debuggable. Plan: [`../hardware/diagnostics.md`](../hardware/diagnostics.md).
   Not hardware-gated; pairs with the ONNX/bring-up work.

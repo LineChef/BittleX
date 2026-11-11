@@ -70,7 +70,7 @@ Never send `Xa`/`XAd` to the voice module (see the project rule in the repo CLAU
 - Mobile app: download the arm's command config file attached to the Petoi page and batch-import the buttons
   ([import steps](https://docs.petoi.com/mobile-app/controller.md#import-commands-in-batches)).
 - Mind+ / Petoi Coding Blocks: the **Perform robot arm skill** block runs the predefined skills.
-- Skill Composer: (Desktop App): author new arm skills and export them to the mobile app, a Mind+ program or source code
+- Skill Composer (Desktop App): author new arm skills and export them to the mobile app, a Mind+ program or source code
   ([Skill Composer](https://docs.petoi.com/desktop-app/skill-composer),
   [source-code skill creation](https://docs.petoi.com/applications/skill-creation)).
 - Sensors: the page says the arm can be combined with other sensors, with the Grove Vision AI V2 as the example
@@ -134,9 +134,9 @@ shift that becomes front shoulders 15, rear 20, front knees 56, rear 50: a stanc
   physical servos the stock build drives as P1L, every commanded angle (firmware skills and the Pi's `i` stream from the policy alike)
   would move about 7% less, and calibration offsets scale the same way. Which is true is not stated anywhere found; measure it on the
   bench after the flash (command a known angle and compare).
-- Joint 1: (the arm's lift) is limited to −10..180° instead of ±85°. During gaits it is held at 0, or 50 for any `bk` gait; the stock
+- Joint 1 (the arm's lift) is limited to −10..180° instead of ±85°. During gaits it is held at 0, or 50 for any `bk` gait; the stock
   build's small head sway during gaits is off.
-- The claw: is joint 2 ("assigned to the tail joint"). It is left out of the ±3° random posture shift and is not mirrored in mirrored
+- The claw is joint 2 ("assigned to the tail joint"). It is left out of the ±3° random posture shift and is not mirrored in mirrored
   behaviours. Calibration `c-2` finds its closed point by vibration, using the IMU.
 - Lifted recovery: the automatic `dropRec` when G2 is picked up is disabled (the skill itself is still in the table).
 - Skill table: 85 skills instead of 93. Not checked: which eight were dropped, and what the `R` serial token (`T_ROBOT_ARM`) does.
@@ -167,7 +167,7 @@ walk (`i` commands), so the arm stays where the last firmware posture put it.
   time is set by the loop speed and is not in the source. `wkArmF` has 43 frames against `wkF`'s 116, so at the same loop speed it cycles
   about 2.7 times faster. Measure it on G2 (`fw_skill_log.py kwkF` under the arm build) before matching it in the sim, where the base is
   played at `PHASE_RATE_NOM_CMD` (today 1.25 s per cycle at the nominal command).
-- Gyro balance: (`motion.h` `adjust()`, applied in `perform()` only while `gyroBalanceQ` is on, firmware default on): every few frames
+- Gyro balance (`motion.h` `adjust()`, applied in `perform()` only while `gyroBalanceQ` is on, firmware default on): every few frames
   it takes roll and pitch minus the skill's expected roll and pitch, ignores a dead band (5 deg roll, 3 deg pitch), and adds a
   proportional per-joint correction (pitch pushes front and rear legs opposite ways, roll left and right). The change per update is capped
   by `ADJUSTMENT_DAMPER` and the total is clamped. The source shown does not say whether it also acts on angles streamed with `i`. G2 keeps
@@ -218,13 +218,13 @@ arm build, and ARM1 trains on `wkArmF` with the claw in the sim ([`../guides/att
   /dev/cu.usbmodem... --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 4MB 0x1000
   bootloader 0x8000 partitions 0xe000 boot_app0 0x10000 app`, from `release/2.0/BittleX+Arm/BiBoard_V1_0/`). The app reports a `usbmodem` port as
   "non-preferred" (it prefers `wchusbserial`, the name with WCH's own driver); that is harmless.
-- The stored calibration survived the flash: (no first-boot questions); the calibrator names joints 0 to 2 Claw Pan, Claw Lift and Claw Open.
+- The stored calibration survived the flash (no first-boot questions); the calibrator names joints 0 to 2 Claw Pan, Claw Lift and Claw Open.
 - Boot: the firmware ends its start-up with `rest` then `d`, so the servos are off until a pose: an `i` command then updates the board's record but
   does not move anything.
 - Arm lift (joint 1): higher values swing the claw forward and out; 0 is the walking pose (the arm hanging down in front of the chest, the claw level and
   forward: a reverse L). **Claw (joint 2):** positive opens it, 0 closes it fully.
 - Poses: stand stable with the claw about 1 in off the floor; sit clear; at rest (lift 59) the claw rests against the floor.
-- The voice module came back in Chinese: , as after every reflash; the Pi's start-up sets it to English.
+- The voice module came back in Chinese, as after every reflash; the Pi's start-up sets it to English.
 
 ## What the page does not say
 

@@ -145,8 +145,8 @@ run on their own, no wake word needed. See
 
 ## The three sounds of an exchange
 
-- beep: (one short bright note): he heard the wake word and is listening
-- boop: (one lower, rounder note): G2 decides the speaker has finished and has the words
+- beep (one short bright note): he heard the wake word and is listening
+- boop (one lower, rounder note): G2 decides the speaker has finished and has the words
 - two falling notes: the follow-up window ended: he has stopped listening (say the wake word again)
 
 On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`). The two falling notes play when the follow-up window closes: the mic stays open `G2_FOLLOW_UP_S` seconds after a reply (default 5; 0 = no window, so no closing notes), and 8 s (`G2_QUESTION_WINDOW_S`) after a reply that ends in a question.
@@ -154,11 +154,11 @@ On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps
 
 ## G2's character sounds
 
-- grunt: (low "hmph"): Plays when: G2 is rebuffed ("shut up", "go away" and the like); Turn off: `G2_GRUNT=0`
-- losing horn: (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip): Plays when: he refuses a request (today: a gait he cannot switch to), and when he tips over at any time, walking or standing (see below); Turn off: `G2_REFUSE_SOUND=0`
+- grunt (low "hmph"): Plays when: G2 is rebuffed ("shut up", "go away" and the like); Turn off: `G2_GRUNT=0`
+- losing horn (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip): Plays when: he refuses a request (today: a gait he cannot switch to), and when he tips over at any time, walking or standing (see below); Turn off: `G2_REFUSE_SOUND=0`
 - *(not built)* a recognition miss, "what is this?" with no match: Plays when: the instance recognizer is not connected to the spoken "what is this?" yet (that goes to Claude's vision); add the horn when it is
 - sigh / yawn: Plays when: going to sleep after 5 min at rest / waking; Turn off: `G2_SLEEP_AFTER_S=0`
-- turning away: (two soft falling notes, about 0.35 s, 70% of the usual level): Plays when: an exploring G2 turns away from a near wall, so the reason for the turn is audible (prototype); Turn off: `G2_WALL_SOUND=0` (and `G2_WALL_STEER=0` stops the steering itself)
+- turning away (two soft falling notes, about 0.35 s, 70% of the usual level): Plays when: an exploring G2 turns away from a near wall, so the reason for the turn is audible (prototype); Turn off: `G2_WALL_SOUND=0` (and `G2_WALL_STEER=0` stops the steering itself)
 - oof: Plays when: built; will play when G2 hits a wall, once wall recognition and wall-distance calibration are trained (a bump cannot be told from walking in the 5 Hz IMU); Turn off: n/a
 
 - losing horn (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip): he refuses a request (today: a gait he cannot switch to), and when he tips over at any time, walking or standing (the stand guard watches the IMU for a tilt past 60 deg for 0.3 s; `G2_FALL_HORN=0` for the fall)

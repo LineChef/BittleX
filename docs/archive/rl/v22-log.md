@@ -11,7 +11,7 @@ Six real hard-floor V2.1 walks on the case (2026-10-06, [`real-walk-log.md`](../
 (weights and positions: [`../../hardware/specs.md`](../../hardware/specs.md)).
 
 ## What the sweeping stage found (V2.1 frozen, 422 g payload, full randomization, flat ground, 12.5 s, `drift_probe.py`)
-- The heavier payload alone: (no drift lever): sim roll std 5.5 deg (real 5.9), pitch 3.1 (real 2.3), 2 of 12 episodes fall (the real walks never fell). The old
+- The heavier payload alone (no drift lever): sim roll std 5.5 deg (real 5.9), pitch 3.1 (real 2.3), 2 of 12 episodes fall (the real walks never fell). The old
   377 g model gave 3.1 deg roll, so most of the roll gap was the payload.
 - Single-leg faults barely turn V2.1 in the sim: servo zero offsets (8 and 14 deg), a shortened shoulder swing (to 50% and 20%), motor force cuts (40% and 15%),
   and a 30% friction foot all leave the heading within about +-20 deg of straight, and the harsher ones mostly add falls.
@@ -55,7 +55,7 @@ a round passes if its calm falls are no more than the control's + 0.05 (and <= 0
   `ps -axo pid,etime,command | grep -E "[t]rain.py --tag|Python phase_v22"` shows what is alive. The runner and the training survive the Claude session ending.
 - Notifications belong to the Claude session that armed them. A new session will NOT be told when a round finishes: read `trained/phase_v22.log` (lines starting
   `[v22 ...]`: `ROUND n START/DONE PASS|FAIL`, `HW CHECKIN`, `FINAL ...`) or arm a new Monitor on it.
-- To add the next round: (after a `ROUND n DONE` line) append an entry to `rounds` in `trained/v22_queue.json`: `{"tag": "v22_r2_...", "desc": "...", "extra": {"G2E_...": "..."}}`.
+- To add the next round (after a `ROUND n DONE` line) append an entry to `rounds` in `trained/v22_queue.json`: `{"tag": "v22_r2_...", "desc": "...", "extra": {"G2E_...": "..."}}`.
   The runner reads the file between rounds and waits 12 minutes for a new entry; with none it goes to the hardware check-in with the best passing round.
   Cap: six rounds (`MAX_ROUNDS`). Plan: rounds 1-5 single levers (drift, then yaw wobble e.g. `G2E_FAC_YAW_TRACK` 9 -> 12 and `G2E_FAC_HEADING` 5 -> 8); round 6 the best of each together.
 - Hardware check-in: after the rounds the runner logs `HW CHECKIN` and PAUSES (no 20M run). Export the best round's policy (`export_onnx.py`, with its `.onnx.json` sidecar), put
@@ -66,7 +66,7 @@ a round passes if its calm falls are no more than the control's + 0.05 (and <= 0
 - Pitfall: `pkill -f phase_v22.py` also kills any watcher whose command line contains that text. Kill the runner by pid
   (`ps -axo pid,command | awk '/Python phase_v22/ && !/awk/ {print $1}'`); the training is a separate process and is not affected. The runner resumes a round that is already training.
 - Mac sleep: closing the lid sleeps the Mac and pauses training (`caffeinate -i` only stops idle sleep). Keep the lid open or use clamshell mode on power.
-- After a successful 20M run: (finished, gates passed): export, benchmark V2.1 and the new policy on the original ladder AND on a ladder with the hardest rungs raised 10%
+- After a successful 20M run (finished, gates passed): export, benchmark V2.1 and the new policy on the original ladder AND on a ladder with the hardest rungs raised 10%
   (add a `--hard-scale` option to `benchmark_decathlon.py` first; not built yet), validate the deploy path (`validate_deploy.py --onnx`), then name it `Release_CandidateV2.2`, set
   `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py`, commit, `rsync` to the Pi, and walk it with the user once G2 is online. Promote only if the user's pass checks (see
   below) hold; otherwise stop and report.

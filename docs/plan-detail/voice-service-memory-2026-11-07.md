@@ -12,7 +12,7 @@ The Pi has 463 MB usable. With the voice service stopped the whole OS idles at a
 The service itself read 280 MB resident plus 71 MB in swap 3 minutes after boot (about 351 MB) before the change below.
 
 ## Done (2026-11-07)
-- Arena off for Piper and the embedder: (`util/ort_memory.py`; `G2_ORT_ARENA=1` restores the old way). In isolation Piper after a sentence: 175 MB to 155 MB, same speed (2.7 s to 2.6 s for a sentence). In the service at 3.5 minutes after boot: 317 MB total with no swap, against about 351 MB.
+- Arena off for Piper and the embedder (`util/ort_memory.py`; `G2_ORT_ARENA=1` restores the old way). In isolation Piper after a sentence: 175 MB to 155 MB, same speed (2.7 s to 2.6 s for a sentence). In the service at 3.5 minutes after boot: 317 MB total with no swap, against about 351 MB.
 - Tried and dropped: `MALLOC_ARENA_MAX=1` with a low trim threshold on the service: 316 MB against 317 MB, no gain. The test override was removed.
 
 ## Already in place
@@ -20,9 +20,9 @@ The embedder (DINOv2 session, about 100 MB) is lazy: it loads on first use and i
 
 ## Options left, biggest first (none done)
 1. (Built 2026-11-07, `G2_RELEASE_VOICE`): **Release Piper while no sentence is likely** (about 155 MB). Loading takes about 10 s, so the first reply after a release would lag; the speech cache already covers fixed lines. A release only during a goal session or an exploration roam (which speak little) avoids the lag in conversation.
-2. A smaller or quantised Piper voice: (the 63 MB `ryan-low` is already the low-quality one; a smaller voice would sound worse; needs a download, which needs the owner's yes).
-3. A systemd `MemoryHigh` limit: so a runaway is throttled instead of dragging the whole box into swap. Untested.
-4. Run heavy work in-process: (already the direction for goals), so no second copy of the stack is loaded.
+2. A smaller or quantised Piper voice (the 63 MB `ryan-low` is already the low-quality one; a smaller voice would sound worse; needs a download, which needs the owner's yes).
+3. A systemd `MemoryHigh` limit so a runaway is throttled instead of dragging the whole box into swap. Untested.
+4. Run heavy work in-process (already the direction for goals), so no second copy of the stack is loaded.
 
 ## Smaller Piper voices (researched 2026-11-07; nothing downloaded)
 The robot filter (`voice/effects.py`, `apply_style`) runs on the synthesised audio array and takes the sample rate as an argument, so it works the same on any Piper voice; the speech cache is keyed by voice file plus style, so a new voice starts with an empty cache.
@@ -36,8 +36,8 @@ The robot filter (`voice/effects.py`, `apply_style`) runs on the synthesised aud
 Method: the service stack started on the Pi with the service stopped (its RSS sampled every 3 s with the log lines beside it), then each heavy import timed one after another in a fresh interpreter. (The probe was started with `--actuator mock`, which still opens the serial port: it sent the same start-up voice-module and attachment commands a normal service start sends, nothing that moves G2.)
 - The service is almost exactly three things: about 99 MB of imports + Vosk 118 MB + Piper 88 MB (155 MB once it has spoken) = about 300-315 MB. There is no large hidden remainder: the runtime objects (camera, walker, memory database, gallery, threads) add roughly 10 MB.
 - Imports, one after another: interpreter 7 MB, numpy +16, onnxruntime +14, vosk library +21, sounddevice +3, PIL +2, pydantic +4, **anthropic +26**, the `pi_pipeline` modules together about +5. All needed except possibly the API client (below).
-- Operating system: with the service stopped the box uses about 111 MB. `gpu_mem` is already 16, memory cgroups are already disabled, Bluetooth is already off by overlay. The other processes are tiny (systemd, sshd, journald, NetworkManager about 40 MB together); stopping the idle extras (avahi is needed for `g2pi.local`) would save a few MB at most. Swap is already zram (256 MB) plus a 1 GB swapfile. The 64 MB CMA pool is mostly usable for ordinary pages, so shrinking it is not a real saving.
-- Candidates: (a) import the `anthropic` client only at the first conversation: about 30 MB (26 + pydantic) saved while the service has not chatted since it started, nothing after the first chat; it only helps services that go straight into goals. (b) Nothing else is worth the work: the rest is a few MB each.
+- Operating system with the service stopped the box uses about 111 MB. `gpu_mem` is already 16, memory cgroups are already disabled, Bluetooth is already off by overlay. The other processes are tiny (systemd, sshd, journald, NetworkManager about 40 MB together); stopping the idle extras (avahi is needed for `g2pi.local`) would save a few MB at most. Swap is already zram (256 MB) plus a 1 GB swapfile. The 64 MB CMA pool is mostly usable for ordinary pages, so shrinking it is not a real saving.
+- Candidates (a) import the `anthropic` client only at the first conversation: about 30 MB (26 + pydantic) saved while the service has not chatted since it started, nothing after the first chat; it only helps services that go straight into goals. (b) Nothing else is worth the work: the rest is a few MB each.
 - The real levers stay the same: Piper while idle (88-155 MB), Vosk (118 MB: the small model is already in use; only the free-form conversation needs its full word graph, the wake and stop words are grammar-limited, but loading it on demand would delay every "G2, ..."), and the embedder during a roam (about 100 MB, already loaded only while used).
 
 ## Memory logging added (2026-11-07)
@@ -46,13 +46,13 @@ Still not logged (ideas): per-component resident size (needs a tracemalloc-style
 
 ## Validated on the Pi (2026-11-07, service stopped, no hardware): releasing did NOT free memory until the heap was trimmed
 A probe process on the Pi ran Piper load / speak / release / reload and the DINOv2 embedder load / release, reading the process's resident size each step.
-- Release alone gave nothing back: (resident 148 MB before and after `release()`; the model is freed inside the process's heap but glibc keeps the pages), and a background `warm()` reload grew it to 246 MB (the reload thread uses its own malloc arena and cannot reuse the main thread's freed memory). So the "frees about 155 MB" figure written above was not true of the first build.
-- Fixed: (commits "trim the heap" and "one malloc arena"): `malloc_trim(0)` after each release (`util/ort_memory.trim_heap`) and one malloc arena for the voice service (`single_arena`, `mallopt(M_ARENA_MAX, 1)` at start; `G2_MALLOC_ARENAS=many` leaves glibc's default).
+- Release alone gave nothing back (resident 148 MB before and after `release()`; the model is freed inside the process's heap but glibc keeps the pages), and a background `warm()` reload grew it to 246 MB (the reload thread uses its own malloc arena and cannot reuse the main thread's freed memory). So the "frees about 155 MB" figure written above was not true of the first build.
+- Fixed (commits "trim the heap" and "one malloc arena"): `malloc_trim(0)` after each release (`util/ort_memory.trim_heap`) and one malloc arena for the voice service (`single_arena`, `mallopt(M_ARENA_MAX, 1)` at start; `G2_MALLOC_ARENAS=many` leaves glibc's default).
 - Measured after the fix: Piper loaded 131 MB, after a sentence 146 MB, **released 58 MB (about 88 MB returned)**, reloaded in the background 135 MB (the same as the first load), after speaking 149 MB. The embedder: 189 MB loaded, **61 MB released (about 128 MB returned)**. The load takes 10 s for Piper (14 s the first time) and 7.5 s for the embedder, and a DINOv2 embedding takes 2.4 s on the Pi.
 - So the real figures are about **88 MB for Piper** (not 155; the extra on an isolated process was heap that the trim also returns) and about **128 MB for the embedder**, both returned to the OS, and the new `speech engine` / `embedder` notes in the memory log carry the readings. The memory check in the hardware plan is still the test of a real session.
 
 ## Update 2026-11-08 (after the roam)
-- The roam's low points: (40 MB free, 136 MB swap) came from the speech engine and the embedder being in memory together: Piper loaded again mid-roam (narration, the attempt-end announcement) while the embedder was loaded. Attempt 3, with Piper released throughout, stayed above 117 MB.
+- The roam's low points (40 MB free, 136 MB swap) came from the speech engine and the embedder being in memory together: Piper loaded again mid-roam (narration, the attempt-end announcement) while the embedder was loaded. Attempt 3, with Piper released throughout, stayed above 117 MB.
 - Fix: `util/mem_budget.py`: Each big model registers how to release itself and how long it has been idle. Before one loads (Piper after a release, the embedder on its first embedding) it asks for room: if the free memory would fall under 70 MB after the load, the other model is released if it has been idle for 15 s. Two models that are both in use are never swapped in and out of each other (that would cost 7-10 s a time).
 - Not done: the lazy `anthropic` import: (about 30 MB until the first chat). The service's start-up warm-up uses the client to open the connection before the first reply, so making it lazy would swap 30 MB for a slower first reply. Revisit only if the idle memory is short again.
 - Still to measure: repeat the roam with this in place (the memory check in the hardware plan).

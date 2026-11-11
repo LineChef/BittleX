@@ -193,7 +193,7 @@ Moved to one place: [`ai-head-implementation.md`](ai-head-implementation.md) hol
    2026-10-02 (FL shoulder servo) have to be fixed before a fair comparison.
 2. Can G2 still do most of the behaviors that make it feel alive? If yes, that is a point for replacing the Pi.
    Inventory below.
-3. The build trade-off: (not a pass/fail, but real): the Pi build means a lot of soldering, wires and mounting, and a
+3. The build trade-off (not a pass/fail, but real): the Pi build means a lot of soldering, wires and mounting, and a
    heavier body with exposed boards and connections (Pi + PiSugar ~61–78 g riding on a printed standoff; mic, amp,
    camera and their wiring still to add) — more vulnerable. A single head module is ~42 g and far more streamlined.
    This was always a learning project and the wiring work has been worthwhile, but robustness and simplicity count.

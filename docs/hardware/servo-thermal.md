@@ -56,7 +56,7 @@ So the failure chain on G2 is:
 3. The firmware's over-current threshold is effectively lower once the winding
    is hot (same torque now needs more current), so protection trips **earlier
    than the nominal stall spec** — and it trips **mid-task**, mid gait-cycle.
-4. On a trip: that joint's torque is cut / it freezes. One frozen leg joint
+4. On a trip that joint's torque is cut / it freezes. One frozen leg joint
    mid-stride ⇒ topple. Short bench tests never show this; it needs tens of
    seconds to minutes of continuous hard work.
 
@@ -69,7 +69,7 @@ So the failure chain on G2 is:
   units act as a mechanical fuse and strip.
 - Driver IC: sustained over-current cooks the servo's onboard H-bridge —
   "melted gears and a shorted driver IC" is the classic coreless-servo autopsy.
-- Magnet: at extreme temps, partial demagnetisation of the rotor magnet =
+- Magnet at extreme temps, partial demagnetisation of the rotor magnet =
   permanent torque loss even after cooling. Unlikely at the loads but the
   end-stop of the cliff.
 
@@ -99,7 +99,7 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 
 ### Layer 0 — already in place
 
-- `FAC_POWER` penalty: (`0.05 · Σ|τ·ω|`, ramped) — trains toward a
+- `FAC_POWER` penalty (`0.05 · Σ|τ·ω|`, ramped) — trains toward a
   low-current gait. Already thermal-adjacent work.
 - `TORQUE_CUTBACK` domain randomisation: 40 % of training episodes weaken
   1–3 random joints by a random fraction. Trains robustness to *a* weak joint,
@@ -200,7 +200,7 @@ been structured.
 
 ## 3. Sim testing plan
 
-1. Dynamic per-joint thermal model in the env: (8 leg joints). Lumped
+1. Dynamic per-joint thermal model in the env (8 leg joints). Lumped
    1-node: `T_j += dt·(k_gen·τ_j² − k_diss·(T_j − T_amb))`, `T_amb` randomised
    15–40 °C. When `T_j > T_trip`, drive the **existing `TORQUE_CUTBACK`
    mechanism** for that joint (reuse it — just switch the trigger from a random
@@ -210,13 +210,13 @@ been structured.
 2. Thermal observation: append normalised `T_j` (8) to the obs, plus a
    `hottest_joint` scalar + its rate. Behind a flag so the base policy's obs
    shape is unchanged until the approach is committed.
-3. Long-episode eval: (this is deferred eval item 5, now with a purpose):
+3. Long-episode eval (this is deferred eval item 5, now with a purpose):
    2 000–4 000-step episodes, thermal model live. Metrics: time-to-first-trip,
    whether the policy sheds effort as joints warm, distance before a trip.
    Compare `run20m_ppo` (no thermal obs) vs a thermal-aware residual.
-4. Sustained-hold variant: (`robustness_sweep.py` was removed 2026-10-17; write a new probe or recover it from the tag): hold a hard stance /
+4. Sustained-hold variant (`robustness_sweep.py` was removed 2026-10-17; write a new probe or recover it from the tag): hold a hard stance /
    slow uphill with the thermal model on, report trip time per policy.
-5. Hardware validation: (hardware-gated): once bring-up allows, run the
+5. Hardware validation (hardware-gated): once bring-up allows, run the
    robot in a fixed hard stance (or one leg against a stop) until protection
    trips — log the time and the cooldown curve. Fit `k_gen`, `k_diss`,
    `T_trip`. This is the one measurement that turns the whole model from
@@ -229,7 +229,7 @@ been structured.
 - Skip real thermistors: No spare ADC channels, no room, coreless servos
   don't have them. I²t estimation is the standard sensorless substitute and is
   good enough for a governor.
-- Skip the full 14-node thermal network: from the paper. Start 1 node per
+- Skip the full 14-node thermal network from the paper. Start 1 node per
   joint; add case↔ambient coupling only if the sim-vs-bench fit is poor.
 - Reuse, don't rebuild: the `TORQUE_CUTBACK` mechanism (re-trigger from live
   `T`), the `FAC_POWER` penalty (already pushing the right way), the behaviour
@@ -285,9 +285,9 @@ soft cutback have no teeth until then.
 
 ## 5. Priority / sequencing
 
-1. Bench test on hardware: (when bring-up allows) → real trip time +
+1. Bench test on hardware (when bring-up allows) → real trip time +
    cooldown constants. The one missing number.
-2. Layer 1 + 2: (I²t estimator, indicator, behaviour governor, cooldown
+2. Layer 1 + 2 (I²t estimator, indicator, behaviour governor, cooldown
    pose) — no training, biggest risk reduction per unit effort, deployable
    without a policy change.
 3. Sim dynamic thermal model + long-episode eval: validates and allows

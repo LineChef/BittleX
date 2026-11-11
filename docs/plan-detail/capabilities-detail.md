@@ -48,7 +48,7 @@ file does not repeat it. Things not built yet (the robot-arm module's walks and 
 ## Locomotion
 
 ### Learned gait (RL) — ✅ in sim and on G2 (hardwood)
-- The deployed policy: (see [`STATUS.md`](../STATUS.md)) is trained under a model of
+- The deployed policy (see [`STATUS.md`](../STATUS.md)) is trained under a model of
   G2's real control path: the stock firmware's 5 Hz IMU with no rate signal, the
   `i` joint command's execution timing, realistic body mass, and small IMU /
   servo calibration errors. Lineage and results: [`rl/hw1-log.md`](../rl/hw1-log.md).
@@ -57,7 +57,7 @@ file does not repeat it. Things not built yet (the robot-arm module's walks and 
   every control step.
   - Tracks forward-speed commands to **0.007 m/s** and heading commands.
   - Climbs a **24° slope** (the benchmark labelled it a descent until 2026-09-23; its up/down labels were inverted).
-  - 0 % falls: on the payload-on (Pi + camera mass) 27-cell decathlon.
+  - 0 % falls on the payload-on (Pi + camera mass) 27-cell decathlon.
   - Conditioned on the mounted-payload configuration, so the sim gait already
     "knows" it is carrying the companion stack.
   - `rl_training/opencat-gym/` — training, eval, and `watch_trained.py` replay.
@@ -86,11 +86,11 @@ serial:
 
 ### Vision-chosen skills and teaching — 🧩
 
-- Vision skill layer: (`gait/skill_layer.py`, `skill_switch.py`, `walk_vision.py`, Phase E) — vision picks a scripted OpenCat keyframe skill on top of the frozen walk
+- Vision skill layer (`gait/skill_layer.py`, `skill_switch.py`, `walk_vision.py`, Phase E) — vision picks a scripted OpenCat keyframe skill on top of the frozen walk
   (no training involved) with a smooth hand-off so the switch does not lurch; the terrain-to-`GaitMode` decision is `vision/gait_selector.py`. Not yet run on G2 while walking.
-- Teach tool: (`gait/teach.py`) — show G2 a leg movement: relax the servos, move a leg by hand, read the eight angles back from the servo feedback and save them as a
+- Teach tool (`gait/teach.py`) — show G2 a leg movement: relax the servos, move a leg by hand, read the eight angles back from the servo feedback and save them as a
   pose, one step at a time. Not yet run on G2.
-- Get-up test: (`gait/getup_test.py`) — tries one firmware get-up move from a fall on his side, logs the IMU and reports whether he came upright; one attempt per run. Paused: it failed from a side lie.
+- Get-up test (`gait/getup_test.py`) — tries one firmware get-up move from a fall on his side, logs the IMU and reports whether he came upright; one attempt per run. Paused: it failed from a side lie.
 
 ### RL training pipeline — ✅ (sim)
 
@@ -137,7 +137,7 @@ link, **mock by default, `--serial` on the robot**. Exploration sessions (voice 
 - Modes: `converse` / `idle` / `explore`, with a controller that switches
   between them.
 - Explore, two tiers:
-  - Tier 0 "attentive": (`behavior/attentive.py`) — *stationary*, always
+  - Tier 0 "attentive" (`behavior/attentive.py`) — *stationary*, always
     active as a life-signs layer on IDLE: turns toward a sound ("what was
     that?"), gaze-follows a person with head/body then **satiates** (drops to
     occasional glances so it doesn't stare), reacts to something new in view
@@ -150,7 +150,7 @@ link, **mock by default, `--serial` on the robot**. Exploration sessions (voice 
     bout cap, a leg-budget leash, or "that's enough" — and disarms, so each bout
     needs re-arming. Gated by `features.vision`; the desk-edge classifier (B16)
     upgrades it for near-edge use.
-  - Exploration, as of 2026-10-09: (user decisions): the start is a rising "ba nun na NAAA" fanfare (buzzer arpeggio, brass-like on the speaker); each leg is 8 s (since 2026-10-10) and ends
+  - Exploration, as of 2026-10-09 (user decisions): the start is a rising "ba nun na NAAA" fanfare (buzzer arpeggio, brass-like on the speaker); each leg is 8 s (since 2026-10-10) and ends
     in the standing pose, never lying down (rest only at the end of the session or on a fall); picture stops are at most one a minute and only when something is worth a picture
     (`behavior/interest_watch.py`: an unknown object-like thing or an unfinished named object, never a person; a slow fallback every 5 min), and the camera prep (the settle frames)
     is done for the first picture and once half way; no head gestures and no recognition hop (`G2_HEAD=1`, `G2_EXCITED_HOP=1` bring them back), a short play bow at a find instead;
@@ -160,10 +160,10 @@ link, **mock by default, `--serial` on the robot**. Exploration sessions (voice 
     `g2explore start`), and a pass/CHECK report written at the end of each roam (`g2explore report`). A roam can also run inside the voice service
     (`G2_EXPLORE_INPROCESS=1`, off by default). Guide: [`guides/exploration-mode.md`](../guides/exploration-mode.md).
     Stop a running session with `tools/g2_safe_stop.sh` (stop, balance, rest), never a plain service stop.
-  - "Come here": (`behavior/approach.py`) — a directed one-shot walk toward
+  - "Come here" (`behavior/approach.py`) — a directed one-shot walk toward
     the nearest person; stops close, or gives up (with a confused chirp) if it
     loses sight. Voice command, `Mode.APPROACH`.
-  - Place memory: (`behavior/place_memory.py`, B11) — while roaming, G2
+  - Place memory (`behavior/place_memory.py`, B11) — while roaming, G2
     accumulates *stable* spatial patterns ("the dog is often to the left") — no
     timestamps — and writes them as durable facts once a direction repeats.
 - Idle-posture staged descent: what pose G2 holds with nothing to do:
@@ -192,22 +192,22 @@ link, **mock by default, `--serial` on the robot**. Exploration sessions (voice 
 
 `pi_pipeline/personality/` — composable, all `.env`-driven, all ✅.
 
-- Traits: (`G2_TRAITS`, levels 0–1) — each contributes a prompt fragment,
+- Traits (`G2_TRAITS`, levels 0–1) — each contributes a prompt fragment,
   behaviour-param biases, and event cues:
   - curiosity: investigate longer, approach novelty.
   - playfulness: more vocal / fidgety / wandering; deliberately pulls
     *against* curiosity's patience.
-  - "Gir" character mode: (`gir`) — an opt-in manner overlay, default level
+  - "Gir" character mode (`gir`) — an opt-in manner overlay, default level
     0.4, **off unless you turn it on** (env or by asking G2 "enable Gir mode").
     Task-guarded at every level so it never derails a real instruction.
 - Mood model: NEUTRAL / CONTENT / PLAYFUL / LONELY / SUBDUED from recent
   interaction history; notices being rebuffed. Wired: the voice loop feeds it
   interaction recency each turn and folds its one-line hint into the system
   prompt; the behaviour driver applies its idle-timing bias.
-- Body state: (`personality/body.py`, 2026-10-18; 🧩 not yet tried on G2) — a low-battery alert, a recent fall and how the
+- Body state (`personality/body.py`, 2026-10-18; 🧩 not yet tried on G2) — a low-battery alert, a recent fall and how the
   last exploration went add one sentence to each turn's mood hint and make idle settling come sooner (low battery, after a fall).
   Every note expires by itself; servo heat is not an input.
-- Bonds: (`G2_BONDS`) — per-person familiarity + disposition
+- Bonds (`G2_BONDS`) — per-person familiarity + disposition
   (affectionate / playful / fearful …) that colours how G2 greets and reacts.
   Personal identifiers live only in the gitignored `.env`.
 - Runtime character state: turning a character on by voice persists across
@@ -227,14 +227,14 @@ API** (`livecheck.py`), and on G2's real mic + speaker since 2026-10-04.
   - `remember` — commit a fact to persistent memory.
   - `await_reply` — keep the microphone open for the answer to a question.
   - `diagnostics_query` — ask G2's own diagnostics what happened.
-- Local commands: (no API) — emergency stop / resume, shut down, go to sleep, come here,
+- Local commands (no API) — emergency stop / resume, shut down, go to sleep, come here,
   explore arm / disarm, "walk for N seconds", gait switching ("hi step", "walk normally"), the floor ("the floor is tile"),
   narration level, forget, character on/off, "carpet mode" / "walk normally", "dismissed" (after a false wake: closes the window silently and logs the trigger as false),
   and conversation mode ("let's talk" until "that's all") — parsed
   on-device, checked before Claude (emergency stop wins over everything).
   Full phrase list + the conversational skill catalogue:
   [`docs/guides/voice-commands.md`](../guides/voice-commands.md).
-- Questions answered locally: (no API): battery (in percent), "what floor", "what did you do" (the last exploration's recap), "what have you learned"; and "switch to English"
+- Questions answered locally (no API): battery (in percent), "what floor", "what did you do" (the last exploration's recap), "what have you learned"; and "switch to English"
   resets the BiBoard voice module's language.
 - Command acknowledgement: *every* recognised voice command (and every
   conversational turn) fires an instant "heard you" chirp + a `heard` cue before
@@ -279,7 +279,7 @@ API** (`livecheck.py`), and on G2's real mic + speaker since 2026-10-04.
 
 `pi_pipeline/memory/` — ✅.
 
-- Persistent fact store: with tagged recall, backing the voice `remember` tool, plus a full exchange log searched by relevance (SQLite FTS5) so older turns come back when they matter.
+- Persistent fact store with tagged recall, backing the voice `remember` tool, plus a full exchange log searched by relevance (SQLite FTS5) so older turns come back when they matter.
 - Review and undo: `python -m pi_pipeline.memory.review` (and `tools/g2_review.py`) lists facts, exchanges and observations and deletes the ones you do not want, with an undo.
 - Reflection: each exploration leaves a recap counted from G2's own events (no picture, no API call); one Claude call per new session can turn recaps into up to three short notes about
   his own experience (`G2_REFLECT`: off, dry or on; dry by default, so the notes are logged but not saved). Memory-processing calls are limited to one per session (`memory/call_log.py`).
@@ -288,7 +288,7 @@ API** (`livecheck.py`), and on G2's real mic + speaker since 2026-10-04.
   browse, add, forget, and (confirmed) wipe.
 - Importance and a core block: facts carry an importance and a core flag; core facts are always in the prompt, the rest are
   recalled by relevance. A privacy rule keeps dates, times and schedules out of facts.
-- Exploration recaps as sightings: (2026-10-18; 🧩 not yet tried on G2) — each exploration's recap (what the detector saw at the
+- Exploration recaps as sightings (2026-10-18; 🧩 not yet tried on G2) — each exploration's recap (what the detector saw at the
   survey stops, the room, bumps, falls) is saved as a sighting, and "where's the chair?" / "what did you find exploring?" recall it.
   Local data only, no extra API call.
 - Sightings and consolidation: a date-only, text-only sightings log; a sleep-time consolidation pass merges and prunes
@@ -335,7 +335,7 @@ that need the camera mounted on the frame for a real point of view.
   has a free local fallback that lists the detections in a sentence (`vision/describe_local.py`, `scene.py`).
 - Picture workflow: contact pictures (what the camera sees when G2 seems to push into something), survey and naming pictures with a JSON sidecar each, a wait for the IMU to show he has stopped swaying
   before each shot, a shutter click, and exposure metering. Pictures are reviewed, filtered and promoted in the `g2pics` page.
-- Object recognition gallery: (B20, `vision/object_gallery.py` +
+- Object recognition gallery (B20, `vision/object_gallery.py` +
   `behavior/object_seek.py`) — 🧩, behind `features.object_gallery` (off by
   default). Recognises *specific* objects it's personally seen before by
   visual-similarity fingerprint, not a trained category — grows on its own,
@@ -356,34 +356,34 @@ that need the camera mounted on the frame for a real point of view.
 
 Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and the fall and stall guards run on G2; the items marked *built, not wired in* below are complete and unit-tested but no runtime module uses them yet (listed in [`../pi_pipeline/README.md`](../../pi_pipeline/README.md)). Thresholds for the rest need the real robot.
 
-- Emergency stop: (`behavior/emergency.py`) — the manual override: latches
+- Emergency stop (`behavior/emergency.py`) — the manual override: latches
   `BehaviorDriver` above *everything* (enrollment / sleep / safety / mode), emits
   stop + an alert chirp + one hold command (`kbalance` by default, configurable),
   and holds until explicitly released. Triggered by a voice phrase ("emergency
   stop" / "freeze" / "halt" / "stop moving"), `python -m pi_pipeline.app --halt`,
   or `kill -USR1 <pid>`; cleared by "resume" / `--release` / `SIGUSR2`.
-- Disabled moves: (`link/opencat.py` `DISABLED_SKILLS`) — five firmware moves are refused for every caller, with a wrong-answer horn (see "Scripted skills").
-- Eased moves: (`link/transitions.py`) — every move into a firmware skill steps the legs from the known pose, capped at 80 deg/s; stand-up uses its own 0.8 s ramp.
-- Jam reflex: (`gait/jam_guard.py`, B9a) — *built, not wired in* — vision-free: from commanded-vs-actual
+- Disabled moves (`link/opencat.py` `DISABLED_SKILLS`) — five firmware moves are refused for every caller, with a wrong-answer horn (see "Scripted skills").
+- Eased moves (`link/transitions.py`) — every move into a firmware skill steps the legs from the known pose, capped at 80 deg/s; stand-up uses its own 0.8 s ramp.
+- Jam reflex (`gait/jam_guard.py`, B9a) — *built, not wired in* — vision-free from commanded-vs-actual
   front-leg joint angle, detect a stuck push and run a fixed bump-and-turn.
-- Servo thermal guard: (`gait/thermal_guard.py`) — per-joint temperature
+- Servo thermal guard (`gait/thermal_guard.py`) — per-joint temperature
   tiers GREEN / AMBER / RED, with a spoken "getting warm" warning.
-- Thermal governor: (`behavior/thermal_governor.py`, backlog B26) — *built, not wired in* — NORMAL → THROTTLED →
+- Thermal governor (`behavior/thermal_governor.py`, backlog B26) — *built, not wired in* — NORMAL → THROTTLED →
   COOLDOWN: scales speed, softens the gait, avoids uphill, and can hold a
   cooldown pose; escalates immediately, de-escalates only after a hold.
-- Sleep mode: (`behavior/sleep_mode.py`) — AWAKE → DOZING → ASLEEP → ROUSING;
+- Sleep mode (`behavior/sleep_mode.py`) — AWAKE → DOZING → ASLEEP → ROUSING;
   enters after a rest period (blocked while a person is present), wakes on loud
   sound / tap / wake word / command. **Wired into `BehaviorDriver`**: emits
   `SKILL kzz` + `POWER headless` + `CAPTURE off` on sleep, `POWER interactive` +
   `CAPTURE on` + the rouse choreography on wake.
-- Carpet detector: (`gait/carpet.py`) — sustained forward-slip → boost the speed command or hand off to the
+- Carpet detector (`gait/carpet.py`) — sustained forward-slip → boost the speed command or hand off to the
   `carpetF` gait; opt-in on the policy walk loop (`run_gait.py --carpet`).
-- Speed estimator: (`gait/speed_estimate.py`) — per-gait-cycle ZUPT bias-corrected leaky integrator over the IMU; the carpet detector's slip source.
-- Stall suspect: (`gait/imu_stall.py`) — the IMU heading jitter of a walk pushing against something; log-only. The contact signal that starts the exploration hit sequence uses it.
-- Stand guard: (`gait/stand_guard.py`) — keeps firmware balance off while G2 stands idle (re-sent every minute) and trips if the IMU shows the standing wobble.
-- Watchdog: (`diag/watchdog.py`) — no heartbeat within the stall window →
+- Speed estimator (`gait/speed_estimate.py`) — per-gait-cycle ZUPT bias-corrected leaky integrator over the IMU; the carpet detector's slip source.
+- Stall suspect (`gait/imu_stall.py`) — the IMU heading jitter of a walk pushing against something; log-only. The contact signal that starts the exploration hit sequence uses it.
+- Stand guard (`gait/stand_guard.py`) — keeps firmware balance off while G2 stands idle (re-sent every minute) and trips if the IMU shows the standing wobble.
+- Watchdog (`diag/watchdog.py`) — no heartbeat within the stall window →
   latch STALL and send `d` (lie down, relax).
-- Supervisor: (`util/supervisor.py`, backlog B27) — ✅ restart-with-backoff for long-running workers; it supervises the camera reader and the
+- Supervisor (`util/supervisor.py`, backlog B27) — ✅ restart-with-backoff for long-running workers; it supervises the camera reader and the
   microphone stream (systemd restarts the whole voice service).
 
 ---
@@ -396,7 +396,7 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
   `none` never sends the firmware question or adds a skill and keeps the legacy behaviour exactly.
 - Per-attachment gait: `gait_profiles.json` holds the saved gait for each attachment (current plus history), checked against the policy's
   payload profile; if nothing saved is usable, the default policy runs and the reason is logged (`g2attach status`, `doctor`).
-- Firmware check: for head and arm, start-up compares the BiBoard's `?` banner with the firmware the attachment needs; the arm adds its skill tokens
+- Firmware check for head and arm, start-up compares the BiBoard's `?` banner with the firmware the attachment needs; the arm adds its skill tokens
   (pick, put, toss, show-off, clap) when its profile allows them. The arm is fitted and its firmware flashed (2026-10-24); its skills stay off until a
   bench test, and its walks have not been run yet.
 - Petoi AI Head: 🧩 mounted on G2 (42 g, on stock Petoi firmware). It is an extra LLM used by pressing its button; Claude stays the main brain and
@@ -424,20 +424,20 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
 - Black-box structured logger: a full event taxonomy, a run manifest
   (start/end, duration, event + incident counts, clean-exit flag), and an
   `install_excepthook()` that logs unhandled crashes and finalises the manifest.
-- System monitor: (`diag/sysmon.py`) — SoC temperature (any Linux),
+- System monitor (`diag/sysmon.py`) — SoC temperature (any Linux),
   `vcgencmd` throttle flags, battery voltage sag — emits rate-limited
   `battery.sag` / `pi.thermal_throttle` events; no-ops where a reader returns
   nothing.
-- Session report: (`python -m pi_pipeline.diag report [SESSION] [--html out.html]`, 2026-10-18) — one page per session from
+- Session report (`python -m pi_pipeline.diag report [SESSION] [--html out.html]`, 2026-10-18) — one page per session from
   the logs that used to be read one by one: walks (end reasons, late ticks, floor), behaviour transitions, narration timing,
   walks that did not stop in time, wake triggers, billed API calls, camera timeouts, worker restarts, every WARN+ event, the profile.
 - Supervised workers: the camera reader and (since 2026-10-18, backlog B27) the microphone stream are restarted by
   `util/supervisor.py` when they die or stall; restarts are diagnostics events.
 - Lint: `ruff check` with correctness rules only (undefined names, mutable defaults, syntax errors), run by the pre-commit hook.
-- Feature flags: (`G2_FEATURES`, `docs/guides/feature-flags.md`) — staged
+- Feature flags (`G2_FEATURES`, `docs/guides/feature-flags.md`) — staged
   bring-up: perception / vision-nav stack gated **off** until a real detector
   exists.
-- `doctor` preflight: (`python -m pi_pipeline.doctor`) — one-command bring-up
+- `doctor` preflight (`python -m pi_pipeline.doctor`) — one-command bring-up
   readiness check: `.env` completeness, API key validity + expiry, model files
   (Vosk / Piper / gait ONNX), Python deps, serial port + optional passive board
   handshake (`?` banner + `P` voltage readback — confirms it actually speaks
@@ -451,17 +451,17 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
   recorded, not just the ones that happen to reach the integrated app.
   `SystemExit` / `KeyboardInterrupt` are recognised as a clean exit, not a
   crash.
-- Guided bring-up runbook: (`python -m pi_pipeline.bringup`) — the
+- Guided bring-up runbook (`python -m pi_pipeline.bringup`) — the
   hardware sequence (Phase 0 bare hardware → Phase 1+ with the Pi wired in)
   as a resumable, interactive checklist (progress persists to disk);
   auto-runs only read-only/passive steps, always shows movement commands as
   text instead of executing them. Steps 1–13a are enforced stand-only; step
   13b (the first floor test) sits behind an explicit `[y/N]` confirm.
-- Guided first movement: (`check_serial firstmove`) — one joint at a time
+- Guided first movement (`check_serial firstmove`) — one joint at a time
   (head, then the 8 leg servos) with a confirm before and after each, then
   `kbalance`, then a single timed `wkF` burst — always ends at rest, including
   on abort.
-- Full movement sweep: (`check_serial allmoves`) — cycles every move G2
+- Full movement sweep (`check_serial allmoves`) — cycles every move G2
   knows (the voice-conversation skills, the non-duplicate autonomous
   behaviour gestures, sleep, the carpet gait, and the recovery/get-up
   keyframes, deduped), logging battery voltage and reply latency
@@ -478,14 +478,14 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
   (body upright or not) — that needs the IMU stream, whose line format isn't
   confirmed until step 13a's `--probe-imu`, which comes later in the
   sequence.
-- Crash forensics: (`diag/crashwatch.py`) — a heartbeat file, a fault trace and a clean-exit marker, read back at the next start, so a native crash of the voice service or an exploration session (Vosk, PortAudio, onnxruntime) leaves a report: `python -m pi_pipeline.diag.crashwatch` (`g2crash`).
+- Crash forensics (`diag/crashwatch.py`) — a heartbeat file, a fault trace and a clean-exit marker, read back at the next start, so a native crash of the voice service or an exploration session (Vosk, PortAudio, onnxruntime) leaves a report: `python -m pi_pipeline.diag.crashwatch` (`g2crash`).
 - Noise log and IMU fan-out: a record of every command that makes the BiBoard make a noise (`link/noise_log.py`), and a per-reader copy of the shared IMU stream so the stand guard, the sensor hub and the walk loop do not steal each other's lines (`link/fanout.py`).
 - Housekeeping: old logs and walk files are deleted at start-up (`util/tidy.py`), and a disk-space warning fires once the SD card passes a threshold (`util/disk.py`).
 - Sysid and calibration tools: a policy-free calibration sequence logs the IMU and every joint command for sim replay (`gait/sysid_collect.py`), a servo speed fit from stepped moves (`gait/servo_step.py`), a gyro-bias check (`gait/yaw_drift_check.py`) and a fresh-baseline walk series (`gait/baseline_runs.py`).
-- Serial trace + replay: (`pi_pipeline/link/trace.py`) — every command sent
+- Serial trace + replay (`pi_pipeline/link/trace.py`) — every command sent
   to the BiBoard logged to a timestamped file (`--trace <path>` on the app);
   `trace.py replay` re-sends the same sequence with the same relative pacing.
-- Bench mode: (`python -m pi_pipeline.app --bench`) — for when G2 is on the
+- Bench mode (`python -m pi_pipeline.app --bench`) — for when G2 is on the
   calibration stand: no autonomous movement, voice actuator forced to mock, a
   clear banner — so `check_serial` / `run_gait --probe-imu` / joint calibration
   own the serial link without the behaviour loop fighting them.
@@ -521,9 +521,9 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
   string builder for streamed policy output.
 - Dangerous-command denylist: calibration / factory-reset prefixes are
   refused.
-- Fall-recovery state machine: (`link/recovery.py`) — *built, not wired in* — detect a flip → run the
+- Fall-recovery state machine (`link/recovery.py`) — *built, not wired in* — detect a flip → run the
   scripted get-up → settle. Today the firmware's own `rc` handles a flip.
-- Bring-up self-test: (`link/check_serial.py`) — list ports, ping the board,
+- Bring-up self-test (`link/check_serial.py`) — list ports, ping the board,
   send one command, cycle the conversational skill set, or run the full
   `allmoves` sweep (every move G2 knows, voltage + latency logged) as a
   hardware smoke test.

@@ -12,11 +12,11 @@ G2 talks through the Claude API, which bills per use. This page covers two layer
 Do these once, before the key is first used.
 
 1. Create a dedicated API key for G2: Keep it separate from any other project's key. That isolates G2's spending and allows revoking or re-capping this key alone.
-2. Set a monthly spend limit: on the key or workspace (Console, Billing or Limits). This is the real ceiling. Once it is reached, calls fail instead of running up charges.
-3. Turn on usage alert emails: at a threshold such as 50% and 80%, so rising spend is noticed before the limit is reached.
-4. Consider prepaid credits instead of auto-reload: where the plan offers them. Spend then cannot exceed what is loaded.
+2. Set a monthly spend limit on the key or workspace (Console, Billing or Limits). This is the real ceiling. Once it is reached, calls fail instead of running up charges.
+3. Turn on usage alert emails at a threshold such as 50% and 80%, so rising spend is noticed before the limit is reached.
+4. Consider prepaid credits instead of auto-reload where the plan offers them. Spend then cannot exceed what is loaded.
 5. Store the key in the gitignored `.env` file as `ANTHROPIC_API_KEY=`. Never put it in a tracked file. The pre-commit hook does not scan for key-shaped strings.
-6. Bookmark the key's console page: so revoking a lost or exposed key takes minutes.
+6. Bookmark the key's console page so revoking a lost or exposed key takes minutes.
 7. Record the expiry, if the key has one. Add `ANTHROPIC_API_KEY_EXPIRES=YYYY-MM-DD` to `.env`. G2 logs a warning as the date approaches (`G2_API_KEY_EXPIRY_WARN_DAYS`, default 30) and an error once it has passed, so an expired key is never a silent non-reply. Update both the console expiry and this date when the key is rotated.
 
 ## Inside G2
@@ -41,7 +41,7 @@ The voice loop catches the error, speaks the line and logs the failure kind. The
 ### Not built yet
 
 - A **call-rate limiter** (for example `G2_MAX_CALLS_PER_MIN`) would catch a bug such as a wake-word false-trigger loop or a retry storm within seconds, without needing to know any cost.
-- Local budget caps: (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`) would make G2 refuse further calls once crossed and say so, without waiting for Anthropic's own limit.
+- Local budget caps (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`) would make G2 refuse further calls once crossed and say so, without waiting for Anthropic's own limit.
 - An **early warning** below the cap (`G2_BUDGET_WARN_PCT`, about 0.8) would speak once when a period crosses the threshold.
 
 Once these exist, they should be checked end to end: set a tiny budget temporarily, confirm the warning and the refusal both fire and read clearly, force a rate-limit and a billing error, confirm each gives a clear message, then restore the real budget.

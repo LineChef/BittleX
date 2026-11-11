@@ -19,7 +19,7 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
 
 * Importance: The `remember` tool takes an `importance` (1-5; 5 = names, who lives here, pets, how G2 looks). Injected facts are
   ranked by importance plus a recency bonus that halves every two weeks, so a name outranks a passing remark when the 30-slot cap bites.
-* Core facts: (`core` flag, set by Claude for identity-level facts or by hand with `python -m pi_pipeline.memory pin <id>`): always
+* Core facts (`core` flag, set by Claude for identity-level facts or by hand with `python -m pi_pipeline.memory pin <id>`): always
   injected in their own block ("About you and your people"), up to `G2_MEMORY_CORE_MAX` (12), never rotated out. "I look like ..." is
   always core, importance 5, and is a single slot (the newest replaces the older).
 * Sightings: When G2 looks, his spoken description and the detector's labels are kept as a sighting (text only, date only, no
@@ -29,7 +29,7 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
   survey stops, the room he was mostly in, bumps and falls. Local data only; no picture and no extra API call.
 * Goal lessons: A goal session (`goals/`) saves up to 3 notes about what he changed and why ("Punt the ball: Punching from 3 in works best so far: 6 of 8 good, against 2 of 6 with 4 in. I'm keeping it.") as facts with
   source `goal_lesson`, importance 2, never core. Built from his own counts; no API call.
-* Places: (`places.py`). Per room, counts only and no dates or times: things the detector saw, falls and bumps, explorations and goal sessions held there, pictures taken there, the floor. A room is told to him ("you're in the kitchen"), never invented; it lapses after 6 hours. A summary of a room reaches the prompt when it is mentioned or asked about. Falls and bumps are counted here, not written as sightings.
+* Places (`places.py`). Per room, counts only and no dates or times: things the detector saw, falls and bumps, explorations and goal sessions held there, pictures taken there, the floor. A room is told to him ("you're in the kitchen"), never invented; it lapses after 6 hours. A summary of a room reaches the prompt when it is mentioned or asked about. Falls and bumps are counted here, not written as sightings.
 * Goal notes: One `goal_summary` fact per goal replaces the per-session lessons (those stay in the journal; `G2_GOAL_LESSONS=1` saves them again). Neither kind is put in the chat prompt unless the ball, a goal, practice or learning comes up.
 * Consolidation: When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or he is told to go to sleep, and at least
   `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones
@@ -39,7 +39,7 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
   `python -m pi_pipeline.memory consolidate` (a dry run); add `--apply` to do it. `G2_CONSOLIDATE=0` turns it off. The call is counted in
   `python -m pi_pipeline.voice.usage`.
 
-* Which memory shaped a reply: (`python -m pi_pipeline.memory usage`). Per fact it counts how often it was injected, how often G2 named it
+* Which memory shaped a reply (`python -m pi_pipeline.memory usage`). Per fact it counts how often it was injected, how often G2 named it
   (`declared`) and how often the reply echoed its content words (`matched`), plus the share of turns where memory was used and a list of
   facts injected 20+ times that never mattered. Counters only: no conversation text is stored. `G2_MEMORY_USE_LOG=match` (default) is
   free: the code compares each reply with the notes it was given. `declare` also tags every note ([#12] fact, [s3] sighting) and gives G2 a

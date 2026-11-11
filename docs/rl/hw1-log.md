@@ -148,7 +148,7 @@ through the real path, pure slopes — no rough-terrain episodes, no torque cut)
   second); with the body level on tilted ground the downhill legs can't reach it
   (FR paw 8 % contact, BR 19 %) and G2 pushes on ~two legs. Bittle has no
   hip-roll joint — only lengthening the downhill legs fixes it.
-- Climbs stall ~24°: (scripted ~20°). Downhill is fine at any tested angle.
+- Climbs stall ~24° (scripted ~20°). Downhill is fine at any tested angle.
 - Every learned gait limps: flat-ground paw contact — scripted wkF 41–61 %
   per paw; `hw1_20m` FR 13–16 %; `run20m_resid30` BL 17 %; `run20m_ppo` mildest.
   The model is symmetric (identical paw shapes, friction, heights).

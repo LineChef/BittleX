@@ -121,7 +121,7 @@ gives you the event *and* the black box:
 
 Debugging behaviour needs the *reason*, not just the action. Convention:
 
-- State machines stay pure: (no `diag` import — keeps them unit-testable) but
+- State machines stay pure (no `diag` import — keeps them unit-testable) but
   each exposes a `last_reason: str` explaining its most recent `update()`.
   Implemented: `behavior/idle_posture.py` (`IdlePosture`),
   `behavior/mode_controller.py` (`ModeController`), `behavior/explore.py`
@@ -130,7 +130,7 @@ Debugging behaviour needs the *reason*, not just the action. Convention:
   (as `DIAG` effects); the runtime's bindings log each one through `behavior/bindings.py`
   `_default_diag`, with the level and event name from `behavior/diag_bridge.py`'s map
   (wired 2026-10-18; `diag report` reads them as the behaviour timeline).
-- The driving loop logs the transition: with the reason + the inputs that
+- The driving loop logs the transition with the reason + the inputs that
   produced it, only when something actually changes:
 
   ```python

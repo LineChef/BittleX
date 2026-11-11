@@ -164,7 +164,7 @@ repo onto the Pi. Fixed to deploy only what actually runs there:
   self-contained (builds its own synthetic ONNX stub in-line just to
   benchmark inference speed) — so that's now `scp` of the one script file,
   fixed in both the doc and the script's own header comment.
-- `docs/` is never deployed at all: , by construction — the `rsync` source
+- `docs/` is never deployed at all, by construction — the `rsync` source
   is `pi_pipeline/` specifically, not the repo root, so nothing outside that
   directory (`docs/`, `rl_training/`'s checkpoints/logs/GIFs, the RL
   toolchain) ever reaches the Pi. The only markdown that does ride along is
@@ -239,7 +239,7 @@ nothing autonomous competing.
 
 **Explore mode — two-tier redesign, built 2026-09-10** (user design session).
 The single time-based `EXPLORE` mode is split:
-- Tier 0 "attentive": (`behavior/attentive.py`, `AttentiveLook`) — stationary,
+- Tier 0 "attentive" (`behavior/attentive.py`, `AttentiveLook`) — stationary,
   *always active* as a life-signs layer the driver runs in the IDLE branch while
   a posture holds steady: gaze-follow the nearest person (`HEAD` bearing),
   react to a novel object (look → `kbuttUp` peer bow → QUESTION chirp), a

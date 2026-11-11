@@ -10,8 +10,8 @@ Script: `rl_training/opencat-gym/reference_gait/verify_getup_reference.py`
 
 ## What was replayed
 
-- `rc`: ("recover") — the firmware self-right for a side / front fall.
-- `rl`: ("roll") — flips a supine robot onto its side; firmware then chains
+- `rc` ("recover") — the firmware self-right for a side / front fall.
+- `rl` ("roll") — flips a supine robot onto its side; firmware then chains
   `rc`. So supine = `rl` → `rc`.
 
 Both decoded from `InstinctBittleESP.h` by `build_skill_reference.py rc rl` →
@@ -167,7 +167,7 @@ ranked by relevance to the specific failure mode found here:
    arbitrary reference motions, not just mocap -- directly reusable with
    the existing `rc_ref.npy`/`rl_ref.npy`. Real lift: a genuine PPO training
    loop, not a script tweak.
-4. From-scratch fall-recovery RL: (no reference trajectory -- reward-
+4. From-scratch fall-recovery RL (no reference trajectory -- reward-
    shaped exploration from domain-randomized fallen starting poses; never
    terminate the episode on falling, corroborated across multiple 2024-2025
    papers). The field's most independently-corroborated *actually working*

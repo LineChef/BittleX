@@ -44,9 +44,9 @@ feet catching) and the first aborted attempts have no log.
   7.65-7.70 during later runs); see the volt column for in-run values (7.37 V in the last 2 s of the
   hand-held run).
 - Servo position feedback (`f`): only an echo came back, with the servos relaxed and powered.
-- Sim replay of the hard-floor V2.1 logs: (`rl_training/opencat-gym/sim_vs_real_walk.py`, corrected
+- Sim replay of the hard-floor V2.1 logs (`rl_training/opencat-gym/sim_vs_real_walk.py`, corrected
   payload inertia): runs 01 and 05 stay upright in the sim -- distance 1.21 / 1.24 m (real ~1.47 m), roll std
   4.1 / 3.6 deg (real 6.6 / 7.0), yaw -37 / -31 deg (real +132 / -15); runs 02-04 and 06 fall over in the open-loop
   replay (the commands came from a closed loop). Actuator `--fit` gave no usable result.
-- Foot lift / stride estimates: (forward kinematics of the commanded joints, body fixed): see the table in
+- Foot lift / stride estimates (forward kinematics of the commanded joints, body fixed): see the table in
   `real-walk-log.md`.

@@ -41,8 +41,8 @@ With G2 on the calibration stand, or while calibration, `check_serial` or an IMU
 
 ## Batteries
 
-- G2's pack: is read through the firmware. G2 warns by voice when it is low and when it is critical. The walk loop reads the voltage under load and rests the legs on a critical reading. The thresholds are settings, listed in [Settings and switches](settings-switches.md).
-- The Pi's battery: (PiSugar S) has no readout. Its warning counts uptime against the measured full-charge runtime. `python -m pi_pipeline.power runtime plugged` pauses the count while charging and `runtime unplugged` restarts it. A reboot clears both, so the Pi is rebooted after charging. See [Pi power](../hardware/pi-power.md).
+- G2's pack is read through the firmware. G2 warns by voice when it is low and when it is critical. The walk loop reads the voltage under load and rests the legs on a critical reading. The thresholds are settings, listed in [Settings and switches](settings-switches.md).
+- The Pi's battery (PiSugar S) has no readout. Its warning counts uptime against the measured full-charge runtime. `python -m pi_pipeline.power runtime plugged` pauses the count while charging and `runtime unplugged` restarts it. A reboot clears both, so the Pi is rebooted after charging. See [Pi power](../hardware/pi-power.md).
 - Session start: Sessions start with both packs full. A block of testing ends when G2's pack passes about 30% at rest or the Pi's low alarm sounds.
 
 ## Diagnosing a fault

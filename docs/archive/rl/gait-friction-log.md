@@ -107,7 +107,7 @@ above is a more complete answer to the same underlying limitation.
 
 ## Testing plan
 
-1. Baseline measurement: (done above) — pure open-loop speed-tracking
+1. Baseline measurement (done above) — pure open-loop speed-tracking
    error across the command range, and the 7-8 degree cruise-speed residual
    baseline from the action-trace work.
 2. Primary change: implement amplitude scaling on the reference pose,
@@ -117,7 +117,7 @@ above is a more complete answer to the same underlying limitation.
 3. Secondary change: narrow the creep band (independent, can go in the
    same or a separate round — low interaction risk with the amplitude
    change).
-4. Short diagnostic round(s): , 2-3M steps each, fresh run off whichever
+4. Short diagnostic round(s), 2-3M steps each, fresh run off whichever
    recipe wins the resid30 campaign — matching `automated-testing-loop.md`'s
    standard round size.
 5. Evaluate: `evaluate_policy.py` fall/speed metrics, plus

@@ -86,7 +86,7 @@ only the previously-known failure point still applies.
   recipe (the frozen base) -- `FAC_NOSTALL` stays off (reverted, documented
   negative result in the resiliency campaign), gait-friction's cadence
   correction stays off (also reverted). Fresh run, not a continuation.
-- `SLOPE_MAX_DEG` 14 -> 20: , bidirectional -- past both known failure
+- `SLOPE_MAX_DEG` 14 -> 20, bidirectional -- past both known failure
   points (T9.1 18deg up, T9.2 20deg down), same "raise past what breaks
   it" logic as the original 10->14 move, now applied to both signs of
   tilt instead of one.

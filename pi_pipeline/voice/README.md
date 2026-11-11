@@ -51,7 +51,7 @@ The mic is only live while G2 is powered on and started in `--mode voice`
 - Side chatter: A turn heard WITHOUT the wake word (a question window or conversation mode) is dropped before Claude when it runs longer than `G2_SIDE_MAX_WORDS` (14; `G2_CONVERSATION_MAX_WORDS` 30 inside conversation mode; 0 = no limit), or when it says it is aimed elsewhere ("I'm not talking to you"). A dropped question-window turn closes the window; in conversation mode the mode stays on unless the remark was aimed elsewhere. Stop / shut-down commands always work.: Turns after the wake word are never dropped for length.
 - "go to sleep": ends the follow-up window immediately; the next turn needs the wake word.: `commands.py`
 - "dismissed": said after a wake word nobody said: closes the window at once, silently; the wake log counts it as a false trigger.: `commands.py`, `wake_log.py`
-- "forget that": (also "scratch that", "don't remember that", …) — deletes every exchange and fact recorded since the wake word, and is never sent to Claude.: `commands.py` + `Memory.forget_session`
+- "forget that" (also "scratch that", "don't remember that", …) — deletes every exchange and fact recorded since the wake word, and is never sent to Claude.: `commands.py` + `Memory.forget_session`
 - Goal suggestions at start-up: After a goal session (the service starts again when it ends), G2 says each new suggestion for a setting only you change and listens once, with no wake word, for "confirm", "cancel" or "review" (silence = review).: `loop.py` `_offer_goal_suggestions`, `goals/suggestions.py`; `G2_GOAL_SUGGEST=0` turns it off
 
 Speech that never triggers the wake word is never transcribed or stored — the

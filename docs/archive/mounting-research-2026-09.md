@@ -197,7 +197,7 @@ Alternate: the edge nearest BiBoard's header, with the standard-length
 jumper, if the back edge doesn't fit the real corner spacing at test-fit.
 
 **How each clip attaches — settled model:**
-- One screw (B) per corner: , running from the clip's boss down through
+- One screw (B) per corner, running from the clip's boss down through
   the clip's base, through BiBoard, into the frame — reusing BiBoard's own
   corner screw point rather than an independent hole. Secures clip + BiBoard
   + frame together in one fastener. The clip's base isn't a passive
@@ -240,7 +240,7 @@ undecided.)
 
 Researched against the real board photos already in this doc, not just
 reasoned abstractly:
-- Pi Zero 2 W: (the vendor's picture (pizero-overview, not included)/the vendor's picture (pizero-detail, not included) above): the
+- Pi Zero 2 W (the vendor's picture (pizero-overview, not included)/the vendor's picture (pizero-detail, not included) above): the
   40-pin GPIO header runs along one **long edge**, spanning nearly the full
   65mm width — pins 6/8/10 (the ones wired) sit at that header's left
   end, next to the microSD slot. The **opposite long edge** is fully
@@ -250,7 +250,7 @@ reasoned abstractly:
   a clip's edge-grip slot. Both long edges have connectors in the way; the
   short-side pair is the one that's actually viable, not an open 50/50
   between short and long.
-- BiBoard: (the vendor's picture (board-overview, not included)/the vendor's picture (header-detail, not included) above): the 5-pin
+- BiBoard (the vendor's picture (board-overview, not included)/the vendor's picture (header-detail, not included) above): the 5-pin
   Pi header sits at BiBoard's top edge, and — from the zoomed photo —
   directly next to BiBoard's top-right corner mounting hole.
 - Combining both: the natural, shortest-wire layout (if mounting near the
@@ -430,7 +430,7 @@ was chosen and built:
    the mount ends up on only 2 of the 4 header holes rather than 4 — a
    real, independently reported instance of the "does the Zero's hole
    pattern actually work here" concern this doc already carries elsewhere.
-3. Get the clip itself redesigned: with more built-in clearance for
+3. Get the clip itself redesigned with more built-in clearance for
    PiSugar — the path actually taken, detailed below.
 4. **Fallback, not pursued unless option 3 fails at test-fit: swap to a
    generic Pi Zero adapter plate instead of Petoi's edge-grip clip design.**

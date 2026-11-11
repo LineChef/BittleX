@@ -41,10 +41,10 @@ Processing is not automatic. The Pi's autolog skips any walk started with `--log
 ### Background jobs on the Mac
 
 `g2bg` (`tools/g2_bg_jobs.sh`, with `g2bg status|stop|start`, logs in `~/g2_logs/`) runs `tools/g2_sync.sh` (`g2sync`) every 30 minutes. It copies everything from the Pi to the Mac, each item on its own schedule:
-- Goal data: and **exploration pictures**, with curation by `tools/g2_curate_auto.sh`.
-- Run logs: , with ingest and the calibration step (`tools/g2_cal_auto.sh`).
-- Wall pictures: , every 30 minutes.
-- A memory database snapshot: and **the logs**, once a day.
+- Goal data and **exploration pictures**, with curation by `tools/g2_curate_auto.sh`.
+- Run logs, with ingest and the calibration step (`tools/g2_cal_auto.sh`).
+- Wall pictures, every 30 minutes.
+- A memory database snapshot and **the logs**, once a day.
 
 `g2sync status` shows when each copy last worked and flags a stale one. The review page shows the same line under its title and has a **Sync from the Pi** button. The job skips quietly while the Pi is off or busy (an exploration, a goal session, a walk or a hardware test), ends at a Mac restart, and runs a snapshot's harm check only when the Mac is idle. launchd cannot run scripts under `~/Desktop` (macOS reports "Operation not permitted"), so a plain loop runs the job.
 

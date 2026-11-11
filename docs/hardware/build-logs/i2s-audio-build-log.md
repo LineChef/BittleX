@@ -152,7 +152,7 @@ LRCL → pin 35, DOUT → pin 38, SEL → pin 39); the amp was connected on 2026
    `dtoverlay=googlevoicehat-soundcard` (original saved alongside as
    `config.txt.bak-pre-i2s`), then a reboot. `arecord -l` listed the
    `googlevoicehat` capture card.
-2. First captures were a flat constant: (every sample identical on both
+2. First captures were a flat constant (every sample identical on both
    channels), meaning no data reached the Pi. Diagnosis: with GPIO20
    (pin 38, `PCM_DIN`) switched to a plain input with the pull-down on
    (`pinctrl set 20 ip pd`, then `pinctrl get 20`), it stayed **high**, while every

@@ -26,7 +26,7 @@ Commands in this folder use `../../.venv/bin/python`. Tests: `../../.venv/bin/py
 ## The scripts
 
 - Environment and training: `opencat_gym_env.py` (the Gym env; every new mechanic is a flag that defaults off), `train.py` (PPO, curriculum and frontier callbacks, health checks), `g2_profile.py` (see below)
-- Chain runners: (unattended; each has a plan doc): `phase_v3.py` (queue runner and scoring, reused by the others), `phase_v4.py` (screens, then the 20M), `phase_v5.py`, `phase_v6.py` (done and deployed), `phase_hs.py` (high-step creep (see below)
+- Chain runners (unattended; each has a plan doc): `phase_v3.py` (queue runner and scoring, reused by the others), `phase_v4.py` (screens, then the 20M), `phase_v5.py`, `phase_v6.py` (done and deployed), `phase_hs.py` (high-step creep (see below)
 - Benchmarks and comparison: `benchmark_decathlon.py` (the graded cells), `benchmark_v4.py`, `benchmark_v5.py` (hills, ledges, size ladder), `benchmark_commanded.py`, `benchmark_gaits.py`, `benchmark_recovery.py`, `evaluate_policy.py`, `multi_ckpt_eval.py`, `paired_compare.py`, `final_exam.py`, `checkpoint_tracker.py`, `exposure_probe.py`, `frontier_report.py`, `caps_report.py`, `passability_audit.py`
 - Reports: `report_v5.py`, `report_summary.py`, `v3_report.py`, `hs_report.py`
 - Gait and steering probes: `gait_probe.py`, `hs_probe.py`, `creep_sweep.py`, `steer_probe.py`, `drift_probe.py`, `turn_gate_probe.py`, `turn_gate_curve.py`, `servo_saturation_check.py`

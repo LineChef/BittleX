@@ -4,7 +4,7 @@ The user runs the hardware (places G2, holds him, measures tape and facing); Cla
 Read first: [`../STATUS.md`](../STATUS.md) (what is deployed).
 
 ## Rules for this and every hardware session (user, 2026-10-09)
-- Everything starts on his feet: (the user has no stand): hands near, never on his back, no "in the air first" step. Anything new still gets a short first walk (6 s).
+- Everything starts on his feet (the user has no stand): hands near, never on his back, no "in the air first" step. Anything new still gets a short first walk (6 s).
 - No gait comparisons on the real robot: Comparing gaits (policy against policy, scripted against hi step) is sim only. On G2, one thing's own behavior is measured: drift, trim, ramp, stability, sounds.
 - Stop anything that controls G2 with `tools/g2_safe_stop.sh` (rest first, never a plain `systemctl stop`). Tell Claude about any fall, odd noise or heat.
 - Why `g2-voice` is stopped before a walk: the service runs the real serial actuator and holds the BiBoard's serial port (and the mic stream), and only one process can use the port at a time (see the `stand_log.py` note in `hardware/petoi-firmware-reference.md`). A walk script started beside it would collide on the port, and the voice loop's own commands (wake word, behavior, battery watcher) could move G2 mid-test. Stop it with `tools/g2_safe_stop.sh voice` (not a plain `systemctl stop`) and start it again at the end (`sudo systemctl start g2-voice`).
@@ -16,15 +16,15 @@ Read first: [`../STATUS.md`](../STATUS.md) (what is deployed).
 Hardwood, the 9 ft lane, no timed spacing between rounds (see the run procedure under the rules), fresh batteries. G2 rests on the user's desk until the session starts.
 
 ## State going in
-- V6 is the deployed default: (`DEFAULT_POLICY`; promoted and deployed on the user's word although it did not beat V4 in the sim: mean falls 0.215 against 0.189, better on 7.5-15 mm step-ups, about equal elsewhere; short report https://claude.ai/artifact/P2CTwR8Z1KgCw8ccVtrRiK, V6 section of [`v6-staged-training-plan.md`](v6-staged-training-plan.md)). It is heading-blind (the Pi feeds yaw 0), commands every 3rd tick, has NO trim yet. V4 (trim -0.2 front-left, keyed to its file name), V3 and V2.1 are on the Pi as fallbacks: `--policy rl_training/opencat-gym/trained/Release_CandidateV4_ppo.onnx`.
+- V6 is the deployed default (`DEFAULT_POLICY`; promoted and deployed on the user's word although it did not beat V4 in the sim: mean falls 0.215 against 0.189, better on 7.5-15 mm step-ups, about equal elsewhere; short report https://claude.ai/artifact/P2CTwR8Z1KgCw8ccVtrRiK, V6 section of [`v6-staged-training-plan.md`](v6-staged-training-plan.md)). It is heading-blind (the Pi feeds yaw 0), commands every 3rd tick, has NO trim yet. V4 (trim -0.2 front-left, keyed to its file name), V3 and V2.1 are on the Pi as fallbacks: `--policy rl_training/opencat-gym/trained/Release_CandidateV4_ppo.onnx`.
 - Everything committed this evening was deployed 11:23 PM (exchange sounds, exploration changes, gait switching and scripted hi step, wall dry run, V6).
 - Lane: 9 ft start line on hardwood, tape numbers = forward then sideways (+ = right) in inches, facing as a clock face (12 = straight). Data goes to `docs/rl/real-walk-data/<date>/README.md` plus CSVs (`g2data` syncs; labels with `g2floor`).
 - Open hardware item: the **back-left shoulder** servo feels stiffer and louder (power off, no wire snag); parked, flag anything unusual (test options: microphone sweep comparison, slow-motion video, USB `servo_static_test.py` with the Pi removed).
 
 ## Block 1 -- V6 calibration (about 45-60 min; must-have)
-1. First walk, 6 s on the floor: , hands ready: `python pi_pipeline/gait/run_gait.py --cmd 0.10 --seconds 6 --log-extra`. Check: upright, no faults, nothing odd in the log.
+1. First walk, 6 s on the floor, hands ready: `python pi_pipeline/gait/run_gait.py --cmd 0.10 --seconds 6 --log-extra`. Check: upright, no faults, nothing odd in the log.
 2. Natural turn, hold and trim off, 3 runs of 12.5 s (`G2_FOOT_TRIM=off python pi_pipeline/gait/run_gait.py --cmd 0.10 --seconds 12.5 --log-extra`; the hold is off by default): tape (forward, sideways), facing by eye, logged yaw. Expect a turn; V4 turned right about 60 deg by eye.
-3. Trim sweep: from the measured turn choose 2-3 values of front-left foot trim (`--foot-trim fl=-0.2` etc.; V4's -0.2 is the starting guess if V6 also turns right), 3 runs each, pick the one that keeps him straightest. Same method as V4 (`trim20_*` logs).
+3. Trim sweep from the measured turn choose 2-3 values of front-left foot trim (`--foot-trim fl=-0.2` etc.; V4's -0.2 is the starting guess if V6 also turns right), 3 runs each, pick the one that keeps him straightest. Same method as V4 (`trim20_*` logs).
 4. Confirm at the chosen trim: 3 more lane runs, then 3 crossings of the 1/4 in (6.4 mm) threshold strip (11 s, tile side), then, if the user has it, the taller strip.
 5. Record: set the V6 default trim in `gait/heading_hold.py` `DEFAULT_TRIMS` keyed to `Release_CandidateV6_ppo.onnx`; README for the day; update STATUS. A trim for tile if the user switches floors.
 

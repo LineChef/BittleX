@@ -86,12 +86,12 @@ so nothing gets rebuilt from scratch:
   triage bandwidth.
 
 **Already-built mechanisms to reuse instead of building new ones:**
-- `RUBBLE`: (not `RANDOM_TERRAIN`, which this session tested and found
+- `RUBBLE` (not `RANDOM_TERRAIN`, which this session tested and found
   nothing) is the actual primary discrete-obstacle hazard, `RUBBLE_N`
   up to 560 / `RUBBLE_MAX_H` up to 0.020 already used in the hardest
   existing gauntlet cells. Use this, swept past those values, for "dense
   obstacle field" testing instead of building something new.
-- `LEDGE_HEIGHT`/`LEDGE_PROB`/`LEDGE_DIR`: (`LEDGE_DIR=-1` = step-down
+- `LEDGE_HEIGHT`/`LEDGE_PROB`/`LEDGE_DIR` (`LEDGE_DIR=-1` = step-down
   only) is literally the drop/pit mechanism from this session's list --
   already built, currently retired/inert. Real history worth knowing:
   Phase 4a tried training on it at 25mm/30% DR and made ledge handling
@@ -131,7 +131,7 @@ had it right.
 
 ## Revised plan
 
-1. Re-verify R10/R12/R4 against the current checkpoints: (run20m_ppo,
+1. Re-verify R10/R12/R4 against the current checkpoints (run20m_ppo,
    then whichever wins resid30) -- cheap, the test methodology already
    exists, just needs re-running. Confirms the stalling problem is still
    present in the current frontier, not just the older checkpoint it was
@@ -147,7 +147,7 @@ had it right.
    stressor axes blind. Check whether it needs the terrain-feature
    dependency it was originally scoped with, or works standalone.
 3. Reopen R2 (IMU bias): now that the hardware precondition is met.
-4. Run R9 properly: (within-episode latency/thermal/battery ramp) --
+4. Run R9 properly (within-episode latency/thermal/battery ramp) --
    covers this session's latency + servo-miscalibration priorities in a
    more realistic form than a static test.
 5. Check R8's drop reasoning: before deciding whether to re-run
@@ -156,7 +156,7 @@ had it right.
 6. Characterize `RUBBLE` and `LEDGE_DIR=-1`: properly (dose-response
    sweep, past the values already used in existing gauntlet cells) --
    reusing existing mechanisms, not building new ones.
-7. `STUCK_FOOT`: , static `JOINT_OFFSET_DEG`, and the combined gnarly
+7. `STUCK_FOOT`, static `JOINT_OFFSET_DEG`, and the combined gnarly
    course last, as originally planned -- these remain genuinely new.
 8. Build `benchmark_resiliency.py` (dose-response sweep tool, composite
    score, as originally planned) once the above informs what it actually
@@ -248,7 +248,7 @@ Full-run estimates below are extrapolated from smoke-test wall-clock while
 CPU-contended with the in-flight training round -- real numbers once run
 standalone will likely be faster, not slower.
 
-- `resilience_imu_bias.py`: (R2) -- sweeps a new `IMU_BIAS_DEG` env
+- `resilience_imu_bias.py` (R2) -- sweeps a new `IMU_BIAS_DEG` env
   constant (persistent per-episode roll/pitch bias, observation-only,
   reward stays clean -- distinct from `RANDOM_GYRO`'s existing zero-mean
   per-step noise). Required an `opencat_gym_env.py` change: the existing
@@ -258,7 +258,7 @@ standalone will likely be faster, not slower.
   no behavior change for any existing script. Smoke test (2 eps x 2
   levels) ran clean in ~4s contended -- **est. ~10-15 min/checkpoint** for
   a real sweep (20 eps x 6 levels).
-- `resilience_episode_ramp.py`: (R9) -- reframed from a static offset to
+- `resilience_episode_ramp.py` (R9) -- reframed from a static offset to
   an actual within-episode ramp per the plan's own note ("more realistic").
   Ramps `env._torque_scale` (battery/thermal sag proxy) and `env._act_buf`
   length (latency) linearly over one long (800-step) episode, entirely from
@@ -283,7 +283,7 @@ standalone will likely be faster, not slower.
   confirm it's not a seed artifact, but a clean 100/100 split at the first
   check is a strong signal either way. **Est. ~3.5 min/checkpoint** for a
   real run (20 eps x 9 cells).
-- `resilience_command_dynamics.py`: (R8) -- reopened; checked git
+- `resilience_command_dynamics.py` (R8) -- reopened; checked git
   history first (`git log`, `robustness-backlog.md`'s 2026-09-03 triage
   commit) and found no specific technical objection survived the doc's
   later restructure, just terse `DROPPED` with a knob sketch -- reopening
@@ -433,7 +433,7 @@ without the anti-stall fix in place).
   (`PHASE_RATE_CORRECTION_ENABLED`) reverted to off first (also
   regressed, see `gait-friction-log.md`), so this round starts from the
   unmodified resid30 baseline, not a carryover experimental change.
-- `FAC_NOSTALL=22.0`: (re-enabled from 0/off) -- not a fresh guess,
+- `FAC_NOSTALL=22.0` (re-enabled from 0/off) -- not a fresh guess,
   the one real validated precedent (`G2E_FAC_NOSTALL=22`, Phase D
   vision-vs-blind A/B, 2026-09-07). `FAC_NOSTALL_BONUS=8.0` unchanged
   (already matched that precedent).

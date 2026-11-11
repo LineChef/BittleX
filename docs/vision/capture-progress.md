@@ -43,7 +43,7 @@ is frozen at Jan 2025; every training toolchain drifted forward since.
 
 - `boxes:[]` forever → head unrecognised (hit with `ultralytics==8.4.146`
   — its LiteRT export ≠ the 8.2.8 graph the firmware knows).
-- box flood: , 10-30/frame on an anchor grid, `postprocess:0ms`, sliders inert
+- box flood, 10-30/frame on an anchor grid, `postprocess:0ms`, sliders inert
   → firmware dumping raw anchors, no NMS (hit with SSCMA `main`-branch
   Swift-YOLO — both a junk-box model AND a real-box mAP@50 0.87 model flooded
   *identically*, proving it's the export head not the data).

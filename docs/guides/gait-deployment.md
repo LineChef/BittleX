@@ -87,7 +87,7 @@ The mapping and signs were verified on G2, but repeat these steps after a servo 
 - The Mac cannot reach the Pi ("No route to host", `EHOSTUNREACH`) but another machine can: Check in this order
 - Deploy refused: An exploration, baseline run or walk is active; `bash tools/g2_explore.sh status`
 
-- The Mac cannot reach the Pi ("No route to host", EHOSTUNREACH) but another machine can: (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on.
+- The Mac cannot reach the Pi ("No route to host", EHOSTUNREACH) but another machine can (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on.
 
   A Deny answer to the "find devices on your local network" prompt blocks that app's connections to every LAN device while the router may still answer, and a program that was already running keeps the old answer until it is quit and reopened .
 

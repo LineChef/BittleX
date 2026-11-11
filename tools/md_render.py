@@ -54,7 +54,7 @@ def lead_split(text: str):
     if not m:
         return None
     lead = m.group("lead")
-    if re.search(r"[.!?]\s|[`\[\]()]\s*$|://|\bhttps?\b|[*\[]", lead) or lead.count("`") % 2 or lead.endswith((".", ",", ";")):
+    if re.search(r"[.!?]\s|://|\bhttps?\b|[*\[\]]", lead) or lead.count("`") % 2 or lead.count("(") != lead.count(")") or lead.endswith((".", ",", ";")):
         return None
     return lead, m.group("rest")
 

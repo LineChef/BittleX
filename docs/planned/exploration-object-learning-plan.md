@@ -51,7 +51,7 @@ Thresholds are the capture tools' defaults and will need tuning on the first rea
 
 ### Phase 1: survey stops and voice-named pictures (code done, wiring in progress)
 1. Feed: `SerialDetectionFeed.snapshot()` stops the detection loop, takes one picture on the same USB port, restarts detection (about one second dark).
-2. Survey: at the end of an exploration leg, at most once every 15 s: stop, stand, `kbuttUp` (the nose-down inspect bow, looking down), picture, `ksit`
+2. Survey at the end of an exploration leg, at most once every 15 s: stop, stand, `kbuttUp` (the nose-down inspect bow, looking down), picture, `ksit`
    (chest raised, looking up), picture, stand, walk on. Skill names and delays are in `SurveyConfig` (the sit pose is a guess at "look up": judged from the
    pictures).
 3. Naming: wake word, then "this is a mug" / "remember this as my mug" / "call this the mug": G2 stops and takes the picture the same way as a survey stop (look down, look up, stand, settle, then one picture, saved under
@@ -186,7 +186,7 @@ and why the curation tool does not discard pictures just because they were taken
 ## Picture workflow, decided 2026-10-10 (user)
 
 Survey pictures no longer feed the object gallery on their own (only a picture named by voice does). The path from a picture to training data:
-1. Automatic filter: (every time the g2pics page loads the pictures, no step to run): too dark, blown out, blurry, flat, cut off, a person in it, and near-duplicates are marked and hidden by default ("Show the N filtered" brings them back). Nothing is deleted; look pictures and contact pictures are never curated.
-2. You label by hand: (Name) and can remove a wrong detector tag (the x on a tag, undoable; the record stays in the sidecar and curation ignores a removed tag, so a false "person" no longer sets a picture aside).
-3. Promotion is automatic for labelled pictures: (user, 2026-10-10: "if they are labeled we should assume they are ready for training"): a picture in a name's folder that the filter kept is promoted when the page loads (and queued for the gallery); Unpromote takes one out and it stays out. A class header shows how many of its pictures are in. Promote by hand puts one back. What promotion does: a copy goes to `training_data/exploration/promoted/<name>/` (gitignored). Only promoted pictures are training data. Unpromote takes the copy back out.
+1. Automatic filter (every time the g2pics page loads the pictures, no step to run): too dark, blown out, blurry, flat, cut off, a person in it, and near-duplicates are marked and hidden by default ("Show the N filtered" brings them back). Nothing is deleted; look pictures and contact pictures are never curated.
+2. You label by hand (Name) and can remove a wrong detector tag (the x on a tag, undoable; the record stays in the sidecar and curation ignores a removed tag, so a false "person" no longer sets a picture aside).
+3. Promotion is automatic for labelled pictures (user, 2026-10-10: "if they are labeled we should assume they are ready for training"): a picture in a name's folder that the filter kept is promoted when the page loads (and queued for the gallery); Unpromote takes one out and it stays out. A class header shows how many of its pictures are in. Promote by hand puts one back. What promotion does: a copy goes to `training_data/exploration/promoted/<name>/` (gitignored). Only promoted pictures are training data. Unpromote takes the copy back out.
 4. Automatic loading into the robot's gallery: promoting also queues the picture on the Pi (`pi_pipeline/vision/promoted_loader.py`); the gallery learns it under its label at once if no exploration is running, otherwise at the next exploration start. A look-alike that already has a different name is not loaded (reported on the page). Un-promoting leaves the gallery as it is.

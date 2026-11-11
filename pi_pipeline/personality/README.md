@@ -54,7 +54,7 @@ voice service and an exploration session, which can be separate processes, both 
 
 - `note_battery(level)` from the low-battery alert, `note_fall()` from the walker and stand guard fall handlers,
   `note_exploration(recap)` at the end of an exploration.
-- `hint()` → one sentence the voice loop adds to each turn's mood hint ("Your battery is low: ...", "You fell over a little while ago ...",
+- `hint()` → one sentence the voice loop adds to each turn's mood hint ("Your battery is low...", "You fell over a little while ago ...",
   "Your last exploration went well ..."). `idle_mult()` → 0.6 / 0.75 / 1.0 on the idle delays, through the behaviour runtime.
 - Notes expire: battery 2 h, fall 30 min, exploration 3 h. Servo heat is deliberately not an input.
 

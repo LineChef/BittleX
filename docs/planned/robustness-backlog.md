@@ -24,7 +24,7 @@ like it's permanently on ice. So:
 2. Train a continuation, 3–4 M steps.
 3. Eval against the full decathlon (`benchmark_decathlon.py --extra-dr payload`)
    **plus** a held-out cell with that knob forced on.
-4. Keep: if the target cell improves and no decathlon cell regresses past
+4. Keep if the target cell improves and no decathlon cell regresses past
    noise. **Revert** otherwise. Log the verdict here.
 5. If several knobs prove out, fold them into the base recipe so the next planned
    20 M from-scratch run trains with them from step 0 — don't ship a stack of
@@ -90,7 +90,7 @@ reason a sim policy wobbles on real hardware.
 Zero all foot contacts for N ticks (robot "held"), optionally reorient, then drop
 from a small height and require the gait to re-acquire. Owners and kids do this
 constantly.
-- Knob sketch: with prob ~0.05, at a random step: disable ground contact +
+- Knob sketch with prob ~0.05, at a random step: disable ground contact +
   apply gentle centring force for `uniform(20, 60)` ticks, then restore with a
   `uniform(0, 40) mm` drop and `±15°` orientation jitter. New `PICKUP_PROB`.
 - Held-out eval: count re-acquisitions vs. tumbles over 32 pick-ups.

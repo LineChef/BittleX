@@ -26,9 +26,9 @@ push that scales with the terrain. 12 episodes per cell.
 
 Winner per row: fewer falls, else more forward distance.
 
-- `phase3-gait`: (fast flat walker): flat: **learned** — 1.28 m vs 0.30 m (~4×); 20 mm: scripted — learned falls 17%; 35 mm: scripted — learned falls 33%; 50 mm: scripted — learned falls 33% vs 8%
-- `gait-v7-stumble-catch`: (crisp trot + balance-catch): flat: **learned** — 0.38 vs 0.30 m; 20 mm: **learned**; 35 mm: scripted — learned falls 8%; 50 mm: ~tie — both 8%
-- `walk-v8-r2`: (Run 7, cautious): flat: ~tie — scripted slightly faster; 20 mm: learned edge on distance; 35 mm: ~tie; 50 mm: scripted — learned falls 17% vs 8%
+- `phase3-gait` (fast flat walker): flat: **learned** — 1.28 m vs 0.30 m (~4×); 20 mm: scripted — learned falls 17%; 35 mm: scripted — learned falls 33%; 50 mm: scripted — learned falls 33% vs 8%
+- `gait-v7-stumble-catch` (crisp trot + balance-catch): flat: **learned** — 0.38 vs 0.30 m; 20 mm: **learned**; 35 mm: scripted — learned falls 8%; 50 mm: ~tie — both 8%
+- `walk-v8-r2` (Run 7, cautious): flat: ~tie — scripted slightly faster; 20 mm: learned edge on distance; 35 mm: ~tie; 50 mm: scripted — learned falls 17% vs 8%
 
 ## What it says
 

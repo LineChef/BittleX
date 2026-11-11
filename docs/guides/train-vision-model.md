@@ -15,7 +15,7 @@ Related: `vision/capture-checklist.md` (the capture routine),
 
 - Grove Vision AI V2 + its camera, USB-C cable (data, not charge-only).
 - A **SenseCraft AI** account (`sensecraft.seeed.cc`) — free.
-- Chrome or Edge: (SenseCraft needs WebSerial; Safari won't work).
+- Chrome or Edge (SenseCraft needs WebSerial; Safari won't work).
 - The repo, with the venv: `source pi_pipeline/.venv/bin/activate`.
 - Camera plugged into the Mac. Confirm: `ls /dev/cu.usbmodem*`.
 
@@ -207,7 +207,7 @@ The boxes are made **at capture time**, not by hand:
 
 **Labelling `ledge`** (the only real work): it's one repeated object on a slow
 pan, so —
-- Roboflow: is fastest: upload just the `ledge` images, use *Label Assist* /
+- Roboflow is fastest: upload just the `ledge` images, use *Label Assist* /
   "repeat previous box", export **YOLO v8**, drop the `.txt` files next to the
   jpgs, `g2promote ledge`. ~20-30 min for ~200 frames.
 - Or: box ~1 frame in 10 in any labeller, then
@@ -255,7 +255,7 @@ household member / pet as another class in the same project over time.
 1. Training done → **Deploy to device** → connect module → flash (~1–2 min).
    (SenseCraft's "please flash first" on the preview after a dropped tab is a UI
    glitch — the flash usually succeeded; verify below.)
-2. Close the SenseCraft tab: (frees the port).
+2. Close the SenseCraft tab (frees the port).
 3. Check what's on the module (the `AT+INFO?` snippet from step 1) — expect
    `"classes":["alex"]`, `"isCustom":true`.
 4. Run it through the pipeline:

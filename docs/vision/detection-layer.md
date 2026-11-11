@@ -126,12 +126,12 @@ overlay + a capture button, pulls JPEGs over serial via `AT+INVOKE=-1,0,0`).
 
 ## Build order
 
-1. Dataset-quality experiment: (above) — cheap, unblocks all estimates.
-2. Interaction model: (B15) — core to personality/bonds/memory; see
+1. Dataset-quality experiment (above) — cheap, unblocks all estimates.
+2. Interaction model (B15) — core to personality/bonds/memory; see
    `person-recognition.md`.
 3. Headless-flash research: required before any model-swapping.
 4. Model-manager: once headless flash works.
-5. Safety model: (B16) — gated on camera-mounted-on-frame (POV-specific
+5. Safety model (B16) — gated on camera-mounted-on-frame (POV-specific
    training data); highest priority the moment the body exists.
 6. Objects model: COCO-80 deploy, lowest effort; wire `scene.narrate`.
 

@@ -165,7 +165,7 @@ is the base gait for hardware. Final scorecard: artifact "20M Gait Scorecard".
 - Payload-on (deployment): 0% falls on all 20 cells (15-cell decathlon + 5
   hardened T6). Beats scripted on speed/distance on nearly every cell. Walks
   *down* a -24 deg slope (+0.058 m/s) where scripted slides back.
-- Speed commands track to 0.007 m/s: (creep 0.033 / cruise 0.092 / fast 0.137
+- Speed commands track to 0.007 m/s (creep 0.033 / cruise 0.092 / fast 0.137
   / backward -0.060). 14-cell battery: 0% falls, wins distance on ~10/14, scripted
   wins none outright (reclaimed side-slope-8, which Phase 3b lost).
 - Bare-robot canary: the descent cells that regressed in Phase 3b are
