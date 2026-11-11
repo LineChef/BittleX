@@ -12,9 +12,9 @@ def _tree(tmp_path, main_rows, adv_rows=""):
     (tmp_path / "tools").mkdir()
     (tmp_path / "tools" / "g2_aliases.sh").write_text("g2mic() { :; }\ng2rest() { :; }\nalias g2back='cd -'\n")
     (tmp_path / "docs" / "guides").mkdir(parents=True)
-    head = "# Cheat sheet\n\n## Voice and mic\n\n"
-    (tmp_path / "docs" / "guides" / "cheatsheet.md").write_text(head + main_rows + "\n## A to Z\n\n<!-- index:start -->\n<!-- index:end -->\n")
-    (tmp_path / "docs" / "guides" / "cheatsheet-advanced.md").write_text("# Advanced\n\n## Setup\n\n" + adv_rows)
+    head = "# Cheat sheet\n\nVoice and mic\n-------------\n\n"
+    later = ("\nSetup\n-----\n\n" + adv_rows) if adv_rows else ""
+    (tmp_path / "docs" / "guides" / "cheatsheet.md").write_text(head + main_rows + later + "\nA to Z\n------\n\n<!-- index:start -->\n<!-- index:end -->\n")
     return str(tmp_path)
 
 
@@ -41,6 +41,6 @@ def test_the_index_lists_each_command_once_with_every_section_it_is_in(tmp_path)
     idx = G.build_index(root)
     assert idx.count("`g2mic`") == 1 and "[Voice and mic](#voice-and-mic)" in idx
     rest = [line for line in idx.splitlines() if line.startswith("- `g2rest`")][0]
-    assert "(#voice-and-mic)" in rest and "cheatsheet-advanced.md#setup" in rest
+    assert "(#voice-and-mic)" in rest and "(#setup)" in rest
     assert idx.index("`g2back`") < idx.index("`g2mic`") < idx.index("`g2rest`")                       # A to Z
     assert "<!-- index:start -->\n- `g2back`" in G.build(root)

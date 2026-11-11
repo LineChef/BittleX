@@ -4,7 +4,7 @@
     python tools/gen_cheatsheet_index.py           # rewrite the index at the bottom of docs/guides/cheatsheet.md
     python tools/gen_cheatsheet_index.py --check   # exit 1 if the index is stale or a row breaks a rule (the doc checker runs this)
 
-The index lists every `g2*` command in docs/guides/cheatsheet.md and cheatsheet-advanced.md with the section it is in. The rules (user, 2026-11-04: a quick reference shows
+The index lists every `g2*` command in docs/guides/cheatsheet.md with the section it is in. The rules (user, 2026-11-04: a quick reference shows
 an example you can copy, not the grammar of the command):
   * a command row is a bullet, - `example`: short description, one command per row (no pipe tables in the docs);
   * the example has no [optional] brackets and no \\| choices (write one real example; give each variation its own row);
@@ -20,7 +20,7 @@ import md_headings  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-PAGES = [("cheatsheet.md", "docs/guides/cheatsheet.md"), ("cheatsheet-advanced.md", "docs/guides/cheatsheet-advanced.md")]
+PAGES = [("cheatsheet.md", "docs/guides/cheatsheet.md")]
 START, END = "<!-- index:start -->", "<!-- index:end -->"
 ROW = re.compile(r"^- `([^`]+)`(?:: (.*))?$")
 MAX_DESC = 80

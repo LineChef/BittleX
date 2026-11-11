@@ -41,7 +41,7 @@ LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 
-GENERATED_PAGES = ("docs/guides/env-reference.md", "docs/guides/shell-helpers.md", "docs/guides/cheatsheet.md", "docs/guides/cheatsheet-advanced.md")
+GENERATED_PAGES = ("docs/guides/env-reference.md", "docs/guides/shell-helpers.md", "docs/guides/cheatsheet.md")
 ATTRIBUTION_RE = re.compile(r"\((?:user|owner)[,:] ?20\d\d-\d\d-\d\d")
 # Published pages read as a product specification, not as working notes (docs/maintaining-docs.md, "Writing a published page"): these patterns are the note-taking voice.
 NOTE_PATTERNS = (

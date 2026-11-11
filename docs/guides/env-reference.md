@@ -220,7 +220,7 @@ All variables
 - `G2_ON_CHARGER`: Default at the read: `PATH`; Read in: `charger.py`; Documented in: not documented
 - `G2_ORIGIN`: Default at the read: `""`; Read in: `command_log.py`; Documented in: not documented
 - `G2_ORT_ARENA`: Default at the read: `""`; Read in: `ort_memory.py`; Documented in: [`settings-switches.md`](settings-switches.md)
-- `G2_PI`: Default at the read: —; Read in: `g2_cleanup.py`, `g2_goal_edits.py`, `g2_places_sync.py` +3; Documented in: [`attachments.md`](attachments.md), [`cheatsheet-advanced.md`](cheatsheet-advanced.md), [`gait-deployment.md`](gait-deployment.md) +5
+- `G2_PI`: Default at the read: —; Read in: `g2_cleanup.py`, `g2_goal_edits.py`, `g2_places_sync.py` +3; Documented in: [`attachments.md`](attachments.md), [`cheatsheet.md`](cheatsheet.md), [`gait-deployment.md`](gait-deployment.md) +5
 - `G2_PICTURE_KEEP_DAYS`: Default at the read: `0.0`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)
 - `G2_PICTURE_PREP_EVERY_S`: Default at the read: `"0"`; Read in: `explore_session.py`; Documented in: [`settings-switches.md`](settings-switches.md)
 - `G2_PI_BATTERY_ARM`: Default at the read: `"boot"`; Read in: `config.py`; Documented in: [`.env.example`](../../.env.example)

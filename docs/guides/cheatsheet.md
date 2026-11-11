@@ -5,9 +5,9 @@ kind: reference
 
 # Cheat sheet
 
-Commands to run, one example per row: copy it and change the value. Every option is in [`shell-helpers.md`](shell-helpers.md) (`g2help` prints it in the terminal). Before G2 moves: [`operating-g2.md`](operating-g2.md). Setup, training, bring-up and repo commands: [`cheatsheet-advanced.md`](cheatsheet-advanced.md).
+Commands to run, one example per row: copy it and change the value. The everyday commands come first, then the ones that are rarely needed (setup, commands on the Pi, training, bring-up, the camera model, docs and repo). Every option is in [`shell-helpers.md`](shell-helpers.md) (`g2help` prints it in the terminal). Before G2 moves: [`operating-g2.md`](operating-g2.md).
 
-Jump to: [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#walk-tests) · [Explore](#explore) · [Ball goal](#ball-goal-and-punts) · [Claw and camera](#claw-and-camera) · [Data](#data-and-review) · [Pi power](#pi-power-and-network) · [Voice and mic](#voice-and-mic) · [Say to G2](#things-to-say-to-g2) · [A to Z](#a-to-z)
+Jump to: [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#walk-tests) · [Explore](#explore) · [Ball goal](#ball-goal-and-punts) · [Claw and camera](#claw-and-camera) · [Data](#data-and-review) · [Pi power](#pi-power-and-network) · [Voice and mic](#voice-and-mic) · [Say to G2](#things-to-say-to-g2) · [Setup](#setup) · [Pi commands](#commands-on-the-pi) · [Training](#training-and-policies) · [Bring-up](#bring-up-and-hardware) · [Camera model](#camera-model) · [Docs and repo](#docs-and-repo) · [A to Z](#a-to-z)
 
 Most used
 ---------
@@ -170,80 +170,205 @@ Wake with "gee two". The full list: [`voice-commands.md`](voice-commands.md).
 - "mic off for 20 minutes": wake word off
 - "go to sleep" / "shut down": sleep / lie down and shut the Pi down (flip the PiSugar switch by hand)
 
+Setup
+-----
+
+Add this to `~/.zshrc` once, and set where the Pi is:
+
+```bash
+source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh
+export G2_PI=<user>@g2pi.local          # the Pi login; kept out of the repo
+```
+
+If the Mac sometimes cannot find `g2pi.local` while the Pi is up, run this once. It adds an `~/.ssh/config` block that falls back to the Pi's last known address; add `--remove` to undo it:
+
+```bash
+bash tools/g2_pi_ssh_setup.sh
+```
+
+Every alias works from any directory and leaves you where you were, except `g2` and `g2rl`. In Claude Code, `!` runs each line in a fresh shell, so `source` and the alias must be on one line.
+
+- `g2`: go to the repo with the pipeline venv
+- `g2rl`: go to `rl_training/opencat-gym` with the RL venv
+- `g2back`: return to where you were
+- `g2help`: list every helper
+- `g2docs`: list the key docs
+- `g2ssh`: open a shell on the Pi
+
+Commands on the Pi
+------------------
+
+Run these over `g2ssh` from `~/bittleX`, with the voice service stopped (`g2stop voice`) and G2 standing.
+
+- `pi_pipeline/.venv/bin/python pi_pipeline/gait/run_gait.py --cmd 0.10 --seconds 12.5 --log ~/g2_runs/x.csv`: one logged policy walk
+- `pi_pipeline/.venv/bin/python pi_pipeline/gait/run_gait.py --dry-run --seconds 5`: the loop with a synthetic IMU, no serial
+- `python pi_pipeline/gait/run_gait.py --openloop --base wkArm --cycles 6`: Petoi's arm walk, no policy
+- `python -m pi_pipeline.diag report --html out.html`: one report for a session
+- `python -m pi_pipeline.attachments floor-trim tile fl=-0.1`: save a trim measured on one floor
+- `python -m pi_pipeline.behavior.ball_chase --dry-run`: print what the chase would do
+- `python -m pi_pipeline.behavior.punt_test --distances 2 3 4 5`: one punch at each ball distance
+- `python -m pi_pipeline.behavior.wall_settings --set chase_wall_in 10`: your own wall settings
+- `python -m pi_pipeline.voice.wake_log --days 7`: wake triggers, false ones, suggested confidence
+- `python -m pi_pipeline.power runtime test start`: a timed Pi battery-life test
+
+Details: [`gait-deployment.md`](gait-deployment.md), [`punt.md`](punt.md), [`goals.md`](goals.md).
+
+Training and policies
+---------------------
+
+Run from anywhere; the RL venv is used automatically. Rules: [`../rl/training-pipeline.md`](../rl/training-pipeline.md). A fresh candidate each run, never a 20M unasked, screens capped at 3M.
+
+- `g2eta plan --steps 3e6 --tail stage`: a timing estimate before launching
+- `g2eta now --target 20e6 --tail final20m`: the estimate during a run
+- `g2train mytag`: start a run with the pre-run checklist (new tag)
+- `g2preflight`: must print ALL PASS before a 20M
+- `g2watchrun`: watch the run happening now
+- `g2watch`: replay the newest finished policy
+- `g2tb`: open TensorBoard (`g2tb stop` ends it)
+- `g2rltest`: the RL test files
+- `g2test`: the pipeline test suite
+- `g2policy mytag Release_Candidate`: promote a policy to G2's default (your call only)
+
+Score, export and check a policy from `rl_training/opencat-gym` (`g2rl` goes there):
+
+```bash
+python benchmark_decathlon.py --learned trained/<tag>_ppo --episodes 24 --hw i --json-out /tmp/dec.json
+python export_onnx.py --model trained/<tag>_ppo --residual-scale-deg 30 --cmd-send-every-n 3 --out trained/<tag>_ppo.onnx
+python validate_deploy.py --onnx trained/<tag>_ppo.onnx            # must print ALL OK
+python promote_release.py --candidate trained/X.onnx --name ARM1 --attachment arm --attachment-only --payload-profile arm
+```
+
+Bring-up and hardware
+---------------------
+
+- `g2doctor --serial`: readiness checklist: key, models, serial, audio, disk
+- `g2bringup`: guided, resumable hardware bring-up
+- `g2serial ports`: list serial ports
+- `g2serial ping` is the BiBoard answering
+- `g2serial firstmove`: guided first movement, one joint at a time
+- `g2serial allmoves`: full movement sweep
+- `g2app --serial`: the whole robot as one program
+- `g2feat`: resolve the feature flags
+- `g2traits`: resolve the personality traits
+- `g2diag`: read a diagnostics session
+- `g2attach arm`: tell the Pi what G2 is wearing (head, arm, none)
+
+### Board tokens
+
+Send with `g2serial send <token>`. Full reference: [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md). **Never send `Xa` or `XAd`.**
+
+- `d`: rest (servos relax)
+- `kbalance`: calibration and stand pose
+- `P`: battery voltage
+- `gc`: calibrate the IMU (level and still)
+- `gb` / `gB`: firmware gyro balance off / on
+- `XS`: enable Serial-2 (once; redo after a reflash)
+- `f`: servo feedback stream (USB only)
+
+Camera model
+------------
+
+Build the detection model: capture, filter, add to the library, upload to SenseCraft. Walkthrough: [`train-vision-model.md`](train-vision-model.md); routine: [`../vision/capture-checklist.md`](../vision/capture-checklist.md).
+
+- `g2pcam mug`: capture with the camera on G2
+- `g2pcam-pull mug`: copy that session to the Mac
+- `g2cam mug`: capture with a camera plugged into the Mac
+- `g2curate mug`: filter the session
+- `g2promote mug`: add the class to the library
+- `g2auto`: run the rest and build the upload set
+- `g2libstatus`: the library counts
+
+Docs and repo
+-------------
+
+
+- `g2check`: docs checks (the pre-commit hook runs it)
+- `g2docsgen`: regenerate the generated docs
+- `g2clean`: list scratch files; `g2clean --apply` deletes them
+- `g2test`: the `pi_pipeline` test suite
+- `pi_pipeline/.venv/bin/ruff check`: lint (the pre-commit hook runs it)
+
+`git commit --no-verify` bypasses the hooks for a genuine false positive.
+
 A to Z
 ------
 
-Every command on this page and in [`cheatsheet-advanced.md`](cheatsheet-advanced.md) (generated; `python tools/gen_cheatsheet_index.py` rewrites it).
+The A to Z of every command is at the bottom of [`cheatsheet.md`](cheatsheet.md#a-to-z).
+
+A to Z
+------
+
+Every command on this page (generated; `python tools/gen_cheatsheet_index.py` rewrites it).
 
 <!-- index:start -->
-- `g2`: [Setup](cheatsheet-advanced.md#setup)
+- `g2`: [Setup](#setup)
 - `g2api`: [Data and review](#data-and-review)
-- `g2app`: [Stop and safety](#stop-and-safety), [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
-- `g2attach`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
+- `g2app`: [Stop and safety](#stop-and-safety), [Bring-up and hardware](#bring-up-and-hardware)
+- `g2attach`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2audio`: [Voice and mic](#voice-and-mic)
-- `g2auto`: [Camera model](cheatsheet-advanced.md#camera-model)
-- `g2back`: [Setup](cheatsheet-advanced.md#setup)
+- `g2auto`: [Camera model](#camera-model)
+- `g2back`: [Setup](#setup)
 - `g2ball`: [Most used](#most-used), [Ball goal and punts](#ball-goal-and-punts)
 - `g2ballstop`: [Most used](#most-used), [Ball goal and punts](#ball-goal-and-punts)
 - `g2baseline`: [Walk tests](#walk-tests)
 - `g2bg`: [Data and review](#data-and-review)
-- `g2bringup`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
+- `g2bringup`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2cal`: [Data and review](#data-and-review)
 - `g2calauto`: [Data and review](#data-and-review)
-- `g2cam`: [Camera model](cheatsheet-advanced.md#camera-model)
+- `g2cam`: [Camera model](#camera-model)
 - `g2chat`: [Voice and mic](#voice-and-mic)
-- `g2check`: [Docs and repo](cheatsheet-advanced.md#docs-and-repo)
+- `g2check`: [Docs and repo](#docs-and-repo)
 - `g2claw`: [Claw and camera](#claw-and-camera)
-- `g2clean`: [Docs and repo](cheatsheet-advanced.md#docs-and-repo)
+- `g2clean`: [Docs and repo](#docs-and-repo)
 - `g2cmds`: [Data and review](#data-and-review)
 - `g2crash`: [Data and review](#data-and-review)
-- `g2curate`: [Camera model](cheatsheet-advanced.md#camera-model)
+- `g2curate`: [Camera model](#camera-model)
 - `g2data`: [Data and review](#data-and-review)
 - `g2deploy`: [Most used](#most-used), [Pi power and network](#pi-power-and-network)
-- `g2diag`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
-- `g2docs`: [Setup](cheatsheet-advanced.md#setup)
-- `g2docsgen`: [Docs and repo](cheatsheet-advanced.md#docs-and-repo)
-- `g2doctor`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
-- `g2eta`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
+- `g2diag`: [Bring-up and hardware](#bring-up-and-hardware)
+- `g2docs`: [Setup](#setup)
+- `g2docsgen`: [Docs and repo](#docs-and-repo)
+- `g2doctor`: [Bring-up and hardware](#bring-up-and-hardware)
+- `g2eta`: [Training and policies](#training-and-policies)
 - `g2explore`: [Most used](#most-used), [Stop and safety](#stop-and-safety), [Explore](#explore)
-- `g2feat`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
+- `g2feat`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2floor`: [Most used](#most-used), [Walk tests](#walk-tests)
 - `g2goal`: [Ball goal and punts](#ball-goal-and-punts)
-- `g2help`: [Setup](cheatsheet-advanced.md#setup)
+- `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)
-- `g2libstatus`: [Camera model](cheatsheet-advanced.md#camera-model)
+- `g2libstatus`: [Camera model](#camera-model)
 - `g2look`: [Claw and camera](#claw-and-camera)
 - `g2mem`: [Data and review](#data-and-review)
 - `g2membackup`: [Data and review](#data-and-review)
 - `g2mic`: [Most used](#most-used), [Voice and mic](#voice-and-mic)
 - `g2micon`: [Voice and mic](#voice-and-mic)
-- `g2pcam`: [Camera model](cheatsheet-advanced.md#camera-model)
-- `g2pcam-pull`: [Camera model](cheatsheet-advanced.md#camera-model)
+- `g2pcam`: [Camera model](#camera-model)
+- `g2pcam-pull`: [Camera model](#camera-model)
 - `g2pics`: [Most used](#most-used), [Data and review](#data-and-review)
 - `g2picscurate`: [Data and review](#data-and-review)
 - `g2pimem`: [Data and review](#data-and-review)
-- `g2policy`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
+- `g2policy`: [Training and policies](#training-and-policies)
 - `g2power`: [Pi power and network](#pi-power-and-network)
-- `g2preflight`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
-- `g2promote`: [Camera model](cheatsheet-advanced.md#camera-model)
+- `g2preflight`: [Training and policies](#training-and-policies)
+- `g2promote`: [Camera model](#camera-model)
 - `g2punt`: [Ball goal and punts](#ball-goal-and-punts)
 - `g2puntset`: [Ball goal and punts](#ball-goal-and-punts)
 - `g2puntstop`: [Ball goal and punts](#ball-goal-and-punts)
 - `g2reset`: [Most used](#most-used)
 - `g2rest`: [Most used](#most-used), [Stop and safety](#stop-and-safety)
-- `g2rl`: [Setup](cheatsheet-advanced.md#setup)
-- `g2rltest`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
+- `g2rl`: [Setup](#setup)
+- `g2rltest`: [Training and policies](#training-and-policies)
 - `g2see`: [Claw and camera](#claw-and-camera)
 - `g2send`: [Claw and camera](#claw-and-camera)
-- `g2serial`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
-- `g2ssh`: [Most used](#most-used), [Setup](cheatsheet-advanced.md#setup)
+- `g2serial`: [Bring-up and hardware](#bring-up-and-hardware)
+- `g2ssh`: [Most used](#most-used), [Setup](#setup)
 - `g2standup`: [Most used](#most-used)
 - `g2stop`: [Most used](#most-used), [Stop and safety](#stop-and-safety)
 - `g2sync`: [Most used](#most-used), [Data and review](#data-and-review)
-- `g2tb`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
-- `g2test`: [Training and policies](cheatsheet-advanced.md#training-and-policies), [Docs and repo](cheatsheet-advanced.md#docs-and-repo)
-- `g2train`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
-- `g2traits`: [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware)
+- `g2tb`: [Training and policies](#training-and-policies)
+- `g2test`: [Training and policies](#training-and-policies), [Docs and repo](#docs-and-repo)
+- `g2train`: [Training and policies](#training-and-policies)
+- `g2traits`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2turn3`: [Claw and camera](#claw-and-camera)
 - `g2turns`: [Walk tests](#walk-tests)
 - `g2vision`: [Claw and camera](#claw-and-camera)
@@ -254,7 +379,7 @@ Every command on this page and in [`cheatsheet-advanced.md`](cheatsheet-advanced
 - `g2wallreplay`: [Claw and camera](#claw-and-camera)
 - `g2walls`: [Claw and camera](#claw-and-camera)
 - `g2wallstats`: [Claw and camera](#claw-and-camera)
-- `g2watch`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
-- `g2watchrun`: [Training and policies](cheatsheet-advanced.md#training-and-policies)
+- `g2watch`: [Training and policies](#training-and-policies)
+- `g2watchrun`: [Training and policies](#training-and-policies)
 - `g2wifi`: [Pi power and network](#pi-power-and-network)
 <!-- index:end -->
