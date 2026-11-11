@@ -3,7 +3,7 @@
 A **separate** walking policy for G2 to switch to when he needs to get onto a ledge: slow, careful, three feet on the ground at all times, trained to step **up** (never down).
 The goal is foot clearance; stability is not ranked, but it must not fall on flat ground. It is not V6 and is not trained on top of anything (a fresh chain from S0).
 Switching between it and V6 on the Pi comes later. Approved by the user 2026-10-12 (steps 1-5 plus a 20M consolidation, run unattended, decisions made and documented by Claude,
-deployment the user's call). This page replaces the "Track C, two modes in one network" path of [`high-step-gait-plan.md`](high-step-gait-plan.md).
+deployment the user's call). This page replaces the "Track C, two modes in one network" path of `high-step-gait-plan.md`.
 
 ## 0. Outcome (2026-10-13 8:52 AM): STOPPED, goal not met, 20M never run
 

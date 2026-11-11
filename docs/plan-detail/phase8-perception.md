@@ -46,7 +46,7 @@ by the reactive-recovery ceiling established in Runs 6–7.
 > mechanism once close enough, advance the same-side front leg), which gets
 > all four paws reliably onto a raised ledge without the earlier "jump"
 > (explosive tail push) the mechanism depended on before. Full log:
-> [`docs/archive/rl/crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md).
+> `docs/archive/rl/crawl-climb-session-checkpoint.md`.
 > One open problem remaining (front legs collapse into an unstable, tilted
 > crouch once both rear legs plant, root cause diagnosed but not yet fixed
 > cleanly — same doc). **Once that's resolved and the climb is reliable on

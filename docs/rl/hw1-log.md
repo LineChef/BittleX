@@ -9,7 +9,7 @@
 What the rounds below add up to. The detail that follows is the evidence; later chains are in [`training-pipeline.md`](training-pipeline.md) and [`../STATUS.md`](../STATUS.md).
 
 - The real control path shapes the gait: The firmware's orientation stream is capped at 5 Hz and carries no angular rate; `m` moves joints one at a time (about 144 ms for 8 joints) while `i` moves them together at about 250 deg/s. A policy is trained and scored through that path (`--hw i`, a command every third tick).
-- The "limp" was a simulator bug, not a gait problem. The welded payload locked the body's rotation; fixing the payload inertia removed it. Conclusions drawn from locked-body results are flagged for re-checking ([`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md)).
+- The "limp" was a simulator bug, not a gait problem. The welded payload locked the body's rotation; fixing the payload inertia removed it. Conclusions drawn from locked-body results are flagged for re-checking (`sim-payload-bug.md`).
 - Staged, single-skill training beat training everything at once. The parallel-combined candidate regressed on ledges as training went on; teaching one mechanic at a time (flat, transitions, carpet, step, snag, ledges last) and then consolidating gave V2, then V2.1 after yaw tuning.
 - A retrain on a 93 to 249 Hz IMU premise was abandoned. The faster rate was a stale-firmware artifact; on current firmware the real rate is 5.0 Hz, so V2.1's original assumptions stood and that lineage was dropped.
 - Lineage since: V2.1 (the default into early October), V3 (a retrain against the measured payload and steering), V4 (the frontier-curriculum upgrade; Candidate A deployed 2026-10-09), V5 (about equal to the scripted walk, not promoted), V6 (deployed, heading-blind, promoted by the user although it did not beat V4 on the sim benchmark). Details: [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) and the V5 and V6 plans.
@@ -81,7 +81,7 @@ policy's sidecar (below).
   62 % on the 18° climb" was that artifact (0 % with the payload). `_apply`
   now restores every cell knob's default first.
 - Earlier learned-vs-scripted verdicts from these benchmarks
-  ([`gait-benchmark.md`](../archive/rl/gait-benchmark.md), [`resid30-log.md`](../archive/rl/resid30-log.md))
+  ([`gait-benchmark.md`](../archive/rl/gait-benchmark.md), `resid30-log.md`)
   used the distorted baseline. Rescored with both fixes: falls within noise of
   pure scripted, learned clearly faster on hard terrain — the verdict survives,
   for the right cells.
@@ -628,7 +628,7 @@ together (bring-up step 12a, `guides/pi-bring-up.md` §7).
 
 ## V4 (2026-10-09): Candidate A promoted for hardware testing
 
-The overnight training (decisions and numbers: [`../archive/plan-detail/decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), summary in [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) section 6) produced two exported candidates comparable to V3. On the user's instruction (2026-10-09) **Candidate A became V4 and the default walking policy** and was deployed to the Pi for hardware testing.
+The overnight training (decisions and numbers: `../archive/plan-detail/decisions-log-2026-10-08.md`, summary in [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) section 6) produced two exported candidates comparable to V3. On the user's instruction (2026-10-09) **Candidate A became V4 and the default walking policy** and was deployed to the Pi for hardware testing.
 
 - Source: a chain of continuations. Stage 1 (`v4_s1`, fresh 5M, short hazard episodes) -> stage 2 (`v4_s2`, long hazard episodes, stopped at 5.4M; its 3M checkpoint) -> cool-down (`v4_c1`, 3M at learning rate 3e-5; its 2.0M checkpoint) -> `v4_c2` (slope floor, learning rate 5e-5; **its 1.0M checkpoint, `trained/checkpoints/v4_c2_1000000_steps`**). All with mirror loss 2.0 and the working curriculum gates (0.25 / 0.12).
 - Export: `export_onnx.py --model trained/checkpoints/v4_c2_1000000_steps --out trained/Release_CandidateV4_ppo.onnx --residual-scale-deg 30 --cmd-send-every-n 3` (568 KB, 278 inputs; the privileged critic inputs are masked for the actor and the export takes only the 278). The exported file matched the trained policy to 2e-7 over 600 simulated steps. Byte-identical to the earlier candidate export.

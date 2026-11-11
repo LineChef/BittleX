@@ -303,7 +303,7 @@ G2 put back at the start spot each run. Pack under load 7.8-8.1 V (not a full ch
 > sim servo-speed limit) is still the record of what was ruled out and what remains open for the residual +40 deg.
 
 The six walks above all turned about +142 deg right in 12.7 s. This section is the record of what was tested and what it shows; the plan
-built on it is [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md). Raw results and the exact commands: [`v3-data/`](../archive/rl/v3-data/README.md).
+built on it is [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md). Raw results and the exact commands: `v3-data/`.
 
 **Ruled out: the Pi's yaw sign.**
 - The firmware stream reports + yaw for a right turn (confirmed with `kvtF` on 10-02, below). PyBullet, where the policy was trained,
@@ -344,7 +344,7 @@ built on it is [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md). Raw res
 **Update 2026-10-06 (afternoon): the sim's servo-speed limit is the dominant sim-vs-G2 gap, and it hides the right turn.** The first version of this
 section used `drift_probe.py`, which did not force the commanded speed (the env redrew the command ~9 times per 1000 steps), so its speeds were too
 low and its "V2.1 slows down on long walks" reading was wrong. Re-measured with a forced command (`benchmark_v4.py`, V2.1, 422 g, the 12.5 s calm
-walk "N1", 20 episodes; raw results in [`v3-data/`](../archive/rl/v3-data/README.md)):
+walk "N1", 20 episodes; raw results in `v3-data/`):
 
 - 90: Falls: 0%; Speed (m/s): 0.067; Heading change over 12.5 s: +7.3 (left); Roll std: 2.26; Pitch std: 1.44
 - 137 (what V2/V2.1 and the V3 profile assume): Falls: 0%; Speed (m/s): 0.089; Heading change over 12.5 s: **+9.3 (left)**; Roll std: **2.64**; Pitch std: 1.70

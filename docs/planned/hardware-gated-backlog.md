@@ -4,7 +4,7 @@ RL / gait-training work that is **deliberately deferred until the real robot is
 available for testing**. Sim iteration on locomotion is otherwise considered done
 as of 2026-09-03 (`run20m_ppo` is the frozen base gait — see
 [`refinement-regimen.md`](../archive/rl/refinement-regimen.md) and
-[`phase4-decision-log.md`](../archive/rl/phase4-decision-log.md)).
+`phase4-decision-log.md`).
 
 Each entry has a **trigger**: the specific thing hardware testing would have to
 show before the run is worth doing. If the trigger never fires, the item stays
