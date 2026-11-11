@@ -59,7 +59,7 @@ N_CELLS = [
     # L1 (2026-10-07, the length level, docs/archive/rl/v3-decisions-log.md): a 40 s straight walk under a constant yaw push of +/-0.25 N*m that ALTERNATES by episode (even episodes push right, odd push left), 16 episodes.
     # Reports the heading change per side (heading_even_abs_mean_deg = right pushes, heading_odd_abs_mean_deg = left pushes) and their gap, so a policy that corrects only one direction shows it.
     ("L1", "Long run, 40 s, alternating yaw push +/-0.25 N*m", {"LONG_RUN_PUSH": 0.25}, 16, 3200, None),
-    # V5 (2026-10-09, docs/plan-detail/v5-training-plan.md): the side-hill in BOTH directions (T3.2 only tests the right side down; V4 fell 0.26 that way and 0.49 the
+    # V5 (2026-10-09, docs/plan-detail/v5-training-plan.md (removed; see git history)): the side-hill in BOTH directions (T3.2 only tests the right side down; V4 fell 0.26 that way and 0.49 the
     # other way) and the ledge split into up and down (the random-direction T5 cells hide which one fails). Same 3.1 s length as the T cells.
     ("SL10", "Side-hill 10 deg, LEFT side down (T3.2's mirror)", {"SLOPE_FIXED_RP": (-math.radians(10), 0.0)}, 40, None, None),
     ("SR8", "Side-hill 8 deg, right side down", {"SLOPE_FIXED_RP": (math.radians(8), 0.0)}, 40, None, None),

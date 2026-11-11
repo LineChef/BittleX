@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn one of our Markdown docs into a single self-contained HTML page (light and dark, tables scroll on a narrow window), with no Markdown package needed.
 
-    python tools/md_to_html.py docs/research/xiaozhi-vendor-docs.md OUT.html docs/research
+    python tools/md_to_html.py docs/research/xiaozhi-vendor-docs.md (removed; see git history) OUT.html docs/research
 
 The third argument is the folder of the source file inside the repo: relative links such as `../plan-detail/x.md` are turned into links to that file on GitHub (the page is read away from the repo).
 It handles what our docs use: headings, tables, flat lists, bold, inline code and links. A document with its own "Contents" section gets no second contents box. The page is a snapshot; the Markdown file stays the source of truth.
@@ -103,7 +103,7 @@ nav ol{{columns:2;column-gap:28px;margin:8px 0;padding-left:1.2rem}} nav li{{fon
 {body[0]}
 {nav_html}
 {chr(10).join(body[1:])}
-<p class="note">Generated from <code>docs/planned/ai-head/ai-head-implementation.md</code>. The Markdown file in the repository is the source of truth; edit that, not this page.</p>
+<p class="note">Generated from <code>docs/planned/ai-head/ai-head-implementation.md (removed; see git history)</code>. The Markdown file in the repository is the source of truth; edit that, not this page.</p>
 </div></body></html>"""
 open(OUT, "w", encoding="utf-8").write(page)
 print(len(page), "bytes,", len(toc), "sections,", sum(1 for b in body if b.startswith("<div class='tw'>")), "tables")

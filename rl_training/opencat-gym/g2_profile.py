@@ -108,7 +108,7 @@ LEVERS = {
     "hazard_long": {"G2E_HAZARD_EP_LEN": "600", "G2E_HAZARD_X_SCALE": "1.0"},                    # hazard-focus episodes 7.5 s with the obstacles where they were: G2 gets time to walk through them
     "imitation_actual": {"G2E_IMITATION_ACTUAL": "1"},                                           # imitation on measured joints (recipe evaluation finding 1)
     "privileged_critic": {"G2E_PRIV_OBS": "1"},                                                  # critic-only true state + hazards (recipe evaluation finding 3)
-    # 2026-10-09 V5 plan (docs/plan-detail/v5-training-plan.md), user-approved. v5_course is the fixed training setup every V5 run uses; the rest are its screens.
+    # 2026-10-09 V5 plan (docs/plan-detail/v5-training-plan.md (removed; see git history)), user-approved. v5_course is the fixed training setup every V5 run uses; the rest are its screens.
     "v5_course": {"G2E_FR_SPLIT_SIDE": "1",                                                      # side-hill left-down and right-down tracked as separate hazards
                   "G2E_FR_BOUNDS": "sidehill_l:8,sidehill_r:8,climb:10,descent:10,ledge_up:0.035,ledge_down:0.04",   # ladder tops = the real caps (user)
                   "G2E_FR_IGNORE_CAPS": "1",                                                     # the old static caps no longer clip frontier sizes (V4's silent 8 deg / 20 mm cap)
@@ -125,7 +125,7 @@ LEVERS = {
     "haz_posture": {"G2E_HAZ_POSTURE_RELAX": "0.5"},                                             # holding a non-scripted posture costs half while on a hazard
     "heading_blind": {"G2E_HEADING_BLIND": "1", "G2E_PRIV_YAW": "1", "G2E_FAC_HEADING": "10"},   # the policy never sees yaw (no steering); the critic does; heading penalty x2
     "ledge30": {"G2E_FR_BOUNDS": "sidehill_l:8,sidehill_r:8,climb:10,descent:10,ledge_up:0.03,ledge_down:0.03", "G2E_LEDGE_HEIGHT": "0.03"},   # 2026-10-09 (user): step-up and step-down tops 30 mm so they stay passable if the policy learns; applied to the preflight and the 20M, not to the screens
-    # 2026-10-09 V6: a chain of short skill stages (docs/plan-detail/v6-staged-training-plan.md). Each stage lever sets that stage's mix of episodes; the stage runner (phase_v6.py) adds
+    # 2026-10-09 V6: a chain of short skill stages (docs/plan-detail/v6-staged-training-plan.md (removed; see git history)). Each stage lever sets that stage's mix of episodes; the stage runner (phase_v6.py) adds
     # it after the fixed recipe. LR_SCALE is the stage's starting learning rate as a fraction of 3e-4 (it decays over the stage); FR_ANCHOR is the stage's flat-walking share.
     "v6_s0_flat": {"G2E_FR_ANCHOR": "0.85", "G2E_FR_SHARE_SET": "rubble:0.05,boxes:0.03,snag:0.02,rough:0.03,ledge:0.0,slope:0.0,cutback:0.10"},                  # flat foundation
     "v6_s1_terrain": {"G2E_FR_ANCHOR": "0.25", "G2E_FR_SHARE_SET": "rubble:0.50,boxes:0.35,snag:0.25,rough:0.20,ledge:0.0,slope:0.0,cutback:0.36", "G2E_LR_SCALE": "0.3"},
@@ -136,7 +136,7 @@ LEVERS = {
     "v6_s4_all": {"G2E_FR_ANCHOR": "0.10", "G2E_FR_SHARE_SET": "ledge:0.25", "G2E_LR_SCALE": "0.4", "G2E_LR_FLOOR": "0.0",           # the consolidation: the V5 course with more ledges, decaying to zero
                   "G2E_FRONTIER_FLOOR": "ledge_up:2,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.5,ledge_down:0.5", "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0",
                   "G2E_HAZ_POSTURE_RELAX": "0.4"},
-    # V6 layer 2 (docs/plan-detail/v6-staged-training-plan.md "Layer 2 and Plan B"): the structural changes, a ledge stage then a mixed consolidation, both chained from layer 1.
+    # V6 layer 2 (docs/plan-detail/v6-staged-training-plan.md (removed; see git history) "Layer 2 and Plan B"): the structural changes, a ledge stage then a mixed consolidation, both chained from layer 1.
     "v6_l2_ledges": {"G2E_FR_ANCHOR": "0.20", "G2E_FR_SHARE_SET": "ledge:0.60,rubble:0.10,boxes:0.05,snag:0.05,rough:0.0,slope:0.0,cutback:0.10", "G2E_LR_SCALE": "0.4", "G2E_LR_FLOOR": "0.1",
                      "G2E_FRONTIER_FLOOR": "ledge_up:1,ledge_down:4", "G2E_FR_PASS_H": "ledge_up:0.45,ledge_down:0.45",
                      "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5",

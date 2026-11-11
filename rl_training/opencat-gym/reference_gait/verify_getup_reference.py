@@ -37,7 +37,7 @@ RL = np.load(HERE / "rl_ref.npy")
 # (which need up to -176/+200 deg on specific joints), on top of the URDF's
 # own (now correct, per-joint, asymmetric) limits already enforced by
 # PyBullet's POSITION_CONTROL. One source of truth for joint limits now:
-# models/bittle_esp32.urdf. See docs/research/community-projects.md Finding 1b.
+# models/bittle_esp32.urdf. See docs/research/community-projects.md (removed; see git history) Finding 1b.
 NEUTRAL = np.array([0.7, -1.0] * 4)          # mild stand — held while the fall settles
 DROP_Z = 0.16                                # spawn height so the fall commits to its pose
 SETTLE = 120                                 # steps to let the fallen pose settle

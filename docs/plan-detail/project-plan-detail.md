@@ -27,14 +27,14 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
 - 2 Orientation: State: ✅ (curriculum items deferred); Detail: below
 - 3 RL training in simulation: State: ✅ policies built through V6 (deployed: see STATUS); further gait training only on the user's go; Detail: `plan-detail/phase3-rl-training.md`
 - Recovery (catch / get-up): State: 🧩 built; partly tested on hardware; Detail: `plan-detail/recovery.md`
-- 4 Hardware assembly: State: 🔧 assembled and bring-up done; Pi mount is temporary; Detail: [`plan-detail/phase4-hardware-assembly.md`](phase4-hardware-assembly.md)
+- 4 Hardware assembly: State: 🔧 assembled and bring-up done; Pi mount is temporary; Detail: `plan-detail/phase4-hardware-assembly.md`
 - 5 Basic control: State: ✅; Detail: `plan-detail/phase5-basic-control.md`
 - 6 Sim-to-real deployment: State: 🔧 loop and safety layers built; first walks done; Detail: `plan-detail/phase6-sim-to-real.md`
-- 7 Voice + Claude: State: ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned; Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md)
-- 8 Perception: State: 🧩 model on the camera and "what do you see" works; navigation reflexes gated off; Detail: [`plan-detail/phase8-perception.md`](phase8-perception.md)
-- 9 Memory: State: ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added; Detail: [`plan-detail/phase9-memory.md`](phase9-memory.md)
+- 7 Voice + Claude: State: ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned; Detail: `plan-detail/phase7-voice.md`
+- 8 Perception: State: 🧩 model on the camera and "what do you see" works; navigation reflexes gated off; Detail: `plan-detail/phase8-perception.md`
+- 9 Memory: State: ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added; Detail: `plan-detail/phase9-memory.md`
 - 10 Integration: State: 🔧 the behavior runtime runs on G2 in exploration sessions; the full app over a long run is still to do; Detail: `plan-detail/phase10-integration.md`
-- Petoi AI Head vs the Pi: State: ⬜ decision pending; head on the bench, not in the build; Detail: below, [`planned/ai-head/`](../planned/ai-head/README.md)
+- Petoi AI Head vs the Pi: State: ⬜ decision pending; head on the bench, not in the build; Detail: below, `planned/ai-head/`
 
 ## Open TODOs that affect everything
 
@@ -100,7 +100,7 @@ firmware's own auto-`rc` (the Pi was not in the loop). Reference: [`hardware/sel
 
 Done: Bittle X V2 assembled (2026-09-28); firmware erased and reflashed to current official (2026-09-29); servo calibration redone and
 verified with `kbalance`; Pi Zero 2 W set up headless; 5-pin Pi socket soldered on the BiBoard; Serial-2 enabled with `XS` (2026-09-30);
-Pi↔BiBoard link working; camera set up on the Pi. Detail: [`plan-detail/phase4-hardware-assembly.md`](phase4-hardware-assembly.md).
+Pi↔BiBoard link working; camera set up on the Pi. Detail: `plan-detail/phase4-hardware-assembly.md`.
 
 - [x] Pi+PiSugar mount to the frame: solved 2026-10-17 with the clip-on pod ([`../blueprints/mounting.md`](../../blueprints/mounting.md)).
 - [ ] Pi housekeeping: disable the serial login shell, the 1-wire interface, and Wi-Fi power-save (`raspi-config`).
@@ -132,7 +132,7 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](../rl/real-walk-
       ledges 20 mm), a lopsided side-hill the benchmark could not see, stacked hazards and near-constant shoves, and a 3.1 s benchmark too short for hazards. V5 fixes the
       course (slopes in under 10% of episodes, dealt evenly both ways, no background tilt, two hazards at most, gentler shoves, 7.5 s hazard-free baseline), screens a crossing
       bonus, hazard-aware reward relaxations and a heading-blind policy (no steering in the policy; the Pi steers), then runs a fresh 20M judged against the scripted walk.
-      Plan, rules and decisions: [`plan-detail/v5-training-plan.md`](v5-training-plan.md).
+      Plan, rules and decisions: `plan-detail/v5-training-plan.md`.
 - [ ] **High-step gait for ground clearance (opened 2026-10-10; the high-step creep attempt of 2026-10-12/13 did not clear steps better than V6, see [`archive/plan-detail/high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md); still wanted; the path forward for clearance now that gait switching works):** the scripted high steps are a knee-folded crouch (`hsF`, 17.8 mm) or fell in the sim (`hsB`/`hsC`), and `carpetF` was rejected on G2. Plan: a better base (sim sweep of the generator, and/or a hand-taught step via Petoi's Skill Composer or the project's own recording, B3 / B25), a sim check, then a fresh screening run of the two-mode policy (Track C) on it, then G2 on the floor. Detail: `plan-detail/high-step-gait-plan.md`.
 - [ ] **Climbing movement, taught by hand with the same method (user, 2026-10-10; after the hi-step gait is built and walked on G2):** the hi-step is the trial of the hand-guided method (B25: the user shows G2's legs a movement, the poses are recorded, a gait is built from them and checked in the sim before G2 tries it on the floor). Once that works, the same method builds a movement for climbing obstacles (B13 / B9: front feet reach up onto the obstacle, the body hauls up, the rear legs push it over), in place of keyframes written by Claude, which the user ruled out. Plan and steps: `plan-detail/high-step-gait-plan.md` "After the hi-step: a climbing movement".
 - [ ] **Real-to-sim calibration from G2's own walks (approved 2026-10-08):** `rl_training/opencat-gym/real2sim.py` replays logged joint commands open-loop through the training
@@ -158,10 +158,10 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](../rl/real-walk-
 
 Built: config-driven Claude client, `perform_skill` and `remember` tools, state cues, command acknowledgement, the real mic and speaker
 (running on the Pi since 2026-10-04), a "shut down" that also powers the Pi off, battery alerts, and speech-recognition hardening for stop and
-shut-down commands. Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md).
+shut-down commands. Detail: `plan-detail/phase7-voice.md`.
 
 - [x] Real-mic capture and the wake-word gate on the Pi — done 2026-10-03, including a first voice → Claude → walk run on the real G2
-      ([`plan-detail/phase7-voice.md`](phase7-voice.md)).
+      (`plan-detail/phase7-voice.md`).
 - [ ] Settle how a Claude-started walk is stopped (the onboard module's "rest", a gait cap, or both) (`perform_skill` now takes an optional duration in seconds; a calibrated distance is still open).
 - [x] Text-to-speech and mic input through the robot's own body — done 2026-10-04 (mic + speaker on the Pi; the Petoi AI Head is still to be evaluated).
 - [x] Shut down also powers the Pi off cleanly (2026-10-05; the PiSugar S keeps powering the halted Pi, so the battery switch is flipped by hand).
@@ -171,7 +171,7 @@ shut-down commands. Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md).
       ([`guides/swappable-llm.md`](../guides/swappable-llm.md)): `fast` and `routed` modes, with Claude as the fallback. To do when the head arrives: create the
       account at xiaozhi.me (phone-number registration; the privacy gate applies, use a throwaway number and no household names), then find out whether it offers
       anything the code can call. Today it is reached through the head's audio pipeline, with no documented developer API, so the likely route is the self-hosted
-      backend in [`research/xiaozhi-esp32-review.md`](../research/xiaozhi-esp32-review.md). Then measure its quality on G2's tools and personality.
+      backend in `research/xiaozhi-esp32-review.md`. Then measure its quality on G2's tools and personality.
 - [ ] `SerialActuator` end-to-end for voice skills (the link is confirmed); confirm it runs independently of the 35+ built-in voice commands.
 - [ ] A buzzer-pattern or posture implementation of the state cue; connect to Claude live and measure latency.
 
@@ -180,7 +180,7 @@ shut-down commands. Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md).
 Built: obstacle-avoidance reflex (not wired into the app), camera serial format, custom detector on the camera (3 classes), scene description, and
 the camera look (2026-10-04: a 240x240 picture goes to Claude when asked what G2 sees; exposure metered first; the camera warms up right before a picture).
 Vision-based navigation is gated off (`features.vision`). Target capability and detail:
-[`plan-detail/phase8-perception.md`](phase8-perception.md); detection-layer notes: [`vision/detection-layer.md`](../vision/detection-layer.md).
+`plan-detail/phase8-perception.md`; detection-layer notes: [`vision/detection-layer.md`](../vision/detection-layer.md).
 
 - [ ] Improve the 3-class model (distance/pose variety, 300+ calibration images, a fourth class).
 - [ ] Train obstacle and table-edge classes on the real mounted camera view.
@@ -189,13 +189,13 @@ Vision-based navigation is gated off (`features.vision`). Target capability and 
 - [ ] (Stretch) more robust self-righting with IMU-based flip detection.
 - [ ] Recalibrate the wall estimator for the camera on the claw (user, 2026-10-25); steps in [`plan-detail/arm-policy-plan.md`](arm-policy-plan.md) "Next hardware rounds".
 - [ ] **Chase and punch the green ball** (the cat's treat ball; user, 2026-10-25): the claw cannot grab the 3 in ball, so the game is chase it, punch it straight ahead (the lunge with the claw shut, about 18 in) so treats fall out, retry until told to stop; built and tried on G2 (the colour finder, the chase, one punch through it on a desk), the punt distance is being dialed in by hand; still to do: "g2, fetch" as a voice command, a trained ball class (300+ pictures), a grab experiment with a smaller object; plan in [`plan-detail/arm-policy-plan.md`](arm-policy-plan.md) "Next hardware rounds" and the ball chase sections. 2026-10-31: claw looks to search, small alignment turns, the policy walk only, the pace measured by G2 himself (built, not yet run on G2).
-- [ ] **Goals: G2 learns from his attempts** (B28, user-approved 2026-10-31): the ball punt as the first goal, up to 10 attempts a session judged on the Pi with no API call, spoken suggestions, a report, your overrides (pin, limit, undo, forget); the judge was rebuilt the same day on all the evidence after an offline test showed the first one got stuck (a made-up-world test now guards it); several goals (a "turn away from walls" standing goal ranked above the punt, `g2goal priority`, "G2, practise"); built, first run on the next hardware session. [`planned/goals-plan.md`](../planned/goals-plan.md), [`guides/goals.md`](../guides/goals.md).
+- [ ] **Goals: G2 learns from his attempts** (B28, user-approved 2026-10-31): the ball punt as the first goal, up to 10 attempts a session judged on the Pi with no API call, spoken suggestions, a report, your overrides (pin, limit, undo, forget); the judge was rebuilt the same day on all the evidence after an offline test showed the first one got stuck (a made-up-world test now guards it); several goals (a "turn away from walls" standing goal ranked above the punt, `g2goal priority`, "G2, practise"); built, first run on the next hardware session. `planned/goals-plan.md`, [`guides/goals.md`](../guides/goals.md).
 - Deferred on purpose: wiring `Avoider` decisions to the actuator (the model only knows face/dog/cat, so it would back away from people and pets).
 
 ## Phase 9 — Memory ✅
 
 SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI and a localhost web UI. Detail:
-[`plan-detail/phase9-memory.md`](phase9-memory.md).
+`plan-detail/phase9-memory.md`.
 
 - [x] Importance, a core block, sightings log, sleep-time consolidation and a memory-use log (2026-10-05); consolidation has only been dry-run.
 - [ ] Semantic recall (embeddings) if keyword matching feels too literal.
@@ -210,7 +210,7 @@ SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI an
 The [Bittle AI Head](https://www.petoi.com/products/bittle-ai-head-upgrade-kit) ($39, 42 g; an ESP32-C3 with its own microphone and speaker; cloud LLM; no camera mentioned by Petoi)
 is **ordered, arriving ~2026-10-10**. It might replace the mic and speaker parts; Petoi expects it to **complement** the Pi, not replace it (single-core C3, firmware to be open-sourced,
 UART shared with the Pi by default). **Undecided; keeping the Pi is a fully valid outcome.** Criteria, behavior inventory, test steps and scorecard:
-[`planned/ai-head/petoi-ai-head-evaluation.md`](../planned/ai-head/petoi-ai-head-evaluation.md). Everything learned hands-on, the pros and cons, and the staged integration plan: [`plan-detail/ai-head-implementation.md`](../planned/ai-head/ai-head-implementation.md).
+`planned/ai-head/petoi-ai-head-evaluation.md`. Everything learned hands-on, the pros and cons, and the staged integration plan: `plan-detail/ai-head-implementation.md`.
 
 **The owner's goal for the head (2026-10-10): offload as much work as possible from Claude to the head, so there are as few API calls as possible.** Also judged on: (1) is the scripted gait about as good as the learned gait (the owner would prefer to keep the RL policy); (2) can G2 still do most of the
 behaviors that make it feel alive; (3) the trade-off — a streamlined ~42 g module vs the Pi build's wiring, weight and exposed hardware, against what

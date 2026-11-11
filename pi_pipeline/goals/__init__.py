@@ -1,4 +1,4 @@
-"""Goals (docs/planned/goals-plan.md, B28): G2 works toward a goal the user sets and learns from his attempts.
+"""Goals (docs/planned/goals-plan.md (removed; see git history), B28): G2 works toward a goal the user sets and learns from his attempts.
 
 The user sets a goal and starts a session with one spoken command; G2 makes up to the goal's number of attempts on his own. After each attempt he scores it with his own sensors,
 judges it on the Pi (no API call) and changes how he makes the next one. Everything is written to a journal the user reads as a report.

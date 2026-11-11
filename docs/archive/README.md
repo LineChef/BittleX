@@ -1,29 +1,11 @@
 # Archive
 
-Closed work, kept for the record. **Nothing here describes the current build**; for that see [`../STATUS.md`](../STATUS.md) and [`../capabilities.md`](../capabilities.md).
+Closed work, kept because code or other notes still cite it. Nothing here describes the current build; for that see [`../STATUS.md`](../STATUS.md) and [`../capabilities.md`](../capabilities.md). Finished logs and plans that nothing cites were removed from the working tree and remain in git history.
 
-## `rl/`: closed gait campaigns and their data
-
-- `rl/v22-log.md`: The v2.2 drift campaign (closed 2026-10-06); appendix = what was known at the end. Data: [`rl/v22-data/`](rl/v22-data/).
-- [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md), [`rl/v3-decisions-log.md`](rl/v3-decisions-log.md): The V3 retrain plan and its decisions (2026-10-06 to 10-08). Data: [`rl/v3-data/`](rl/v3-data/).
+- [`history.md`](history.md): The dated project narrative as of late September 2026.
+- [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md) and [`rl/v3-decisions-log.md`](rl/v3-decisions-log.md): The V3 retrain plan and its decisions. Calibration data: `rl/v3-data/calibration/`.
 - [`rl/next-20m-plan.md`](rl/next-20m-plan.md): The parked next-20M plan, superseded by the V4 to V6 chains.
-- `rl/hardware-session-2026-10-09.md`: The V4 hardware session plan (run 2026-10-09; data in [`../rl/real-walk-data/`](../rl/real-walk-data/2026-10-09/README.md)).
-- `rl/resid30-log.md`, [`rl/gait-friction-log.md`](rl/gait-friction-log.md), [`rl/resiliency-log.md`](rl/resiliency-log.md), [`rl/slope-ceiling-log.md`](rl/slope-ceiling-log.md), [`rl/gait-benchmark.md`](rl/gait-benchmark.md): The 2026-09 sim campaign logs (superseded).
-- [`rl/refinement-regimen.md`](rl/refinement-regimen.md), `rl/final-synthesis-plan.md`, `rl/phase4-decision-log.md`: The pre-hardware robustness push and its decisions (concluded).
-- `rl/foot-probing-log.md`, `rl/crawl-climb-session-checkpoint.md`, `rl/reference-frames/`: Foot probing and crawl-climb work. The reference frames are local-only stills from Petoi's video (gitignored, not for redistribution).
-- [`rl/vision-in-gait.md`](rl/vision-in-gait.md): Vision in the gait policy: tried and closed.
-
-## `plan-detail/`: finished phase write-ups and closed plans
-
-`phase3-rl-training`, `phase5-basic-control`, `phase6-sim-to-real`,
-`phase10-integration`, `recovery`, `sim-payload-bug`,
-`decisions-log-2026-10-08` (the V4 overnight decisions), `high-step-gait-plan` and
-[`high-step-creep-training-plan`](plan-detail/high-step-creep-training-plan.md) (stopped 2026-10-13, goal not met).
-
-## `guides/`: retired guides
-
-`automated-testing-loop.md`: the unattended reward-iteration loop of the first training runs (retired 2026-10-17).
-
-## Other
-
-[`history.md`](history.md): the dated project narrative as of late September 2026.
+- [`rl/gait-friction-log.md`](rl/gait-friction-log.md), [`rl/resiliency-log.md`](rl/resiliency-log.md), [`rl/slope-ceiling-log.md`](rl/slope-ceiling-log.md), [`rl/gait-benchmark.md`](rl/gait-benchmark.md): The friction, resilience and slope sweeps.
+- [`rl/refinement-regimen.md`](rl/refinement-regimen.md): The pre-hardware robustness push.
+- [`rl/vision-in-gait.md`](rl/vision-in-gait.md): Vision in the gait policy: evaluated and rejected.
+- [`plan-detail/high-step-creep-training-plan.md`](plan-detail/high-step-creep-training-plan.md): The high-step creep training plan (stopped, goal not met).

@@ -3,7 +3,7 @@
 #   G2_PI=<user>@g2pi.local bash tools/g2_memory_backup.sh          # or: g2membackup (g2_aliases.sh)
 # Lands in $G2_BACKUP_DIR (default ~/Desktop/G2Memory/memory-backups), outside the repo -- it holds conversations.
 # Uses SQLite's serialize() on the Pi (a consistent snapshot of a live DB, nothing written on the Pi), then
-# integrity-checks the copy. Restore: see docs/plan-detail/phase9-memory.md.
+# integrity-checks the copy. Restore: see docs/plan-detail/phase9-memory.md (removed; see git history).
 set -euo pipefail
 host="${G2_PI:?set G2_PI=<user>@g2pi.local}"
 dest="${G2_BACKUP_DIR:-$HOME/Desktop/G2Memory/memory-backups}"

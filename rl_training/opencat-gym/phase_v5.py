@@ -1,4 +1,4 @@
-"""The V5 training plan, unattended end to end (user-approved 2026-10-09; the plan and every decision rule: docs/plan-detail/v5-training-plan.md).
+"""The V5 training plan, unattended end to end (user-approved 2026-10-09; the plan and every decision rule: docs/plan-detail/v5-training-plan.md (removed; see git history)).
 
     python phase_v5.py run                    # the whole plan, resumable: scripted baseline -> screens -> preflight -> the 20M -> pick + export -> report
     python phase_v5.py status                 # where it is: one line per step
@@ -147,7 +147,7 @@ def combine(results):
     return out
 
 
-# ------------------------------------------------------------------------------------------------ the decision rules (docs/plan-detail/v5-training-plan.md section 5)
+# ------------------------------------------------------------------------------------------------ the decision rules (docs/plan-detail/v5-training-plan.md (removed; see git history) section 5)
 SLOPE_CELLS = ("T2.2", "T3.2", "SL10", "SL8", "SR8")          # slope / tilt tests
 SLOPE_HAZARDS = ("sidehill_l", "sidehill_r", "climb", "descent")
 SLOPE_LARGE = 0.30       # user, 2026-10-09: slopes and tilts are not a primary trait (only some exposure); stop for them only on a LARGE regression

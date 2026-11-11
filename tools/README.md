@@ -12,7 +12,6 @@ Documentation
 - [`build_docs_bundle.py`](build_docs_bundle.py): Builds the docs bundle for the website (pages, navigation manifest, search index, assets) from git-tracked files; CI publishes it to GitHub Pages. [`docs-bundle.md`](../docs/guides/docs-bundle.md)
 - [`gen_helpers_doc.py`](gen_helpers_doc.py): Regenerates `docs/guides/shell-helpers.md` from the comments in `g2_aliases.sh`.
 - [`md_to_html.py`](md_to_html.py): Turns one Markdown doc into a single self-contained HTML page.
-- [`make_petoi_edition.py`](make_petoi_edition.py): Builds the English edition of the XiaoZhi and Petoi head documentation for sending to Petoi (writes outside the repo).
 
 Running G2 from the Mac
 -----------------------

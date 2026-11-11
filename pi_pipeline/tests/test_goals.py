@@ -1,4 +1,4 @@
-"""Goals (docs/planned/goals-plan.md): knobs, the judge, the ball-punt scorer, the claw look and search moves, a whole session against fakes, the voice start and the report.
+"""Goals (docs/planned/goals-plan.md (removed; see git history)): knobs, the judge, the ball-punt scorer, the claw look and search moves, a whole session against fakes, the voice start and the report.
 No hardware, no network, no API call."""
 import json
 

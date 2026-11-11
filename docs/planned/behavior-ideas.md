@@ -804,7 +804,7 @@ applies):**
   more than it currently does — a later design question, not blocking this.
 
 ### B11 — Learn its way around the house (topological place memory)  🟡  PARTLY BUILT (P1 logging built, not deployed)
-**Plan agreed 2026-10-10 (rooms, phases P0 to P4): [`plan-detail/place-memory-plan.md`](place-memory-plan.md).** P0 = room labels on the saved pictures (`g2pics`, Room button) + `tools/eval_rooms.py`.
+**Plan agreed 2026-10-10 (rooms, phases P0 to P4): `plan-detail/place-memory-plan.md`.** P0 = room labels on the saved pictures (`g2pics`, Room button) + `tools/eval_rooms.py`.
 
 G2 builds up a sense of *where it is* over time — as **place recognition + a
 graph of places**, never a metric floor plan (no depth/lidar, and monocular
@@ -1147,4 +1147,4 @@ first step if/when this gets picked back up.
 
 
 ### B28 — Goals: G2 works toward a goal you set and learns from his attempts  🟢  BUILT 2026-10-31, not run on G2
-The user sets a goal; one spoken command starts a session of up to 10 attempts; G2 chooses the approach and its settings (bounded, from a fixed list), measures each attempt with his own sensors, and judges it locally on the Pi to change the next attempt, with no shadow mode and no API call. Notes, spoken suggestions (confirm / cancel / review) and a report for the user follow automatically. First goal: the ball punt; then a "turn away from walls" standing goal ranked above it, and "G2, practise" (he picks what to practise when asked; practising unasked stays a B24 decision). The first bounded step of [B23] and [B24]. Plan: [`goals-plan.md`](goals-plan.md); guide: [`../guides/goals.md`](../guides/goals.md).
+The user sets a goal; one spoken command starts a session of up to 10 attempts; G2 chooses the approach and its settings (bounded, from a fixed list), measures each attempt with his own sensors, and judges it locally on the Pi to change the next attempt, with no shadow mode and no API call. Notes, spoken suggestions (confirm / cancel / review) and a report for the user follow automatically. First goal: the ball punt; then a "turn away from walls" standing goal ranked above it, and "G2, practise" (he picks what to practise when asked; practising unasked stays a B24 decision). The first bounded step of [B23] and [B24]. Plan: `goals-plan.md`; guide: [`../guides/goals.md`](../guides/goals.md).

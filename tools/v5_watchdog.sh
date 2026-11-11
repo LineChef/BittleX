@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keep the V5 training plan (rl_training/opencat-gym/phase_v5.py run) alive unattended (docs/plan-detail/v5-training-plan.md). Every 2 minutes: if no runner process
+# Keep the V5 training plan (rl_training/opencat-gym/phase_v5.py run) alive unattended (docs/plan-detail/v5-training-plan.md (removed; see git history)). Every 2 minutes: if no runner process
 # exists and the plan is not complete, relaunch it (the runner resumes from trained/v5_state.json and waits for a run that is already training; it never restarts one)
 # and keep the Mac awake while it lives. Stops when the runner wrote trained/v5_halt (a DECISION NEEDED or a HALT) or logged "V5 COMPLETE".
 # Start (from anywhere): nohup bash tools/v5_watchdog.sh > /dev/null 2>&1 &     Log: ~/g2_logs/v5_watchdog.log.  Stop: kill <pid of this script>.  Never uses pkill.

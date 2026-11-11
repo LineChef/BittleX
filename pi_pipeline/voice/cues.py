@@ -26,7 +26,7 @@ class LogCue:
 # Cue melodies as (note, duration divisor); notes are C3 = 14 semitone numbers, and the buzzer reproduces 1-35 (low is loudest).
 # On 2026-10-04 notes 26/30 were faint, +7 and +14 semitones were not heard at all, and the pair 4 and 8 was the loudest of a sweep.
 # "thinking" is the acknowledgement for a command that goes to Claude: a low rising two-note blip. (A bosun's-call style whistle was
-# drafted and dropped for now; see docs/research/buzzer-sounds.md.)
+# drafted and dropped for now; see docs/research/buzzer-sounds.md (removed; see git history).)
 LOW_CUES: dict[str, list[tuple[int, int]]] = {
     "awake": [(10, 4)],                # the wake word was heard: ONE short beep (user, 2026-10-09; used when there is no speaker)
     "captured": [(4, 3)],              # he thinks you have finished speaking and has your words: ONE lower "boop"

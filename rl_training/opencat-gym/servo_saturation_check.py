@@ -2,7 +2,7 @@
 (pre-limiter) joint deltas would exceed a real servo's speed ceiling.
 
 Built 2026-09-24 reviewing community Bittle/Petoi projects (see
-docs/research/community-projects.md) -- a comparable project measured its
+docs/research/community-projects.md (removed; see git history)) -- a comparable project measured its
 own Bittle X servos at ~137 deg/s; we've never measured G2's. This is a
 mj_deployability.py-style check (same idea as that project's own tool):
 reproduce the env's residual-mode target computation (ref + action *

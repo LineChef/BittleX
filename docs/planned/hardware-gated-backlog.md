@@ -324,7 +324,7 @@ generalises to real thresholds; the rubble swap (rounded shapes, `RUBBLE_PROB`
 > **Picked up 2026-10-06 by [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) (Phase 0 step 4):** removing the 137 deg/s limit makes the sim's roll swing match G2's ([`real-walk-log.md`](../rl/real-walk-log.md) "Why V2.1 drifts right"), so G2's real servo speed is measured and calibrated in before training.
 
 Found reviewing community Bittle/Petoi projects (2026-09-24,
-[`../research/community-projects.md`](../research/community-projects.md)):
+`../research/community-projects.md`):
 the sim never measured a real servo response. A comparable project
 (BittleJuice) measured its own Bittle X servos at τ = 33 ms, ceiling ≈
 137°/s. Measured against the project's own trained policy (`servo_saturation_check.py`,

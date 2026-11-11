@@ -1,4 +1,4 @@
-"""Benchmark V5 (2026-10-09, docs/plan-detail/v5-training-plan.md): everything benchmark_v4 scores (the T / N cells, now with the side-hill in both directions and the
+"""Benchmark V5 (2026-10-09, docs/plan-detail/v5-training-plan.md (removed; see git history)): everything benchmark_v4 scores (the T / N cells, now with the side-hill in both directions and the
 ledge split into up and down), plus the SIZE LADDER: each training hazard on its own at four sizes up to the top of its V5 training ladder, in 7.5 s episodes (the
 same length as V5's hazard training episodes), so the report can say "the largest size it passes" per hazard and compare it with the scripted walk.
 

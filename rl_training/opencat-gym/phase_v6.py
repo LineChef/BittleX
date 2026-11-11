@@ -1,4 +1,4 @@
-"""V6: a chain of short skill stages, then a 20M consolidation, run unattended (plan: docs/plan-detail/v6-staged-training-plan.md; user approved 2026-10-09).
+"""V6: a chain of short skill stages, then a 20M consolidation, run unattended (plan: docs/plan-detail/v6-staged-training-plan.md (removed; see git history); user approved 2026-10-09).
 
     python phase_v6.py run        # preflight -> S0 -> S1 -> S2 -> S3 -> S3 benchmark and go/no-go -> S4 (20M) -> pick (average of the last 5) -> export -> report
     python phase_v6.py status | plan | smoke
@@ -496,7 +496,7 @@ li{{margin:.35rem 0}}.mut{{color:var(--mut)}}</style></head><body><h1>V6 Summary
 <p>Chosen candidate: <b>{H.escape(str(chosen.get('name', 'none yet')))}</b> ({H.escape(str(chosen.get('path', '')))}). Not promoted, not deployed: that is your call. Numbers are 100 paired episodes per cell on the same {len(ids)} cells; ledge columns are the four sizes 7.5 / 15 / 22.5 / 30 mm.</p>
 <h2>Candidates</h2><div class="t"><table><tr><th>Policy</th><th>Mean falls</th><th>Flat falls</th><th>Heading (deg)</th><th>Asymmetry</th><th>Step-up success</th><th>Step-up falls</th><th>Step-down success</th></tr>{body}</table></div>
 <h2>Decisions made while you were away</h2><ul>{dec}</ul>
-<p class="mut">Full per-hazard report for layer 1: report.html in the same folder; the plan, stage results and Layer 2 / Plan B design: docs/plan-detail/v6-staged-training-plan.md.</p></body></html>"""
+<p class="mut">Full per-hazard report for layer 1: report.html in the same folder; the plan, stage results and Layer 2 / Plan B design: docs/plan-detail/v6-staged-training-plan.md (removed; see git history).</p></body></html>"""
     open(f"{REPORT_DIR}/summary.html", "w").write(page)
     st["summary"] = "done"
     save_state(st)

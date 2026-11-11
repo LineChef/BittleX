@@ -1,4 +1,4 @@
-"""The V5 training plan (docs/plan-detail/v5-training-plan.md): the V5 course keeps slopes and tilts to 10% of episodes, dealt evenly, never stacks more than two
+"""The V5 training plan (docs/plan-detail/v5-training-plan.md (removed; see git history)): the V5 course keeps slopes and tilts to 10% of episodes, dealt evenly, never stacks more than two
 hazards, gives the hazard-free baseline the same 7.5 s as the hazard episodes, and its sizes are the ladder tops (the old static caps no longer clip them); the
 heading-blind policy never sees yaw while its critic does (and the mirror maps cover that); the crossing bonus pays once per field and per ledge edge; the report's
 Holm correction and its summary build. Run with the RL venv: pytest test_v5.py."""

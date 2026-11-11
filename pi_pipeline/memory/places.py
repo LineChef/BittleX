@@ -3,7 +3,7 @@
     ~/.local/share/g2/places.json     {"kitchen": {"floor": "tile", "sessions": 5, "goal_sessions": 3, "stops": 12, "items": {"dishwasher": 4}, "hazards": {"fall": 2, "bump": 8}, "views": 14}}
     ~/.local/share/g2/current_place   the room G2 was told he is in (one word or two; it lapses after CURRENT_TTL_S so a moved G2 is not tagged with an old room)
 
-A room is named by a person, never invented (docs/planned/place-memory-plan.md): "you're in the kitchen" by voice, `python -m pi_pipeline.memory place kitchen`, or the Room button in g2pics.
+A room is named by a person, never invented (docs/planned/place-memory-plan.md (removed; see git history)): "you're in the kitchen" by voice, `python -m pi_pipeline.memory place kitchen`, or the Room button in g2pics.
 While a room is current, explorations and goal sessions add to it: survey stops (and the pictures taken there carry the room name, not a time), the things the detector saw, falls and bumps, the floor
 he stands on. Only counts are kept. A question about a room, or a known room's name in what is said, puts a short summary of it into the prompt (`recall_block`). No API call anywhere.
 """

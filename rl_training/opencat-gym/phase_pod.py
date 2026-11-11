@@ -1,7 +1,7 @@
 """POD: the V6 recipe, unchanged, retrained from scratch on the new payload (the 185 g pod + the 42 g AI head, sim profile "pod"; user, 2026-10-18). A copy of phase_v6.py with its own tags (pod_*),
 state, log, report and candidate names so the V6 files are never touched; it never promotes or deploys anything, and it does not compare against V4/V5 (their numbers are on the old payload).
 
-(The V6 docstring follows.) V6: a chain of short skill stages, then a 20M consolidation, run unattended (plan: docs/plan-detail/v6-staged-training-plan.md; user approved 2026-10-09).
+(The V6 docstring follows.) V6: a chain of short skill stages, then a 20M consolidation, run unattended (plan: docs/plan-detail/v6-staged-training-plan.md (removed; see git history); user approved 2026-10-09).
 
     python phase_pod.py run       # preflight -> S0 -> S1 -> S2 -> S3 -> S3 flat-ground check -> S4 (20M) -> pick (average of the last 5) -> export
     python phase_pod.py status | plan

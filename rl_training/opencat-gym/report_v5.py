@@ -106,7 +106,7 @@ def build(P, S, frontier=None, title="G2 Gait V5 vs Scripted", console=None, pol
     allcmp = cmp_cells + cmp_lad
     PS, SS = P["size_ladder"]["summary"], S["size_ladder"]["summary"]
 
-    # ---- verdict on the win criteria (docs/plan-detail/v5-training-plan.md section 6)
+    # ---- verdict on the win criteria (docs/plan-detail/v5-training-plan.md (removed; see git history) section 6)
     crit = []
     flat_falls = {c: Pc[c]["fell_fraction"] for c in FLAT if c in Pc}
     ok = all(v == 0 for v in flat_falls.values())

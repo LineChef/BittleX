@@ -1,4 +1,4 @@
-"""V6 (docs/plan-detail/v6-staged-training-plan.md): the stage mixes set the shares of episodes, the ledge-stage rewards pay and cost what they should, the per-hazard gate and the
+"""V6 (docs/plan-detail/v6-staged-training-plan.md (removed; see git history)): the stage mixes set the shares of episodes, the ledge-stage rewards pay and cost what they should, the per-hazard gate and the
 chained start exist, and the stage levers assemble. Run with the RL venv: pytest test_v6.py."""
 import os
 import subprocess
