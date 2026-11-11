@@ -115,7 +115,7 @@ Exploration pictures, contact and one-sound-at-a-time
 Locations, logs and limits
 --------------------------
 
-Where G2 keeps things, and the limits people occasionally change. Variables the code reads that are not listed here: `python tools/gen_env_reference.py`.
+Where G2 keeps things, and the limits people occasionally change. The variables not listed here are printed by `python tools/gen_env_reference.py`.
 
 - `G2_API_LOG`: Default: `~/.local/share/g2/api_calls.jsonl`; What it does: the log of every Claude API call (one JSON line each); `off` turns it off. Read with `g2api`
 - `G2_API_PRICE`: Default: `2,10`; What it does: input and output dollars per million tokens, used for the cost estimate (Sonnet 5.5's list price); set it to match the model in use

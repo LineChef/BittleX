@@ -39,3 +39,25 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 
 - Write a section heading as its title on its own line over a line of `---`, never as `## Title` (the page title stays `# Title`, and sub-sections stay `###`). A title that would start like a list item escapes its first marker (`1\\. Title`). `python tools/md_headings.py FILE` converts a page, and `python tools/check_docs.py` fails on a `##` in a published page.
 - Never wrap a title in `**` bold. The title of a list item or a paragraph is its plain lead followed by a colon (`Orientation: G2 is never placed on his back.`); the bundle renders the text before the first colon as an `h4` (see [the bundle guide](guides/docs-bundle.md), "Semantic HTML"), and the site styles it by tag.
+
+Background jobs on the Mac
+--------------------------
+
+`g2bg` (`tools/g2_bg_jobs.sh`, with `g2bg status|stop|start`, logs in `~/g2_logs/`) runs `tools/g2_sync.sh` (`g2sync`) every 30 minutes. It copies everything from the Pi to the Mac, each item on its own schedule:
+- Goal data and **exploration pictures**, with curation by `tools/g2_curate_auto.sh`.
+- Run logs, with ingest and the calibration step (`tools/g2_cal_auto.sh`).
+- Wall pictures, every 30 minutes.
+- A memory database snapshot and **the logs**, once a day.
+
+`g2sync status` shows when each copy last worked and flags a stale one. The review page shows the same line under its title and has a **Sync from the Pi** button. The job skips quietly while the Pi is off or busy (an exploration, a goal session, a walk or a hardware test), ends at a Mac restart, and runs a snapshot's harm check only when the Mac is idle. launchd cannot run scripts under `~/Desktop` (macOS reports "Operation not permitted"), so a plain loop runs the job.
+
+Calibration approval is automatic through statistical gates ([Real-data pipeline](rl/real-data-pipeline.md)), and `g2cal revert` undoes it.
+
+Working in the repository
+-------------------------
+
+- A command chain that must stop on a failing test uses `&&` before committing, because `;` continues past a failure.
+- A failing pytest assertion can print a settings object. Tests compare plain numbers, and full-suite output is filtered for `sk-ant` before it is shared.
+- The privacy hook flags personal names in docs and docstrings, so tracked files use placeholders.
+- Committing is local. `git push origin development` is a deliberate step, because the repository is public.
+- Capture folders, `trained/` files and the memory database are looked at before deleting, because they are not all reproducible.
