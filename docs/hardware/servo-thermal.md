@@ -6,12 +6,10 @@ limit under sustained load. Researched 2026-09-05.
 
 ## Status at a glance
 
-| Layer | What | State |
-|---|---|---|
-| 0 | `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed | In place |
-| 1 | `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop | **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos |
-| 2 | `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED | Built and tested, **not wired in** (planned) |
-| 3 | A thermal-aware residual policy (the literature blueprint) | Designed, not built; needs training |
+- **0**: What: `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed; State: In place
+- **1**: What: `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop; State: **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos
+- **2**: What: `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED; State: Built and tested, **not wired in** (planned)
+- **3**: What: A thermal-aware residual policy (the literature blueprint); State: Designed, not built; needs training
 
 **The estimator is unvalidated.** G2's servos report no temperature or current, so heat is estimated from commanded motion. Until it is checked against the real servos, treat the thresholds as guesses that err toward safety.
 
@@ -29,16 +27,14 @@ limit under sustained load. Researched 2026-09-05.
 
 ### The P1S servo (×8 legs + 1 neck)
 
-| Spec | Value | Source |
-|---|---|---|
-| Peak torque | ~3 kg·cm (~0.29 N·m) | Petoi listing / `hardware-specs.md` |
-| No-load speed | ~0.07 s/60° (~14 rad/s) | Petoi listing |
-| Motor | coreless DC, alloy gears, ball bearing | Petoi listing |
-| Rated life | "100+ h continuous walking" | Petoi listing |
-| Voltage | 8.4 V compatible (2S Li-ion, 7.4 V nominal) | Petoi |
-| Protection | "electronic overheat cutback" | Petoi (no detail published) |
-| Winding temp sensor | **none** | coreless micro servos don't have one |
-| Datasheet | **not published** by Petoi (forum requests unanswered) | petoi.camp |
+- **Peak torque**: Value: ~3 kg·cm (~0.29 N·m); Source: Petoi listing / `hardware-specs.md`
+- **No-load speed**: Value: ~0.07 s/60° (~14 rad/s); Source: Petoi listing
+- **Motor**: Value: coreless DC, alloy gears, ball bearing; Source: Petoi listing
+- **Rated life**: Value: "100+ h continuous walking"; Source: Petoi listing
+- **Voltage**: Value: 8.4 V compatible (2S Li-ion, 7.4 V nominal); Source: Petoi
+- **Protection**: Value: "electronic overheat cutback"; Source: Petoi (no detail published)
+- **Winding temp sensor**: Value: **none**; Source: coreless micro servos don't have one
+- **Datasheet**: Value: **not published** by Petoi (forum requests unanswered); Source: petoi.camp
 
 ### How the "cliff" actually works here
 
@@ -140,11 +136,9 @@ joint target vs the wkF reference, (c) total pack current from the board
 
 **Indicator** — 3-tier per-joint state:
 
-| State | H_j vs estimated trip | Action |
-|---|---|---|
-| GREEN | < 50 % | normal |
-| AMBER | 50–85 % | governor throttles (Layer 2) |
-| RED | > 85 % | forced cooldown (Layer 2) |
+- **GREEN**: H_j vs estimated trip: < 50 %; Action: normal
+- **AMBER**: H_j vs estimated trip: 50–85 %; Action: governor throttles (Layer 2)
+- **RED**: H_j vs estimated trip: > 85 %; Action: forced cooldown (Layer 2)
 
 Surface it: LED pattern, the Pi status channel, and — since G2 has the voice
 pipeline — a spoken heads-up ("my left-front leg is getting warm"). Always log
@@ -258,17 +252,15 @@ backstop forces a lie-down on a long run. It has never seen real hardware.
 
 **Retune once the bench test (§3.5 / §5.1) gives real numbers:**
 
-| Constant | Now (placeholder) | Calibrate from |
-|---|---|---|
-| `_K_GEN` | 4e-3 | bench trip time — scale so `H` reaches `_H_TRIP` at the measured time-to-protection under a hard hold |
-| `_K_DISS` | 0.010 (~100 s τ) | measured cooldown curve after releasing a hot servo |
-| `_H_TRIP` | 60 (unitless) | rescale `H` to estimated °C once `_K_GEN`/`_K_DISS` are fit; set at the real protection threshold |
-| `_WARN_FRAC` / `_COOLDOWN_FRAC` | 0.45 / 0.85 | how much margin the operator wants before the spoken warning / auto lie-down |
-| `_MAX_CONTINUOUS_S` | 480 s | **NOT a thermal estimate** — a blind "take a break" floor in case the estimator is miscalibrated |
-| `_STALL_ERR_DEG` / `_STALL_SOFT_S` / `_STALL_HOLD_S` | 18° / 0.4 s / 1.5 s | real feedback-servo tracking error under a normal hard push vs an actual stall — set the threshold above the former, below the latter |
-| `_SOFT_JOINT_SCALE` | 0.35 | how hard to ease a stalling joint toward neutral before giving up on it |
-| `_STAND_DEG` | ±35° | replace with the actual `wkf_ref.npy` mean pose |
-| effort proxy (`_K_VEL`, `_K_DEV`, `_GRAV_BOOST`) | 0.010 / 0.004 / 1.6 | if the feedback servos expose position readback, cross-check the proxy against measured tracking error; re-weight if a term is dead |
+- **`_K_GEN`**: Now (placeholder): 4e-3; Calibrate from: bench trip time — scale so `H` reaches `_H_TRIP` at the measured time-to-protection under a hard hold
+- **`_K_DISS`**: Now (placeholder): 0.010 (~100 s τ); Calibrate from: measured cooldown curve after releasing a hot servo
+- **`_H_TRIP`**: Now (placeholder): 60 (unitless); Calibrate from: rescale `H` to estimated °C once `_K_GEN`/`_K_DISS` are fit; set at the real protection threshold
+- **`_WARN_FRAC` / `_COOLDOWN_FRAC`**: Now (placeholder): 0.45 / 0.85; Calibrate from: how much margin the operator wants before the spoken warning / auto lie-down
+- **`_MAX_CONTINUOUS_S`**: Now (placeholder): 480 s; Calibrate from: **NOT a thermal estimate** — a blind "take a break" floor in case the estimator is miscalibrated
+- **`_STALL_ERR_DEG` / `_STALL_SOFT_S` / `_STALL_HOLD_S`**: Now (placeholder): 18° / 0.4 s / 1.5 s; Calibrate from: real feedback-servo tracking error under a normal hard push vs an actual stall — set the threshold above the former, below the latter
+- **`_SOFT_JOINT_SCALE`**: Now (placeholder): 0.35; Calibrate from: how hard to ease a stalling joint toward neutral before giving up on it
+- **`_STAND_DEG`**: Now (placeholder): ±35°; Calibrate from: replace with the actual `wkf_ref.npy` mean pose
+- **effort proxy (`_K_VEL`, `_K_DEV`, `_GRAV_BOOST`)**: Now (placeholder): 0.010 / 0.004 / 1.6; Calibrate from: if the feedback servos expose position readback, cross-check the proxy against measured tracking error; re-weight if a term is dead
 
 - **_MAX_CONTINUOUS_S:** **First-class action: once the estimator is bench-calibrated, evaluate raising this a lot or removing it (set to 0 to disable).** If the calibrated heat estimate alone reliably catches the danger case, this rule is redundant and should go.
 

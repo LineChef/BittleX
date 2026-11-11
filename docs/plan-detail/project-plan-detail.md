@@ -12,33 +12,29 @@ controller.
 **How this document works.** It is the roadmap and decision log — checklists, statuses and links, not narrative. Where things
 live (one home per fact; see [`maintaining-docs.md`](../maintaining-docs.md)):
 
-| Looking for | Go to |
-|---|---|
-| What is true right now (deployed, tested on the robot, open problems, next steps) | [`STATUS.md`](../STATUS.md) |
-| Full detail behind a phase (moved here verbatim 2026-10-02) | [`plan-detail/`](./) |
-| Open work by ID | [`backlog.md`](../backlog.md) |
-| Dated data and findings | the logs: [`rl/real-walk-log.md`](../rl/real-walk-log.md), [`rl/hw1-log.md`](../rl/hw1-log.md), … |
-| Parts list and hardware decisions | [`hardware/parts-and-decisions.md`](../hardware/parts-and-decisions.md) |
-| Day-1 bring-up sequence | [`guides/bring-up-sequence.md`](../guides/bring-up-sequence.md) (executable: `python -m pi_pipeline.bringup`) |
+- **What is true right now (deployed, tested on the robot, open problems, next steps)**: [`STATUS.md`](../STATUS.md)
+- **Full detail behind a phase (moved here verbatim 2026-10-02)**: [`plan-detail/`](./)
+- **Open work by ID**: [`backlog.md`](../backlog.md)
+- **Dated data and findings**: the logs: [`rl/real-walk-log.md`](../rl/real-walk-log.md), [`rl/hw1-log.md`](../rl/hw1-log.md), …
+- **Parts list and hardware decisions**: [`hardware/parts-and-decisions.md`](../hardware/parts-and-decisions.md)
+- **Day-1 bring-up sequence**: [`guides/bring-up-sequence.md`](../guides/bring-up-sequence.md) (executable: `python -m pi_pipeline.bringup`)
 
 Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 🔧 in progress · ⬜ not started.
 
 ## Phases at a glance
 
-| Phase | State | Detail |
-|---|---|---|
-| 1 Repo setup | ✅ | below |
-| 2 Orientation | ✅ (curriculum items deferred) | below |
-| 3 RL training in simulation | ✅ policies built through V6 (deployed: see STATUS); further gait training only on the user's go | [`plan-detail/phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) |
-| Recovery (catch / get-up) | 🧩 built; partly tested on hardware | [`plan-detail/recovery.md`](../archive/plan-detail/recovery.md) |
-| 4 Hardware assembly | 🔧 assembled and bring-up done; Pi mount is temporary | [`plan-detail/phase4-hardware-assembly.md`](phase4-hardware-assembly.md) |
-| 5 Basic control | ✅ | [`plan-detail/phase5-basic-control.md`](../archive/plan-detail/phase5-basic-control.md) |
-| 6 Sim-to-real deployment | 🔧 loop and safety layers built; first walks done | [`plan-detail/phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) |
-| 7 Voice + Claude | ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned | [`plan-detail/phase7-voice.md`](phase7-voice.md) |
-| 8 Perception | 🧩 model on the camera and "what do you see" works; navigation reflexes gated off | [`plan-detail/phase8-perception.md`](phase8-perception.md) |
-| 9 Memory | ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added | [`plan-detail/phase9-memory.md`](phase9-memory.md) |
-| 10 Integration | 🔧 the behavior runtime runs on G2 in exploration sessions; the full app over a long run is still to do | [`plan-detail/phase10-integration.md`](../archive/plan-detail/phase10-integration.md) |
-| Petoi AI Head vs the Pi | ⬜ decision pending; head on the bench, not in the build | below, [`planned/ai-head/`](../planned/ai-head/README.md) |
+- **1 Repo setup**: State: ✅; Detail: below
+- **2 Orientation**: State: ✅ (curriculum items deferred); Detail: below
+- **3 RL training in simulation**: State: ✅ policies built through V6 (deployed: see STATUS); further gait training only on the user's go; Detail: [`plan-detail/phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md)
+- **Recovery (catch / get-up)**: State: 🧩 built; partly tested on hardware; Detail: [`plan-detail/recovery.md`](../archive/plan-detail/recovery.md)
+- **4 Hardware assembly**: State: 🔧 assembled and bring-up done; Pi mount is temporary; Detail: [`plan-detail/phase4-hardware-assembly.md`](phase4-hardware-assembly.md)
+- **5 Basic control**: State: ✅; Detail: [`plan-detail/phase5-basic-control.md`](../archive/plan-detail/phase5-basic-control.md)
+- **6 Sim-to-real deployment**: State: 🔧 loop and safety layers built; first walks done; Detail: [`plan-detail/phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md)
+- **7 Voice + Claude**: State: ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned; Detail: [`plan-detail/phase7-voice.md`](phase7-voice.md)
+- **8 Perception**: State: 🧩 model on the camera and "what do you see" works; navigation reflexes gated off; Detail: [`plan-detail/phase8-perception.md`](phase8-perception.md)
+- **9 Memory**: State: ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added; Detail: [`plan-detail/phase9-memory.md`](phase9-memory.md)
+- **10 Integration**: State: 🔧 the behavior runtime runs on G2 in exploration sessions; the full app over a long run is still to do; Detail: [`plan-detail/phase10-integration.md`](../archive/plan-detail/phase10-integration.md)
+- **Petoi AI Head vs the Pi**: State: ⬜ decision pending; head on the bench, not in the build; Detail: below, [`planned/ai-head/`](../planned/ai-head/README.md)
 
 ## Open TODOs that affect everything
 

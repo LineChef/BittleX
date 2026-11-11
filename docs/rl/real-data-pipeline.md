@@ -19,14 +19,12 @@ approval (auto or user) -> `g2_profile` loads the approved snapshot at retrain l
 
 ## What gets captured (movement-path inventory, 2026-10-07)
 
-| Path | Where it goes through | Capture |
-|---|---|---|
-| Policy walking from the voice service and the exploration runtime | `PolicyWalker` -> `run_gait.run()` with no log path | one choke point: auto-log when no `--log` is given (`G2_AUTOLOG=off` disables) |
-| Policy walks started from the command line / baseline runner | `run_gait.run()` | already logged with `--log`; the auto-log fills in when none is given |
-| Scripted `wkF` open-loop walks | `run_gait.openloop()` | only run from the command line / baseline runner, which already pass `--log`; not hooked |
-| Firmware gaits and skills sent as tokens (turns, `kwk*`, tricks, rest, stand) | `WalkerSink` / `SerialActuatorSink` | IMU-only recorder (later phase); commands are already traceable through `link/trace.py` |
-| Idle / rest IMU | the IMU stream the app already reads | low-rate recorder (later phase): IMU bias and noise at rest are free, plentiful data |
-| Events: falls, guard stops, thermal cooldowns, battery alerts, pick-ups | diag events | event log, used for real fault and fall rates |
+- **Policy walking from the voice service and the exploration runtime**: Where it goes through: `PolicyWalker` -> `run_gait.run()` with no log path; Capture: one choke point: auto-log when no `--log` is given (`G2_AUTOLOG=off` disables)
+- **Policy walks started from the command line / baseline runner**: Where it goes through: `run_gait.run()`; Capture: already logged with `--log`; the auto-log fills in when none is given
+- **Scripted `wkF` open-loop walks**: Where it goes through: `run_gait.openloop()`; Capture: only run from the command line / baseline runner, which already pass `--log`; not hooked
+- **Firmware gaits and skills sent as tokens (turns, `kwk*`, tricks, rest, stand)**: Where it goes through: `WalkerSink` / `SerialActuatorSink`; Capture: IMU-only recorder (later phase); commands are already traceable through `link/trace.py`
+- **Idle / rest IMU**: Where it goes through: the IMU stream the app already reads; Capture: low-rate recorder (later phase): IMU bias and noise at rest are free, plentiful data
+- **Events: falls, guard stops, thermal cooldowns, battery alerts, pick-ups**: Where it goes through: diag events; Capture: event log, used for real fault and fall rates
 
 Every run gets a sidecar with: kind, policy name, commands, git commit, hardware epoch, surface label, battery at start and end, features on, why the run ended.
 
@@ -101,11 +99,9 @@ The first snapshot is no longer always reviewed. Anything that fails a gate othe
 
 The table below is the earlier rule, kept for history.
 
-| Case | Who approves | When |
-|---|---|---|
-| Every changed value within its noise band, every check and the harm check pass, no epoch change, and the total change since the last **human**-approved snapshot is under the cumulative cap | **Automatic** (the rules); recorded as auto-approved and shown in the next report; one command reverts to the previous snapshot | when the snapshot is built |
-| A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded | **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks | at the next session after the proposal exists; always reviewed before a 20M go |
-| Harm check fails | **Blocked**, not approvable until the cause is understood | |
+- **Every changed value within its noise band, every check and the harm check pass, no epoch change, and the total change since the last **human**-approved snapshot is under the cumulative cap**: Who approves: **Automatic** (the rules); recorded as auto-approved and shown in the next report; one command reverts to the previous snapshot; When: when the snapshot is built
+- **A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded**: Who approves: **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks; When: at the next session after the proposal exists; always reviewed before a 20M go
+- **Harm check fails**: Who approves: **Blocked**, not approvable until the cause is understood
 
 **Training launches.** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
 1. **Automatic when idle:** a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is running on the Mac (no training, benchmark or other test in progress, so nothing gets a random slowdown), at most one per snapshot, and its result is reported. The harm check (benchmark scoring, no training) follows the same idle-only rule.
@@ -142,14 +138,12 @@ and the carpet detector. For those, a tape-measured average speed per dedicated 
 
 ## Phases and status
 
-| Phase | What | Status |
-|---|---|---|
-| 0 | Inventory, schema, epochs file, capture module with tests | **done 2026-10-07** (`pi_pipeline/telemetry/`, the hook in `run_gait.run()`, `g2floor`; tests in `test_autolog.py`; not yet on the Pi) |
-| 1 | Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi | **policy-walk capture done and verified on G2 (2026-10-07)**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started |
-| 2 | Sync, ingest gates, store, `g2data status` | **built 2026-10-07** (`tools/g2_ingest.py`, `g2data sync|ingest|status`, tests in `test_g2_ingest.py`); sync is manual (`g2data sync`), not yet a watcher |
-| 3 | Calibration builder, harm check, snapshots, approval, `g2_profile` loading | **built 2026-10-08** (`tools/g2_calibrate.py`, `g2cal`; background loop `tools/g2_bg_jobs.sh`, `g2bg`, calling `tools/g2_cal_auto.sh`; tests in `test_g2_calibrate.py`) |
-| 4 | Backfill of the 2026-10-01 to 10-07 logs by epoch | not started |
-| 5 | Retrain runner reads the snapshot; report in the pre-20M report | not started |
+- **0**: What: Inventory, schema, epochs file, capture module with tests; Status: **done 2026-10-07** (`pi_pipeline/telemetry/`, the hook in `run_gait.run()`, `g2floor`; tests in `test_autolog.py`; not yet on the Pi)
+- **1**: What: Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi; Status: **policy-walk capture done and verified on G2 (2026-10-07)**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started
+- **2**: What: Sync, ingest gates, store, `g2data status`; Status: **built 2026-10-07** (`tools/g2_ingest.py`, `g2data sync
+- **3**: What: Calibration builder, harm check, snapshots, approval, `g2_profile` loading; Status: **built 2026-10-08** (`tools/g2_calibrate.py`, `g2cal`; background loop `tools/g2_bg_jobs.sh`, `g2bg`, calling `tools/g2_cal_auto.sh`; tests in `test_g2_calibrate.py`)
+- **4**: What: Backfill of the 2026-10-01 to 10-07 logs by epoch; Status: not started
+- **5**: What: Retrain runner reads the snapshot; report in the pre-20M report; Status: not started
 
 - **3:** Fits the confident tier the walk logs support (IMU frame rate -> `G2E_IMU_HOLD_STEPS`, loop jitter -> `G2E_CMD_PATH_EXTRA_MS_MAX`); IMU bias and noise, servo rate and force, fall and snag rates are listed as needing data (rest-IMU recorder, bench data, many more metres). Snapshots are numbered and immutable in `~/g2_data/calibration/`; `g2_profile` loads only an approved one and records `G2_CAL_ID`. The harm check scores V2.1 and the newest V3 policy in the old and new world and waits for an idle Mac
 

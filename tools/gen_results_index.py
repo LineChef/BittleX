@@ -13,6 +13,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_lists  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "docs", "rl", "results-index.md")
@@ -75,7 +78,7 @@ def build():
             out.append(f"| `{name}` | {size/1024:.0f} KB | {links} |")
         out.append("")
     out.insert(5, f"**{sum(len(v) for v in rows.values())} files, {total/1e6:.1f} MB.**\n")
-    return "\n".join(out).rstrip() + "\n"
+    return md_lists.convert("\n".join(out).rstrip() + "\n")[0]          # no pipe tables in the docs (tools/md_lists.py)
 
 
 def main():

@@ -54,13 +54,13 @@ def _write_manifest(lib: str, m: dict) -> None:
     json.dump(m, open(os.path.join(lib, MANIFEST), "w"), indent=2)
     lines = ["# G2 vision training library", "",
              f"updated: {m['updated']}", "",
-             "| class | images |", "|---|---|"]
+             "Images per class:", ""]
     for c, n in sorted(m["classes"].items()):
-        lines.append(f"| `{c}` | {n} |")
+        lines.append(f"- `{c}`: {n}")
         for bk, bn in sorted(m.get("buckets", {}).items()):
             if bk.startswith(c + "/"):
-                lines.append(f"| &nbsp;&nbsp;`{bk}` | {bn} |")
-    lines += [f"| _negatives_ | {m['negatives']} |", "",
+                lines.append(f"  - `{bk}`: {bn}")
+    lines += [f"- _negatives_: {m['negatives']}", "",
               f"{len(m['promoted'])} session(s) promoted:", ""]
     lines += [f"- {s}" for s in m["promoted"]]
     # hint uses first-promoted order (= intended class-id order), not alphabetical

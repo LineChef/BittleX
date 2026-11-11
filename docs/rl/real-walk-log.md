@@ -141,30 +141,26 @@ the rest pose is right when the leg first drops into it; (2) the firmware step g
 Numbering matches the log files (`hard_v21_runNN`). Roll/pitch mean / std in degrees. Yaw = change
 at 25/50/75/100% of the run.
 
-| run | distance | seen | roll | pitch | yaw |
-|---|---|---|---|---|---|
-| open-loop scripted `wkF`, 6 cycles | ~3 ft | stood cleanly, no grinding, signs OK; curved left | -- | -- | -- |
-| 01 (before `gc`) | ~5-6 ft (eyeballed) | curved right, steady turn | -2.7 / 6.6 | +0.9 / 3.5 | +24 +68 +120 +132 |
-| 02 | 4 ft 10 in | slight right; small push near the end | -1.8 / 5.9 | -1.8 / 3.5 | -7 -8 -29 -22 |
-| 03 | same | drifted right, corrected by hand (desk edge) | -1.3 / 6.3 | -2.1 / 3.6 | +5 -17 -8 +2 |
-| 04 | same | drifted right, corrected | -1.3 / 6.2 | -2.0 / 3.4 | +2 -11 +5 +18 |
-| 05 | same | drifted right, corrected | -2.1 / 7.0 | -1.4 / 3.5 | +11 +12 -39 -15 |
-| 06 (hands off) | ~4 ft 2 in straight line | drifts hard early, then stabilizes; not touched | -1.8 / 6.7 | -2.1 / 3.9 | +11 +19 +16 +16 |
+- **open-loop scripted `wkF`, 6 cycles**: distance: ~3 ft; seen: stood cleanly, no grinding, signs OK; curved left; roll: --; pitch: --; yaw: --
+- **01 (before `gc`)**: distance: ~5-6 ft (eyeballed); seen: curved right, steady turn; roll: -2.7 / 6.6; pitch: +0.9 / 3.5; yaw: +24 +68 +120 +132
+- **02**: distance: 4 ft 10 in; seen: slight right; small push near the end; roll: -1.8 / 5.9; pitch: -1.8 / 3.5; yaw: -7 -8 -29 -22
+- **03**: distance: same; seen: drifted right, corrected by hand (desk edge); roll: -1.3 / 6.3; pitch: -2.1 / 3.6; yaw: +5 -17 -8 +2
+- **04**: distance: same; seen: drifted right, corrected; roll: -1.3 / 6.2; pitch: -2.0 / 3.4; yaw: +2 -11 +5 +18
+- **05**: distance: same; seen: drifted right, corrected; roll: -2.1 / 7.0; pitch: -1.4 / 3.5; yaw: +11 +12 -39 -15
+- **06 (hands off)**: distance: ~4 ft 2 in straight line; seen: drifts hard early, then stabilizes; not touched; roll: -1.8 / 6.7; pitch: -2.1 / 3.9; yaw: +11 +19 +16 +16
 
 ## Carpet (~6.4 mm pile)
 
-| attempt | result |
-|---|---|
-| V2.1 policy, 10 cycles | fell at 2.0 s and again at ~11 s, each time rolling over the FR shoulder (once head-first); feet catch in the pile. Roll -52 / 68 over the run |
-| scripted `wkF` x1.0 open-loop | fell, feet catching on the pile (no log; firmware balance probably on) |
-| firmware `kcarpetF` (~27 mm lift) 10 s | **stayed up but walked in place**; back-right leg sagged while stepping. Roll -10.5 / 11.6 (range -36..+8). The same gait on hard floor walked forward ~1 ft 9 in, no sag, roll +0.4 / 3.5 |
-| scripted, all joints x1.6 (~21 mm lift, stride +55%) | walked forward a little, fell sideways at 2.7 s; roll swung -45..+14 before the fall |
-| scripted, all joints x2.0 (~31 mm, stride +85%) | same: fell sideways at 2.7 s (roll -43..+15). User: the long strides cost stability; feet only snag occasionally |
-| knees x2.0 + shoulders x0.7, no ramp (~26 mm, stride ~80 mm) | fell at 0.7 s -- the jump from the stand pose into the first scaled frame |
-| same, 1-cycle ramp-in | 2 good steps, fell at 2.9 s. User: the carpet is a little bouncy; shorter steps may help |
-| knees x1.75 + shoulders x0.1, ramp (~25 mm, stride ~50 mm) | fell sideways at 3.0 s (roll -77, pitch stayed within -16..+11) |
-| same variant, voltage logged | **invalid as a fall test: the user was holding G2 up for most of it.** Voltage held 7.60-7.72 V for the first 8 s (incl. the first tilt at 1.3 s) then read 7.37 V in the last 2 s while it was held/thrashing |
-| same variant on **hard floor** | **fell at 3.3 s (flipped)**; voltage 7.70 flat |
+- **V2.1 policy, 10 cycles**: fell at 2.0 s and again at ~11 s, each time rolling over the FR shoulder (once head-first); feet catch in the pile. Roll -52 / 68 over the run
+- **scripted `wkF` x1.0 open-loop**: fell, feet catching on the pile (no log; firmware balance probably on)
+- **firmware `kcarpetF` (~27 mm lift) 10 s**: **stayed up but walked in place**; back-right leg sagged while stepping. Roll -10.5 / 11.6 (range -36..+8). The same gait on hard floor walked forward ~1 ft 9 in, no sag, roll +0.4 / 3.5
+- **scripted, all joints x1.6 (~21 mm lift, stride +55%)**: walked forward a little, fell sideways at 2.7 s; roll swung -45..+14 before the fall
+- **scripted, all joints x2.0 (~31 mm, stride +85%)**: same: fell sideways at 2.7 s (roll -43..+15). User: the long strides cost stability; feet only snag occasionally
+- **knees x2.0 + shoulders x0.7, no ramp (~26 mm, stride ~80 mm)**: fell at 0.7 s -- the jump from the stand pose into the first scaled frame
+- **same, 1-cycle ramp-in**: 2 good steps, fell at 2.9 s. User: the carpet is a little bouncy; shorter steps may help
+- **knees x1.75 + shoulders x0.1, ramp (~25 mm, stride ~50 mm)**: fell sideways at 3.0 s (roll -77, pitch stayed within -16..+11)
+- **same variant, voltage logged**: **invalid as a fall test: the user was holding G2 up for most of it.** Voltage held 7.60-7.72 V for the first 8 s (incl. the first tilt at 1.3 s) then read 7.37 V in the last 2 s while it was held/thrashing
+- **same variant on **hard floor****: **fell at 3.3 s (flipped)**; voltage 7.70 flat
 
 Standing in `kbalance` on the carpet, balance off: roll -0.8 / pitch -0.5, level -- the carpet
 does not make the static stance lopsided.
@@ -175,15 +171,13 @@ Forward kinematics of the commanded joint angles in the sim's robot model, body 
 mean over the four paws. Real lift is lower (servo lag, easing, rate limit; the `f` servo
 readback returned nothing, so it is unmeasured) and a planted foot sinks into the pile.
 
-| gait | peak foot lift | stride (fore-aft foot travel) |
-|---|---|---|
-| scripted `wkF` | ~9 mm | ~75 mm |
-| V2.1 commanded | 15-21 mm (same on both surfaces) | -- |
-| Petoi `carpetF` | ~27 mm | ~36 mm (different rest posture: shoulders mean ~61 vs 47-53, knees ~-11 vs +6) |
-| `wkF` all joints x1.6 / x2.0 | ~21 / ~31 mm | ~117 / ~140 mm |
-| knees x2.0 | ~23 mm | ~94 mm |
-| knees x2.0, shoulders x0.7 | ~26 mm | ~80 mm |
-| knees x1.75, shoulders x0.1 | ~25 mm | ~50 mm |
+- **scripted `wkF`**: peak foot lift: ~9 mm; stride (fore-aft foot travel): ~75 mm
+- **V2.1 commanded**: peak foot lift: 15-21 mm (same on both surfaces); stride (fore-aft foot travel): --
+- **Petoi `carpetF`**: peak foot lift: ~27 mm; stride (fore-aft foot travel): ~36 mm (different rest posture: shoulders mean ~61 vs 47-53, knees ~-11 vs +6)
+- **`wkF` all joints x1.6 / x2.0**: peak foot lift: ~21 / ~31 mm; stride (fore-aft foot travel): ~117 / ~140 mm
+- **knees x2.0**: peak foot lift: ~23 mm; stride (fore-aft foot travel): ~94 mm
+- **knees x2.0, shoulders x0.7**: peak foot lift: ~26 mm; stride (fore-aft foot travel): ~80 mm
+- **knees x1.75, shoulders x0.1**: peak foot lift: ~25 mm; stride (fore-aft foot travel): ~50 mm
 
 Shoulders mostly set the stride but the knee bend adds some; shrinking the shoulders alone cannot
 get below ~63 mm at knees x2.
@@ -270,14 +264,12 @@ The case was installed (camera at the front, speaker at the very back, microphon
 `Release_CandidateV2.1` walks on the same hard floor, `run_gait.py --cmd 0.10 --seconds 12.5`, fall guard on, hands off, G2 put back at the same start
 spot between runs (`tools/g2_baseline.sh`, runner `gait/baseline_runs.py`). Logs: `real-walk-data/2026-10-06/`. Fresh, fully charged pack (8.51 V at rest).
 
-| run | roll mean / std (deg) | roll range | pitch std | yaw change at 25 / 50 / 75 / 100 % (deg, + = right) |
-|---|---|---|---|---|
-| 1 | +0.2 / 5.9 | -13 .. +11 | 2.7 | +35 +85 +130 -108 (wrapped or hand-corrected; ignore the last value) |
-| 2 | +0.8 / 5.8 | -11 .. +9 | 1.9 | +35 +72 +111 +150 |
-| 3 | +0.8 / 6.2 | -10 .. +10 | 2.4 | +44 +87 +129 +176 |
-| 4 | +1.4 / 5.7 | -10 .. +11 | 2.3 | +31 +68 +101 +144 |
-| 5 | +1.0 / 5.9 | -10 .. +11 | 2.2 | +34 +69 +101 +136 |
-| 6 | +1.3 / 6.0 | -9 .. +10 | 2.5 | +15 +44 +64 +103 |
+- **1**: roll mean / std (deg): +0.2 / 5.9; roll range: -13 .. +11; pitch std: 2.7; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +35 +85 +130 -108 (wrapped or hand-corrected; ignore the last value)
+- **2**: roll mean / std (deg): +0.8 / 5.8; roll range: -11 .. +9; pitch std: 1.9; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +35 +72 +111 +150
+- **3**: roll mean / std (deg): +0.8 / 6.2; roll range: -10 .. +10; pitch std: 2.4; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +44 +87 +129 +176
+- **4**: roll mean / std (deg): +1.4 / 5.7; roll range: -10 .. +11; pitch std: 2.3; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +31 +68 +101 +144
+- **5**: roll mean / std (deg): +1.0 / 5.9; roll range: -10 .. +11; pitch std: 2.2; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +34 +69 +101 +136
+- **6**: roll mean / std (deg): +1.3 / 6.0; roll range: -9 .. +10; pitch std: 2.5; yaw change at 25 / 50 / 75 / 100 % (deg, + = right): +15 +44 +64 +103
 
 - **No falls, no stops**; the policy step took about 1.85 ms on average. The user saw a clear drift to the right on every walk; the yaw trace agrees
   (runs 2-6: +103 to +176 deg over 12.7 s, mean about +142, so roughly 8-14 deg/s).
@@ -292,11 +284,9 @@ spot between runs (`tools/g2_baseline.sh`, runner `gait/baseline_runs.py`). Logs
 The user replaced and recalibrated servo 8 (FL shoulder). Same hard floor, same `run_gait.py --cmd 0.10 --seconds 12.5` walks, `Release_CandidateV2.1`, hands off,
 G2 put back at the start spot each run. Pack under load 7.8-8.1 V (not a full charge). Logs: `real-walk-data/2026-10-06b/`. Yaw change over 12.7 s, + = right.
 
-| Series | Runs (deg) | Mean | vs before the swap |
-|---|---|---|---|
-| Before the swap (six walks, case mounted, 2026-10-06 morning) | +103, +136, +144, +150, +176 (run 1 unusable) | about +142 | |
-| After, series A (new yaw sign, deployed 1:17 PM) | +18, +7, +7, +40, +44, +77 | +32 | |
-| After, series B (ABBA: the yaw sign alternated, order sealed from the user) | NEW sign: +80, +64, +29, -5 / OLD sign: +15, +46, +37, +49 | NEW +42, OLD +37 | |
+- **Before the swap (six walks, case mounted, 2026-10-06 morning)**: Runs (deg): +103, +136, +144, +150, +176 (run 1 unusable); Mean: about +142
+- **After, series A (new yaw sign, deployed 1:17 PM)**: Runs (deg): +18, +7, +7, +40, +44, +77; Mean: +32
+- **After, series B (ABBA: the yaw sign alternated, order sealed from the user)**: Runs (deg): NEW sign: +80, +64, +29, -5 / OLD sign: +15, +46, +37, +49; Mean: NEW +42, OLD +37
 
 - **The drift fell from about +142 to about +35-40 deg per 12.7 s after the servo swap and recalibration.**
 - **The yaw-sign fix is not what cured it:** with the pre-fix sign (OLD, `G2_POLICY_YAW_SIGN=+1`) the mean is +37 vs +42 with the corrected sign; within-group spread is about +-27 deg, so a 5 deg gap is noise. (The first reading, that the fix and the swap could not be told apart, was right to be cautious; the interleaved test separates them.)
@@ -356,15 +346,13 @@ section used `drift_probe.py`, which did not force the commanded speed (the env 
 low and its "V2.1 slows down on long walks" reading was wrong. Re-measured with a forced command (`benchmark_v4.py`, V2.1, 422 g, the 12.5 s calm
 walk "N1", 20 episodes; raw results in [`v3-data/`](../archive/rl/v3-data/README.md)):
 
-| Sim servo speed limit (deg/s) | Falls | Speed (m/s) | Heading change over 12.5 s | Roll std | Pitch std |
-|---|---|---|---|---|---|
-| 90 | 0% | 0.067 | +7.3 (left) | 2.26 | 1.44 |
-| **137 (what V2/V2.1 and the V3 profile assume)** | 0% | 0.089 | **+9.3 (left)** | **2.64** | 1.70 |
-| 180 | 0% | 0.091 | +1.8 | 3.83 | 2.27 |
-| 250 (the firmware's own `i` easing) | 10% | 0.086 | **-10.8 (right)** | **5.92** | 3.97 |
-| 400 | 10% | 0.081 | -15.8 | 6.68 | 4.89 |
-| none | 5% | 0.081 | -23.3 | 6.51 | 4.77 |
-| **G2 (six walks)** | 0 / 6 | ~0.118 (10-01 taped) | **-142 (right)** | **5.7-6.2** | 1.9-2.7 |
+- **90**: Falls: 0%; Speed (m/s): 0.067; Heading change over 12.5 s: +7.3 (left); Roll std: 2.26; Pitch std: 1.44
+- **137 (what V2/V2.1 and the V3 profile assume)**: Falls: 0%; Speed (m/s): 0.089; Heading change over 12.5 s: **+9.3 (left)**; Roll std: **2.64**; Pitch std: 1.70
+- **180**: Falls: 0%; Speed (m/s): 0.091; Heading change over 12.5 s: +1.8; Roll std: 3.83; Pitch std: 2.27
+- **250 (the firmware's own `i` easing)**: Falls: 10%; Speed (m/s): 0.086; Heading change over 12.5 s: **-10.8 (right)**; Roll std: **5.92**; Pitch std: 3.97
+- **400**: Falls: 10%; Speed (m/s): 0.081; Heading change over 12.5 s: -15.8; Roll std: 6.68; Pitch std: 4.89
+- **none**: Falls: 5%; Speed (m/s): 0.081; Heading change over 12.5 s: -23.3; Roll std: 6.51; Pitch std: 4.77
+- **G2 (six walks)**: Falls: 0 / 6; Speed (m/s): ~0.118 (10-01 taped); Heading change over 12.5 s: **-142 (right)**; Roll std: **5.7-6.2**; Pitch std: 1.9-2.7
 
 - Raising the limit from 137 to 250 deg/s moves the sim's roll swing onto G2's and turns V2.1 **right** for the first time. The 137 figure
   was borrowed from another project (never measured on G2), and the firmware's own easing is already 250 deg/s, so the extra limit probably
@@ -388,10 +376,8 @@ walk "N1", 20 episodes; raw results in [`v3-data/`](../archive/rl/v3-data/README
 
 `steer_probe.py` on V2.1: a fixed stride difference u (left legs scaled by 1 - u, right legs by 1 + u, so u > 0 = longer RIGHT strides), 12 episodes of 12.5 s per value, both payload models. Raw output: `v3-data/steer_sweep/`. Heading change in degrees, sim sign + = left:
 
-| u (probe) | -0.30 | -0.20 | -0.10 | 0 | +0.10 | +0.20 | +0.30 |
-|---|---|---|---|---|---|---|---|
-| new payload (`case2`) | +32 (6/12 fell) | +35 | +17 | -2 | -16 | -29 | -47 |
-| old payload (`case`) | +20 (6/12 fell) | +27 | +18 | -3 | -21 | -32 | -42 |
+- **new payload (`case2`)**: -0.30: +32 (6/12 fell); -0.20: +35; -0.10: +17; 0: -2; +0.10: -16; +0.20: -29; +0.30: -47
+- **old payload (`case`)**: -0.30: +20 (6/12 fell); -0.20: +27; -0.10: +18; 0: -3; +0.10: -21; +0.20: -32; +0.30: -42
 
 - **The sign is still opposite to G2's.** In the sim longer right strides turn the robot RIGHT; on G2 they turn it LEFT (u = -0.20 in the G2 convention, which is longer right strides, took +90 deg to +1 deg of right drift). The payload model does not change this.
 - **The sim's steering is 3 to 4 times weaker**: about 10-12 deg/s per unit u against about 40 deg/s per unit on G2 (the G2 figure from the 2026-10-07 `recheck2` runs: u = 0 drifts +9.6 deg/s, u = -0.20 about +1.3 deg/s).
@@ -402,12 +388,10 @@ walk "N1", 20 episodes; raw results in [`v3-data/`](../archive/rl/v3-data/README
 
 Mean commanded joint angle over a calm walk, degrees, URDF joint order (the sim's N1 cell, 30 episodes of 12.5 s; G2 from the `recheck2` run 1 log at u = 0, after the first second; the scripted walk from `reference_gait/wkf_ref.npy`):
 
-| | FL sh | FR sh | BR hip | BL hip | BL - BR hip | BR kn | BL kn |
-|---|---|---|---|---|---|---|---|
-| scripted `wkF` | 46.9 | 46.9 | 53.0 | 53.0 | 0.0 | 8.2 | 8.2 |
-| V2.1 in the sim, old payload | 49.5 | 50.1 | 54.6 | 61.6 | +7.0 | 0.3 | 4.1 |
-| V2.1 in the sim, new payload | 49.3 | 50.3 | 54.5 | 61.6 | +7.2 | -0.3 | 3.9 |
-| V2.1 on G2, u = 0 | 49.6 | 49.3 | 54.2 | 60.4 | +6.2 | 0.4 | 4.8 |
+- **scripted `wkF`**: FL sh: 46.9; FR sh: 46.9; BR hip: 53.0; BL hip: 53.0; BL - BR hip: 0.0; BR kn: 8.2; BL kn: 8.2
+- **V2.1 in the sim, old payload**: FL sh: 49.5; FR sh: 50.1; BR hip: 54.6; BL hip: 61.6; BL - BR hip: +7.0; BR kn: 0.3; BL kn: 4.1
+- **V2.1 in the sim, new payload**: FL sh: 49.3; FR sh: 50.3; BR hip: 54.5; BL hip: 61.6; BL - BR hip: +7.2; BR kn: -0.3; BL kn: 3.9
+- **V2.1 on G2, u = 0**: FL sh: 49.6; FR sh: 49.3; BR hip: 54.2; BL hip: 60.4; BL - BR hip: +6.2; BR kn: 0.4; BL kn: 4.8
 
 - The scripted walk is exactly left/right symmetric. V2.1 holds the back-left hip about 7 degrees above the scripted value and the back-right hip only about 1 degree above it, a 6-7 degree one-sided offset that is the same in the sim and on G2 (same policy, similar inputs). With steering (u = -0.20) the hips read 55.4 and 58.4, because the stride scaling pulls the left hip in.
 - This is the learned asymmetry the leading drift hypothesis names. It confirms the policy adds a one-sided offset the scripted walk does not have; it does not show that the offset causes G2's right drift. That needs the scripted-versus-V2.1 comparison on G2 (six open-loop `wkF` walks against six V2.1 walks in one session), which is still undone.
@@ -420,14 +404,12 @@ First scripted runs of the postcal batch (hardwood, pack 7.96 V): the scripted w
 
 Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab`), pack about 7.9 V: odd runs the scripted open-loop `wkF` walk (10 cycles, 12.5 s, the fixed pacing), even runs V2.1 at u = 0 (no heading hold). Net yaw over the walk, degrees, right positive, firmware yaw. Raw logs: `real-walk-data/2026-10-07/`.
 
-| Pair | scripted | V2.1 next | V2.1 minus scripted |
-|---|---|---|---|
-| 1-2 | +34 | +65 | +30 |
-| 3-4 | +20 | +99 | +79 |
-| 5-6 | +62 | +117 | +56 |
-| 7-8 | +88 | +113 | +25 |
-| 9-10 | +97 | +118 | +21 |
-| 11-12 | +86 (raw -274: the firmware's yaw counter jumped by exactly -360 mid-walk; the scripted logs are not wrapped) | +153 | +66 |
+- **1-2**: scripted: +34; V2.1 next: +65; V2.1 minus scripted: +30
+- **3-4**: scripted: +20; V2.1 next: +99; V2.1 minus scripted: +79
+- **5-6**: scripted: +62; V2.1 next: +117; V2.1 minus scripted: +56
+- **7-8**: scripted: +88; V2.1 next: +113; V2.1 minus scripted: +25
+- **9-10**: scripted: +97; V2.1 next: +118; V2.1 minus scripted: +21
+- **11-12**: scripted: +86 (raw -274: the firmware's yaw counter jumped by exactly -360 mid-walk; the scripted logs are not wrapped); V2.1 next: +153; V2.1 minus scripted: +66
 
 - Scripted mean +64 deg (about +5 deg/s), V2.1 mean +111 deg (about +8.7 deg/s). V2.1 is more to the right than the scripted walk in all six pairs, by about 46 deg per 12.5 s (+3.7 deg/s, range +21 to +79).
 - **The scripted walk is NOT straight on this floor**: it drifts right too. The early observation that it curves left (one qualitative open-loop test before the servo swap and the case) did not reproduce. Most of G2's right drift (about 5 of 8.7 deg/s) is in the hardware, floor or calibration; the policy adds about 40% on top.
@@ -438,12 +420,10 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 
 `gc` run through the Pi with G2 standing level and untouched (`yaw_drift_check.py`, raw logs in `real-walk-data/2026-10-07/imu/`). Firmware balance off for every reading.
 
-| | before `gc` | after `gc` |
-|---|---|---|
-| yaw drift at rest, 60 s | +0.14 deg/s (scatter 0.3 deg) | 0.000 deg/s (scatter 0.05 deg) |
-| rest pose mean roll / pitch | +0.59 / -1.22 deg | +0.24 / +1.69 deg |
-| standing (`kbalance`, then `gb`), 40 s, 185 frames | not measured | roll -0.69 deg, pitch -0.07 deg (zero error); sd 0.09 / 0.08 deg; yaw 0.00 deg/s |
-| IMU frame interval | | median 0.202 s (4.96 Hz) |
+- **yaw drift at rest, 60 s**: before `gc`: +0.14 deg/s (scatter 0.3 deg); after `gc`: 0.000 deg/s (scatter 0.05 deg)
+- **rest pose mean roll / pitch**: before `gc`: +0.59 / -1.22 deg; after `gc`: +0.24 / +1.69 deg
+- **standing (`kbalance`, then `gb`), 40 s, 185 frames**: before `gc`: not measured; after `gc`: roll -0.69 deg, pitch -0.07 deg (zero error); sd 0.09 / 0.08 deg; yaw 0.00 deg/s
+- **IMU frame interval**: after `gc`: median 0.202 s (4.96 Hz)
 
 - A first standing run read pitch sd 5.5 deg and a -4 deg mean: the user rested G2 during it; discarded. The standing order matters: `kbalance` can switch the firmware balance back on, so `gb` goes after it (`yaw_drift_check.py --stand` does that now).
 - Sim settings set from this: IMU roll/pitch zero error +-0.7 deg (was +-2), IMU noise 0.001 in the quaternion (was 0.02; the real sensor noise is about 0.09 deg = 0.0008), hold 16 steps unchanged (5 Hz). Everything not yet run uses them; earlier runs and the replicate set in the queue keep the old values (`g2_profile.IMU_WORLD_A`).
@@ -452,11 +432,9 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 
 `g2_baseline.sh start 12 auth2 --const-u=0,-0.20,-0.30 --hold-umax 0.30` (interleaved order 0, -0.20, -0.30, -0.30, -0.20, 0, ...; pack 7.86 V; fixed u, no feedback; u < 0 = longer right strides = a left turn). Net yaw over 12.5 s, right positive. Raw logs `real-walk-data/2026-10-07/auth2_*`.
 
-| u (applied) | runs | net yaw per run | mean | sd |
-|---|---|---|---|---|
-| 0 | 1, 6, 7, 12 | +111, +108, +98, +64 | +95 deg (+7.6 deg/s) | 19 |
-| -0.20 (-0.19) | 2, 5, 8, 11 | +14, -27, -17, -48 | -20 deg (-1.6 deg/s) | 22 |
-| -0.30 (-0.28) | 3, 4, 9, 10 | -56, -24, -31, -65 | -44 deg (-3.5 deg/s) | 17 |
+- **0**: runs: 1, 6, 7, 12; net yaw per run: +111, +108, +98, +64; mean: +95 deg (+7.6 deg/s); sd: 19
+- **-0.20 (-0.19)**: runs: 2, 5, 8, 11; net yaw per run: +14, -27, -17, -48; mean: -20 deg (-1.6 deg/s); sd: 22
+- **-0.30 (-0.28)**: runs: 3, 4, 9, 10; net yaw per run: -56, -24, -31, -65; mean: -44 deg (-3.5 deg/s); sd: 17
 
 - **The lever still works, and the signs are right**: more negative u turns G2 further left. No falls at -0.30; the back-right foot landing flat was not reported (the user did not track the runs).
 - **Authority flattens beyond -0.2**: from 0 to -0.19 the turn changes by -9.2 deg/s (about 48 deg/s per unit of u), from -0.19 to -0.28 by only -2 deg/s (about 22 deg/s per unit): the joint-range clamp (`heading_hold.JOINT_RANGE_DEG`) limits the stride change. So raising the limit from 0.20 to 0.30 buys about 2 more deg/s of left turn.
@@ -467,14 +445,12 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 
 `g2_baseline.sh start 6 hold1 --hold on --hold-ff=-0.16 --hold-kp 0.01 --hold-ki 0.001 --hold-umax 0.30` on the hardwood after the gyro calibration (pack 7.82 V; V2.1 with the Pi-side stride-difference hold; the hold's target is the heading at the start of each walk). Raw logs `real-walk-data/2026-10-07/hold1_*`.
 
-| run | final yaw (right +) | u mean | u range |
-|---|---|---|---|
-| 1 | -5.6 | -0.14 | -0.24 .. 0.00 |
-| 2 | -3.3 | -0.12 | -0.23 .. 0.00 |
-| 3 | -3.1 | -0.15 | -0.25 .. 0.00 |
-| 4 | -1.1 | -0.15 | -0.23 .. 0.00 |
-| 5 | -2.4 | -0.14 | -0.26 .. 0.00 |
-| 6 | -2.2 | -0.11 | -0.22 .. 0.00 |
+- **1**: final yaw (right +): -5.6; u mean: -0.14; u range: -0.24 .. 0.00
+- **2**: final yaw (right +): -3.3; u mean: -0.12; u range: -0.23 .. 0.00
+- **3**: final yaw (right +): -3.1; u mean: -0.15; u range: -0.25 .. 0.00
+- **4**: final yaw (right +): -1.1; u mean: -0.15; u range: -0.23 .. 0.00
+- **5**: final yaw (right +): -2.4; u mean: -0.14; u range: -0.26 .. 0.00
+- **6**: final yaw (right +): -2.2; u mean: -0.11; u range: -0.22 .. 0.00
 
 - Final heading mean -3.0 deg, sd 1.4 deg, every run within 6 deg of straight (the same walks with a fixed u had a 40 deg band, +111 to -65). The user saw slight left curves in most runs, none to the right, and called run 6 the straightest in a while: matches the log.
 - The output never reached its 0.30 limit (peak -0.26) and settled near -0.14, so the loop is not authority-limited at today's drift (+7.6 deg/s at u = 0). The slight left bias (-3 deg) says the -0.16 feed-forward is a touch strong; about -0.14 would center it.
@@ -527,10 +503,8 @@ when it first drops to rest and the FR shoulder visibly lags/sags *after* the se
 `tools/g2_turns.sh start 6` (kbalance stand, then the firmware skill for 10 s, IMU logged, hard floor; raw CSVs in `v3-data/turns/`).
 Yaw rate is a least-squares line through the unwrapped IMU yaw (firmware convention, + = right):
 
-| Skill | Runs (deg/s) | Mean |
-|---|---|---|
-| `kwkL` | -10.9, -13.4, -12.1 | -12.1 |
-| `kwkR` | +18.7, +18.1, +19.0 | +18.6 |
+- **`kwkL`**: Runs (deg/s): -10.9, -13.4, -12.1; Mean: -12.1
+- **`kwkR`**: Runs (deg/s): +18.7, +18.1, +19.0; Mean: +18.6
 
 Right turns are about 50% faster than left, repeatably (spread about 1 deg/s per side): a steady rightward bias of about 3 deg/s, the same size as V2.1's
 right drift, in a scripted firmware gait with no policy running. The bias belongs to G2's body / servos, not to the learned gait.
@@ -546,10 +520,8 @@ mirror loss plus heading feedback.
 `tools/g2_baseline.sh start 16 hold_v21 --hold abba` (V2.1, 0.10 m/s, 12.5 s, hard floor, pack charged; hold off, on, on, off, off, on, on, off ...; raw logs in
 `v3-data/hold_ab/`; filenames carry the condition). Heading change over the walk, firmware convention (+ = right):
 
-| Hold | n | Mean | Sd | Range | Roll std |
-|---|---|---|---|---|---|
-| OFF | 8 | +65 deg | 18 | +43 .. +100 | 5.6 deg |
-| ON | 8 | +82 deg | 19 | +57 .. +115 | 4.1 deg |
+- **OFF**: n: 8; Mean: +65 deg; Sd: 18; Range: +43 .. +100; Roll std: 5.6 deg
+- **ON**: n: 8; Mean: +82 deg; Sd: 19; Range: +57 .. +115; Roll std: 4.1 deg
 
 The hold did **not** reduce the drift: ON turned about 17 degrees MORE to the right (difference of means 17 deg, standard error about 9, so suggestive, not
 conclusive). The controller output was pinned at its limit (u = -0.20, longer left strides) for the whole of every ON run, so it asked for the most correction it
@@ -565,11 +537,9 @@ had it the other way round, so the hold in the A/B above steered into the drift.
 before the fix: u > 0 = longer right strides; no feedback; order -0.2, 0, +0.2, +0.2, 0, -0.2 ...; raw logs in `v3-data/const_u/`), heading change over 12.5 s,
 right-positive:
 
-| u | n | Mean | Sd | Runs |
-|---|---|---|---|---|
-| -0.20 (longer LEFT strides) | 4 | +114.5 deg | 3.0 | 118, 114, 117, 110 |
-| 0 | 4 | +90.0 deg | 13.6 | 68, 91, 106, 95 |
-| +0.20 (longer RIGHT strides) | 4 | -29.2 deg | 11.0 | -47, -30, -20, -20 |
+- **-0.20 (longer LEFT strides)**: n: 4; Mean: +114.5 deg; Sd: 3.0; Runs: 118, 114, 117, 110
+- **0**: n: 4; Mean: +90.0 deg; Sd: 13.6; Runs: 68, 91, 106, 95
+- **+0.20 (longer RIGHT strides)**: n: 4; Mean: -29.2 deg; Sd: 11.0; Runs: -47, -30, -20, -20
 
 - **Authority is large:** u = +0.2 swings the walk by about 120 deg (about 10 deg/s) from the u = 0 drift, more than enough to cancel it. The response is not linear: from
   0 to +0.2 it is about -600 deg per unit u, from -0.2 to 0 only about -120. The zero crossing of the drift is near u = +0.15 in the old sign (-0.15 in the
@@ -586,11 +556,9 @@ right-positive:
 
 `g2_baseline.sh start 12 dial1 --const-u=-0.10,-0.15,-0.20` (no feedback; raw logs `v3-data/dial1/`), heading change over 12.5 s, right-positive:
 
-| u | n | Mean | Sd | Runs (in run order) |
-|---|---|---|---|---|
-| -0.10 | 4 | +64 deg | 18 | 43, 62, 59, 93 |
-| -0.15 | 4 | +11 deg | 24 | -19, -5, 33, 37 |
-| -0.20 | 4 | +1 deg | 11 | -9, -7, 19, 3 |
+- **-0.10**: n: 4; Mean: +64 deg; Sd: 18; Runs (in run order): 43, 62, 59, 93
+- **-0.15**: n: 4; Mean: +11 deg; Sd: 24; Runs (in run order): -19, -5, 33, 37
+- **-0.20**: n: 4; Mean: +1 deg; Sd: 11; Runs (in run order): -9, -7, 19, 3
 
 Straight walking needs u of about -0.19 (linear interpolation), at the old +-0.20 limit, so there is no headroom: the drift crept up through the series (within each u the later
 runs turn further right, about +30 deg over ten minutes), which a fixed offset cannot follow. The feedback needs more authority than +-0.20 (untested beyond it).
@@ -616,22 +584,18 @@ Hard floor (hardwood) unless noted, pack 8.1 to 8.4 V, yaw right-positive, firmw
 
 **1. Per-foot trim, scripted `wkF` walk, 12.5 s (`--foot-trim`, a fixed stretch of one foot's swing, no feedback).** Positive trim = a longer step.
 
-| Foot | -0.25 | none | +0.25 |
-|---|---|---|---|
-| front-left | +45 | +88 | +108 |
-| front-right | +106 | +88 | +54 |
-| back-left | +87 | +88 | +85 |
-| back-right | +88 | +88 | +85 |
+- **front-left**: -0.25: +45; none: +88; +0.25: +108
+- **front-right**: -0.25: +106; none: +88; +0.25: +54
+- **back-left**: -0.25: +87; none: +88; +0.25: +85
+- **back-right**: -0.25: +88; none: +88; +0.25: +85
 
 The **front** feet steer, with the ordinary vehicle sign (a longer step on one side swings G2 toward the other side); the back feet do nothing (within the ~3 deg walk-to-walk noise). The sim has it the other way round (rear legs steer, opposite sign). One front foot is worth about 9 to 10 deg/s per unit of trim. Second batch: no trim +78 / +68 (so the baseline is +68 to +88), `fl=-0.25` +43, `fl=-0.5` +21, front pair (`fl=-0.3`, `fr=+0.3`) +32 / +49 and a roll lean of about -3.7 deg (against -0.2 with no trim). Front-left alone gives the same correction without the lean. No falls in 15 walks.
 
 **2. Closed-loop hold on the front-left foot (`FootHold` in `gait/heading_hold.py`).** Trim = -(KP x error outside a 6 deg deadband + KI x integral + KD x turn rate), clamped to -0.6..+0.2 and slew-limited; the turn-rate term is the ease-off. Yaw after the walk:
 
-| Walk | No hold | Front-left hold |
-|---|---|---|
-| scripted, 12.8 s | +50, +71 | +18, +21 |
-| V2.1, 12.8 s | +96, +93 | +20, +18 |
-| V2.1, 25 s (about 10 ft) | +148 | +21, +13, +14 |
+- **scripted, 12.8 s**: No hold: +50, +71; Front-left hold: +18, +21
+- **V2.1, 12.8 s**: No hold: +96, +93; Front-left hold: +20, +18
+- **V2.1, 25 s (about 10 ft)**: No hold: +148; Front-left hold: +21, +13, +14
 
 Over 25 s the trim reached its clamp for only 2 to 3% of each walk, so the drift sits well inside one foot's authority. No falls in 7 held V2.1 walks on hardwood. A hold-trimmed walk leans mildly toward the shortened foot (roll mean about -3.4 deg). No-hold walks at 25 s drifted too far off the lane, so no further uncontrolled runs were made at that length (user).
 
@@ -668,33 +632,27 @@ Pod (185 g) and AI head (42 g) mounted, about 481 g in all; hardwood. Policy V7.
 
 **Walks (12 s, 0.10 m/s, `run_gait.py`, tape-measured by the owner):**
 
-| Walk | Trim | Distance | Ended | Log |
-|---|---|---|---|---|
-| 1 | none | 4 ft 3 in | 5 in right of centre | roll mean -1.0, swing ±5.3 deg, no fall |
-| 2 | none | 4 ft 3 in | 5 in right (the same) | roll swing ±5.3 deg, no fall |
-| 3 | `fl=-0.3` | 4 ft | 1 in right of centre | ended normally |
+- **1**: Trim: none; Distance: 4 ft 3 in; Ended: 5 in right of centre; Log: roll mean -1.0, swing ±5.3 deg, no fall
+- **2**: Trim: none; Distance: 4 ft 3 in; Ended: 5 in right (the same); Log: roll swing ±5.3 deg, no fall
+- **3**: Trim: `fl=-0.3`; Distance: 4 ft; Ended: 1 in right of centre; Log: ended normally
 
 The logged yaw read +146 and +124 deg on the untrimmed walks and does not follow the real heading (IMU yaw drift); the tape measure is the record. `fl=-0.3` became V7's default trim. **This is V7's calibration on G2 (hardwood), done.** More V7 walks are wanted only for another floor's trim or for the sim fit ([`sysid-capture-plan.md`](sysid-capture-plan.md)), not to calibrate V7 again.
 
 **Poses (IMU at 5 Hz, G2 on the floor, stand / sit / stand-from-sit):**
 
-| Variant | Stand (max tilt) | Sit (roll swing) | Result |
-|---|---|---|---|
-| 0.8 s ramp from the sit | 2 deg | n/a | back legs skipped and jittered, he fell forward |
-| 1.4 s ramp from the sit | 3 deg | 18-25 deg | same, fell forward |
-| via rest, 2 s, firmware balance left on | 3 deg | 25 deg | slipping at the bottom of the sit, "catching his balance" |
-| via rest, firmware balance off after each skill | 3 deg | 2 deg | smooth |
+- **0.8 s ramp from the sit**: Stand (max tilt): 2 deg; Sit (roll swing): n/a; Result: back legs skipped and jittered, he fell forward
+- **1.4 s ramp from the sit**: Stand (max tilt): 3 deg; Sit (roll swing): 18-25 deg; Result: same, fell forward
+- **via rest, 2 s, firmware balance left on**: Stand (max tilt): 3 deg; Sit (roll swing): 25 deg; Result: slipping at the bottom of the sit, "catching his balance"
+- **via rest, firmware balance off after each skill**: Stand (max tilt): 3 deg; Sit (roll swing): 2 deg; Result: smooth
 
 The wave (`khi`): 47 deg pitch swing, flipped him twice (both triggered by mis-heard speech, 13:10 and 13:16). Stage-2 servo read over the Pi's link: 0 of 5 reads returned angles, and a request tilted him up to 21 deg (raw capture).
 
 **Explorations (tight room, `G2_PROFILE=1`):**
 
-| | 1:57 PM, 3 min | 2:29 PM, 4 min |
-|---|---|---|
-| Walk ticks late (over 18.75 ms) | 32% (782 of 2440), worst gap 303 ms | 30% in the one walk checked (488 of 1631), 477 of them the send tick |
-| Survey pictures | none (surveys wait for a clean leg end; the gate wants G2 far from a wall) | 2 of 4 milestones saved; the other two lost to camera timeouts (8 of 6 s) |
-| Contact picture delay | 7.2 s and 8.6 s | n/a |
-| Settle before a walk | 0.02 s and 2.0 s (the cap) | twitching with firmware balance on |
-| Falls | none | one tip-over (112 deg) at the 99% survey stop |
+- **Walk ticks late (over 18.75 ms)**: 1:57 PM, 3 min: 32% (782 of 2440), worst gap 303 ms; 2:29 PM, 4 min: 30% in the one walk checked (488 of 1631), 477 of them the send tick
+- **Survey pictures**: 1:57 PM, 3 min: none (surveys wait for a clean leg end; the gate wants G2 far from a wall); 2:29 PM, 4 min: 2 of 4 milestones saved; the other two lost to camera timeouts (8 of 6 s)
+- **Contact picture delay**: 1:57 PM, 3 min: 7.2 s and 8.6 s; 2:29 PM, 4 min: n/a
+- **Settle before a walk**: 1:57 PM, 3 min: 0.02 s and 2.0 s (the cap); 2:29 PM, 4 min: twitching with firmware balance on
+- **Falls**: 1:57 PM, 3 min: none; 2:29 PM, 4 min: one tip-over (112 deg) at the 99% survey stop
 
 Profile (208 s): the wake-word listener 30.7% running (48.4 s CPU), the walk thread 21.3% (11.0 s), the narrator 90% in the speech model. CPU governor `ondemand` at 1 GHz, not throttled. Fixes made afterwards are listed in STATUS (not retested).

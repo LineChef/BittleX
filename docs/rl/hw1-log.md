@@ -41,10 +41,8 @@ model of the real control path, `hw1_20m`, is the release candidate.
 
 ## Sim measurements
 
-| Probe | Result |
-|---|---|
-| `resilience_imu_rate.py` — 5 Hz held orientation, no rate, vs the 80 Hz training condition (7 hard cells × 40 eps) | No measurable cost: 107 vs 111 falls / 280 |
-| `resilience_joint_cmd.py` — `firmware_model.py` timing between policy and servos (8 cells × 20 eps) | `m`: G2 doesn't walk (~0 m/s, 2 % of commands run, ~650 ms lag). `i`: ~96 % of ideal speed, ~55 ms lag, ~9° joint error. `i` with `transformSpeed` 0 (firmware change): ≈ ideal |
+- **`resilience_imu_rate.py` — 5 Hz held orientation, no rate, vs the 80 Hz training condition (7 hard cells × 40 eps)**: No measurable cost: 107 vs 111 falls / 280
+- **`resilience_joint_cmd.py` — `firmware_model.py` timing between policy and servos (8 cells × 20 eps)**: `m`: G2 doesn't walk (~0 m/s, 2 % of commands run, ~650 ms lag). `i`: ~96 % of ideal speed, ~55 ms lag, ~9° joint error. `i` with `transformSpeed` 0 (firmware change): ≈ ideal
 
 The run20m checkpoints need `G2E_RESIDUAL_SCALE_DEG=22` (env default 30 since
 resid30); both probes and `validate_deploy.py` now take the scale from the
@@ -93,25 +91,21 @@ policy's sidecar (below).
 
 ## Sim-vs-hardware audit
 
-| Item | Status |
-|---|---|
-| IMU 5 Hz / no rate | `IMU_HOLD_STEPS`, `IMU_RATE_ZERO` (obs only; the Pi feeds an exact 0 rate, so no noise on it) |
-| Command path | `CMD_PATH="i"` via `firmware_model.py` + `CMD_PATH_EXTRA_MS_MAX` (0–4 ms unmodelled firmware work) |
-| Body mass | URDF 269 g = bottom of Petoi's 269–353 g; G2 has alloy servos → `BODY_MASS_SCALE=1.12` (~301 g). Re-set from the bring-up weigh-in |
-| IMU mount tilt / servo zero error | `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2` |
-| Servo torque / speed | Fine: 0.2 N·m vs 0.29 peak; `i` easing (250°/s) is below the P1S (~800°/s) |
-| Payload, joint obs, int-degree commands | Already matched |
-| Hardware-only | Firmware version vs the traced source (bring-up 8a), roll/pitch sign (13a), low-battery cutoff 7.0 V → `rest` |
+- **IMU 5 Hz / no rate**: `IMU_HOLD_STEPS`, `IMU_RATE_ZERO` (obs only; the Pi feeds an exact 0 rate, so no noise on it)
+- **Command path**: `CMD_PATH="i"` via `firmware_model.py` + `CMD_PATH_EXTRA_MS_MAX` (0–4 ms unmodelled firmware work)
+- **Body mass**: URDF 269 g = bottom of Petoi's 269–353 g; G2 has alloy servos → `BODY_MASS_SCALE=1.12` (~301 g). Re-set from the bring-up weigh-in
+- **IMU mount tilt / servo zero error**: `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`
+- **Servo torque / speed**: Fine: 0.2 N·m vs 0.29 peak; `i` easing (250°/s) is below the P1S (~800°/s)
+- **Payload, joint obs, int-degree commands**: Already matched
+- **Hardware-only**: Firmware version vs the traced source (bring-up 8a), roll/pitch sign (13a), low-battery cutoff 7.0 V → `rest`
 
 All knobs default off (older checkpoints replay unchanged) and are exposed as
 `G2E_*` environment variables.
 
 ## Runs
 
-| Run | Config | Result |
-|---|---|---|
-| `hw1_i` (3M pilot) | 5 Hz IMU + `i` + 0–4 ms | Real-path decathlon: fastest policy so far (0.073 m/s avg; 0.115 vs scripted 0.101 on flat); falls 162/1048, in line with the ideal-trained 3M `resid30_r1` (149); residual p95 21° of 30 |
-| `hw1_20m` | pilot + `BODY_MASS_SCALE=1.12`, `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`, ±30° | **Promoted — deployed policy (`DEFAULT_POLICY`).** See results below |
+- **`hw1_i` (3M pilot)**: Config: 5 Hz IMU + `i` + 0–4 ms; Result: Real-path decathlon: fastest policy so far (0.073 m/s avg; 0.115 vs scripted 0.101 on flat); falls 162/1048, in line with the ideal-trained 3M `resid30_r1` (149); residual p95 21° of 30
+- **`hw1_20m`**: Config: pilot + `BODY_MASS_SCALE=1.12`, `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`, ±30°; Result: **Promoted — deployed policy (`DEFAULT_POLICY`).** See results below
 
 ### `hw1_20m` results (2026-09-23)
 
@@ -123,11 +117,9 @@ near the limit. Replay reviewed frame by frame: level, full-extension trot.
 
 Real-path decathlon (`--hw i`, 30 cells, 1,048 eps; scripted reused):
 
-| | Falls | Avg speed |
-|---|---|---|
-| Scripted (pure `wkF`) | 77 | 0.0625 |
-| **`hw1_20m`** | 161 | 0.0707 |
-| `run20m_resid30_ppo` (previous base) | 94 | 0.0720 |
+- **Scripted (pure `wkF`)**: Falls: 77; Avg speed: 0.0625
+- **`hw1_20m`**: Falls: 161; Avg speed: 0.0707
+- **`run20m_resid30_ppo` (previous base)**: Falls: 94; Avg speed: 0.0720
 
 - 25 of 30 cells: 0 % falls and faster than scripted in every one — flat
   0.108 vs 0.101, 18° climb 0.104 vs 0.087, 20° descent 0.069 vs 0.022, rough
@@ -148,11 +140,9 @@ Real-path decathlon (`--hw i`, 30 cells, 1,048 eps; scripted reused):
 through the real path, pure slopes — no rough-terrain episodes, no torque cut),
 `hw1_20m`, 20 eps per condition, 0 % falls everywhere:
 
-| Terrain | hw1_20m m/s | scripted m/s |
-|---|---|---|
-| Downhill 4–28° | 0.103–0.120 | 0.079–0.106 |
-| Uphill 4 / 12 / 16 / 20 / 24 / 28° | 0.104 / 0.087 / 0.069 / 0.037 / 0.009 / −0.034 | 0.087 / 0.061 / 0.041 / 0.001 / −0.001 / −0.054 |
-| Side-hill 5 / 6 / 7 / 8 / 12–20° | 0.088 / 0.073 / 0.048 / 0.020 / ~0.02 | 0.084 / 0.052 / 0.019 / 0.021 / ~0.005 |
+- **Downhill 4–28°**: hw1_20m m/s: 0.103–0.120; scripted m/s: 0.079–0.106
+- **Uphill 4 / 12 / 16 / 20 / 24 / 28°**: hw1_20m m/s: 0.104 / 0.087 / 0.069 / 0.037 / 0.009 / −0.034; scripted m/s: 0.087 / 0.061 / 0.041 / 0.001 / −0.001 / −0.054
+- **Side-hill 5 / 6 / 7 / 8 / 12–20°**: hw1_20m m/s: 0.088 / 0.073 / 0.048 / 0.020 / ~0.02; scripted m/s: 0.084 / 0.052 / 0.019 / 0.021 / ~0.005
 
 - **Side-hills stall by ~8°.** The gait levels its body (roll 8° → 0° within a
   second); with the body level on tilted ground the downhill legs can't reach it
@@ -237,15 +227,13 @@ gates manufactured regressions — **stopping `hw2` as "mixed" was a wrong call 
 that evidence.** `multi_ckpt_eval.py` now scores 5 checkpoints (2.2–3.0M) per run
 and reports mean ± spread; this is the standard gate from here.
 
-| mean ± spread over 2.2–3.0M | hw1 | hw2 slopes+leg-balance | hw3 slopes | hw4 footfalls |
-|---|---|---|---|---|
-| least-used paw (scripted 0.41) | 0.20 ±0.03 | 0.22 ±0.03 | 0.17 ±0.01 | 0.16 ±0.08 |
-| footfall mismatch (scripted 0.06) | 0.41 | **0.29** | 0.45 | **0.33** |
-| uphill 16° m/s | 0.030 ±0.036 | **0.065** ±0.004 | 0.049 | 0.014 |
-| side-hill 12° m/s | 0.011 | **0.029** | 0.024 | **0.056** |
-| flat m/s | 0.102 | 0.091 | 0.100 | 0.076 |
-| rough ground m/s | 0.044 | 0.031 | 0.034 | 0.024 |
-| bare gauntlet falls | 74 % | **37 %** | 63 % | 75 % |
+- **least-used paw (scripted 0.41)**: hw1: 0.20 ±0.03; hw2 slopes+leg-balance: 0.22 ±0.03; hw3 slopes: 0.17 ±0.01; hw4 footfalls: 0.16 ±0.08
+- **footfall mismatch (scripted 0.06)**: hw1: 0.41; hw2 slopes+leg-balance: **0.29**; hw3 slopes: 0.45; hw4 footfalls: **0.33**
+- **uphill 16° m/s**: hw1: 0.030 ±0.036; hw2 slopes+leg-balance: **0.065** ±0.004; hw3 slopes: 0.049; hw4 footfalls: 0.014
+- **side-hill 12° m/s**: hw1: 0.011; hw2 slopes+leg-balance: **0.029**; hw3 slopes: 0.024; hw4 footfalls: **0.056**
+- **flat m/s**: hw1: 0.102; hw2 slopes+leg-balance: 0.091; hw3 slopes: 0.100; hw4 footfalls: 0.076
+- **rough ground m/s**: hw1: 0.044; hw2 slopes+leg-balance: 0.031; hw3 slopes: 0.034; hw4 footfalls: 0.024
+- **bare gauntlet falls**: hw1: 74 %; hw2 slopes+leg-balance: **37 %**; hw3 slopes: 63 %; hw4 footfalls: 75 %
 
 `hw2` is the best overall; no run fixed the limp; footfall imitation at 8 is
 too strong (slows everything).

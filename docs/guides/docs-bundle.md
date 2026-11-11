@@ -19,14 +19,12 @@ Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 
 ## What is in the bundle
 
-| File | What it is |
-|---|---|
-| `latest.json` | A tiny pointer: `version`, `built`, the names of the other files (`manifest`, `search`, `schema`), page and asset counts. Fetch this first; it changes whenever any page changes |
-| `manifest.json` | The navigation tree (`nav`), every page's metadata (`pages`), the assets list, and the settings the links were built with (`base`, `assetsUrl`, `repo`, `branch`) |
-| `schema.json` | The JSON Schema of `latest.json`, `manifest.json` and `search.json` (source: [`docs-bundle.schema.json`](docs-bundle.schema.json)); the contract below in machine-readable form |
-| `search.json` | One plain-text record per page (title, headings, the first 4,000 characters) for a client-side search library |
-| `pages/<route>.md` | Each page's Markdown with its links already rewritten. `pages/index.md` is the home page |
-| `assets/<repo path>` | Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan) |
+- **`latest.json`**: A tiny pointer: `version`, `built`, the names of the other files (`manifest`, `search`, `schema`), page and asset counts. Fetch this first; it changes whenever any page changes
+- **`manifest.json`**: The navigation tree (`nav`), every page's metadata (`pages`), the assets list, and the settings the links were built with (`base`, `assetsUrl`, `repo`, `branch`)
+- **`schema.json`**: The JSON Schema of `latest.json`, `manifest.json` and `search.json` (source: [`docs-bundle.schema.json`](docs-bundle.schema.json)); the contract below in machine-readable form
+- **`search.json`**: One plain-text record per page (title, headings, the first 4,000 characters) for a client-side search library
+- **`pages/<route>.md`**: Each page's Markdown with its links already rewritten. `pages/index.md` is the home page
+- **`assets/<repo path>`**: Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan)
 
 A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `audience`, `kind`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. `summary` is the first paragraph as plain text, at most 220 characters; a longer one is cut at a word boundary and ends with `…`. `search.json`'s `text` is the opposite, a raw cut-off at 4,000 characters.
 

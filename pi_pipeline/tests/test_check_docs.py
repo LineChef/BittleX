@@ -81,9 +81,14 @@ def test_the_real_repo_docs_pass(tmp_path):
 
 
 def test_readability_warnings_for_published_pages():
-    long_cell = " ".join(["word"] * 45)
-    page = f"# T\n\n| a | b |\n|---|---|\n| x | {long_cell} |\n\nDecided (user, 2026-10-21) to do it.\n"
+    page = "# T\n\nDecided (user, 2026-10-21) to do it.\n"
     out = cd.readability_warnings("docs/guides/x.md", page)
-    assert any("table cell" in w for w in out) and any("attribution" in w for w in out)
+    assert any("attribution" in w for w in out)
     assert cd.readability_warnings("docs/guides/x.md", "---\naudience: visitor\n---\n# T\n\nOne clear opening sentence.\n") == []
     assert any("no opening paragraph" in w for w in cd.readability_warnings("docs/guides/x.md", "# T\n\n- only a list\n"))
+
+
+def test_a_pipe_table_is_an_error_but_a_table_in_a_code_fence_and_plain_pipes_are_not():
+    assert cd.table_lines("# T\n\nintro\n\n| a | b |\n|---|---|\n| x | y |\n") == [5]
+    assert cd.table_lines("# T\n\n```\n| a | b |\n|---|---|\n```\n") == []
+    assert cd.table_lines("# T\n\nUse a | b | c in the shell.\n- **x**: y | z\n") == []

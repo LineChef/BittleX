@@ -32,24 +32,22 @@ settings such as Serial-2 (`XS`) mode.
 
 ## What Petoi has said (2026-10-03)
 
-| Topic | Answer | What it means for the project |
-|---|---|---|
-| Hardware | ESP32-C3, microphone, speaker; 16 MB flash, about a third free, with a 4 MB OTA partition; ESP-IDF | single-core, no FPU: little headroom for the code next to Wi-Fi, audio and the LLM client |
-| Firmware | to be open-sourced (not released yet); you can modify it and write your own applications | everything below that says "modify the firmware" waits for the source |
-| Mic audio to a host | processed internally; could be modified to stream out | custom firmware work |
-| Speaker driven by a host | yes — define a protocol so a host sends text or audio playback commands | custom firmware work, but supported by design |
-| Own backend instead of the XiaoZhi cloud | yes, by modifying the firmware | a project-controlled server could put Claude, memory and personality behind it |
-| Talk-only / motion redirected | yes, by modifying the MCP (motion control) | the Pi can keep sole control of motion |
-| Link to the BiBoard | the existing Petoi serial protocol, including joint-level commands; the BiBoard listens on the UART when `XS` is on; rate depends on the implementation | the same protocol the Pi uses |
-| Port | UART2 through the first Grove socket. **By default the Pi and the head share the same UART and can conflict.** Petoi has made some BiBoards without the built-in voice control module, so the head gets an independent serial port | the BiBoard has the voice module; see the UART options below |
-| IMU / battery / servo feedback | not sent to the head by default; could be added over the serial protocol | closed loops stay on the Pi |
-| An 80 Hz custom loop | "potentially" — 12.5 ms per iteration, depends on the cost and on resources shared with other tasks | doubtful on a single-core C3 running Wi-Fi and audio |
-| Offline / safety | the default firmware periodically reminds users to reconnect; Petoi recommends keeping the e-stop and watchdog on the BiBoard or another local controller | the Pi's safety layers stay |
-| Power | tested while moving, but no idle / speaking / peak figures; check the Grove 5 V and measure under load | it is measured (step 2) |
-| Updates and recovery | OTA is off by default; flash or recover over a wired connection | the "pin updates" worry is covered |
-| Logs | ESP-IDF serial logging; can add more | use the USB-C serial log to read what it sends |
-| Memory and data | memory is managed on xiaozhi.me; by default audio goes to a speech-to-text service, the text to the LLM server, the reply to a text-to-speech service; the provider's policies govern retention; Petoi sees no conversations; your own backend gives you control | privacy gate stands; a self-hosted backend is the privacy fix |
-| Camera and models | recognition runs locally on the Petoi AI Vision Module and works offline; forwarding detections to a host needs development; individual identification depends on the model | the camera question is about the Vision Module, which already installed |
+- **Hardware**: Answer: ESP32-C3, microphone, speaker; 16 MB flash, about a third free, with a 4 MB OTA partition; ESP-IDF; What it means for the project: single-core, no FPU: little headroom for the code next to Wi-Fi, audio and the LLM client
+- **Firmware**: Answer: to be open-sourced (not released yet); you can modify it and write your own applications; What it means for the project: everything below that says "modify the firmware" waits for the source
+- **Mic audio to a host**: Answer: processed internally; could be modified to stream out; What it means for the project: custom firmware work
+- **Speaker driven by a host**: Answer: yes — define a protocol so a host sends text or audio playback commands; What it means for the project: custom firmware work, but supported by design
+- **Own backend instead of the XiaoZhi cloud**: Answer: yes, by modifying the firmware; What it means for the project: a project-controlled server could put Claude, memory and personality behind it
+- **Talk-only / motion redirected**: Answer: yes, by modifying the MCP (motion control); What it means for the project: the Pi can keep sole control of motion
+- **Link to the BiBoard**: Answer: the existing Petoi serial protocol, including joint-level commands; the BiBoard listens on the UART when `XS` is on; rate depends on the implementation; What it means for the project: the same protocol the Pi uses
+- **Port**: Answer: UART2 through the first Grove socket. **By default the Pi and the head share the same UART and can conflict.** Petoi has made some BiBoards without the built-in voice control module, so the head gets an independent serial port; What it means for the project: the BiBoard has the voice module; see the UART options below
+- **IMU / battery / servo feedback**: Answer: not sent to the head by default; could be added over the serial protocol; What it means for the project: closed loops stay on the Pi
+- **An 80 Hz custom loop**: Answer: "potentially" — 12.5 ms per iteration, depends on the cost and on resources shared with other tasks; What it means for the project: doubtful on a single-core C3 running Wi-Fi and audio
+- **Offline / safety**: Answer: the default firmware periodically reminds users to reconnect; Petoi recommends keeping the e-stop and watchdog on the BiBoard or another local controller; What it means for the project: the Pi's safety layers stay
+- **Power**: Answer: tested while moving, but no idle / speaking / peak figures; check the Grove 5 V and measure under load; What it means for the project: it is measured (step 2)
+- **Updates and recovery**: Answer: OTA is off by default; flash or recover over a wired connection; What it means for the project: the "pin updates" worry is covered
+- **Logs**: Answer: ESP-IDF serial logging; can add more; What it means for the project: use the USB-C serial log to read what it sends
+- **Memory and data**: Answer: memory is managed on xiaozhi.me; by default audio goes to a speech-to-text service, the text to the LLM server, the reply to a text-to-speech service; the provider's policies govern retention; Petoi sees no conversations; your own backend gives you control; What it means for the project: privacy gate stands; a self-hosted backend is the privacy fix
+- **Camera and models**: Answer: recognition runs locally on the Petoi AI Vision Module and works offline; forwarding detections to a host needs development; individual identification depends on the model; What it means for the project: the camera question is about the Vision Module, which already installed
 
 **Petoi's own view:** the head could **complement** the Raspberry Pi rather than replace it — the C3 suits lightweight audio and AI
 interaction, the Pi carries the learned walking policy, safety layers and behavior runtime. Some of the integrations described need
@@ -90,15 +88,13 @@ Source: [AI conversation](https://guide.petoi.com/extensible-modules/ai-conversa
 
 "Gone" and "moves to the cloud" are different; this table keeps them apart. Assumes the head plus the BiBoard only, no Pi.
 
-| Capability | With the Pi today | Without it | Gone or different |
-|---|---|---|---|
-| Walking | learned policy (V2.1) at 80 Hz | Petoi's scripted gaits with the firmware's gyro balance | **gone** (the learned gait), replaced |
-| Reflexes | the project's: fall guard, thermal guard, jam guard, carpet detector, watchdog, e-stop | Petoi's firmware reflexes remain (below), the project's are gone | different: the mid-walk catch, the heat estimate and the e-stop are lost |
-| "Feels alive" behaviors | behavior runtime (attentive, roam, idle descent, sleep and wake, gestures, mood, enrollment) at ~8 Hz | no deterministic runtime on the head; the LLM can call skills but not run timers and sensor loops | **gone** unless rebuilt as server or tool logic |
-| Claude, personality, the memory | Claude API with SQLite memory and traits | XiaoZhi's LLM with its own platform memory; the project's only if a backend is hosted | **different** — memory lives in their cloud (or the project's); the design is not the project's |
-| Speech | local Vosk and Piper, works offline | cloud speech-to-text and text-to-speech; needs Wi-Fi and the internet | different; offline is gone |
-| Vision into behavior | detections feed the behavior layer | the camera's stock path on the BiBoard (face detection model; `XC` on, `Xc` off) | different, and costly: enabling the camera mode kills the IMU task in current firmware |
-| Dev loop | SSH, Python, logs, rsync, tests | ESP-IDF serial logs on the head, USB on the BiBoard | different, much weaker |
+- **Walking**: With the Pi today: learned policy (V2.1) at 80 Hz; Without it: Petoi's scripted gaits with the firmware's gyro balance; Gone or different: **gone** (the learned gait), replaced
+- **Reflexes**: With the Pi today: the project's: fall guard, thermal guard, jam guard, carpet detector, watchdog, e-stop; Without it: Petoi's firmware reflexes remain (below), the project's are gone; Gone or different: different: the mid-walk catch, the heat estimate and the e-stop are lost
+- **"Feels alive" behaviors**: With the Pi today: behavior runtime (attentive, roam, idle descent, sleep and wake, gestures, mood, enrollment) at ~8 Hz; Without it: no deterministic runtime on the head; the LLM can call skills but not run timers and sensor loops; Gone or different: **gone** unless rebuilt as server or tool logic
+- **Claude, personality, the memory**: With the Pi today: Claude API with SQLite memory and traits; Without it: XiaoZhi's LLM with its own platform memory; the project's only if a backend is hosted; Gone or different: **different** — memory lives in their cloud (or the project's); the design is not the project's
+- **Speech**: With the Pi today: local Vosk and Piper, works offline; Without it: cloud speech-to-text and text-to-speech; needs Wi-Fi and the internet; Gone or different: different; offline is gone
+- **Vision into behavior**: With the Pi today: detections feed the behavior layer; Without it: the camera's stock path on the BiBoard (face detection model; `XC` on, `Xc` off); Gone or different: different, and costly: enabling the camera mode kills the IMU task in current firmware
+- **Dev loop**: With the Pi today: SSH, Python, logs, rsync, tests; Without it: ESP-IDF serial logs on the head, USB on the BiBoard; Gone or different: different, much weaker
 
 The firmware reflexes that stay (`imu.h`, `reaction.h`; `docs/hardware/petoi-firmware-reference.md`), all with gyro assist on:
 flipped (roll > 85° with accel-Z near zero) plays a fall sound and runs the get-up `rc` once, repeating until upright; lifted
@@ -174,10 +170,8 @@ has only a face model, so any exploration would be blind to obstacles and ledges
 **The firmware's built-in distance modules** (from OpenCatEsp32 `main`, summarized by a fetch tool, not a line-by-line read; check the
 source before relying on thresholds). Neither is owned.
 
-| Module | Hardware | Behavior |
-|---|---|---|
-| Ultrasonic (`XU` on, `Xu` off) | RGB ultrasonic on the first Grove socket (UART2 — the same UART as the Pi header and the head) | A reactive demo, not navigation. By distance: idle > 60 cm; LED colors and gaze/attentive posture 30–60 cm; random `wkL`/`wkR`/sit 15–30 cm; sit and twitch 10–15 cm; meows and servo adjustments 5–10 cm; under 5 cm a random backward step (`bkL`/`bkR`), sniff or sit |
-| Dual IR distance | two IR sensors on ANALOG1/ANALOG2 (no UART conflict) | Real avoidance. Walk mode (`IR_WALK_AVOID`): clear path `trF`; under 4 cm turn in place (`vtR`/`vtL`); 4–10 cm back up then turn; uneven readings turn toward the clearer side; detection threshold about 20 cm. Sit mode (`IR_SIT_TRACK`): head-only tracking. The module manager notes bugs in it |
+- **Ultrasonic (`XU` on, `Xu` off)**: Hardware: RGB ultrasonic on the first Grove socket (UART2 — the same UART as the Pi header and the head); Behavior: A reactive demo, not navigation. By distance: idle > 60 cm; LED colors and gaze/attentive posture 30–60 cm; random `wkL`/`wkR`/sit 15–30 cm; sit and twitch 10–15 cm; meows and servo adjustments 5–10 cm; under 5 cm a random backward step (`bkL`/`bkR`), sniff or sit
+- **Dual IR distance**: Hardware: two IR sensors on ANALOG1/ANALOG2 (no UART conflict); Behavior: Real avoidance. Walk mode (`IR_WALK_AVOID`): clear path `trF`; under 4 cm turn in place (`vtR`/`vtL`); 4–10 cm back up then turn; uneven readings turn toward the clearer side; detection threshold about 20 cm. Sit mode (`IR_SIT_TRACK`): head-only tracking. The module manager notes bugs in it
 
 Neither detects a ledge, and neither has a leash, memory, voice arming or camera integration. A Pi-less G2 could get a bumper-style
 wander with the IR pair, not the exploration.
@@ -221,18 +215,16 @@ tier, what happens if the service changes or shuts down, loss of the SSH/Python 
 
 From `docs/capabilities.md`. "Needs today" is what makes it work now; the last column is what to check on the head.
 
-| Behavior / capability | Needs today | Check on the head |
-|---|---|---|
-| Learned walking policy (V2.1, 80 Hz) | host reading the IMU, joint commands to the BiBoard at ~27–80 Hz | can anything on the head do joint-level control at that rate? else scripted gaits only |
-| Safety layers (fall guard, thermal guard, jam guard, carpet detector, e-stop, watchdogs) | on-robot loop with IMU + joint data | what does the head do if Wi-Fi/cloud drops; is there a local loop; which of these the BiBoard firmware already covers |
-| Tier 0 "attentive": turn toward a sound, gaze-follow with head/body then satiate, react to novelty, periodic scan, greet known people | sensors + detections + head/body commands at ~8 Hz | detections reaching something that can act; sound direction; head servo control |
-| Tier 1 "roam" (voice-armed walking exploration), "come here" approach, place memory | detections + walking commands; vision gating | same as above, plus walking commands from the head's LLM/skills |
-| Idle-posture staged descent (peek, sit, rest, sleep), graceful shutdown, deep-idle sleep with wake on word/tap/loud sound, mood-scaled timing | a behavior state machine with timers and sensor events | can the head's LLM/skills reproduce timed state changes, or is any custom logic possible (own code, MCP/HTTP tools, a project-controlled server) |
-| Gestures, emotive chirps (buzzer melodies for recognition, startle, greeting, edge, sleep) | skill tokens + `beep` melodies | tool list the LLM can call; speaker can make non-speech sounds |
-| Person enrollment (capture sessions, per-person recognition, bonds) | camera capture pipeline, named classes | how new models are trained/deployed, per-person recognition, exposing identity to a host |
-| Claude conversation, tool calls, persistent memory (facts + searchable log), personality traits and mood | Claude API, SQLite memory, prompt composition | which LLM; custom server or BYO key; editable prompt/tools; where memory lives and whether it can be read and written |
-| Local offline voice (Vosk wake/STT, Piper TTS), local commands (emergency stop, shut down, come here) | Pi CPU | offline behavior; any local command path; latency |
-| Dev and diagnostics (SSH, logs, rsync deploys, black-box ring buffer, tests) | the Pi | logs, debug console, OTA pinning, recovery |
+- **Learned walking policy (V2.1, 80 Hz)**: Needs today: host reading the IMU, joint commands to the BiBoard at ~27–80 Hz; Check on the head: can anything on the head do joint-level control at that rate? else scripted gaits only
+- **Safety layers (fall guard, thermal guard, jam guard, carpet detector, e-stop, watchdogs)**: Needs today: on-robot loop with IMU + joint data; Check on the head: what does the head do if Wi-Fi/cloud drops; is there a local loop; which of these the BiBoard firmware already covers
+- **Tier 0 "attentive": turn toward a sound, gaze-follow with head/body then satiate, react to novelty, periodic scan, greet known people**: Needs today: sensors + detections + head/body commands at ~8 Hz; Check on the head: detections reaching something that can act; sound direction; head servo control
+- **Tier 1 "roam" (voice-armed walking exploration), "come here" approach, place memory**: Needs today: detections + walking commands; vision gating; Check on the head: same as above, plus walking commands from the head's LLM/skills
+- **Idle-posture staged descent (peek, sit, rest, sleep), graceful shutdown, deep-idle sleep with wake on word/tap/loud sound, mood-scaled timing**: Needs today: a behavior state machine with timers and sensor events; Check on the head: can the head's LLM/skills reproduce timed state changes, or is any custom logic possible (own code, MCP/HTTP tools, a project-controlled server)
+- **Gestures, emotive chirps (buzzer melodies for recognition, startle, greeting, edge, sleep)**: Needs today: skill tokens + `beep` melodies; Check on the head: tool list the LLM can call; speaker can make non-speech sounds
+- **Person enrollment (capture sessions, per-person recognition, bonds)**: Needs today: camera capture pipeline, named classes; Check on the head: how new models are trained/deployed, per-person recognition, exposing identity to a host
+- **Claude conversation, tool calls, persistent memory (facts + searchable log), personality traits and mood**: Needs today: Claude API, SQLite memory, prompt composition; Check on the head: which LLM; custom server or BYO key; editable prompt/tools; where memory lives and whether it can be read and written
+- **Local offline voice (Vosk wake/STT, Piper TTS), local commands (emergency stop, shut down, come here)**: Needs today: Pi CPU; Check on the head: offline behavior; any local command path; latency
+- **Dev and diagnostics (SSH, logs, rsync deploys, black-box ring buffer, tests)**: Needs today: the Pi; Check on the head: logs, debug console, OTA pinning, recovery
 
 ## Hands-on test steps (when the head arrives)
 
@@ -277,16 +269,14 @@ privacy problem.
 
 ## Scorecard (fill in after the tests)
 
-| Question | Pi build | Head only | Pi + head |
-|---|---|---|---|
-| Walking: learned gait kept? scripted as good? | | | |
-| Fraction of the "feels alive" behaviors preserved | | | |
-| Voice / Claude / memory path (and where data lives) | | | |
-| Vision (custom detector, per-person) | | | |
-| Safety layers and offline behavior | | | |
-| Mass, wiring and robustness | | | |
-| Privacy, cost, vendor dependence | | | |
-| Dev loop (debugging, logs, recovery) | | | |
+- **Walking: learned gait kept? scripted as good?**
+- **Fraction of the "feels alive" behaviors preserved**
+- **Voice / Claude / memory path (and where data lives)**
+- **Vision (custom detector, per-person)**
+- **Safety layers and offline behavior**
+- **Mass, wiring and robustness**
+- **Privacy, cost, vendor dependence**
+- **Dev loop (debugging, logs, recovery)**
 
 **Outcomes:** A) keep the Pi, ignore or sell the head; B) keep the Pi and use the head as an audio/vision front end (only if it
 exposes them to a host); C) head only, using Petoi's scripted gaits (gives up the learned policy and the custom safety
@@ -294,12 +284,10 @@ layers); D) head only, with the project's own logic moved to a server or onto th
 
 ## How to read the findings
 
-| If the finding is | Then |
-|---|---|
-| Raw mic and speaker access, or a configurable server | **Extendable.** The head can be the audio front end, or a self-hosted server can put Claude behind it |
-| Talk-only or motion redirected to a host, plus transcripts or an MCP/HTTP tool hook | **Partly extendable.** Voice front end while the Pi keeps control of motion |
-| Camera detections or frames reach a host | The head's camera could replace the Grove Vision camera (one part fewer) |
-| Open firmware, free compute for user code, real-time loop and IMU access | **It could replace the Pi.** A large rewrite from Python to embedded code, but possible |
-| Only fixed skill codes to the BiBoard, closed firmware | **Canned behavior.** It would compete with the Pi, bypass Claude, memory and personality, and give up the learned gait and safety layers |
-| Shares UART2/Serial-2 with the Pi header and can't coexist | Don't connect it without a port plan |
-| Cloud-only with no offline or safety fallback | Not acceptable as the only controller of a walking robot |
+- **Raw mic and speaker access, or a configurable server**: **Extendable.** The head can be the audio front end, or a self-hosted server can put Claude behind it
+- **Talk-only or motion redirected to a host, plus transcripts or an MCP/HTTP tool hook**: **Partly extendable.** Voice front end while the Pi keeps control of motion
+- **Camera detections or frames reach a host**: The head's camera could replace the Grove Vision camera (one part fewer)
+- **Open firmware, free compute for user code, real-time loop and IMU access**: **It could replace the Pi.** A large rewrite from Python to embedded code, but possible
+- **Only fixed skill codes to the BiBoard, closed firmware**: **Canned behavior.** It would compete with the Pi, bypass Claude, memory and personality, and give up the learned gait and safety layers
+- **Shares UART2/Serial-2 with the Pi header and can't coexist**: Don't connect it without a port plan
+- **Cloud-only with no offline or safety fallback**: Not acceptable as the only controller of a walking robot

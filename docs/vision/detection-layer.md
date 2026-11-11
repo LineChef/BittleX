@@ -73,11 +73,9 @@ Classes from several domains in a single model: `person`, `dad`, `mom`, `dog`,
 
 Three models, selected by `ModeController`:
 
-| Model | Loaded when | Classes | Notes |
-|---|---|---|---|
-| **safety** | G2 moving autonomously (EXPLORE, any commanded walk) | `edge` / `dropoff` / `obstacle` | small, fast, **biased hard to false-positives**; never diluted with other classes. This is B16 `CliffGuard` + obstacle. |
-| **interaction** | CONVERSE, idle, stationary-with-person | `person` + household individuals + pets | this is B15. See `person-recognition.md`. |
-| **objects/scene** | on demand — "what's on my desk / in this room" | COCO-80, or a curated subset | mostly free (pretrained COCO). Lowest priority. |
+- **safety**: Loaded when: G2 moving autonomously (EXPLORE, any commanded walk); Classes: `edge` / `dropoff` / `obstacle`; Notes: small, fast, **biased hard to false-positives**; never diluted with other classes. This is B16 `CliffGuard` + obstacle.
+- **interaction**: Loaded when: CONVERSE, idle, stationary-with-person; Classes: `person` + household individuals + pets; Notes: this is B15. See `person-recognition.md`.
+- **objects/scene**: Loaded when: on demand — "what's on my desk / in this room"; Classes: COCO-80, or a curated subset; Notes: mostly free (pretrained COCO). Lowest priority.
 
 If swap latency proves annoying in practice, **fold a few key objects
 (`mug`, `phone`, `ball`) into the interaction model** and keep only `safety`
@@ -143,14 +141,12 @@ Priority if forced to choose: **safety > recognition > objects.**
 
 ## Consumers (mostly built)
 
-| Consumer | Uses | State |
-|---|---|---|
-| `vision/feed.py` `SerialDetectionFeed` | parses INVOKE → `Detection` | built; auto-starts inference; `VISION_LABELS` names classes |
-| `vision/avoidance.py` `Avoider` | box area → closeness, `center_x` → bearing | built; thresholds need real-detection + stopping-distance calibration |
-| `vision/scene.py` | detections → text → Claude narration | built |
-| `vision/terrain_feature.py` | box → (dist, bearing, tall_flag) for the gait obs | removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d) |
-| `personality/bonds.py` | detection label → disposition / closeness | built (API only) |
-| `memory` + B11 place memory | accumulate "kitchen has a table", "dog near couch" | memory built; place-graph not |
+- **`vision/feed.py` `SerialDetectionFeed`**: Uses: parses INVOKE → `Detection`; State: built; auto-starts inference; `VISION_LABELS` names classes
+- **`vision/avoidance.py` `Avoider`**: Uses: box area → closeness, `center_x` → bearing; State: built; thresholds need real-detection + stopping-distance calibration
+- **`vision/scene.py`**: Uses: detections → text → Claude narration; State: built
+- **`vision/terrain_feature.py`**: Uses: box → (dist, bearing, tall_flag) for the gait obs; State: removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d)
+- **`personality/bonds.py`**: Uses: detection label → disposition / closeness; State: built (API only)
+- **`memory` + B11 place memory**: Uses: accumulate "kitchen has a table", "dog near couch"; State: memory built; place-graph not
 
 ---
 

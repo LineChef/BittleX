@@ -177,29 +177,25 @@ Measured reward budget of a calm V2.1 walk (per step, penalty ramp full; 1500 st
 speed tracking, which is why V2.1 stays close to the scripted walk and why small terms (like the smoothing term) still steer it. Lever weights
 below were calibrated to these magnitudes on V2.1's walk (R3 5.0 -> -0.31, R6 25 -> -0.12, R2 3.0 -> -0.11 per step).
 
-| # | Change | Why |
-|---|---|---|
-| R1 | **Left/right mirror symmetry** as a mirror-consistency loss (APPROVED; spec §2.5) | Removes the learned constant bias (V2.1's BL hip +7 deg); a bias can then only be corrected through feedback |
-| R2 | **Heading reward shape:** replace `FAC_HEADING·err²` with a bounded tracking reward `exp(-(err/10°)²)` | A real gradient near straight |
-| R3 | **Servo-feasibility penalty:** soft penalty on commanded joint speed above the measured servo ceiling (H13: 26% of `base1_20m`'s commands exceeded 137 deg/s) | Commands the servos can follow; smaller sim/real gap |
-| R4 | **Potential-based balance reward** γΦ(s') - Φ(s) with Φ = -(tilt + k·tilt rate); review `FAC_SURVIVE_BONUS` (scales with peak tilt) | `FAC_BALANCE` pays every drop in tilt and never charges the rise (code: `max(0, prev_tilt - tilt)`), so a wobble is paid on each down-swing. Only active above 0.5 rad |
-| R5 (revised) | **Activate the inert joint-smoothness terms:** `FAC_SMOOTH_1/2` 0.3 -> 15 | Measured 2026-10-06: they contribute -0.0013 per step in a calm walk (the trot term +0.0012 is inert too, so the premise of the first R5 was wrong); the V2 -> V2.1 lever `FAC_RESID_SMOOTH` sits at -0.10 per step and measurably cut yaw wobble, so a smoothness term of that size on the commanded joints is the same kind of lever |
-| R6 | **Softer footfalls:** small penalty on foot vertical speed at touchdown | Impacts drive roll swing. Only if Phase 1 reproduced G2's roll swing |
-| R7 | Discount γ 0.99 → 0.995 (horizon 1.25 → 2.5 s) | Low priority; only if K3 still drifts on long walks |
+- **R1**: Change: **Left/right mirror symmetry** as a mirror-consistency loss (APPROVED; spec §2.5); Why: Removes the learned constant bias (V2.1's BL hip +7 deg); a bias can then only be corrected through feedback
+- **R2**: Change: **Heading reward shape:** replace `FAC_HEADING·err²` with a bounded tracking reward `exp(-(err/10°)²)`; Why: A real gradient near straight
+- **R3**: Change: **Servo-feasibility penalty:** soft penalty on commanded joint speed above the measured servo ceiling (H13: 26% of `base1_20m`'s commands exceeded 137 deg/s); Why: Commands the servos can follow; smaller sim/real gap
+- **R4**: Change: **Potential-based balance reward** γΦ(s') - Φ(s) with Φ = -(tilt + k·tilt rate); review `FAC_SURVIVE_BONUS` (scales with peak tilt); Why: `FAC_BALANCE` pays every drop in tilt and never charges the rise (code: `max(0, prev_tilt - tilt)`), so a wobble is paid on each down-swing. Only active above 0.5 rad
+- **R5 (revised)**: Change: **Activate the inert joint-smoothness terms:** `FAC_SMOOTH_1/2` 0.3 -> 15; Why: Measured 2026-10-06: they contribute -0.0013 per step in a calm walk (the trot term +0.0012 is inert too, so the premise of the first R5 was wrong); the V2 -> V2.1 lever `FAC_RESID_SMOOTH` sits at -0.10 per step and measurably cut yaw wobble, so a smoothness term of that size on the commanded joints is the same kind of lever
+- **R6**: Change: **Softer footfalls:** small penalty on foot vertical speed at touchdown; Why: Impacts drive roll swing. Only if Phase 1 reproduced G2's roll swing
+- **R7**: Change: Discount γ 0.99 → 0.995 (horizon 1.25 → 2.5 s); Why: Low priority; only if K3 still drifts on long walks
 
 Not proposed again (failed before): raising `FAC_STABILITY` / `FAC_YAW` (over-damped, rtune_r2); a fall penalty (`-15` collapsed entropy);
 the phase slow-down and imitation fade (PPO diverged); a stride reward (gamed).
 
 ### 2.4 Yaw levers
 
-| # | Lever | Notes |
-|---|---|---|
-| Y1 | Yaw-sign fix on the Pi | Required; code (§0 next step 1) |
-| Y2 | Explicit heading-error input (sin, cos of heading - commanded heading) + a yaw-free tilt input instead of the raw quaternion | Changes the observation size, so fresh runs only (fine: V3 is fresh). The Pi's `residual_policy.py` must build the same inputs, behind the policy's `.onnx.json` sidecar |
-| Y3 | Mixed episode lengths (25% of episodes at 1000 steps) | v2.2 R2 (all 1000) hurt at 3M, so mix rather than replace |
-| Y4 | Turn-command curriculum `G2E_TRAIN_YAW` ±0.15 rad/s, widened to ±0.45 in the chain | **Only if Phase 1's turning gate passes.** `TURN_BLEND` (wkF → wkL/wkR base) exists, dormant |
-| Y5 | Persistent asymmetry randomization per episode: a stuck servo (promote `_motor_max` / drift_probe's `clip:J:DEG` to a training knob), a weak joint, a zero offset, a mild yaw torque (`G2E_DRIFT_TORQUE` ≤ 0.25; 0.5 was too harsh in v2.2 R1) | Practice steering back against real causes |
-| Y6 | Heading hold on the Pi: turn command = -k × heading error | Pi code only; needs Y4 |
+- **Y1**: Lever: Yaw-sign fix on the Pi; Notes: Required; code (§0 next step 1)
+- **Y2**: Lever: Explicit heading-error input (sin, cos of heading - commanded heading) + a yaw-free tilt input instead of the raw quaternion; Notes: Changes the observation size, so fresh runs only (fine: V3 is fresh). The Pi's `residual_policy.py` must build the same inputs, behind the policy's `.onnx.json` sidecar
+- **Y3**: Lever: Mixed episode lengths (25% of episodes at 1000 steps); Notes: v2.2 R2 (all 1000) hurt at 3M, so mix rather than replace
+- **Y4**: Lever: Turn-command curriculum `G2E_TRAIN_YAW` ±0.15 rad/s, widened to ±0.45 in the chain; Notes: **Only if Phase 1's turning gate passes.** `TURN_BLEND` (wkF → wkL/wkR base) exists, dormant
+- **Y5**: Lever: Persistent asymmetry randomization per episode: a stuck servo (promote `_motor_max` / drift_probe's `clip:J:DEG` to a training knob), a weak joint, a zero offset, a mild yaw torque (`G2E_DRIFT_TORQUE` ≤ 0.25; 0.5 was too harsh in v2.2 R1); Notes: Practice steering back against real causes
+- **Y6**: Lever: Heading hold on the Pi: turn command = -k × heading error; Notes: Pi code only; needs Y4
 
 ### 2.5 Mirror symmetry (R1) spec (approved: a loss, not data augmentation)
 - **Loss:** a small PPO subclass (flag-gated, e.g. `G2E_MIRROR_LOSS=<weight>`) adds `w · ||μ(M_s(s)) - M_a(μ(s))||²` on the policy mean,
@@ -287,18 +283,16 @@ screens, fewer scoring episodes (all change quality).
 - **C0 control:** calibrated profile, sign-correct, ramp fix, base recipe. Gate: T1.1 falls ≤ 0.15 at 3M.
 - Single-lever rounds (fresh 3M each, vs C0):
 
-| Round | Lever | Pass needs (plus no regression) |
-|---|---|---|
-| S1 | R1 mirror symmetry | Joint L/R asymmetry near 0; 12.5 s heading ≤ C0 |
-| S2 | Y2 heading inputs | Heading in the real-match and yaw-disturbance cells ≥ 30% better |
-| S3 | R2 heading reward shape | Same as S2 |
-| S4 | Y3 mixed episode lengths | Speed decay and 60 s survival better |
-| S5 | Y4 turn curriculum *(only if the turning gate passed)* | Turn tracking works; straight walk unchanged |
-| S6 | Y5 asymmetry randomization | Servo-fault and yaw-disturbance cells better |
-| S7 | R3 servo-feasibility penalty | Over-ceiling commands down; real-match roll/pitch no worse |
-| S8 | R4 potential-based balance | Shove / gauntlet falls no worse; calm wobble lower |
-| S9 | R5 trot-term normalization | Smoothness (yaw RMS, jitter) better; trot correlation kept |
-| S10 | R6 softer footfalls *(only if Phase 1 reproduced the roll swing)* | Real-match roll std lower |
+- **S1**: Lever: R1 mirror symmetry; Pass needs (plus no regression): Joint L/R asymmetry near 0; 12.5 s heading ≤ C0
+- **S2**: Lever: Y2 heading inputs; Pass needs (plus no regression): Heading in the real-match and yaw-disturbance cells ≥ 30% better
+- **S3**: Lever: R2 heading reward shape; Pass needs (plus no regression): Same as S2
+- **S4**: Lever: Y3 mixed episode lengths; Pass needs (plus no regression): Speed decay and 60 s survival better
+- **S5**: Lever: Y4 turn curriculum *(only if the turning gate passed)*; Pass needs (plus no regression): Turn tracking works; straight walk unchanged
+- **S6**: Lever: Y5 asymmetry randomization; Pass needs (plus no regression): Servo-fault and yaw-disturbance cells better
+- **S7**: Lever: R3 servo-feasibility penalty; Pass needs (plus no regression): Over-ceiling commands down; real-match roll/pitch no worse
+- **S8**: Lever: R4 potential-based balance; Pass needs (plus no regression): Shove / gauntlet falls no worse; calm wobble lower
+- **S9**: Lever: R5 trot-term normalization; Pass needs (plus no regression): Smoothness (yaw RMS, jitter) better; trot correlation kept
+- **S10**: Lever: R6 softer footfalls *(only if Phase 1 reproduced the roll swing)*; Pass needs (plus no regression): Real-match roll std lower
 
 - **Calm-walk bar for every round:** calm falls ≤ min(0.15, C0 + 0.05); speed ≥ 90% of C0. 24-episode fall rates carry about ±15 points of
   noise; don't chase small differences.
@@ -345,20 +339,18 @@ Per-run costs on the Mac (measured): plain PPO 892 steps/s -> a 3M run 56 min + 
 steps/s -> 66 + 4 = **70 min**; the 20M with the mirror loss 7.3 h (+ the three gait checks, ~7.5 h). A full v4 scoring of one policy takes 5 min on 8
 workers (the 60 s endurance cell is the long pole); 2 workers while a training is running.
 
-| Step | Duration | Case A: Phase 0 data in by ~4:45 PM today | Case B: Phase 0 tomorrow, done by ~11 AM Wed |
-|---|---|---|---|
-| Phase 0 hardware (user) | ~2-2.5 h | Tue 2:30 - 4:45 PM | Wed 8:30 - 11:00 AM |
-| Phase 1 sim calibration (Claude; sweeps run in the background) | ~4 h | Tue 4:45 - 9:00 PM | Wed 11:00 AM - 3:00 PM |
-| V2.1 reference + C0 control | 65 min | Tue 9:00 - 10:05 PM | Wed 3:00 - 4:05 PM |
-| S1 mirror | 70 min | to 11:15 PM | to 5:15 PM |
-| S2, S3, S4, S6, S7, S8, S9, S10 (S5 turn only if its gate passes: +1 h) | 8 x 60 min | to Wed 7:15 AM | to Thu 1:15 AM |
-| K3 (all passing levers; also stage s0) | 70 min | to 8:25 AM | to 2:25 AM |
-| Stages s1-s4 (+ s5 turn range if kept) + s6 full strength | 5-6 x 70 min | to Wed ~2:15 PM (3:25 PM with turn) | to Thu ~8:15 AM (9:25 AM) |
-| Hardware check-in (runner pauses; user ~1 h, Claude ~20 min) | ~1.3 h | Wed ~2:30 - 4:00 PM | Thu ~9:30 - 11:00 AM |
-| 20M consolidation (gait checks at 3M, 5M, 10M) | ~7.5 h | Wed 4:00 - 11:30 PM | Thu 11:00 AM - 6:30 PM |
-| Final scoring (both ladders), `validate_deploy`, export | ~30 min | Wed ~midnight | Thu ~7:00 PM |
-| Deploy + six real walks (user) | ~1.5 h | Thu 9:00 - 10:30 AM | Fri 9:00 - 10:30 AM |
-| **Estimated completion** | | **Thu Oct 8, ~10:30 AM** | **Fri Oct 9, ~10:30 AM** |
+- **Phase 0 hardware (user)**: Duration: ~2-2.5 h; Case A: Phase 0 data in by ~4:45 PM today: Tue 2:30 - 4:45 PM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Wed 8:30 - 11:00 AM
+- **Phase 1 sim calibration (Claude; sweeps run in the background)**: Duration: ~4 h; Case A: Phase 0 data in by ~4:45 PM today: Tue 4:45 - 9:00 PM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Wed 11:00 AM - 3:00 PM
+- **V2.1 reference + C0 control**: Duration: 65 min; Case A: Phase 0 data in by ~4:45 PM today: Tue 9:00 - 10:05 PM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Wed 3:00 - 4:05 PM
+- **S1 mirror**: Duration: 70 min; Case A: Phase 0 data in by ~4:45 PM today: to 11:15 PM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: to 5:15 PM
+- **S2, S3, S4, S6, S7, S8, S9, S10 (S5 turn only if its gate passes: +1 h)**: Duration: 8 x 60 min; Case A: Phase 0 data in by ~4:45 PM today: to Wed 7:15 AM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: to Thu 1:15 AM
+- **K3 (all passing levers; also stage s0)**: Duration: 70 min; Case A: Phase 0 data in by ~4:45 PM today: to 8:25 AM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: to 2:25 AM
+- **Stages s1-s4 (+ s5 turn range if kept) + s6 full strength**: Duration: 5-6 x 70 min; Case A: Phase 0 data in by ~4:45 PM today: to Wed ~2:15 PM (3:25 PM with turn); Case B: Phase 0 tomorrow, done by ~11 AM Wed: to Thu ~8:15 AM (9:25 AM)
+- **Hardware check-in (runner pauses; user ~1 h, Claude ~20 min)**: Duration: ~1.3 h; Case A: Phase 0 data in by ~4:45 PM today: Wed ~2:30 - 4:00 PM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Thu ~9:30 - 11:00 AM
+- **20M consolidation (gait checks at 3M, 5M, 10M)**: Duration: ~7.5 h; Case A: Phase 0 data in by ~4:45 PM today: Wed 4:00 - 11:30 PM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Thu 11:00 AM - 6:30 PM
+- **Final scoring (both ladders), `validate_deploy`, export**: Duration: ~30 min; Case A: Phase 0 data in by ~4:45 PM today: Wed ~midnight; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Thu ~7:00 PM
+- **Deploy + six real walks (user)**: Duration: ~1.5 h; Case A: Phase 0 data in by ~4:45 PM today: Thu 9:00 - 10:30 AM; Case B: Phase 0 tomorrow, done by ~11 AM Wed: Fri 9:00 - 10:30 AM
+- **Estimated completion**: Case A: Phase 0 data in by ~4:45 PM today: **Thu Oct 8, ~10:30 AM**; Case B: Phase 0 tomorrow, done by ~11 AM Wed: **Fri Oct 9, ~10:30 AM**
 
 Training/scoring wall time, unattended: about **25 h** (S5 skipped) to **27 h** (every lever). **Contingencies** (not in the table): the K3
 combination fails and the runner splits it (+2 h20); a stage needs the one retry (+70 min each); a screening round must be repeated or a lever

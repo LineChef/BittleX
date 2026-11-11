@@ -18,19 +18,17 @@ model estimates (not measured temperatures); `volt` battery volts where logged.
 
 ## Files
 
-| file | what | notes |
-|---|---|---|
-| `hard_v21_run01.csv` .. `run06.csv` | V2.1 policy, `--cmd 0.10`, 12.5 s (10 gait cycles), hard floor | run01 is before `gc`; runs 02-05 had small hand corrections to stay on the desk; run06 hands off. All upright |
-| `carpet_v21_run01.csv` | same, on carpet | fell at 2.0 s and ~11 s (user flipped it back in between, so only the first fall is clean) |
-| `carpet_fw_carpetF_run01.csv` | firmware `kcarpetF`, 10 s, carpet | stayed up, walked in place, BR leg sagged |
-| `hard_fw_carpetF_run01.csv` | same, hard floor | walked forward ~1 ft 9 in, no sag |
-| `carpet_ol_lift16_run01.csv` | scripted `wkF` open-loop, all joints x1.6, 6 cycles, balance off | fell at 2.7 s (sideways) |
-| `carpet_ol_lift20_run01.csv` | same, x2.0 | fell at 2.7 s (sideways) |
-| `carpet_ol_knee20_sh07_run01.csv` | knees x2.0, shoulders x0.7, no ramp | fell at 0.7 s (start transition) |
-| `carpet_ol_knee20_sh07_ramp_run01.csv` | same + 1-cycle ramp, 8 cycles | 2 good steps, fell at 2.9 s |
-| `carpet_ol_knee175_sh01_ramp_run01.csv` | knees x1.75, shoulders x0.1, ramp, 8 cycles | fell sideways at 3.0 s |
-| `carpet_ol_knee175_sh01_volt_run01.csv` | same, voltage logged | **INVALID as a fall test -- the user held G2 up for most of it.** Voltage column is valid |
-| `hard_ol_knee175_sh01_volt_run01.csv` | same variant on hard floor, voltage logged | fell at 3.3 s (flipped) |
+- **`hard_v21_run01.csv` .. `run06.csv`**: what: V2.1 policy, `--cmd 0.10`, 12.5 s (10 gait cycles), hard floor; notes: run01 is before `gc`; runs 02-05 had small hand corrections to stay on the desk; run06 hands off. All upright
+- **`carpet_v21_run01.csv`**: what: same, on carpet; notes: fell at 2.0 s and ~11 s (user flipped it back in between, so only the first fall is clean)
+- **`carpet_fw_carpetF_run01.csv`**: what: firmware `kcarpetF`, 10 s, carpet; notes: stayed up, walked in place, BR leg sagged
+- **`hard_fw_carpetF_run01.csv`**: what: same, hard floor; notes: walked forward ~1 ft 9 in, no sag
+- **`carpet_ol_lift16_run01.csv`**: what: scripted `wkF` open-loop, all joints x1.6, 6 cycles, balance off; notes: fell at 2.7 s (sideways)
+- **`carpet_ol_lift20_run01.csv`**: what: same, x2.0; notes: fell at 2.7 s (sideways)
+- **`carpet_ol_knee20_sh07_run01.csv`**: what: knees x2.0, shoulders x0.7, no ramp; notes: fell at 0.7 s (start transition)
+- **`carpet_ol_knee20_sh07_ramp_run01.csv`**: what: same + 1-cycle ramp, 8 cycles; notes: 2 good steps, fell at 2.9 s
+- **`carpet_ol_knee175_sh01_ramp_run01.csv`**: what: knees x1.75, shoulders x0.1, ramp, 8 cycles; notes: fell sideways at 3.0 s
+- **`carpet_ol_knee175_sh01_volt_run01.csv`**: what: same, voltage logged; notes: **INVALID as a fall test -- the user held G2 up for most of it.** Voltage column is valid
+- **`hard_ol_knee175_sh01_volt_run01.csv`**: what: same variant on hard floor, voltage logged; notes: fell at 3.3 s (flipped)
 
 The first open-loop scripted runs (hard floor ~3 ft in 6 cycles, curved left; carpet x1.0, fell with the
 feet catching) and the first aborted attempts have no log.

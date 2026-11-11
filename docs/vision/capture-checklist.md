@@ -49,18 +49,16 @@ Same poses every time; the *variation* comes from a different room / lighting /
 clothes / hair per session, not different poses. Hit **Start**, hold, **Stop**,
 reposition, repeat. ~4 frames/sec.
 
-| # | Pose | Hold | Notes |
-|---|---|---|---|
-| 1 | **Close** (~1.5 ft), straight on, neutral | ~8 s | small natural head movement |
-| 2 | Close, talking + a smile | ~6 s | |
-| 3 | **Mid** (~3 ft), straight on, neutral | ~8 s | |
-| 4 | Mid — slow head turn: full left → full right → back | ~10 s | both 3/4 profiles |
-| 5 | Mid — chin up (hold), then chin down (hold) | ~8 s | |
-| 6 | Mid — look away: left, right, up (not at the lens) | ~6 s | |
-| 7 | Mid — hand near face / push hair back | ~6 s | a little natural occlusion |
-| 8 | **Far** (~5–6 ft), straight on | ~6 s | |
-| 9 | **Second spot / different light** — repeat 1 + 3 (close + mid, straight on) | ~10 s | move near a window, or change which lamps are on |
-| N | **Negatives** — step fully out of frame / point at an empty wall | ~12 s | ~50 empty frames |
+- **1**: Pose: **Close** (~1.5 ft), straight on, neutral; Hold: ~8 s; Notes: small natural head movement
+- **2**: Pose: Close, talking + a smile; Hold: ~6 s
+- **3**: Pose: **Mid** (~3 ft), straight on, neutral; Hold: ~8 s
+- **4**: Pose: Mid — slow head turn: full left → full right → back; Hold: ~10 s; Notes: both 3/4 profiles
+- **5**: Pose: Mid — chin up (hold), then chin down (hold); Hold: ~8 s
+- **6**: Pose: Mid — look away: left, right, up (not at the lens); Hold: ~6 s
+- **7**: Pose: Mid — hand near face / push hair back; Hold: ~6 s; Notes: a little natural occlusion
+- **8**: Pose: **Far** (~5–6 ft), straight on; Hold: ~6 s
+- **9**: Pose: **Second spot / different light** — repeat 1 + 3 (close + mid, straight on); Hold: ~10 s; Notes: move near a window, or change which lamps are on
+- **N**: Pose: **Negatives** — step fully out of frame / point at an empty wall; Hold: ~12 s; Notes: ~50 empty frames
 
 `camera_preview.py` saves **motion-gated** — a held pose is ~1 frame, moving
 resumes capture — so leave "Start capturing" on and move slowly through the

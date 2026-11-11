@@ -4,11 +4,9 @@ How a policy trained in simulation reaches the real robot, how the on-Pi loop ru
 
 ## What runs where
 
-| Where | What | Code |
-|---|---|---|
-| Mac | Trains the policy, exports it, validates the export, deploys | `rl_training/opencat-gym/`, `tools/` |
-| Pi | The 80 Hz control loop that runs the exported policy | `pi_pipeline/gait/` |
-| BiBoard | Receives joint commands (`i` command, all joints at once), streams the IMU at 5 Hz | OpenCat firmware |
+- **Mac**: What: Trains the policy, exports it, validates the export, deploys; Code: `rl_training/opencat-gym/`, `tools/`
+- **Pi**: What: The 80 Hz control loop that runs the exported policy; Code: `pi_pipeline/gait/`
+- **BiBoard**: What: Receives joint commands (`i` command, all joints at once), streams the IMU at 5 Hz; Code: OpenCat firmware
 
 Only two things travel to the Pi: `pi_pipeline/` and the exported policy, a `.onnx` file (under 1 MB) with its `.onnx.json` sidecar. `rl_training/` and `docs/` never do.
 
@@ -18,13 +16,11 @@ The trained network is a *residual*: its output, bounded to ±30° per joint, is
 
 The **sidecar** (`<name>.onnx.json`) travels with every policy and is read by both the validator and the Pi:
 
-| Field | Meaning |
-|---|---|
-| `residual_scale_deg` | The residual bound the policy was trained with (30) |
-| `cmd_send_every_n` | Send a joint command every n-th control tick; the Pi follows it by default |
-| `heading_blind` | If true, the Pi feeds the policy a yaw of 0 (steering is done outside the policy) |
-| `checkpoint`, `exported`, `levers` | Provenance |
-| `modes` | Optional. The gaits the policy was trained for; without it, `normal` only |
+- **`residual_scale_deg`**: The residual bound the policy was trained with (30)
+- **`cmd_send_every_n`**: Send a joint command every n-th control tick; the Pi follows it by default
+- **`heading_blind`**: If true, the Pi feeds the policy a yaw of 0 (steering is done outside the policy)
+- **`checkpoint`, `exported`, `levers`**: Provenance
+- **`modes`**: Optional. The gaits the policy was trained for; without it, `normal` only
 
 Export with `rl_training/opencat-gym/export_onnx.py` (writes the sidecar), and check parity with `verify_onnx.py` (ONNX versus the torch policy) and `validate_deploy.py` (drives the Pi-side `residual_policy.py` in lockstep with the sim: observation, action and rounded joint targets must match). Score a policy through G2's real control path with `benchmark_decathlon.py --hw i`.
 
@@ -84,14 +80,12 @@ The mapping and signs were verified on G2, but repeat these steps after a servo 
 
 ## Troubleshooting
 
-| Symptom | Look at |
-|---|---|
-| The walk never starts or no IMU frames | The raw IMU lines; the yaw field once overflowed and made every line unparseable (fixed in `imu_parse.py`). [`operating-lessons.md`](operating-lessons.md) |
-| Heading drifts | The foot trim for this policy and floor |
-| A leg moves the wrong way | `deploy_map.SERVO_SIGN` and step 3 above |
-| The loop overruns or lags | Whether something else is using the Pi (exploration, speech); [`../hardware/diagnostics.md`](../hardware/diagnostics.md) |
-| The Mac cannot reach the Pi ("No route to host", `EHOSTUNREACH`) but another machine can | Check in this order |
-| Deploy refused | An exploration, baseline run or walk is active; `bash tools/g2_explore.sh status` |
+- **The walk never starts or no IMU frames**: The raw IMU lines; the yaw field once overflowed and made every line unparseable (fixed in `imu_parse.py`). [`operating-lessons.md`](operating-lessons.md)
+- **Heading drifts**: The foot trim for this policy and floor
+- **A leg moves the wrong way**: `deploy_map.SERVO_SIGN` and step 3 above
+- **The loop overruns or lags**: Whether something else is using the Pi (exploration, speech); [`../hardware/diagnostics.md`](../hardware/diagnostics.md)
+- **The Mac cannot reach the Pi ("No route to host", `EHOSTUNREACH`) but another machine can**: Check in this order
+- **Deploy refused**: An exploration, baseline run or walk is active; `bash tools/g2_explore.sh status`
 
 - **The Mac cannot reach the Pi ("No route to host", EHOSTUNREACH) but another machine can:** (1) **macOS Local Network permission:** System Settings, Privacy & Security, Local Network: the app you run commands in (iTerm, **Visual Studio Code**, and `claude` if listed) must be switched on.
 

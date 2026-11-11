@@ -26,13 +26,11 @@ by for emergencies.
 Measured the *pure open-loop scripted gait* (`wkF`, action forced to 0)
 against its commanded speed across the full command range:
 
-| Command | Actual speed | Error |
-|---|---|---|
-| 0.02 m/s (creep-low) | 0.001 m/s | -93% |
-| 0.04 m/s (creep-mid) | 0.040 m/s | 0% |
-| 0.10 m/s (cruise, the phase-rate calibration point) | 0.095 m/s | -4.6% |
-| 0.115 m/s (fast-low) | 0.109 m/s | -5.0% |
-| 0.15 m/s (fast-high, max) | 0.139 m/s | -7.5% |
+- **0.02 m/s (creep-low)**: Actual speed: 0.001 m/s; Error: -93%
+- **0.04 m/s (creep-mid)**: Actual speed: 0.040 m/s; Error: 0%
+- **0.10 m/s (cruise, the phase-rate calibration point)**: Actual speed: 0.095 m/s; Error: -4.6%
+- **0.115 m/s (fast-low)**: Actual speed: 0.109 m/s; Error: -5.0%
+- **0.15 m/s (fast-high, max)**: Actual speed: 0.139 m/s; Error: -7.5%
 
 **The shared root cause, relevant to both the creep case and the general
 case:** `wkF`'s phase-rate scaling (`PHASE_RATE_NOM_CMD`,
@@ -179,11 +177,9 @@ above is a more complete answer to the same underlying limitation.
   disturbance, matching this campaign's actual reprioritized target.
 - **Residual usage roughly doubled at every band, not reduced:**
 
-  | Band | Baseline RMS | r1 RMS | Baseline speed err | r1 speed err |
-  |---|---|---|---|---|
-  | creep | 3.69deg | 10.85deg | -0.024 | -0.039 |
-  | cruise | 4.98deg | 9.69deg | -0.010 | -0.045 |
-  | fast | 5.47deg | 9.25deg | +0.013 | -0.017 (+1 fall) |
+  - **creep**: Baseline RMS: 3.69deg; r1 RMS: 10.85deg; Baseline speed err: -0.024; r1 speed err: -0.039
+  - **cruise**: Baseline RMS: 4.98deg; r1 RMS: 9.69deg; Baseline speed err: -0.010; r1 speed err: -0.045
+  - **fast**: Baseline RMS: 5.47deg; r1 RMS: 9.25deg; Baseline speed err: +0.013; r1 speed err: -0.017 (+1 fall)
 
   Speed tracking got worse everywhere too, and a fall appeared at the top
   of the fast band that wasn't there before. Visual replay (leg-tinting
@@ -293,11 +289,9 @@ clean, finite rewards, cost tracks tilt as expected.
 entirely.** Completed 2026-09-18, 3,014,656 steps, converged clean. Same
 pinned speed-sweep evaluation as round 1:
 
-| Band | Baseline RMS | r2 RMS | Baseline speed err | r2 speed err |
-|---|---|---|---|---|
-| creep | 3.85deg | 7.45deg | -0.016 | -0.031 |
-| cruise | 4.98deg | 7.18deg | -0.010 | -0.024 |
-| fast | 5.41deg | 7.52deg | +0.006 | -0.003 (+1 fall) |
+- **creep**: Baseline RMS: 3.85deg; r2 RMS: 7.45deg; Baseline speed err: -0.016; r2 speed err: -0.031
+- **cruise**: Baseline RMS: 4.98deg; r2 RMS: 7.18deg; Baseline speed err: -0.010; r2 speed err: -0.024
+- **fast**: Baseline RMS: 5.41deg; r2 RMS: 7.52deg; Baseline speed err: +0.006; r2 speed err: -0.003 (+1 fall)
 
 Narrowing the clip range (0.35/1.60 -> 0.70/1.30) roughly halved the size
 of the round-1 regression (was ~2x baseline, now ~1.5x) but didn't come
@@ -314,11 +308,9 @@ mismatch below ~0.035 ratio, not touched by this revert.
 Completed 2026-09-18, 3,014,656 steps, converged (`approx_kl` ~0.001, no
 instability). Speed-sweep result:
 
-| Band | Baseline RMS | r3 RMS | Baseline speed err | r3 speed err |
-|---|---|---|---|---|
-| creep | 4.08deg | 6.83deg | -0.008 | -0.012 |
-| cruise | 4.99deg | 7.85deg | -0.014 | -0.019 |
-| fast | 5.18deg | 8.47deg | -0.015 | -0.029 (+1 fall) |
+- **creep**: Baseline RMS: 4.08deg; r3 RMS: 6.83deg; Baseline speed err: -0.008; r3 speed err: -0.012
+- **cruise**: Baseline RMS: 4.99deg; r3 RMS: 7.85deg; Baseline speed err: -0.014; r3 speed err: -0.019
+- **fast**: Baseline RMS: 5.18deg; r3 RMS: 8.47deg; Baseline speed err: -0.015; r3 speed err: -0.029 (+1 fall)
 
 Residual usage went **up**, not down, despite the extra cost specifically
 penalizing it -- the counterintuitive direction. Checked reward-hacking
@@ -375,9 +367,7 @@ building anything -- n=16/point (vs the earlier 4-6 point samples, which
 had real non-monotonic noise), calm-ground DR (friction/mass/payload on,
 terrain/push off):
 
-| cmd | 0.03 | 0.04 | 0.05 | 0.06 | 0.07 | 0.08 | 0.09 | 0.10 | 0.11 | 0.115 | 0.125 | 0.13 | 0.14 | 0.15 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| actual | .023 | .028 | .032 | .036 | .043 | .045 | .053 | .055 | .056 | .058 | .062 | .062 | .069 | .072 |
+- **actual**: 0.03: .023; 0.04: .028; 0.05: .032; 0.06: .036; 0.07: .043; 0.08: .045; 0.09: .053; 0.10: .055; 0.11: .056; 0.115: .058; 0.125: .062; 0.13: .062; 0.14: .069; 0.15: .072
 
 Monotonic this time -- the earlier "overshoot at high commands" finding
 was small-sample noise, not real. Undershoot grows from ~23% at cmd=0.03
@@ -434,11 +424,9 @@ different-looking number.
 
 **Corrected, valid result:**
 
-| Band | Baseline RMS | r5 RMS | Baseline speed err | r5 speed err |
-|---|---|---|---|---|
-| creep | 4.08deg | 9.17deg | -0.008 | -0.020 |
-| cruise | 4.99deg | 10.22deg | -0.014 | +0.003 (+1 fall) |
-| fast | 5.18deg | 10.31deg | -0.015 | -0.017 |
+- **creep**: Baseline RMS: 4.08deg; r5 RMS: 9.17deg; Baseline speed err: -0.008; r5 speed err: -0.020
+- **cruise**: Baseline RMS: 4.99deg; r5 RMS: 10.22deg; Baseline speed err: -0.014; r5 speed err: +0.003 (+1 fall)
+- **fast**: Baseline RMS: 5.18deg; r5 RMS: 10.31deg; Baseline speed err: -0.015; r5 speed err: -0.017
 
 Also a regression -- residual usage roughly doubled, same magnitude as
 the amplitude-scaling failures, plus a new fall at cruise (cmd=0.12) that

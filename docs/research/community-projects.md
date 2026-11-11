@@ -10,17 +10,15 @@ reviewed at all.
 
 ## Sources
 
-| Source | How reviewed | Reviewable? |
-|---|---|---|
-| **BittleJuice** — RL walking policy, MuJoCo→real, patched firmware | Reddit post pasted by user + `mike-grayhat.github.io/bittlejuice` + `github.com/mike-grayhat/bittlejuice` fetched directly | Yes |
-| **bittle-mujoco** — Bittle X V1 MuJoCo model, measured mass/CoM/joints | Found via background research (linked from the BittleJuice ecosystem) | Yes |
-| **MH-FLOCKE** — spiking-neural-network self-taught walking | Reddit post pasted by user; `github.com/MarcHesse/mhflocke` and `github.com/MarcHesse/bittle-mujoco` linked but not independently fetched | Partial (post text only) |
-| **TypeFly** — LLM-driven robot task planning, Petoi HTTP support | `github.com/typefly/TypeFly` fetched directly | Yes |
-| Classroom Bittle V2 session | One-line gist only, via a third-party blog mention | No — not project-relevant regardless |
-| "I used an LLM to control the Petoi..." | Reddit — blocked, not pasted | No |
-| "Tutorial to use Claude Code to develop Bittle's..." | Reddit — blocked, never revisited | No |
-| `ocolakoglu/PetoiBittleChatGPT` + Petoi's official ChatGPT blog post | `Text2SpeechEn.py` fetched directly (2026-09-29, researching voice output) | Yes |
-| FinoBot (Bittle X + Pi + ROS2, person-following) | Petoi blog post fetched directly | Yes |
+- **BittleJuice** — RL walking policy, MuJoCo→real, patched firmware: How reviewed: Reddit post pasted by user + `mike-grayhat.github.io/bittlejuice` + `github.com/mike-grayhat/bittlejuice` fetched directly; Reviewable?: Yes
+- **bittle-mujoco** — Bittle X V1 MuJoCo model, measured mass/CoM/joints: How reviewed: Found via background research (linked from the BittleJuice ecosystem); Reviewable?: Yes
+- **MH-FLOCKE** — spiking-neural-network self-taught walking: How reviewed: Reddit post pasted by user; `github.com/MarcHesse/mhflocke` and `github.com/MarcHesse/bittle-mujoco` linked but not independently fetched; Reviewable?: Partial (post text only)
+- **TypeFly** — LLM-driven robot task planning, Petoi HTTP support: How reviewed: `github.com/typefly/TypeFly` fetched directly; Reviewable?: Yes
+- **Classroom Bittle V2 session**: How reviewed: One-line gist only, via a third-party blog mention; Reviewable?: No — not project-relevant regardless
+- **"I used an LLM to control the Petoi..."**: How reviewed: Reddit — blocked, not pasted; Reviewable?: No
+- **"Tutorial to use Claude Code to develop Bittle's..."**: How reviewed: Reddit — blocked, never revisited; Reviewable?: No
+- **`ocolakoglu/PetoiBittleChatGPT` + Petoi's official ChatGPT blog post**: How reviewed: `Text2SpeechEn.py` fetched directly (2026-09-29, researching voice output); Reviewable?: Yes
+- **FinoBot (Bittle X + Pi + ROS2, person-following)**: How reviewed: Petoi blog post fetched directly; Reviewable?: Yes
 
 ---
 

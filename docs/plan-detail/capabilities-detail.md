@@ -11,11 +11,9 @@ the *what*, kept current as capabilities land.
 
 **Status key**
 
-| | meaning |
-|---|---|
-| ✅ | **Working now** — runs today, on a dev machine, on the camera, or in sim |
-| 🧩 | **Built, hardware-gated** — code complete and tested against mocks; needs the physical robot or camera to exercise and tune |
-| 🔬 | **Researched / parked** — investigated, outcome recorded, not currently active |
+- **✅**: **Working now** — runs today, on a dev machine, on the camera, or in sim
+- **🧩**: **Built, hardware-gated** — code complete and tested against mocks; needs the physical robot or camera to exercise and tune
+- **🔬**: **Researched / parked** — investigated, outcome recorded, not currently active
 
 The 🧩 items are the ones not yet exercised on the robot; much has been since the first walk
 (voice, memory, exploration, the wall avoider and the learned gait all run on G2). What has actually
@@ -27,25 +25,23 @@ file does not repeat it. Things not built yet (the robot-arm module's walks and 
 
 ## At a glance
 
-| Domain | Headline | Status |
-|---|---|---|
-| Locomotion — learned | An RL walk that tracks speed/heading commands, trained under G2's real control path (5 Hz IMU, firmware `i` command timing); which policy is deployed and how it does on the robot: [`STATUS.md`](../STATUS.md) | ✅ sim / 🧩 robot |
-| Locomotion — scripted | ~20 OpenCat keyframe skills wired with friendly names (walk, turn, back up, trot, crawl, carpet gait, get-up, sit, stretch, nod, play-bow); the one-foot and jumping moves (wave, scratch, shake paw, high five, hop) are refused because they tip G2 over on the pod payload | ✅ / 🧩 |
-| Carpet mode | "G2, carpet mode" plays Petoi's firmware carpet gait (`kcarpetF`) instead of the learned walk; no gait yet walks reliably on the real carpet ([`rl/carpet-findings-2026-10-20.md`](../rl/carpet-findings-2026-10-20.md)) | 🧩 |
-| Attachments | One setting (`g2attach head\|arm\|none`) says what G2 wears on the neck; it picks the gait saved for it, checks the firmware, and turns behaviour off per attachment (easing, gyro balance, gait switching, the arm's skills). G2 wears the Petoi robot arm since 2026-10-24 | ✅ head / 🧩 arm |
-| Real-data pipeline | Every real walk is logged with its floor and hardware epoch; the Mac gates the logs and fits numbered sim-calibration snapshots from the usable ones | ✅ |
-| Sim → real | Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call | ✅ built / 🧩 deploy |
-| Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography; exploration narrates what he sees and does and takes four scheduled survey pictures per roam | 🧩 |
-| Smooth transitions | Every move into a firmware skill is eased by the serial link (speed-capped, 40 steps a second, balance off); moves that tip G2 over on the pod payload are refused with the wrong-answer sound ([`hardware/disabled-moves.md`](../hardware/disabled-moves.md)) | ✅ |
-| Personality | Composable traits (curiosity, playfulness, "Gir" character mode), mood model, per-person bonds — all `.env`-driven | ✅ |
-| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down. Mic → wake word → Claude → a real walk verified on G2 2026-10-03 | ✅ on G2 (mic, speaker, Claude, real walk) |
-| Memory | Persistent fact store with recall, a CLI, and a localhost web UI | ✅ |
-| Vision | Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed; a colour finder for the green treat ball and a chase-and-punt loop with the arm (`behavior/ball_chase.py`, 2026-10-25: finder tested, chase dry-run and a short live run done, a trained ball class not yet; 2026-10-31: claw looks that point the camera with the arm, small alignment turns checked with the camera, walking pace and turn rates G2 measures himself, not yet run on G2) | ✅ model / 🧩 mounted camera / 🧩 ball chase |
-| Goals and learning from attempts | The user sets a goal ("G2, ball goal"); G2 makes up to 10 attempts, scores each with his own sensors, decides on the Pi how to make the next one (a record per setting and value judged by its own stage, one setting at a time, at most one step, the best-supported value kept; checked against a made-up world with a known best; no API call), takes your overrides (pin, limit, undo, forget); a "turn away from walls" standing goal learns from every exploration and chase and ranks above the punt; "G2, practise" picks a goal by priority, need and what is possible now; says suggestions for the settings only the user changes (confirm / cancel / review), saves lessons to memory and writes a report (`goals/`, [`guides/goals.md`](../guides/goals.md); built 2026-10-31, not yet run on G2) | 🧩 |
-| Safety reflexes | Emergency stop, disabled-move refusal, servo thermal guard, watchdog, sleep mode, carpet detector, fall and stall guards (running); jam reflex and thermal governor (built, not wired in); cliff/edge guard (gated on a classifier) | ✅ / 🧩 |
-| Diagnostics | Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall, queryable by voice (`diagnostics_query`: session summary / last failure / feature status) | ✅ logic / 🧩 HW sensors |
-| Power | Idle-REST staged descent + sleep mode (real power-profile switch, camera off) fully built and tested; on-demand vision is still just binary on/off, not scaled to activity | ✅ logic / 🧩 tuning |
-| Robot link | One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test | ✅ |
+- **Locomotion — learned**: Headline: An RL walk that tracks speed/heading commands, trained under G2's real control path (5 Hz IMU, firmware `i` command timing); which policy is deployed and how it does on the robot: [`STATUS.md`](../STATUS.md); Status: ✅ sim / 🧩 robot
+- **Locomotion — scripted**: Headline: ~20 OpenCat keyframe skills wired with friendly names (walk, turn, back up, trot, crawl, carpet gait, get-up, sit, stretch, nod, play-bow); the one-foot and jumping moves (wave, scratch, shake paw, high five, hop) are refused because they tip G2 over on the pod payload; Status: ✅ / 🧩
+- **Carpet mode**: Headline: "G2, carpet mode" plays Petoi's firmware carpet gait (`kcarpetF`) instead of the learned walk; no gait yet walks reliably on the real carpet ([`rl/carpet-findings-2026-10-20.md`](../rl/carpet-findings-2026-10-20.md)); Status: 🧩
+- **Attachments**: Headline: One setting (`g2attach head|arm|none`) says what G2 wears on the neck; it picks the gait saved for it, checks the firmware, and turns behaviour off per attachment (easing, gyro balance, gait switching, the arm's skills). G2 wears the Petoi robot arm since 2026-10-24; Status: ✅ head / 🧩 arm
+- **Real-data pipeline**: Headline: Every real walk is logged with its floor and hardware epoch; the Mac gates the logs and fits numbered sim-calibration snapshots from the usable ones; Status: ✅
+- **Sim → real**: Headline: Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call; Status: ✅ built / 🧩 deploy
+- **Autonomous behaviour**: Headline: A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography; exploration narrates what he sees and does and takes four scheduled survey pictures per roam; Status: 🧩
+- **Smooth transitions**: Headline: Every move into a firmware skill is eased by the serial link (speed-capped, 40 steps a second, balance off); moves that tip G2 over on the pod payload are refused with the wrong-answer sound ([`hardware/disabled-moves.md`](../hardware/disabled-moves.md)); Status: ✅
+- **Personality**: Headline: Composable traits (curiosity, playfulness, "Gir" character mode), mood model, per-person bonds — all `.env`-driven; Status: ✅
+- **Voice**: Headline: Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down. Mic → wake word → Claude → a real walk verified on G2 2026-10-03; Status: ✅ on G2 (mic, speaker, Claude, real walk)
+- **Memory**: Headline: Persistent fact store with recall, a CLI, and a localhost web UI; Status: ✅
+- **Vision**: Headline: Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed; a colour finder for the green treat ball and a chase-and-punt loop with the arm (`behavior/ball_chase.py`, 2026-10-25: finder tested, chase dry-run and a short live run done, a trained ball class not yet; 2026-10-31: claw looks that point the camera with the arm, small alignment turns checked with the camera, walking pace and turn rates G2 measures himself, not yet run on G2); Status: ✅ model / 🧩 mounted camera / 🧩 ball chase
+- **Goals and learning from attempts**: Headline: The user sets a goal ("G2, ball goal"); G2 makes up to 10 attempts, scores each with his own sensors, decides on the Pi how to make the next one (a record per setting and value judged by its own stage, one setting at a time, at most one step, the best-supported value kept; checked against a made-up world with a known best; no API call), takes your overrides (pin, limit, undo, forget); a "turn away from walls" standing goal learns from every exploration and chase and ranks above the punt; "G2, practise" picks a goal by priority, need and what is possible now; says suggestions for the settings only the user changes (confirm / cancel / review), saves lessons to memory and writes a report (`goals/`, [`guides/goals.md`](../guides/goals.md); built 2026-10-31, not yet run on G2); Status: 🧩
+- **Safety reflexes**: Headline: Emergency stop, disabled-move refusal, servo thermal guard, watchdog, sleep mode, carpet detector, fall and stall guards (running); jam reflex and thermal governor (built, not wired in); cliff/edge guard (gated on a classifier); Status: ✅ / 🧩
+- **Diagnostics**: Headline: Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall, queryable by voice (`diagnostics_query`: session summary / last failure / feature status); Status: ✅ logic / 🧩 HW sensors
+- **Power**: Headline: Idle-REST staged descent + sleep mode (real power-profile switch, camera off) fully built and tested; on-demand vision is still just binary on/off, not scaled to activity; Status: ✅ logic / 🧩 tuning
+- **Robot link**: Headline: One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test; Status: ✅
 
 ---
 

@@ -11,14 +11,12 @@ The longer story of how each part works is in [How it works](how-it-works.md); t
 
 ## At a glance
 
-| Area | Where it stands |
-|---|---|
-| Walking | Works on hardwood floors. Tile and carpet are not solved. |
-| Voice conversation | Works. Wake word, spoken commands, Claude replies, speech out. |
-| Memory | Works. Facts and past conversations persist between sessions. |
-| Exploration | Works in a small room. Camera and speech timing need more testing. |
-| Ball goal (punting a ball) | Works some of the time. Falls during turns are the main problem. |
-| Falls | The biggest open problem. G2 sometimes tips over at pose and turn changes. |
+- **Walking**: Works on hardwood floors. Tile and carpet are not solved.
+- **Voice conversation**: Works. Wake word, spoken commands, Claude replies, speech out.
+- **Memory**: Works. Facts and past conversations persist between sessions.
+- **Exploration**: Works in a small room. Camera and speech timing need more testing.
+- **Ball goal (punting a ball)**: Works some of the time. Falls during turns are the main problem.
+- **Falls**: The biggest open problem. G2 sometimes tips over at pose and turn changes.
 
 ## What G2 is made of
 

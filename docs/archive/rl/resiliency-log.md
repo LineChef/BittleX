@@ -19,13 +19,11 @@ new test infrastructure — should have been the first thing checked, not
 the last. A 300+ rollout probe batch against the frozen base (`run20m_ppo`)
 found **1 fall**. Everywhere else, the robot didn't tumble — it stopped:
 
-| Scenario | Result |
-|---|---|
-| Carpet, 90s episode | speed decayed to 0.00 m/s by 60s |
-| Side-hill, 10-15deg sustained tilt (R12a) | -73% speed |
-| Stepped split, one side raised 15-25mm (R12b) | -92% speed (under left feet specifically -- a real left/right handedness asymmetry) |
-| Thin raised lip, 15mm (R4) | 0/16 crossed, just recoils |
-| Pick-up/set-down (R3) | 31/32 re-acquire fine -- no problem here |
+- **Carpet, 90s episode**: speed decayed to 0.00 m/s by 60s
+- **Side-hill, 10-15deg sustained tilt (R12a)**: -73% speed
+- **Stepped split, one side raised 15-25mm (R12b)**: -92% speed (under left feet specifically -- a real left/right handedness asymmetry)
+- **Thin raised lip, 15mm (R4)**: 0/16 crossed, just recoils
+- **Pick-up/set-down (R3)**: 31/32 re-acquire fine -- no problem here
 
 This matches everything found independently this session too (lateral
 pushes, terrain roughness, one-sided steps -- none produced falls) from the
@@ -325,13 +323,11 @@ sudden one-sided-drop destabilization, not a stuck-foot problem.
 
 **Finer sweep (15 episodes/level, `run20m_resid30_ppo`, bare robot):**
 
-| Height | Learned falls | Scripted falls |
-|---|---|---|
-| 20mm | 0% | 0% |
-| 24mm | 67% | 100% |
-| 27mm | 47% | 100% |
-| 30mm | 100% | 100% |
-| 33mm | 100% | 100% |
+- **20mm**: Learned falls: 0%; Scripted falls: 0%
+- **24mm**: Learned falls: 67%; Scripted falls: 100%
+- **27mm**: Learned falls: 47%; Scripted falls: 100%
+- **30mm**: Learned falls: 100%; Scripted falls: 100%
+- **33mm**: Learned falls: 100%; Scripted falls: 100%
 
 24-27mm is a genuine partially-recoverable band -- the learned policy
 already beats scripted here (incidentally, not by design). 30mm+ is
@@ -461,10 +457,8 @@ without the anti-stall fix in place).
 - **R12 re-check (side-hill, 12deg sustained cross-slope, 12 episodes,
   payload off) -- serious red flag, not a pass:**
 
-  | Checkpoint | Falls | Mean speed |
-  |---|---|---|
-  | `run20m_resid30_ppo` (baseline) | 5/12 (42%) | 0.061 m/s |
-  | `nostall_r1` | **12/12 (100%)** | 0.072 m/s |
+  - **`run20m_resid30_ppo` (baseline)**: Falls: 5/12 (42%); Mean speed: 0.061 m/s
+  - **`nostall_r1`**: Falls: **12/12 (100%)**; Mean speed: 0.072 m/s
 
   Fall rate jumped from 42% to 100% under sustained lateral tilt -- a
   large, clear regression, not noise (n=12, both checkpoints tested on
@@ -514,11 +508,9 @@ either way until this resolves.
 Completed 2026-09-18, 3,014,656 steps, converged (`approx_kl` ~0.0007).
 Side-hill re-check (12deg sustained cross-slope, 12 episodes, matched seeds):
 
-| Checkpoint | Falls |
-|---|---|
-| `run20m_resid30_ppo` (baseline) | 5/12 (42%) |
-| `nostall_r1` (penalty + bonus) | 12/12 (100%) |
-| `nostall_r2` (penalty only, bonus=0) | 12/12 (100%) |
+- **`run20m_resid30_ppo` (baseline)**: 5/12 (42%)
+- **`nostall_r1` (penalty + bonus)**: 12/12 (100%)
+- **`nostall_r2` (penalty only, bonus=0)**: 12/12 (100%)
 
 Identical failure with the bonus fully removed -- round 1's diagnosis (the
 standalone-trigger fix on the bonus was the culprit) is refuted. Didn't

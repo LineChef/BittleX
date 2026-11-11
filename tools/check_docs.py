@@ -10,8 +10,9 @@ ERRORS (exit 1, block the commit):
   * a hard-coded test count ("679 tests", "599 passing") in a page that must not carry one
   * the currently deployed policy's name (read from DEFAULT_POLICY in the code) in a page that must not name it
   * docs/backlog.md out of date with the item headings it is generated from (tools/gen_backlog.py)
+  * a markdown pipe table (owner, 2026-11-11: no tables in the docs; write a bulleted list, one bullet per row; tools/md_lists.py converts)
 WARNINGS (printed, never fail):
-  * readability of a page published on the docs site: a table cell over 40 words, a line over 700 characters, an attribution tag such as
+  * readability of a page published on the docs site: a line over 700 characters, an attribution tag such as
     "(user, 2026-10-21)", or no opening paragraph (the site uses it as the page summary)
   * a link whose #anchor matches no heading in the target page
   * a docs page that no other page links to (an orphan)
@@ -66,11 +67,6 @@ def readability_warnings(path, text):
             has_intro = True
         if len(line) > LONG_LINE and not generated:
             out.append(f"{path}:{i}: line of {len(line)} characters; split it up or move detail into a list")
-        if st.startswith("|") and not generated:
-            for cell in st.strip("|").split("|"):
-                if len(re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", cell).split()) > CELL_WORDS:
-                    out.append(f"{path}:{i}: table cell over {CELL_WORDS} words; use a heading and a short paragraph or list")
-                    break
         if ATTRIBUTION_RE.search(line):
             out.append(f"{path}:{i}: attribution tag in a published page; keep who decided what in the working notes")
     if not has_intro:
@@ -145,6 +141,19 @@ def deployed_policy_stem(root):
     return re.sub(r"(_ppo)?\.onnx$", "", m.group(1))
 
 
+def table_lines(text):
+    """Line numbers where a pipe table starts (a header row followed by a separator row), outside code fences."""
+    lines, out, infence = text.split("\n"), [], False
+    sep = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+    for i, ln in enumerate(lines):
+        if FENCE_RE.match(ln):
+            infence = not infence
+            continue
+        if not infence and re.match(r"^\s*\|.*\|\s*$", ln) and i + 1 < len(lines) and "|" in lines[i + 1] and sep.match(lines[i + 1]):
+            out.append(i + 1)
+    return out
+
+
 def check(root, files):
     errors, warnings = [], []
     policy = deployed_policy_stem(root)
@@ -183,6 +192,8 @@ def check(root, files):
                     anchor_cache[dest] = anchors_of(dest)
                 if anchor not in anchor_cache[dest]:
                     warnings.append(f"{f}:{line_no}: anchor #{anchor} not found in {os.path.relpath(dest, root)}")
+        for line_no in table_lines(text):
+            errors.append(f"{f}:{line_no}: markdown pipe table -- no tables in the docs; write a bulleted list, one bullet per row (python tools/md_lists.py {f} converts it)")
         if volatile_free:
             infence = False
             for i, line in enumerate(text.splitlines(), 1):

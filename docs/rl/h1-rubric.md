@@ -17,11 +17,9 @@ comparison table + verdict).
 
 ## Contenders
 
-| id | what | how to run |
-|---|---|---|
-| **SCR** | firmware `wkF` + gyro-assist | `kwkF` over serial; gyro assist ON (its real advantage) |
-| **RL**  | `run20m_ppo`, policy in full control | `run_gait.py --cmd <v>` (firmware balance OFF — it sends `g`) |
-| **RL+b** | `run20m_ppo` *with* firmware gyro-assist underneath | `run_gait.py --cmd <v> --keep-firmware-balance` |
+- **SCR**: what: firmware `wkF` + gyro-assist; how to run: `kwkF` over serial; gyro assist ON (its real advantage)
+- **RL**: what: `run20m_ppo`, policy in full control; how to run: `run_gait.py --cmd <v>` (firmware balance OFF — it sends `g`)
+- **RL+b**: what: `run20m_ppo` *with* firmware gyro-assist underneath; how to run: `run_gait.py --cmd <v> --keep-firmware-balance`
 
 RL+b is a real deployment option, not just a curiosity — a second independent
 balance loop under the policy may transfer better than either alone. Test all
@@ -34,14 +32,12 @@ three; the headline comparison is **SCR vs RL**.
 Run every contender on each. Start easy; stop a contender early only if it's
 clearly unsafe.
 
-| id | surface / obstacle | why |
-|---|---|---|
-| C1 | hard flat floor | baseline — speed, heading, gait quality |
-| C2 | low-pile carpet / rug | the real deployment surface; friction + compliance |
-| C3 | a single ~15 mm threshold / door sill | the disturbance the sim's payload masked |
-| C4 | a shallow board ramp, ~8–10° up, then down | slope handling |
-| C5 | a few scattered ~20–30 mm obstacles (bottle caps, cardboard) | foot clearance / trip resistance |
-| C6 | flat floor + a **measured** lateral shove mid-walk | stance recovery — the Phase-4 question, finally on hardware |
+- **C1**: surface / obstacle: hard flat floor; why: baseline — speed, heading, gait quality
+- **C2**: surface / obstacle: low-pile carpet / rug; why: the real deployment surface; friction + compliance
+- **C3**: surface / obstacle: a single ~15 mm threshold / door sill; why: the disturbance the sim's payload masked
+- **C4**: surface / obstacle: a shallow board ramp, ~8–10° up, then down; why: slope handling
+- **C5**: surface / obstacle: a few scattered ~20–30 mm obstacles (bottle caps, cardboard); why: foot clearance / trip resistance
+- **C6**: surface / obstacle: flat floor + a **measured** lateral shove mid-walk; why: stance recovery — the Phase-4 question, finally on hardware
 
 For C6, "measured" = a repeatable push: a small weight on a string swung from a
 fixed drop, or a luggage scale pulled to a target force (record the peak). Same
@@ -55,15 +51,13 @@ push for every contender.
 battery droop and servo warm-up hit everyone equally. One battery charge per
 session; note the surface temperature (servo torque drifts with heat).
 
-| metric | how | notes |
-|---|---|---|
-| **forward speed** (m/s) | mark a 1.0–1.5 m lane; time from start line to finish line (phone stopwatch or video frame count) | for SCR use its natural speed; for RL command the speed that *matches* SCR's measured speed **and** also RL's own "cruise" (0.10) — report both |
-| **heading drift** (deg) | lateral offset at the finish line ÷ lane length, → `atan` | + or − (which way it curves) |
-| **fall rate** | falls ÷ N runs on that condition | a "fall" = body on the ground / needs manual reset |
-| **recovery (C6 only)** | of the shoves that caused a visible stagger, fraction where it caught and kept walking without a fall; eyeball time-to-resettle (video) | this is H4's real answer too |
-| **gait quality** (0–3) | video review: 3 = clean diagonal trot, feet clearing, low body bounce; 0 = dragging / stumbling / hopping | score blind if you can (rename clips) |
-| **power / endurance** (proxy) | PiSugar S has no telemetry — use an inline USB power meter on the BiBoard 5 V feed if you have one, else: time to first brown-out walking continuously on C1, one run each | rough; a tie-breaker, not a headline |
-| **the "can't" column** | does the contender do it *at all*: hold a commanded speed (creep 0.04 / fast 0.14), stand on command, walk backward, hold heading to <5°? | SCR structurally can't; RL's whole value proposition |
+- **forward speed** (m/s): how: lay out a 1.0–1.5 m lane; time from start line to finish line (phone stopwatch or video frame count); notes: for SCR use its natural speed; for RL command the speed that *matches* SCR's measured speed **and** also RL's own "cruise" (0.10) — report both
+- **heading drift** (deg): how: lateral offset at the finish line ÷ lane length, → `atan`; notes: + or − (which way it curves)
+- **fall rate**: how: falls ÷ N runs on that condition; notes: a "fall" = body on the ground / needs manual reset
+- **recovery (C6 only)**: how: of the shoves that caused a visible stagger, fraction where it caught and kept walking without a fall; eyeball time-to-resettle (video); notes: this is H4's real answer too
+- **gait quality** (0–3): how: video review: 3 = clean diagonal trot, feet clearing, low body bounce; 0 = dragging / stumbling / hopping; notes: score blind if you can (rename clips)
+- **power / endurance** (proxy): how: PiSugar S has no telemetry — use an inline USB power meter on the BiBoard 5 V feed if you have one, else: time to first brown-out walking continuously on C1, one run each; notes: rough; a tie-breaker, not a headline
+- **the "can't" column**: how: does the contender do it *at all*: hold a commanded speed (creep 0.04 / fast 0.14), stand on command, walk backward, hold heading to <5°?; notes: SCR structurally can't; RL's whole value proposition
 
 Log raw runs (a notebook row per run: contender, condition, run #, time, offset,
 fell y/n, notes). `run_gait.py --log` writes the RL runs' per-tick IMU +

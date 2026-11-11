@@ -4,14 +4,12 @@
 
 **The decision:** the Pi has its own battery (a PiSugar S 1200 mAh), and the BiBoard link is data only (TX, RX and GND). Drawing the Pi from G2's shared pack caused reduced motion and brownout risk. The first half of this page is the research that led there.
 
-| Measure | State |
-|---|---|
-| Disable unused peripherals, Wi-Fi power-save when headless, CPU governor `ondemand` (`pi_pipeline.power`) | **Built and in use** |
-| Idle rest posture and sleep mode (`behavior/idle_posture.py`, `sleep_mode.py`, plus the power-saving sleep in `power/sleep_watch.py`) | **Built and in use** (sleep after 5 minutes at rest) |
-| Battery watch for G2's pack; Pi runtime measurement and warning; power log | **Built and in use** |
-| Pi shutdown from a voice command | Built; the PiSugar S keeps powering the halted Pi, so its switch is flipped by hand |
-| On-demand vision (scale the camera to activity) | **Not built**: only on or off exists, tied to sleep |
-| A hardware battery readout for the Pi | Not available on the PiSugar S; the warning counts uptime against a measured runtime |
+- **Disable unused peripherals, Wi-Fi power-save when headless, CPU governor `ondemand` (`pi_pipeline.power`)**: **Built and in use**
+- **Idle rest posture and sleep mode (`behavior/idle_posture.py`, `sleep_mode.py`, plus the power-saving sleep in `power/sleep_watch.py`)**: **Built and in use** (sleep after 5 minutes at rest)
+- **Battery watch for G2's pack; Pi runtime measurement and warning; power log**: **Built and in use**
+- **Pi shutdown from a voice command**: Built; the PiSugar S keeps powering the halted Pi, so its switch is flipped by hand
+- **On-demand vision (scale the camera to activity)**: **Not built**: only on or off exists, tied to sleep
+- **A hardware battery readout for the Pi**: Not available on the PiSugar S; the warning counts uptime against a measured runtime
 
 Package overview: [`../../pi_pipeline/power/README.md`](../../pi_pipeline/power/README.md). Operator view: [`../guides/operating-g2.md`](../guides/operating-g2.md).
 
@@ -156,16 +154,14 @@ Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
 
 ## Measures
 
-| Measure | Buildable now? | Autonomy impact | Rule |
-|---|---|---|---|
-| **Disable unused peripherals** (onboard LEDs runtime; audio + camera-LED via boot config) | **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`) | none | boot lines go in `config.txt` at Pi setup (pi-set-up.md) |
-| **Wi-Fi power-save when headless** (`iw dev wlan0 set power_save on`) | **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()` | +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).** | on in autonomous mode; off when a human is actively connected |
-| **idle-REST timeout** — send `d` after N s of no command | **BUILT** — `behavior/idle_posture.py`'s `IdlePosture` (ACTIVE→SIT→RESTING staged descent, mood-scaled timeouts, person-present multiplier, "stay" override, `safe_to_rest` gating, wired into `BehaviorDriver.tick()`, 109 lines of tests) | Was already behaviour-aware from the start — exploring holds ACTIVE with no descent (`exploring=True` short-circuits it), a conversation holds SIT and never lies down | done; see `docs/guides/voice-commands.md` / `capabilities.md` |
-| **On-demand vision** — gate the Grove Vision AI V2 | **Not built — only a binary on/off exists**, tied to sleep-mode entry/exit (`EffectKind.CAPTURE`). The rate-scaling ambition below has zero implementation, not even stubbed — just an unused `kind` param on the `CAPTURE` effect anticipating it | **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move | "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep. **This is the one remaining open design question.** |
-| **Sleep / idle mode** — servos REST, vision off, governor down, Wi-Fi power-save on | **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake (see below) | Wake triggers already cover the risk noted here — IMU tap / loud sound / wake word all wake it | done |
-| **CPU governor → `ondemand`** | **BUILT** — `pi_pipeline.power.set_cpu_governor()` (refuses `powersave`) | Ramp latency could cause one late 80 Hz control tick after idle | use `ondemand` (fast ramp), **not** `powersave`; verify with `benchmark_pi.py` loop-jitter |
-| **Camera resolution / fps down** | with hardware | detection may degrade | drop only if detection still passes |
-| **PiSugar low-power mode** | with hardware | — | check if it exists and whether the Pi can trigger it |
+- **Disable unused peripherals** (onboard LEDs runtime; audio + camera-LED via boot config): Buildable now?: **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`); Autonomy impact: none; Rule: boot lines go in `config.txt` at Pi setup (pi-set-up.md)
+- **Wi-Fi power-save when headless** (`iw dev wlan0 set power_save on`): Buildable now?: **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()`; Autonomy impact: +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).**; Rule: on in autonomous mode; off when a human is actively connected
+- **idle-REST timeout** — send `d` after N s of no command: Buildable now?: **BUILT** — `behavior/idle_posture.py`'s `IdlePosture` (ACTIVE→SIT→RESTING staged descent, mood-scaled timeouts, person-present multiplier, "stay" override, `safe_to_rest` gating, wired into `BehaviorDriver.tick()`, 109 lines of tests); Autonomy impact: Was already behaviour-aware from the start — exploring holds ACTIVE with no descent (`exploring=True` short-circuits it), a conversation holds SIT and never lies down; Rule: done; see `docs/guides/voice-commands.md` / `capabilities.md`
+- **On-demand vision** — gate the Grove Vision AI V2: Buildable now?: **Not built — only a binary on/off exists**, tied to sleep-mode entry/exit (`EffectKind.CAPTURE`). The rate-scaling ambition below has zero implementation, not even stubbed — just an unused `kind` param on the `CAPTURE` effect anticipating it; Autonomy impact: **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move; Rule: "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep. **This is the one remaining open design question.**
+- **Sleep / idle mode** — servos REST, vision off, governor down, Wi-Fi power-save on: Buildable now?: **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake (see below); Autonomy impact: Wake triggers already cover the risk noted here — IMU tap / loud sound / wake word all wake it; Rule: done
+- **CPU governor → `ondemand`**: Buildable now?: **BUILT** — `pi_pipeline.power.set_cpu_governor()` (refuses `powersave`); Autonomy impact: Ramp latency could cause one late 80 Hz control tick after idle; Rule: use `ondemand` (fast ramp), **not** `powersave`; verify with `benchmark_pi.py` loop-jitter
+- **Camera resolution / fps down**: Buildable now?: with hardware; Autonomy impact: detection may degrade; Rule: drop only if detection still passes
+- **PiSugar low-power mode**: Buildable now?: with hardware; Autonomy impact: —; Rule: check if it exists and whether the Pi can trigger it
 
 - **Sleep / idle mode — servos REST, vision off, governor down, Wi-Fi power-save on:** **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake word, anti-thrash min-sleep hold), wired into `BehaviorDriver.tick()` with real effect dispatch (power-profile switch + camera off in `bindings.py`), 146 lines of tests
 

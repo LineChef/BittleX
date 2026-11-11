@@ -29,12 +29,10 @@ The XiaoZhi firmware that powers the AI head is documented almost entirely in Ch
 
 **Pages with a named community author** (the author's name appears on the page; treat every other page as third-party until its author is confirmed):
 
-| Page | Author named on the page | Used in |
-|---|---|---|
-| 小智AI终端ASR自定义唤醒词简单方案 (custom wake-word add-on module) | 粽子DIY | section 5 |
-| 修改提示音P3文件 (changing the prompt sounds) | 酷世DIY | section 6 |
-| Windows搭建 ESP IDF开发环境&编译小智 (Windows ESP-IDF build) | 酷世DIY | sections 5 and 6 |
-| xiaozhi-esp32-server (a community backend, MIT) | the xinnan-tech project | section 11 |
+- **小智AI终端ASR自定义唤醒词简单方案 (custom wake-word add-on module)**: author named on the page, 粽子DIY; used in section 5
+- **修改提示音P3文件 (changing the prompt sounds)**: author named on the page, 酷世DIY; used in section 6
+- **Windows搭建 ESP IDF开发环境&编译小智 (Windows ESP-IDF build)**: author named on the page, 酷世DIY; used in sections 5 and 6
+- **xiaozhi-esp32-server (a community backend, MIT)**: author named on the page, the xinnan-tech project; used in section 11
 
 """
 

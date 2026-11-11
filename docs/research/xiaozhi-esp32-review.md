@@ -17,17 +17,15 @@ README and `docs/` through a fetch tool, not built or run; items marked *unverif
 
 ## What is useful to the project
 
-| Finding | Why it matters |
-|---|---|
-| **Documented WebSocket protocol** (device `hello`, then `listen`/`stt`/`tts`/`llm`/`mcp` JSON messages; mono Opus, 16 kHz up, 60 ms frames, up to 24 kHz down) | The backend can be written in-house. The device sends microphone audio to a server and plays back audio the server returns, so a backend on the Pi (or a laptop) can put Claude, the memory and personality, and the vision behind the head |
-| **Four community self-hosted servers** (Python `xinnan-tech/xiaozhi-esp32-server`, Java, and two Go ones) | Existing servers to adapt rather than write from scratch; swapping their LLM step for Claude is the likely change. *Unverified: quality, how they handle memory and tools* |
-| **MCP on the device**: `McpServer::AddTool` registers a tool with a name, description and JSON input schema; the backend calls it with `tools/call` | Petoi's `self.robot.send_command` is one such tool. Tools such as stop, get status, or perform-skill can be added. Tools can also live on the backend side, so "what do you see?" can be a backend function that reads the Pi's camera feed |
-| **`otto-robot` board** (a servo walker): exposes `self.otto.action` with parameters, plus `stop`, `get_status` and trims as tools | A worked example of a motion-tool set to copy for a Petoi tool set, including a stop tool |
-| **Custom-board guide**: three files per board (`config.h` pins, `config.json`, a board class), builds with `scripts/build.py`; ESP32-C3 is covered | Shows what would be needed from Petoi's release (pin map, codec) and confirms the build path is conventional ESP-IDF |
-| **Vision hook**: MCP `initialize` can carry a vision server URL and token, and boards with cameras can send a photo for the LLM to describe | The pattern for "what do you see?" exists, but it assumes a camera on the head. For the project the equivalent is a backend tool that returns the Vision Module's detections as text |
-| **Offline, customizable wake word** (ESP-SR; WakeNet9s on C3) | The stock phrase is "Hi, Jason"; a custom one such as G2's name may be possible. *Unverified on the head* |
-| **Speaker recognition** (3D Speaker) | Could tell who is talking, which maps to the bonds and enrollment ideas. Petoi's console lists it as not on the free plan; *unverified whether a self-hosted setup gets it* |
-| **MIT licence** | Free to patch and redistribute the changes |
+- **Documented WebSocket protocol** (device `hello`, then `listen`/`stt`/`tts`/`llm`/`mcp` JSON messages; mono Opus, 16 kHz up, 60 ms frames, up to 24 kHz down): The backend can be written in-house. The device sends microphone audio to a server and plays back audio the server returns, so a backend on the Pi (or a laptop) can put Claude, the memory and personality, and the vision behind the head
+- **Four community self-hosted servers** (Python `xinnan-tech/xiaozhi-esp32-server`, Java, and two Go ones): Existing servers to adapt rather than write from scratch; swapping their LLM step for Claude is the likely change. *Unverified: quality, how they handle memory and tools*
+- **MCP on the device**: `McpServer::AddTool` registers a tool with a name, description and JSON input schema; the backend calls it with `tools/call`: Petoi's `self.robot.send_command` is one such tool. Tools such as stop, get status, or perform-skill can be added. Tools can also live on the backend side, so "what do you see?" can be a backend function that reads the Pi's camera feed
+- **`otto-robot` board** (a servo walker): exposes `self.otto.action` with parameters, plus `stop`, `get_status` and trims as tools: A worked example of a motion-tool set to copy for a Petoi tool set, including a stop tool
+- **Custom-board guide**: three files per board (`config.h` pins, `config.json`, a board class), builds with `scripts/build.py`; ESP32-C3 is covered: Shows what would be needed from Petoi's release (pin map, codec) and confirms the build path is conventional ESP-IDF
+- **Vision hook**: MCP `initialize` can carry a vision server URL and token, and boards with cameras can send a photo for the LLM to describe: The pattern for "what do you see?" exists, but it assumes a camera on the head. For the project the equivalent is a backend tool that returns the Vision Module's detections as text
+- **Offline, customizable wake word** (ESP-SR; WakeNet9s on C3): The stock phrase is "Hi, Jason"; a custom one such as G2's name may be possible. *Unverified on the head*
+- **Speaker recognition** (3D Speaker): Could tell who is talking, which maps to the bonds and enrollment ideas. Petoi's console lists it as not on the free plan; *unverified whether a self-hosted setup gets it*
+- **MIT licence**: Free to patch and redistribute the changes
 
 ## What does not help
 

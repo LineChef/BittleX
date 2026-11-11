@@ -193,11 +193,9 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
 - **Corrected Stage 1/Stage 2 numbers, full DR, 12 episodes each, matched
   seeds:**
 
-  | Checkpoint | Falls | Speed (m/s) | Trot correlation |
-  |---|---|---|---|
-  | `run20m_ppo` (22deg) | 0/12 | 0.027 | -0.24 |
-  | `resid30_r1` (30deg, 3M) | 0/12 | 0.025 | -0.38 |
-  | `resid30_val10m` (30deg, 10M) | 0/12 | 0.030 | -0.46 |
+  - **`run20m_ppo` (22deg)**: Falls: 0/12; Speed (m/s): 0.027; Trot correlation: -0.24
+  - **`resid30_r1` (30deg, 3M)**: Falls: 0/12; Speed (m/s): 0.025; Trot correlation: -0.38
+  - **`resid30_val10m` (30deg, 10M)**: Falls: 0/12; Speed (m/s): 0.030; Trot correlation: -0.46
 
   No falls for any checkpoint under real conditions -- the earlier "no
   falls" verdict holds. What's new: the resid30 checkpoints hold a
@@ -234,12 +232,10 @@ a bit higher, trot correlation is consistently tighter. The aggregate
 fall-rate regression is driven almost entirely by four cells at or beyond
 the training envelope's edge:
 
-| Cell | What | 22deg falls | 30deg falls |
-|---|---|---|---|
-| T9.1 | 18deg slope up (beyond the 14deg training ceiling) | **62%** | **0%** |
-| T9.2 | 20deg slope down (beyond training; descent is harder) | **0%** | **68%** |
-| T8.2 | Rough/uneven: dense bumps + rolling swell | 4% | 25% |
-| T9.3 | Rubble denser/taller than anything in training | 22% | 32% |
+- **T9.1**: What: 18deg slope up (beyond the 14deg training ceiling); 22deg falls: **62%**; 30deg falls: **0%**
+- **T9.2**: What: 20deg slope down (beyond training; descent is harder); 22deg falls: **0%**; 30deg falls: **68%**
+- **T8.2**: What: Rough/uneven: dense bumps + rolling swell; 22deg falls: 4%; 30deg falls: 25%
+- **T9.3**: What: Rubble denser/taller than anything in training; 22deg falls: 22%; 30deg falls: 32%
 
 T9.1 is the exact failure mode `docs/archive/rl/slope-ceiling-log.md` was queued
 to fix by raising `SLOPE_MAX_DEG` -- resid30 fixes it completely with zero
@@ -277,10 +273,8 @@ isn't.
 fresh this pass after the original run's JSON was lost to a stale
 scratchpad path -- see fix below)
 
-| Checkpoint | Falls | Recover rate | Resettle steps (mean) |
-|---|---|---|---|
-| `run20m_ppo` (22deg) | 55% | 7% | 17.7 |
-| `run20m_resid30_ppo` (30deg) | 50% | 9% | 21.0 |
+- **`run20m_ppo` (22deg)**: Falls: 55%; Recover rate: 7%; Resettle steps (mean): 17.7
+- **`run20m_resid30_ppo` (30deg)**: Falls: 50%; Recover rate: 9%; Resettle steps (mean): 21.0
 
 resid30 falls slightly less and recovers slightly more often, but takes
 ~19% longer to resettle when it does. Only 3 (22deg) and 4 (30deg) actual

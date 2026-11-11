@@ -14,13 +14,11 @@ Agreed with the user 2026-10-10: **rooms** (not finer spots), tag the existing p
 
 ## Phases and gates
 
-| Phase | What | Gate |
-|---|---|---|
-| **P0** | Test on the saved pictures: rooms set by hand in `g2pics`, `python tools/eval_rooms.py` | 3-stop vote picks the right room >= 75% on a returning visit (other days only), with the histogram embedder. If it fails: a learned image model (a download: ask first, CLAUDE.md security protocol) |
-| **P1** (built 2026-10-10, not yet deployed; `behavior/place_log.py`) | Record only: exploration writes stops and legs; behavior unchanged | A real session gives a complete chain; no extra late ticks; tests pass |
-| **P2** | "Where are you?": naming rooms by voice, the vote over recent stops, a local spoken answer ("I think the kitchen" / "not sure yet"); Places view in `g2pics` | Right room >= 80% over 2 sessions in at least 2 rooms |
-| **P3** | The map: room links from transitions, "the hallway leads to the kitchen" facts, rooms attached to the existing "the dog is often to the left" notes | Links match the house as the user would draw it |
-| **P4** | "Go to the kitchen" (later) | Needs a closed-loop turn and wall avoidance trusted on several wall types (both open) |
+- **P0**: What: Test on the saved pictures: rooms set by hand in `g2pics`, `python tools/eval_rooms.py`; Gate: 3-stop vote picks the right room >= 75% on a returning visit (other days only), with the histogram embedder. If it fails: a learned image model (a download: ask first, CLAUDE.md security protocol)
+- **P1** (built 2026-10-10, not yet deployed; `behavior/place_log.py`): What: Record only: exploration writes stops and legs; behavior unchanged; Gate: A real session gives a complete chain; no extra late ticks; tests pass
+- **P2**: What: "Where are you?": naming rooms by voice, the vote over recent stops, a local spoken answer ("I think the kitchen" / "not sure yet"); Places view in `g2pics`; Gate: Right room >= 80% over 2 sessions in at least 2 rooms
+- **P3**: What: The map: room links from transitions, "the hallway leads to the kitchen" facts, rooms attached to the existing "the dog is often to the left" notes; Gate: Links match the house as the user would draw it
+- **P4**: What: "Go to the kitchen" (later); Gate: Needs a closed-loop turn and wall avoidance trusted on several wall types (both open)
 
 ## Phase P0: how to run it
 

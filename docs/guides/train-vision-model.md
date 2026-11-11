@@ -201,11 +201,9 @@ jointly. `combine_for_upload.py --classes a,b,c` builds that folder and writes
 
 The boxes are made **at capture time**, not by hand:
 
-| class | box source | manual effort |
-|---|---|---|
-| `person` | Person-Detection base model → `.json` sidecar → `curate` writes the `.txt` | **none** — already labelled in the library |
-| `dog`, `cat` | capture with a **COCO-80** model loaded → sidecar has dog/cat boxes → `curate` writes `.txt` | none for frames it caught; hand-box the misses |
-| `ledge` | nothing auto-detects it | **box it** — see below |
+- **`person`**: box source: Person-Detection base model → `.json` sidecar → `curate` writes the `.txt`; manual effort: **none** — already labelled in the library
+- **`dog`, `cat`**: box source: capture with a **COCO-80** model loaded → sidecar has dog/cat boxes → `curate` writes `.txt`; manual effort: none for frames it caught; hand-box the misses
+- **`ledge`**: box source: nothing auto-detects it; manual effort: **box it** — see below
 
 **Labelling `ledge`** (the only real work): it's one repeated object on a slow
 pan, so —
@@ -284,16 +282,14 @@ unrecognised person defaulted to `curious`.
 
 ## Troubleshooting
 
-| Symptom | Cause / fix |
-|---|---|
-| "Resource busy" opening the serial port | SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB). |
-| Few pre-labels (`raw pos` low in curate) | Feed is sideways → Person Detection misses the subject. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those. |
-| Curated images upside-down / sideways | Wrong `--rotate` — try 90 / 180 / 270; the contact sheet shows it. |
-| Dark / grainy frames | `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses. |
-| Only a handful of positives after curate | De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames. |
-| Trained model detects nothing | Dataset below the floor — dark, too few (<~40 varied), one lighting/background. Recapture in daylight, 3 varied sessions, retrain. |
-| Model flashes + runs (`inference: ~90ms` in Device Logger) but `boxes:[]` on every frame, any threshold | **Wrong architecture.** GV2 firmware only decodes the **Swift-YOLO** head. A standard Ultralytics YOLOv8 export runs but its detection tensor is unreadable → permanent empty boxes. Must train/export via SSCMA. See `vision/capture-progress.md` 2026-09-09 note. |
-| Model confuses two people | Coarse at 192 px — more data per person, or move to face-embedding recognition (`vision/person-recognition.md` "upgrade path"). |
+- **"Resource busy" opening the serial port**: SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB).
+- **Few pre-labels (`raw pos` low in curate)**: Feed is sideways → Person Detection misses the subject. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those.
+- **Curated images upside-down / sideways**: Wrong `--rotate` — try 90 / 180 / 270; the contact sheet shows it.
+- **Dark / grainy frames**: `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses.
+- **Only a handful of positives after curate**: De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames.
+- **Trained model detects nothing**: Dataset below the floor — dark, too few (<~40 varied), one lighting/background. Recapture in daylight, 3 varied sessions, retrain.
+- **Model flashes + runs (`inference: ~90ms` in Device Logger) but `boxes:[]` on every frame, any threshold**: **Wrong architecture.** GV2 firmware only decodes the **Swift-YOLO** head. A standard Ultralytics YOLOv8 export runs but its detection tensor is unreadable → permanent empty boxes. Must train/export via SSCMA. See `vision/capture-progress.md` 2026-09-09 note.
+- **Model confuses two people**: Coarse at 192 px — more data per person, or move to face-embedding recognition (`vision/person-recognition.md` "upgrade path").
 
 ## What lives where
 

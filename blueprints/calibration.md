@@ -70,15 +70,13 @@ Read from the Petoi Desktop App's Joint Calibrator on the stock Bittle X firmwar
 X+Arm reflash (a reflash can reset the calibration). The arm's servo cables were unplugged from the BiBoard for the reading. Petoi's labels: "Arm" is the upper leg
 joint, "Shoulder" (4 to 7) is unused on Bittle.
 
-| Joint | Offset | | Joint | Offset |
-|---|---|---|---|---|
-| 0 head pan | 0 | | 2 tail pan | 0 |
-| 1 head tilt | 0 | | 3 (N/A) | 0 |
-| 8 left front upper leg | -1 | | 12 left front knee | 2 |
-| 9 right front upper leg | 0 | | 13 right front knee | 5 |
-| 10 right back upper leg | 5 | | 14 right back knee | -4 |
-| 11 left back upper leg | -6 | | 15 left back knee | 4 |
-| 4 to 7 shoulders | 0 | | | |
+- **0 head pan**: Offset: 0; Joint: 2 tail pan; Offset: 0
+- **1 head tilt**: Offset: 0; Joint: 3 (N/A); Offset: 0
+- **8 left front upper leg**: Offset: -1; Joint: 12 left front knee; Offset: 2
+- **9 right front upper leg**: Offset: 0; Joint: 13 right front knee; Offset: 5
+- **10 right back upper leg**: Offset: 5; Joint: 14 right back knee; Offset: -4
+- **11 left back upper leg**: Offset: -6; Joint: 15 left back knee; Offset: 4
+- **4 to 7 shoulders**: Offset: 0
 
 If the arm firmware's calibration starts from zero, these are the leg values to enter before the `c-2` claw calibration; the calibration pose then shows whether
 any leg needs a touch-up.
@@ -89,12 +87,10 @@ After the Petoi robot arm replaced the AI head and the BiBoard was flashed with 
 own esptool command and files; the app's port list could not show the BiBoard's `cu.usbmodem` port). The flash kept the stored calibration: no first-boot
 questions, and every leg offset above was unchanged. In the arm build the calibrator names joints 0 to 2 Claw Pan (the neck servo), Claw Lift and Claw Open.
 
-| Joint | Offset |
-|---|---|
-| 0 claw pan | -14 |
-| 1 claw lift | 0 |
-| 2 claw open | 1 (Auto) |
-| 8 to 15 legs | as in the table above |
+- **0 claw pan**: -14
+- **1 claw lift**: 0
+- **2 claw open**: 1 (Auto)
+- **8 to 15 legs**: as in the table above
 
 ## After the legs were removed and refitted (2026-10-31)
 
@@ -114,11 +110,9 @@ wrong servos.
 
 Socket map to check after any leg comes off:
 
-| Leg | Upper leg socket | Knee socket |
-|---|---|---|
-| Front left | 8 | 12 |
-| Front right | 9 | 13 |
-| Back right | 10 | 14 |
-| Back left | 11 | 15 |
+- **Front left**: Upper leg socket: 8; Knee socket: 12
+- **Front right**: Upper leg socket: 9; Knee socket: 13
+- **Back right**: Upper leg socket: 10; Knee socket: 14
+- **Back left**: Upper leg socket: 11; Knee socket: 15
 
 If the calibration pose looks right but Stand does not, check the cables before changing any offset.

@@ -6,30 +6,26 @@ policy later (ARM2), after those parts are installed. Background on the arm firm
 
 ## Decisions (user, 2026-10-24)
 
-| | |
-|---|---|
-| Base walk | Petoi's arm walk `wkArmF` (`reference_gait/wkArm_ref.npy`) in place of `wkF`, as the residual base and the imitation reference |
-| Rewards and recipe | The V7 recipe unchanged ("today's rewards"); reward changes for the claw's weight come after the first hardware data |
-| Turn blending | Off (already off in the V7 recipe) |
-| Gait switching | Off on G2 with the arm |
-| Easing | Off on G2 with the arm (stand ramp, skill transitions, stop blend) |
-| Gyro balance | Off throughout arm testing: policy walks, poses and Petoi's own walk |
-| Servo range | Petoi's arm build (P1S, 290 deg) assumed right; checked at calibration |
-| Step speed | Today's 1.25 s cycle; Petoi's real cycle is measured on hardware and a matched-speed screen follows if it differs |
-| Legs | Stock shoulders, stock feet (CLpaw and wide shoulders: ARM2, later) |
-| AI head | Removed; the arm takes the neck |
+- **Base walk**: Petoi's arm walk `wkArmF` (`reference_gait/wkArm_ref.npy`) in place of `wkF`, as the residual base and the imitation reference
+- **Rewards and recipe**: The V7 recipe unchanged ("today's rewards"); reward changes for the claw's weight come after the first hardware data
+- **Turn blending**: Off (already off in the V7 recipe)
+- **Gait switching**: Off on G2 with the arm
+- **Easing**: Off on G2 with the arm (stand ramp, skill transitions, stop blend)
+- **Gyro balance**: Off throughout arm testing: policy walks, poses and Petoi's own walk
+- **Servo range**: Petoi's arm build (P1S, 290 deg) assumed right; checked at calibration
+- **Step speed**: Today's 1.25 s cycle; Petoi's real cycle is measured on hardware and a matched-speed screen follows if it differs
+- **Legs**: Stock shoulders, stock feet (CLpaw and wide shoulders: ARM2, later)
+- **AI head**: Removed; the arm takes the neck
 
 ## Simulator: the `arm` payload profile
 
 The pod as in `pod` (185 g, weighed) with the AI head body replaced by the claw. Nothing about the claw is published except what follows, so the
 uncertain values are varied per episode.
 
-| | Value | Source |
-|---|---|---|
-| Claw mass | 63 g, varied ±15 g | Petoi's spec pages: the arm version tops out at 353 g against 290 g for the plain Bittle X |
-| Position | centre 3.1 in (80 mm) ahead of the body centre, at the torso's mid height (z 0), varied ±0.4 in in x and z | estimate: the arm hangs from the neck servo and reaches forward; the AI head's centre is at 68 mm |
-| Collision box | 2.4 x 1.2 x 1.0 in (60 x 30 x 25 mm) | estimate, so the sim sees the claw hit the floor in a stumble |
-| Whole robot | about 502 g (AI head build 481 g) | |
+- **Claw mass**: Value: 63 g, varied ±15 g; Source: Petoi's spec pages: the arm version tops out at 353 g against 290 g for the plain Bittle X
+- **Position**: Value: centre 3.1 in (80 mm) ahead of the body centre, at the torso's mid height (z 0), varied ±0.4 in in x and z; Source: estimate: the arm hangs from the neck servo and reaches forward; the AI head's centre is at 68 mm
+- **Collision box**: Value: 2.4 x 1.2 x 1.0 in (60 x 30 x 25 mm); Source: estimate, so the sim sees the claw hit the floor in a stumble
+- **Whole robot**: Value: about 502 g (AI head build 481 g)
 
 When the claw is weighed and measured, the profile takes the real numbers (fixed, no variation, as for the pod). If the weight is more than 15 g
 off the estimate, a retrain on the real numbers is offered.
@@ -59,14 +55,12 @@ Note: the user judged G2 at his limit at 481 g (2026-10-21); the arm build is ab
 
 Estimated timeline (`tools/eta.py`, medians of finished runs of the same size; from a 5:15 PM start):
 
-| Step | Time | Done about |
-|---|---|---|
-| Build the profile and runner, sim check | about 60 min | 6:15 PM |
-| Preflight | about 15 min | 6:30 PM |
-| Screens `armwk` + `armctl` (3M each, scored) | about 26 min each, 52 min | 7:25 PM |
-| Chain S0 to S3 (9M) + flat check | about 75 min | 8:40 PM |
-| 20M | about 141 min (130 to 168) | 11:00 PM (10:50 PM to 11:30 PM) |
-| Pick, export, score against V7 in the claw world, report | about 35 min | 11:35 PM (11:20 PM to 12:15 AM) |
+- **Build the profile and runner, sim check**: Time: about 60 min; Done about: 6:15 PM
+- **Preflight**: Time: about 15 min; Done about: 6:30 PM
+- **Screens `armwk` + `armctl` (3M each, scored)**: Time: about 26 min each, 52 min; Done about: 7:25 PM
+- **Chain S0 to S3 (9M) + flat check**: Time: about 75 min; Done about: 8:40 PM
+- **20M**: Time: about 141 min (130 to 168); Done about: 11:00 PM (10:50 PM to 11:30 PM)
+- **Pick, export, score against V7 in the claw world, report**: Time: about 35 min; Done about: 11:35 PM (11:20 PM to 12:15 AM)
 
 Clocks are re-estimated with `tools/eta.py` at each launch. Early estimates have run short by up to about 40%.
 
@@ -106,17 +100,15 @@ user says the arm is installed** (user, 2026-10-24), when the Pi is idle and eve
 Each step runs on the user's go, G2 on his feet on the floor with hands near, the floor label set (`g2floor`), one step at a time with a
 report in between. Battery as percent at the start of each step.
 
-| Step | What | Pass | Time |
-|---|---|---|---|
-| H0 | Before the swap: photograph the Joint Calibrator offsets; weigh the arm module, the camera, and the arm with the camera on; photograph and measure where it sits (forward of the neck, how low the claw hangs with the arm at its walking angle) | numbers recorded here | 15 min |
-| H1 | Swap and flash: AI head off, arm on (J-hook neck part); Desktop App, product **Bittle X+Arm**, board BiBoard_V1_0, the `cu.usbmodem` port; `?` reads `Bittle X+Arm`; recalibrate every joint and the claw (`c-2` / Auto); voice module English | banner right, the calibration pose looks right (this also checks the servo range) | 45 to 60 min |
-| H2 | `g2attach arm`; `python -m pi_pipeline.doctor --serial` | firmware check passes, the arm's gait and settings shown | 5 min |
-| H3 | Bench poses: a small joint 1 move (which way is up), claw open / close, `kbalance`, `ksit`, `krest` from standing (does the claw clear the floor?), back to stand; one camera picture from the claw-mounted camera (where it points at the arm's walking angle, whether the cable reaches through the lift and claw moves) | no contact, no jump, view noted | 15 min |
-| H4 | Petoi's walk: `fw_skill_log.py kwkF --seconds 10` (plays `wkArmF`), balance off, with a phone video; twice | distance and drift recorded; the cycle time counted from the video | 10 min |
-| H5 | The same walk from the Pi at the training pace: `run_gait.py --openloop --base wkArm --cycles 6` | compared with H4 | 10 min |
-| H6 | ARM1: `run_gait.py --cmd 0.10 --seconds 12.5`, three walks; then V7 once for comparison | no falls; distance and drift; a foot trim if needed (`g2attach save arm ... --trim`) | 25 min |
-| H7 | Turns: `kwkL` / `kwkR` (play the arm turn) | turns without tipping | 10 min |
-| H8 | Rest and stand: `d`, then stand (no easing) | no fall, heading jump noted | 5 min |
+- **H0**: What: Before the swap: photograph the Joint Calibrator offsets; weigh the arm module, the camera, and the arm with the camera on; photograph and measure where it sits (forward of the neck, how low the claw hangs with the arm at its walking angle); Pass: numbers recorded here; Time: 15 min
+- **H1**: What: Swap and flash: AI head off, arm on (J-hook neck part); Desktop App, product **Bittle X+Arm**, board BiBoard_V1_0, the `cu.usbmodem` port; `?` reads `Bittle X+Arm`; recalibrate every joint and the claw (`c-2` / Auto); voice module English; Pass: banner right, the calibration pose looks right (this also checks the servo range); Time: 45 to 60 min
+- **H2**: What: `g2attach arm`; `python -m pi_pipeline.doctor --serial`; Pass: firmware check passes, the arm's gait and settings shown; Time: 5 min
+- **H3**: What: Bench poses: a small joint 1 move (which way is up), claw open / close, `kbalance`, `ksit`, `krest` from standing (does the claw clear the floor?), back to stand; one camera picture from the claw-mounted camera (where it points at the arm's walking angle, whether the cable reaches through the lift and claw moves); Pass: no contact, no jump, view noted; Time: 15 min
+- **H4**: What: Petoi's walk: `fw_skill_log.py kwkF --seconds 10` (plays `wkArmF`), balance off, with a phone video; twice; Pass: distance and drift recorded; the cycle time counted from the video; Time: 10 min
+- **H5**: What: The same walk from the Pi at the training pace: `run_gait.py --openloop --base wkArm --cycles 6`; Pass: compared with H4; Time: 10 min
+- **H6**: What: ARM1: `run_gait.py --cmd 0.10 --seconds 12.5`, three walks; then V7 once for comparison; Pass: no falls; distance and drift; a foot trim if needed (`g2attach save arm ... --trim`); Time: 25 min
+- **H7**: What: Turns: `kwkL` / `kwkR` (play the arm turn); Pass: turns without tipping; Time: 10 min
+- **H8**: What: Rest and stand: `d`, then stand (no easing); Pass: no fall, heading jump noted; Time: 5 min
 
 About 2.5 to 3 hours in all, at the pace of one go per step. H0 to H3 do not need ARM1 and can run tonight while it trains; H4 and H5 need the
 Pi work above deployed (after the user says the arm is installed); H6 needs ARM1 (about 11:35 PM, or the next morning).
@@ -235,14 +227,12 @@ entropy bonus. Changes (runner `phase_armx.py`, log `trained/phase_armx.log`):
 
 The full run (screens: control, batch 512 x 5 and the entropy bonus adopted, back-foot clearance not; S0 to S3; a 20M with no plateau stop) finished at 2:32 PM and scored 2:53 PM; avg5 weights picked (final tied). All three in the corrected world (532 g, claw 1.25 in, step-ups capped at 15 mm), 100 episodes per test, sim only:
 
-| | ARM1X | ARM1R | Petoi's scripted walk |
-|---|---|---|---|
-| Flat falls | 0 | 0 | 0 |
-| Calm walk | 0.111 m/s | 0.113 | 0.096 |
-| Roll / heading | 2.2 / 7 deg | 3.4 / 7 | 1.4 / 4 |
-| Front / back shoulders, peak | 53 / 73 deg | 52 / 74 | 52 / 71 |
-| Ladder falls / success | 2.0% / 69% | 6.1% / 72% | 3.0% / 57% |
-| Step-up success (to 15 mm) | 26% | 39% | 12% |
+- **Flat falls**: ARM1X: 0; ARM1R: 0; Petoi's scripted walk: 0
+- **Calm walk**: ARM1X: 0.111 m/s; ARM1R: 0.113; Petoi's scripted walk: 0.096
+- **Roll / heading**: ARM1X: 2.2 / 7 deg; ARM1R: 3.4 / 7; Petoi's scripted walk: 1.4 / 4
+- **Front / back shoulders, peak**: ARM1X: 53 / 73 deg; ARM1R: 52 / 74; Petoi's scripted walk: 52 / 71
+- **Ladder falls / success**: ARM1X: 2.0% / 69%; ARM1R: 6.1% / 72%; Petoi's scripted walk: 3.0% / 57%
+- **Step-up success (to 15 mm)**: ARM1X: 26%; ARM1R: 39%; Petoi's scripted walk: 12%
 
 Faster and better on hazards than the scripted walk, steadier than ARM1R (a third of the roll, a third of the falls), not as steady as the scripted walk; the sim has understated hardware roll about 1.8x for ARM1R. The 20M's training system: the plateau rule logged no "would stop"; clip fraction 0.08 (0.25 to 0.29 before); `ledge_down` was marked trained at 18M; the four slope frontiers reached F6 (ARM1R's reached F3); the frontier flagged hazards short of evidence (a slope bin needs 30 episodes) or failing (snag, from its second bin). Rubble stayed weak (success 0.12 to 0.36).
 

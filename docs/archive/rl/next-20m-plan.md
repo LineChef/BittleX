@@ -8,28 +8,24 @@ The 20M that finished at 11:50 AM on 2026-10-08 (`v3_20m`) was launched as a fre
 
 ## What the new run contains (all already in code; `g2_profile.env_for_job` is the single definition)
 
-| Item | Setting | Where |
-|---|---|---|
-| Recipe | K3 = the `mirror` lever only (the command-drift levers are out, user decision 2026-10-07) | `trained/v3_results.json` -> `v3_k3.levers` |
-| New payload ("world 2") | `G2E_PAYLOAD_LAYOUT=spine`: spine-sized block, camera and speaker as tall as the block (front weight share 46.7%) | `g2_profile.WORLD2_CALIBRATION`; the marker `trained/v3_world2` is already on (created 11:59 AM), so every new run gets it |
-| Course hazards | the share of training episodes each appears in, set by the user on 2026-10-08 and tuned by sampling the reset: **rubble 50%, box obstacles 30%, slopes of 5 deg or more 20%, rough floor 20%, snag obstacles 20%, ledges 20%**. Each starts from an empty floor and ramps with its level. **The surface step (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the course completely**: no stage, course or recipe switches it on; its generator stays in the environment only because benchmark cells T4.1 and T4.2 test it. Carpet, soft-carpet and rug floors are off too | `g2_profile.FULL_COURSE` (the per-episode chances) and `STAGES` (surface step removed), added to a new fresh final by `env_for_job` |
-| Level ceiling | 1.25 (RECIPE) | `G2E_LEVEL_MAX` |
-| Hard levels | x1.10 | `FINAL_EXTRA` |
-| Top-threshold caps | **Built and tested (2026-10-08).** Provisional start values: side-hill 8 deg, climb 10 deg, descent 10 deg, ledge face 2.0 cm. They were set one step below the first proposal (10/12/12) because the report tool, run on the finished 20M's own log, showed its slope level stuck at 0.70 (side-hill about 10 deg, climb about 17 deg) with probe scores at or below 0.5. The ledge starts small and rises as the policy earns it (ceiling 3.7 cm, the training maximum: the user decides). Adjustable while the run trains and reviewed every 1M steps: "Caps: how they are chosen and monitored" below | `G2E_CAP_*` in `g2_profile.FULL_COURSE` (start values); `trained/<tag>_caps.json` (live values, created at launch); `CapsSync` in `train.py`; `caps_report.py` |
-| Episode recording | about 1 episode in 50 is saved so it can be watched exactly: `python watch_training.py <tag>` | `G2E_RECORD_EVERY=50` |
-| Real-data calibration | the approved snapshot, if any. Snapshot 0002 (the only candidate) changes nothing: its one value, `G2E_IMU_HOLD_STEPS` 16, equals the profile's, and `G2E_CMD_PATH_EXTRA_MS_MAX` was rejected by the user | `~/g2_data/calibration/` |
+- **Recipe**: Setting: K3 = the `mirror` lever only (the command-drift levers are out, user decision 2026-10-07); Where: `trained/v3_results.json` -> `v3_k3.levers`
+- **New payload ("world 2")**: Setting: `G2E_PAYLOAD_LAYOUT=spine`: spine-sized block, camera and speaker as tall as the block (front weight share 46.7%); Where: `g2_profile.WORLD2_CALIBRATION`; the marker `trained/v3_world2` is already on (created 11:59 AM), so every new run gets it
+- **Course hazards**: Setting: the share of training episodes each appears in, set by the user on 2026-10-08 and tuned by sampling the reset: **rubble 50%, box obstacles 30%, slopes of 5 deg or more 20%, rough floor 20%, snag obstacles 20%, ledges 20%**. Each starts from an empty floor and ramps with its level. **The surface step (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the course completely**: no stage, course or recipe switches it on; its generator stays in the environment only because benchmark cells T4.1 and T4.2 test it. Carpet, soft-carpet and rug floors are off too; Where: `g2_profile.FULL_COURSE` (the per-episode chances) and `STAGES` (surface step removed), added to a new fresh final by `env_for_job`
+- **Level ceiling**: Setting: 1.25 (RECIPE); Where: `G2E_LEVEL_MAX`
+- **Hard levels**: Setting: x1.10; Where: `FINAL_EXTRA`
+- **Top-threshold caps**: Setting: **Built and tested (2026-10-08).** Provisional start values: side-hill 8 deg, climb 10 deg, descent 10 deg, ledge face 2.0 cm. They were set one step below the first proposal (10/12/12) because the report tool, run on the finished 20M's own log, showed its slope level stuck at 0.70 (side-hill about 10 deg, climb about 17 deg) with probe scores at or below 0.5. The ledge starts small and rises as the policy earns it (ceiling 3.7 cm, the training maximum: the user decides). Adjustable while the run trains and reviewed every 1M steps: "Caps: how they are chosen and monitored" below; Where: `G2E_CAP_*` in `g2_profile.FULL_COURSE` (start values); `trained/<tag>_caps.json` (live values, created at launch); `CapsSync` in `train.py`; `caps_report.py`
+- **Episode recording**: Setting: about 1 episode in 50 is saved so it can be watched exactly: `python watch_training.py <tag>`; Where: `G2E_RECORD_EVERY=50`
+- **Real-data calibration**: Setting: the approved snapshot, if any. Snapshot 0002 (the only candidate) changes nothing: its one value, `G2E_IMU_HOLD_STEPS` 16, equals the profile's, and `G2E_CMD_PATH_EXTRA_MS_MAX` was rejected by the user; Where: `~/g2_data/calibration/`
 
 ### How often each hazard appears (user targets, 2026-10-08; measured by sampling the training reset, 2000 episodes at mature levels)
 
-| Challenge | Share of training episodes | Finished 20M for comparison |
-|---|---|---|
-| Rubble | 50% | 71% |
-| Box obstacles | 30% | 32% |
-| Slopes (ground tilted 5 deg or more) | 20% | 22% |
-| Rough floor | 20% | 22% |
-| Snag obstacles | 20% | 0% |
-| Ledges (full-width block, up or down) | 20% | 0% |
-| Surface step | 0% (removed) | 0% |
+- **Rubble**: Share of training episodes: 50%; Finished 20M for comparison: 71%
+- **Box obstacles**: Share of training episodes: 30%; Finished 20M for comparison: 32%
+- **Slopes (ground tilted 5 deg or more)**: Share of training episodes: 20%; Finished 20M for comparison: 22%
+- **Rough floor**: Share of training episodes: 20%; Finished 20M for comparison: 22%
+- **Snag obstacles**: Share of training episodes: 20%; Finished 20M for comparison: 0%
+- **Ledges (full-width block, up or down)**: Share of training episodes: 20%; Finished 20M for comparison: 0%
+- **Surface step**: Share of training episodes: 0% (removed); Finished 20M for comparison: 0%
 
 The settings that produce them: `G2E_RUBBLE_PROB` 0.575, `G2E_RANDOM_TERRAIN_PROB` 0.34 (boxes), `G2E_SLOPE_TARGET_PROB` 0.14 with `G2E_SLOPE_MAX_DEG` 10 (slopes), `G2E_ROUGH_TERRAIN_PROB` 0.25, `G2E_SNAG_OBSTACLE_PROB` 0.228, `G2E_LEDGE_PROB` 0.28. They are chances per episode; the measured shares are what the list above reports, after the episode mix (10% hazard-free anchors, focus and combo episodes). To re-check them: sample the reset with `g2_profile.env_for_job` for the new tag (see the hazard-mix method in the decisions log).
 
@@ -39,13 +35,11 @@ The faults lever is not part of K3, so the fault category stays inert in this ru
 
 **What the data says (capability test, Part B, 2026-10-08; policies: V2.1, K3 and the finished 20M; 20 episodes per cell; "success" = stayed up and covered half the commanded distance in 3 s, which is strict on slopes because every policy slows down there; the fall rate is the better sign of "impossible"):**
 
-| Hazard | Best policy (the finished 20M) | Reading |
-|---|---|---|
-| Side-hill roll 4 / 6 / 8 / 10 / 12 / 15 deg | falls 15 / 5 / 25 / 40 / 65 / 70% | passable to about 8-10 deg; the course reaches 15 deg (19 deg at level 1.25) |
-| Climb 8 / 12 / 16 / 20 / 24 deg | falls 5 / 15 / 15 / 50 / 70% (progress shrinks from 12 deg) | usable to about 12 deg; the course reaches 24 deg (30 at 1.25) |
-| Descent 8 / 12 / 16 / 20 deg | falls 10 / 30 / 60 / 65% | usable to about 12 deg |
-| Step-down (starts on the block, drops off) 1.5 / 2.5 / 3.5 cm | V2.1 and K3 pass 92-100% / about 50% / about 0%; the 20M passes 88% / 0% / 0% | none of them survives a drop of 3.5 cm or more; the course goes to 3.7 cm |
-| Step-up (climbs onto the block) 1.5-6 cm | few falls, but nobody gets onto the block within 3 s (0-8% pass) | untested ability: none of these policies ever trained on ledges |
+- **Side-hill roll 4 / 6 / 8 / 10 / 12 / 15 deg**: Best policy (the finished 20M): falls 15 / 5 / 25 / 40 / 65 / 70%; Reading: passable to about 8-10 deg; the course reaches 15 deg (19 deg at level 1.25)
+- **Climb 8 / 12 / 16 / 20 / 24 deg**: Best policy (the finished 20M): falls 5 / 15 / 15 / 50 / 70% (progress shrinks from 12 deg); Reading: usable to about 12 deg; the course reaches 24 deg (30 at 1.25)
+- **Descent 8 / 12 / 16 / 20 deg**: Best policy (the finished 20M): falls 10 / 30 / 60 / 65%; Reading: usable to about 12 deg
+- **Step-down (starts on the block, drops off) 1.5 / 2.5 / 3.5 cm**: Best policy (the finished 20M): V2.1 and K3 pass 92-100% / about 50% / about 0%; the 20M passes 88% / 0% / 0%; Reading: none of them survives a drop of 3.5 cm or more; the course goes to 3.7 cm
+- **Step-up (climbs onto the block) 1.5-6 cm**: Best policy (the finished 20M): few falls, but nobody gets onto the block within 3 s (0-8% pass); Reading: untested ability: none of these policies ever trained on ledges
 
 The ledge numbers measure policies that never trained on ledges, so they are a starting point, not a limit. The slope numbers are for policies that did train on slopes up to 24 deg and still fail above about 10 deg, which is much stronger evidence of a real limit.
 

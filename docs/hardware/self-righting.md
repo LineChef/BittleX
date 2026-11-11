@@ -37,10 +37,8 @@ Place him on his side by hand first, on the floor, hands near; never on his back
 
 **Results (2026-10-18, pod + AI head payload, paused; resume later):**
 
-| # | Move | Side | Balance | Result |
-|---|---|---|---|---|
-| 1 | `rc` (firmware) | right (roll about 108 deg) | on | not up: the body rose about 20 deg toward vertical for under a second, then fell back |
-| 2 | `s_rl_rc` (streamed, head pinned, 1 s per keyframe) | left (roll about -99 deg) | off | not up: roll did not change at all in 21 s (not yet known whether the legs moved) |
+- **1**: Move: `rc` (firmware); Side: right (roll about 108 deg); Balance: on; Result: not up: the body rose about 20 deg toward vertical for under a second, then fell back
+- **2**: Move: `s_rl_rc` (streamed, head pinned, 1 s per keyframe); Side: left (roll about -99 deg); Balance: off; Result: not up: roll did not change at all in 21 s (not yet known whether the legs moved)
 
 Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg and tilt 40 deg, into the legs' path with the AI head on; `rc` keeps the head straight for its flipping frames. Next when testing resumes: confirm whether the legs moved in test 2; then `s_rc --frame-s 0.4` (momentum), the firmware `rc` from the left side, and if none works, hand-guided teaching of a side roll (`gait/teach.py`).
 

@@ -110,18 +110,16 @@ options and waiting. Record the choice and its reasoning in the log.
 deterministic episodes, and emits JSON metrics. Core metrics and the failure mode
 each targets:
 
-| Metric | Failure mode |
-|---|---|
-| Forward distance, mean forward speed | progress / efficiency |
-| Speed error vs. `TARGET_SPEED` | holding the walk set-point (Run 7+) |
-| Yaw drift / heading deviation | curving off a straight line |
-| Per-foot peak swing height, stride length | shuffling vs. real steps |
-| Foot-slip distance while in contact | dragging feet |
-| Diagonal-trot phase correlation | wrong / no gait pattern |
-| Joint direction-reversal count | jitter |
-| Fell fraction, time-to-fall | stability |
-| Big-stumble recovery rate | catching a stumble before a fall (Run 7+) |
-| Roll & pitch variance | body stability |
+- **Forward distance, mean forward speed**: progress / efficiency
+- **Speed error vs. `TARGET_SPEED`**: holding the walk set-point (Run 7+)
+- **Yaw drift / heading deviation**: curving off a straight line
+- **Per-foot peak swing height, stride length**: shuffling vs. real steps
+- **Foot-slip distance while in contact**: dragging feet
+- **Diagonal-trot phase correlation**: wrong / no gait pattern
+- **Joint direction-reversal count**: jitter
+- **Fell fraction, time-to-fall**: stability
+- **Big-stumble recovery rate**: catching a stumble before a fall (Run 7+)
+- **Roll & pitch variance**: body stability
 
 `--dr-*` flags (`--dr-terrain`, `--dr-push`, …) force full-strength domain
 randomization for a held-out scenario the policy never trained on. Any flag

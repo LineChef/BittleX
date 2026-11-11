@@ -8,14 +8,12 @@ pre-hardware.
 
 ## Status at a glance
 
-| Part | State |
-|---|---|
-| Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`) | **Built and in use** |
-| Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`) | **Built and in use** |
-| System sampling for battery and Pi thermal (`diag/sysmon.py`) | Built; the Pi-specific reads degrade to nothing off the Pi |
-| Crash forensics for the voice service and exploration (`diag/crashwatch.py`) | **Built and in use** (2026-10-08) |
-| Disk-space warning (`util/disk.py`) | **Built and in use** |
-| Live Wi-Fi stream to a laptop, longer-term trend storage | **Designed, not built** (Phase 3, only if needed) |
+- **Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`)**: **Built and in use**
+- **Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`)**: **Built and in use**
+- **System sampling for battery and Pi thermal (`diag/sysmon.py`)**: Built; the Pi-specific reads degrade to nothing off the Pi
+- **Crash forensics for the voice service and exploration (`diag/crashwatch.py`)**: **Built and in use** (2026-10-08)
+- **Disk-space warning (`util/disk.py`)**: **Built and in use**
+- **Live Wi-Fi stream to a laptop, longer-term trend storage**: **Designed, not built** (Phase 3, only if needed)
 
 Package overview: [`../../pi_pipeline/diag/README.md`](../../pi_pipeline/diag/README.md).
 
@@ -106,18 +104,16 @@ A supervisor thread:
 Anticipated failure modes, each emitted with structured context so one call
 gives you the event *and* the black box:
 
-| Event | Fired by | Context |
-|---|---|---|
-| `link.lost` / `link.reconnect` | `serial_link` | consecutive timeouts, gap ms |
-| `imu.parse_fail` / `imu.stale` | `run_gait` | raw line, consecutive misses |
-| `servo.stall` | `thermal_guard` | joint, tracking error, held s |
-| `servo.thermal_cooldown` | `thermal_guard` | reason, per-joint heat, duty s |
-| `fall.detected` | `recovery` | roll/pitch, classified body state |
-| `onnx.overrun` | `residual_policy` | step ms vs budget |
-| `battery.sag` | watchdog | voltage, threshold |
-| `pi.thermal_throttle` | watchdog | `vcgencmd get_throttled` bits, SoC temp |
-| `loop.stall` | watchdog | last tick age, last ring row |
-| `wifi.drop` | watchdog / voice | RSSI, ping RTT |
+- **`link.lost` / `link.reconnect`**: Fired by: `serial_link`; Context: consecutive timeouts, gap ms
+- **`imu.parse_fail` / `imu.stale`**: Fired by: `run_gait`; Context: raw line, consecutive misses
+- **`servo.stall`**: Fired by: `thermal_guard`; Context: joint, tracking error, held s
+- **`servo.thermal_cooldown`**: Fired by: `thermal_guard`; Context: reason, per-joint heat, duty s
+- **`fall.detected`**: Fired by: `recovery`; Context: roll/pitch, classified body state
+- **`onnx.overrun`**: Fired by: `residual_policy`; Context: step ms vs budget
+- **`battery.sag`**: Fired by: watchdog; Context: voltage, threshold
+- **`pi.thermal_throttle`**: Fired by: watchdog; Context: `vcgencmd get_throttled` bits, SoC temp
+- **`loop.stall`**: Fired by: watchdog; Context: last tick age, last ring row
+- **`wifi.drop`**: Fired by: watchdog / voice; Context: RSSI, ping RTT
 
 ---
 

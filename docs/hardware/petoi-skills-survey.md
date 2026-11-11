@@ -10,24 +10,22 @@ order), the same format the RL env / SkillSwitch consume.
 
 ## High value for this project
 
-| skill | what it is | use for G2 |
-|---|---|---|
-| **`rc`** (recover) | scripted self-right, slow falls | already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch. |
-| **`balance`** | **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below) |
-| **`bx` / `showOff` / `chr` / `lucky`** | **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned (see below) |
-| **`buttUp`** (play-bow / downward-dog) | posture, nose-down pitch +15° | the **INSPECT peer-pose** the sim couldn't hold — Petoi already tuned it. Port as the INSPECT scaffold (tilt camera down at a near obstacle). |
-| **`carpetF` / `carpetL`** | walk gait tuned for **carpet** | directly targets the known "G2 stalls on carpet" problem. Decode + A/B vs `wkF` on the carpet cell. |
-| **`str`** (stretch) | "just woke up" stretch posture | idle / wake behaviour for the autonomous layer. |
-| **`snf`** (sniff) | head-down sniffing loop | **explore mode** — G2 sniffs around a new spot. |
-| **`scrh`** (scratch) | dog scratching, nose-down | idle personality behaviour. |
-| **`zz`** (zzz) | curl up to sleep | **sleep mode / idle-REST** (the user's power priority). |
-| **`nd`** (nod) | head nod | acknowledgement / "yes" in the voice + personality loop. |
-| **`sit`** | sit posture | idle, "stay", greeting. |
-| **`gdb`** (give paw / shake) | offer a paw, nose-down | **"G2, meet X"** enrollment + bonds; social greeting. |
-| **`fiv`** (high-five) / **`hi`** (wave) | social gesture | personality / interaction. |
-| **`jpF`** (jump forward) | genuine dynamic crouch-load-then-hop | (a) an "excited" expressive move; (b) the *untested* dynamic path for clearing an obstacle on hardware, where static climb failed. |
-| **`phF`** (pounce forward) | pounce | play behaviour; could pair with vision ball/target tracking. |
-| **`hunt`** | seeking / hunting routine | tie into vision tracking / the avoider. |
+- **`rc`** (recover): what it is: scripted self-right, slow falls; use for G2: already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch.
+- **`balance`**: what it is: **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 (see below)
+- **`bx` / `showOff` / `chr` / `lucky`**: what it is: **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned (see below)
+- **`buttUp`** (play-bow / downward-dog): what it is: posture, nose-down pitch +15°; use for G2: the **INSPECT peer-pose** the sim couldn't hold — Petoi already tuned it. Port as the INSPECT scaffold (tilt camera down at a near obstacle).
+- **`carpetF` / `carpetL`**: what it is: walk gait tuned for **carpet**; use for G2: directly targets the known "G2 stalls on carpet" problem. Decode + A/B vs `wkF` on the carpet cell.
+- **`str`** (stretch): what it is: "just woke up" stretch posture; use for G2: idle / wake behaviour for the autonomous layer.
+- **`snf`** (sniff): what it is: head-down sniffing loop; use for G2: **explore mode** — G2 sniffs around a new spot.
+- **`scrh`** (scratch): what it is: dog scratching, nose-down; use for G2: idle personality behaviour.
+- **`zz`** (zzz): what it is: curl up to sleep; use for G2: **sleep mode / idle-REST** (the user's power priority).
+- **`nd`** (nod): what it is: head nod; use for G2: acknowledgement / "yes" in the voice + personality loop.
+- **`sit`**: what it is: sit posture; use for G2: idle, "stay", greeting.
+- **`gdb`** (give paw / shake): what it is: offer a paw, nose-down; use for G2: **"G2, meet X"** enrollment + bonds; social greeting.
+- **`fiv`** (high-five) / **`hi`** (wave): what it is: social gesture; use for G2: personality / interaction.
+- **`jpF`** (jump forward): what it is: genuine dynamic crouch-load-then-hop; use for G2: (a) an "excited" expressive move; (b) the *untested* dynamic path for clearing an obstacle on hardware, where static climb failed.
+- **`phF`** (pounce forward): what it is: pounce; use for G2: play behaviour; could pair with vision ball/target tracking.
+- **`hunt`**: what it is: seeking / hunting routine; use for G2: tie into vision tracking / the avoider.
 
 - **balance:** **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 leg joints to 30° — **byte-identical to `up`** (the neutral-stand pose). In sim the body drops *lower* and all 4 legs splay out/up, not a dynamic balancing act.
 

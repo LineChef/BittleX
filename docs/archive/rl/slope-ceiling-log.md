@@ -18,11 +18,9 @@ While stress-testing `run20m_ppo` looking for a genuine fall (separate from
 the resid30 question), a quick decathlon pass found a real, clear failure
 mode that horizontal pushes and terrain roughness never produced:
 
-| Cell | Learned fall rate | Scripted fall rate |
-|---|---|---|
-| T9.1 -- 18 deg slope up (beyond training's 14 deg ceiling) | **62%** | 0% |
-| T8.2 -- rough/uneven + rolling swell | 12% | 0% |
-| T9.3 -- denser/taller rubble than training | 22% | 25% |
+- **T9.1 -- 18 deg slope up (beyond training's 14 deg ceiling)**: Learned fall rate: **62%**; Scripted fall rate: 0%
+- **T8.2 -- rough/uneven + rolling swell**: Learned fall rate: 12%; Scripted fall rate: 0%
+- **T9.3 -- denser/taller rubble than training**: Learned fall rate: 22%; Scripted fall rate: 25%
 
 Extensive testing ruled out other candidate stressors as the "real" weak
 point: horizontal shoves (any direction/timing, up to absurd magnitudes),

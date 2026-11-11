@@ -64,12 +64,10 @@ corner clip is needed (no separate notch screw — see
 2026-09-16 that hardware in this exact spec is real and purchasable — not
 just assumed to exist:
 
-| Option | What it is | Covers the range? |
-|---|---|---|
-| [800pc M2 Pan Head Self-Tapping Assortment (Amazon, `B0GV338JJK`)](https://www.amazon.com/800pcs-Self-Tapping-Head-Screws-Assortment/dp/B0GV338JJK) | 100 pcs each of M2×4/5/6/8/10/12/16/20, carbon steel, nickel-plated | **Best pick** — every length from 4–20mm in one kit, no guessing needed before test-fit |
-| [1200pc M2 Phillips Pan Head Self-Tapping Kit (Amazon, `B0146E9ZAQ`)](https://www.amazon.com/1200pcs-Phillips-Head-Tapping-Screws/dp/B0146E9ZAQ) | Larger mixed-length box kit, same head/drive/thread type | Alternative to the above if it's unavailable or a bigger box is wanted |
-| [uxcell 50pc M2×6mm Self-Tapping (Amazon, `B01M0DCPQ5`)](https://www.amazon.com/uxcell-Stainless-Phillips-Tapping-Screws/dp/B01M0DCPQ5) | Single length only (M2×6), stainless | Cheap way to test the shortest plausible length first, before committing to a full assortment |
-| [Misumi self-tapping pan-head line, part `CSPPNH02B-STN-M2-6`](https://us.misumi-ec.com/vona2/detail/221005018379/?HissuCode=CSPPNH02B-STN-M2-6) | Individual/bulk order by exact part number, industrial supplier | Useful if buying a precise single length later once test-fit confirms it, rather than a mixed assortment |
+- **[800pc M2 Pan Head Self-Tapping Assortment (Amazon, `B0GV338JJK`)](https://www.amazon.com/800pcs-Self-Tapping-Head-Screws-Assortment/dp/B0GV338JJK)**: What it is: 100 pcs each of M2×4/5/6/8/10/12/16/20, carbon steel, nickel-plated; Covers the range?: **Best pick** — every length from 4–20mm in one kit, no guessing needed before test-fit
+- **[1200pc M2 Phillips Pan Head Self-Tapping Kit (Amazon, `B0146E9ZAQ`)](https://www.amazon.com/1200pcs-Phillips-Head-Tapping-Screws/dp/B0146E9ZAQ)**: What it is: Larger mixed-length box kit, same head/drive/thread type; Covers the range?: Alternative to the above if it's unavailable or a bigger box is wanted
+- **[uxcell 50pc M2×6mm Self-Tapping (Amazon, `B01M0DCPQ5`)](https://www.amazon.com/uxcell-Stainless-Phillips-Tapping-Screws/dp/B01M0DCPQ5)**: What it is: Single length only (M2×6), stainless; Covers the range?: Cheap way to test the shortest plausible length first, before committing to a full assortment
+- **[Misumi self-tapping pan-head line, part `CSPPNH02B-STN-M2-6`](https://us.misumi-ec.com/vona2/detail/221005018379/?HissuCode=CSPPNH02B-STN-M2-6)**: What it is: Individual/bulk order by exact part number, industrial supplier; Covers the range?: Useful if buying a precise single length later once test-fit confirms it, rather than a mixed assortment
 
 **Recommendation: buy the 800pc assortment kit first.** It's the only option
 that removes the length guess entirely — every candidate length (6, 8, 10,

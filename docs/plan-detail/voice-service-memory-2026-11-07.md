@@ -3,13 +3,11 @@
 The Pi has 463 MB usable. With the voice service stopped the whole OS idles at about 114 MB; the service is the rest.
 
 ## Where the memory goes (a clean process loading each part in turn, service stopped)
-| Part | Cost |
-|---|---|
-| Python + `pi_pipeline`, numpy, onnxruntime, vosk imports | about 57 MB together |
-| Vosk model (the small mobile English model, 68 MB on disk) | 118 MB; the full-vocabulary and grammar recognisers add about 3 MB |
-| Piper `ryan-low` | 88 MB at load, **about 175 MB after the first sentence** (onnxruntime's memory arena keeps what it grabbed) |
-| Policy session | about 0 MB |
-| Camera, walker, memory database, threads | roughly 50-60 MB (the remainder of the service's total) |
+- **Python + `pi_pipeline`, numpy, onnxruntime, vosk imports**: about 57 MB together
+- **Vosk model (the small mobile English model, 68 MB on disk)**: 118 MB; the full-vocabulary and grammar recognisers add about 3 MB
+- **Piper `ryan-low`**: 88 MB at load, **about 175 MB after the first sentence** (onnxruntime's memory arena keeps what it grabbed)
+- **Policy session**: about 0 MB
+- **Camera, walker, memory database, threads**: roughly 50-60 MB (the remainder of the service's total)
 
 The service itself read 280 MB resident plus 71 MB in swap 3 minutes after boot (about 351 MB) before the change below.
 

@@ -8,10 +8,8 @@ coupled to movement or vision.
 
 SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory:
 
-| | What | How it's used |
-|---|---|---|
-| **Exchanges** | the conversation transcript, one row per turn, mirrored into an FTS5 index | relevance-searched at recall time for *older* turns related to what was just said |
-| **Facts** | short durable notes G2 chose to keep ("Their name is Sam.") | the top `G2_MEMORY_MAX_FACTS` (by recency of creation/use) are injected every turn |
+- **Exchanges**: What: the conversation transcript, one row per turn, mirrored into an FTS5 index; How it's used: relevance-searched at recall time for *older* turns related to what was just said
+- **Facts**: What: short durable notes G2 chose to keep ("Their name is Sam."); How it's used: the top `G2_MEMORY_MAX_FACTS` (by recency of creation/use) are injected every turn
 
 - **Exchanges:** Since 2026-10-07 turns that were only a short command ("rest", "walk forward") and exact repeats within 10 minutes are not logged (`G2_MEMORY_LOG_COMMANDS=1` brings them back); `python -m pi_pipeline.memory.review trash-commands [--apply]` moves the old ones to a trash you can restore from
 

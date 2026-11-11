@@ -39,12 +39,10 @@ Every setting an approach exposes is marked as one of:
 
 For the ball punt (settings from `behavior/punt_settings.py`, controls in `goals/ball_punt.py` `KNOB_INFO`):
 
-| Kind | Settings | Why |
-|---|---|---|
-| free | punch distance, small steps closer (from where, how many, how long), where the long walk stops, line-up tolerance, looks before searching, the search order, the turn between claw looks, claw-look pan and lift, what to do when the ball vanishes up close, the alignment pulse, alignment tries, what to do when he cannot line up | Where and when he punches, how he lines up, looks and searches: the outcome measures them directly, and every free setting is named by at least one outcome (a test checks it) |
-| ask | `punch_lunge_s` | A faster lunge hits harder but is the move most likely to tip him on the arm payload |
-| fixed | `search_walk`, `max_seconds`, `back_up_budget_s`, `claw_pan_sign`, the budget, the success definition, battery limits | Walking blind and backing up are only safe on a big floor (no edge detector); the pan direction is measured, not learned; the rest define the goal |
-| fixed | `punch_hold_s`, `back_up_s`, `stuck_punts`, `search_step_deg` | No outcome points at them, so G2 could never change them anyway (user, 2026-10-31); they become free again only with an outcome that names them |
+- **free**: Settings: punch distance, small steps closer (from where, how many, how long), where the long walk stops, line-up tolerance, looks before searching, the search order, the turn between claw looks, claw-look pan and lift, what to do when the ball vanishes up close, the alignment pulse, alignment tries, what to do when he cannot line up; Why: Where and when he punches, how he lines up, looks and searches: the outcome measures them directly, and every free setting is named by at least one outcome (a test checks it)
+- **ask**: Settings: `punch_lunge_s`; Why: A faster lunge hits harder but is the move most likely to tip him on the arm payload
+- **fixed**: Settings: `search_walk`, `max_seconds`, `back_up_budget_s`, `claw_pan_sign`, the budget, the success definition, battery limits; Why: Walking blind and backing up are only safe on a big floor (no edge detector); the pan direction is measured, not learned; the rest define the goal
+- **fixed**: Settings: `punch_hold_s`, `back_up_s`, `stuck_punts`, `search_step_deg`; Why: No outcome points at them, so G2 could never change them anyway (user, 2026-10-31); they become free again only with an outcome that names them
 
 **Not a setting at all: the walk.** Always the default gait policy (user, 2026-10-31). One gait keeps the learning clean: every change he makes is judged against the same walk,
 so a better score means the setting helped and not that the gait changed underneath; his measured pace stays one number per floor instead of two; it is the policy trained for
@@ -59,15 +57,13 @@ because the last attempts all succeeded with nothing left to try.
 
 ## The parts
 
-| Part | What |
-|---|---|
-| **Goal** | A JSON entry on the Pi (`~/.local/share/g2/goals.json`, written with `g2goal set`): what success means as measured by his own sensors, the allowed approaches, the settings he may change with their bounds, the budget (attempts, minutes, lowest pack %, falls) |
-| **Approach** | An existing behaviour run with given settings. The first one is the ball chase (`behavior/ball_chase.py`), whose settings and bounds already exist in `behavior/punt_settings.py` |
-| **Attempt record** | One line per attempt in `~/.local/share/g2/goal_journal.jsonl`: the settings used, the conditions (floor label, pack %, attachment, policy), the measured outcome, why it ended |
-| **Judgement** | After each attempt, local code reads the outcome, decides what to change for the next attempt and writes why, citing the attempts it used |
-| **Learned settings** | `~/.local/share/g2/goal_state.json`: the best known settings per goal and conditions (attachment + floor), the starting point of the next session. The user's own `punt_settings.json` is the starting point of the first session and is never overwritten |
-| **Notes** | Each decision carries a one-line first-person note built from the numbers. At the end of a session up to 3 of them are kept as memory facts (source `goal_lesson`, importance 2, never core), so he can talk about them when asked |
-| **Suggestions** | For ask settings: said when the voice service starts after the session; "confirm" writes it into the user's own settings, "cancel" drops it (not suggested again for 30 attempts), "review" or silence keeps it in the report (`g2goal confirm` / `cancel` later) |
+- **Goal**: A JSON entry on the Pi (`~/.local/share/g2/goals.json`, written with `g2goal set`): what success means as measured by his own sensors, the allowed approaches, the settings he may change with their bounds, the budget (attempts, minutes, lowest pack %, falls)
+- **Approach**: An existing behaviour run with given settings. The first one is the ball chase (`behavior/ball_chase.py`), whose settings and bounds already exist in `behavior/punt_settings.py`
+- **Attempt record**: One line per attempt in `~/.local/share/g2/goal_journal.jsonl`: the settings used, the conditions (floor label, pack %, attachment, policy), the measured outcome, why it ended
+- **Judgement**: After each attempt, local code reads the outcome, decides what to change for the next attempt and writes why, citing the attempts it used
+- **Learned settings**: `~/.local/share/g2/goal_state.json`: the best known settings per goal and conditions (attachment + floor), the starting point of the next session. The user's own `punt_settings.json` is the starting point of the first session and is never overwritten
+- **Notes**: Each decision carries a one-line first-person note built from the numbers. At the end of a session up to 3 of them are kept as memory facts (source `goal_lesson`, importance 2, never core), so he can talk about them when asked
+- **Suggestions**: For ask settings: said when the voice service starts after the session; "confirm" writes it into the user's own settings, "cancel" drops it (not suggested again for 30 attempts), "review" or silence keeps it in the report (`g2goal confirm` / `cancel` later)
 
 ### Session flow
 
@@ -86,19 +82,17 @@ Two layers, both plain code with tests:
 
 1. **Diagnosis: a table from a measured failure to the setting it points at.** Every attempt ends with an outcome code and its numbers. For the ball punt, for example:
 
-   | Outcome | Measured | The settings it points at and which way (the first one gets the most weight toward the focus) |
-   |---|---|---|
-   | `hit` / `hit_unseen` | the ball moved 8 in or more / went out of sight | keep everything |
-   | `missed` | the ball moved under 3 in | punch from closer, line up tighter, more small steps |
-   | `missed_off_line` | ... and the punch was well off straight | line up tighter, more alignment turns |
-   | `missed_vanished` | punched at a ball out of sight at the claw, it did not move | the other `when_vanished`, punch from closer |
-   | `weak_hit` | 3 to 8 in | punch from closer, line up tighter; suggest a faster lunge (ask) |
-   | `pushed_away` | the ball farther right after a walk toward it | stop the walk farther out, shorter small steps |
-   | `never_reached` | saw it, never got within 7 in | stop the walk closer, small steps from farther out |
-   | `align_overshoot` / `align_no_move` / `align_stuck` | small turns swung past the ball / did not move him / never lined up | shorter pulses / longer pulses / more tries, the other `when_misaligned` |
-   | `never_punted` | got close, never punched | line-up tolerance wider, fewer small steps, punch from farther |
-   | `never_found` | never saw the ball | another search order, a higher or wider claw look, smaller scan turns, fewer looks before searching |
-   | `fell` | | undo the change being tried; the session ends |
+   - **`hit` / `hit_unseen`**: Measured: the ball moved 8 in or more / went out of sight; The settings it points at and which way (the first one gets the most weight toward the focus): keep everything
+   - **`missed`**: Measured: the ball moved under 3 in; The settings it points at and which way (the first one gets the most weight toward the focus): punch from closer, line up tighter, more small steps
+   - **`missed_off_line`**: Measured: ... and the punch was well off straight; The settings it points at and which way (the first one gets the most weight toward the focus): line up tighter, more alignment turns
+   - **`missed_vanished`**: Measured: punched at a ball out of sight at the claw, it did not move; The settings it points at and which way (the first one gets the most weight toward the focus): the other `when_vanished`, punch from closer
+   - **`weak_hit`**: Measured: 3 to 8 in; The settings it points at and which way (the first one gets the most weight toward the focus): punch from closer, line up tighter; suggest a faster lunge (ask)
+   - **`pushed_away`**: Measured: the ball farther right after a walk toward it; The settings it points at and which way (the first one gets the most weight toward the focus): stop the walk farther out, shorter small steps
+   - **`never_reached`**: Measured: saw it, never got within 7 in; The settings it points at and which way (the first one gets the most weight toward the focus): stop the walk closer, small steps from farther out
+   - **`align_overshoot` / `align_no_move` / `align_stuck`**: Measured: small turns swung past the ball / did not move him / never lined up; The settings it points at and which way (the first one gets the most weight toward the focus): shorter pulses / longer pulses / more tries, the other `when_misaligned`
+   - **`never_punted`**: Measured: got close, never punched; The settings it points at and which way (the first one gets the most weight toward the focus): line-up tolerance wider, fewer small steps, punch from farther
+   - **`never_found`**: Measured: never saw the ball; The settings it points at and which way (the first one gets the most weight toward the focus): another search order, a higher or wider claw look, smaller scan turns, fewer looks before searching
+   - **`fell`**: The settings it points at and which way (the first one gets the most weight toward the focus): undo the change being tried; the session ends
 
    The table is data (`DIAGNOSIS` in `goals/ball_punt.py`); the scores are 0 to 1, a hit higher the farther the ball went and the sooner it happened.
 
@@ -135,13 +129,11 @@ The report shows each value's record ("3 in: 7 of 9 good"), so a value backed by
 All from the Mac (`g2goal`, `goals/overrides.py`, `~/.local/share/g2/goal_overrides.json`); `--floor tile` or `--scope attachment=arm|floor=tile` narrows one, the default is
 every attachment and floor. Who wins: a pin > a limit > what he learned > the user's own settings file.
 
-| Command | What it does |
-|---|---|
-| `pin GOAL KNOB VALUE` / `unpin` | holds a setting at the user's value; he cannot change it |
-| `limit GOAL KNOB LO HI` / `unlimit` | he keeps learning it, only inside the user's range |
-| `undo GOAL KNOB` / `unban GOAL KNOB VALUE` | bans his best value for it (for good, until unbanned); he goes to his next best |
-| `forget GOAL KNOB` | drops his record for one setting: back to the user's value, he may learn it again |
-| `overrides GOAL` | lists them |
+- **`pin GOAL KNOB VALUE` / `unpin`**: holds a setting at the user's value; he cannot change it
+- **`limit GOAL KNOB LO HI` / `unlimit`**: he keeps learning it, only inside the user's range
+- **`undo GOAL KNOB` / `unban GOAL KNOB VALUE`**: bans his best value for it (for good, until unbanned); he goes to his next best
+- **`forget GOAL KNOB`**: drops his record for one setting: back to the user's value, he may learn it again
+- **`overrides GOAL`**: lists them
 
 Every override goes into the journal and the report ("Your overrides").
 
@@ -149,19 +141,15 @@ Every override goes into the journal and the report ("Your overrides").
 
 Goals come in two kinds (`kind` in `goals/spec.py`):
 
-| | Task (punt the ball) | Standing (turn away from walls) |
-|---|---|---|
-| Shape | starts, succeeds or fails, ends | always on, no start or end |
-| An attempt | one find, walk and punch | every wall encounter, in any activity |
-| Chosen? | yes, one at a time | never: it runs inside every task as a limit |
+- **Shape**: Task (punt the ball): starts, succeeds or fails, ends; Standing (turn away from walls): always on, no start or end
+- **An attempt**: Task (punt the ball): one find, walk and punch; Standing (turn away from walls): every wall encounter, in any activity
+- **Chosen?**: Task (punt the ball): yes, one at a time; Standing (turn away from walls): never: it runs inside every task as a limit
 
 **The walls goal** (`goals/walls.py`, its settings in `behavior/wall_settings.py`, `~/.local/share/g2/wall_settings.json`): every attempt that meets a wall dials it in, in
 both directions (user, 2026-10-31). Every exploration and every ball chase hands it its wall encounters (`goals/standing.py`):
 
-| Where | Good | Too careful (pulls him closer) | Too late (pushes him farther) |
-|---|---|---|---|
-| Exploring | turned away, no touch in the next 8 s | turned away with the wall still more than 12 in off | turned but still touched it; bumped with no turn (the hit sequence or the IMU contact) |
-| Chasing | turned away at `chase_wall_in`, no touch | left a ball lying by a wall | turned but still touched it; bumped while walking (the policy walk's IMU contact, which also stops the walk) |
+- **Exploring**: Good: turned away, no touch in the next 8 s; Too careful (pulls him closer): turned away with the wall still more than 12 in off; Too late (pushes him farther): turned but still touched it; bumped with no turn (the hit sequence or the IMU contact)
+- **Chasing**: Good: turned away at `chase_wall_in`, no touch; Too careful (pulls him closer): left a ball lying by a wall; Too late (pushes him farther): turned but still touched it; bumped while walking (the policy walk's IMU contact, which also stops the walk)
 
 He tunes the exploration's turn distance (`wall_turn_in`, the wall reading's `TURN_IN`), its single-look distance, the fast-look distance, how short walks stop before a wall, his
 turn, and how close the chase may get (`chase_wall_in`, never below 4 in). Each is judged only by encounters where it acts. A made-up-world test checks that `chase_wall_in` settles
@@ -185,15 +173,13 @@ old ones carried through both calibrations to the same picture rows (`translate_
 
 ## Local reasoning or a Claude call
 
-| | Local on the Pi | A Claude call |
-|---|---|---|
-| Cost | free | billed per call (the API rule: sparingly) |
-| Speed | instant, so the next attempt can use it | seconds plus network; one call between every two attempts would add up fast |
-| Counting and comparing ("4 of 5 from 3.5 in, 1 of 4 from 4.5 in") | exact | can misread numbers |
-| Notes true to the data | always: built from the numbers | can sound confident about a cause that 10 attempts do not support |
-| Testable and repeatable | yes, same input gives the same choice | no |
-| A pattern nobody wrote a rule for ("the first walk after a stand-up covers nothing") | cannot see it | can, from the event log |
-| A new idea to try (a settle step, a new approach) | cannot | can suggest it, but G2 can only use what is in his list, so it becomes a code change anyway |
+- **Cost**: Local on the Pi: free; A Claude call: billed per call (the API rule: sparingly)
+- **Speed**: Local on the Pi: instant, so the next attempt can use it; A Claude call: seconds plus network; one call between every two attempts would add up fast
+- **Counting and comparing ("4 of 5 from 3.5 in, 1 of 4 from 4.5 in")**: Local on the Pi: exact; A Claude call: can misread numbers
+- **Notes true to the data**: Local on the Pi: always: built from the numbers; A Claude call: can sound confident about a cause that 10 attempts do not support
+- **Testable and repeatable**: Local on the Pi: yes, same input gives the same choice; A Claude call: no
+- **A pattern nobody wrote a rule for ("the first walk after a stand-up covers nothing")**: Local on the Pi: cannot see it; A Claude call: can, from the event log
+- **A new idea to try (a settle step, a new approach)**: Local on the Pi: cannot; A Claude call: can suggest it, but G2 can only use what is in his list, so it becomes a code change anyway
 
 **Recommendation:** G2 does all the judging locally; that is what makes the next attempt different. Claude's real value is spotting patterns and proposing new approaches or
 settings, which needs a code change to act on. That review happens when the user and Claude Code read the report together, at no cost on the Pi. An optional end-of-session Claude
@@ -219,11 +205,9 @@ notes match what you saw; is any setting drifting to one end of its bounds (a si
 
 The framework knows nothing about balls. A goal is three pieces, each found by name in a registry (like `personality/traits.py`'s `REGISTRY`):
 
-| Piece | What it provides |
-|---|---|
-| **Approach** | `settings()`: each setting with its kind (free / ask / fixed), type, bounds, step and default; `run(settings, ctx) -> AttemptResult` (events plus measured numbers) |
-| **Scorer** | `score(result) -> Outcome`: an outcome code, a graded score from 0 to 1 (not only hit or miss: "the ball moved 9 in" carries more to learn from than "hit") and the numbers |
-| **Diagnosis table** | Data, not code: outcome code -> the settings it points at and which way |
+- **Approach**: `settings()`: each setting with its kind (free / ask / fixed), type, bounds, step and default; `run(settings, ctx) -> AttemptResult` (events plus measured numbers)
+- **Scorer**: `score(result) -> Outcome`: an outcome code, a graded score from 0 to 1 (not only hit or miss: "the ball moved 9 in" carries more to learn from than "hit") and the numbers
+- **Diagnosis table**: Data, not code: outcome code -> the settings it points at and which way
 
 Everything else is shared by every goal: the session loop and budget, the judge (records, direction votes, the focus setting, Thompson sampling), the user's overrides, choosing between approaches, counting per conditions, the journal, notes,
 memory facts and the report. The conditions a result is counted under are the shared ones (attachment, floor) plus any the goal adds (a room once place memory names rooms,
@@ -231,13 +215,11 @@ the light level). A goal can later be made of steps (find the ball, then punt it
 
 Goals that fit later, with what is needed first:
 
-| Goal | Scored by | Needs first |
-|---|---|---|
-| Explore N minutes without a fall or bump | the exploration recap | nothing |
-| Find a named object | recognition at a survey stop | recognition checked on G2 |
-| Punt the ball toward a spot | where the ball ends up in the picture | the ball punt goal working |
-| Go to a room | the room vote | place memory P2 to P4 |
-| Walk straight across a floor | heading drift from the walk log | the user's call: tuning the walk on G2 touches the gait-comparison rule |
+- **Explore N minutes without a fall or bump**: Scored by: the exploration recap; Needs first: nothing
+- **Find a named object**: Scored by: recognition at a survey stop; Needs first: recognition checked on G2
+- **Punt the ball toward a spot**: Scored by: where the ball ends up in the picture; Needs first: the ball punt goal working
+- **Go to a room**: Scored by: the room vote; Needs first: place memory P2 to P4
+- **Walk straight across a floor**: Scored by: heading drift from the walk log; Needs first: the user's call: tuning the walk on G2 touches the gait-comparison rule
 
 ## Code layout
 
@@ -245,10 +227,8 @@ Goals that fit later, with what is needed first:
 
 ## Phases and gates
 
-| Phase | What | Gate |
-|---|---|---|
-| **G0** | Goal format, scorers, judge, journal, report, spoken suggestions; tested against fakes and synthetic pictures | Built 2026-10-31, tests pass |
-| **G1** | The ball-punt goal live on G2: start phrase, 10 attempts, judging between attempts (no shadow mode), notes, report | The scorer agrees with the user's call on the attempts; no unsafe behaviour. The next hardware run |
-| **G2** | Several goals: task and standing kinds, the walls goal (learned both ways in exploration and the chase, carried over a new calibration), the priority order, "G2, practise" | Built 2026-10-31 |
-| **G3** | Optional end-of-session Claude review, if the reports show patterns the rules miss | Its notes beat the local ones in the user's reading, worth the cost |
-| **G4** | Several goals, G2 picks which to pursue (B24) | A later decision by the user |
+- **G0**: What: Goal format, scorers, judge, journal, report, spoken suggestions; tested against fakes and synthetic pictures; Gate: Built 2026-10-31, tests pass
+- **G1**: What: The ball-punt goal live on G2: start phrase, 10 attempts, judging between attempts (no shadow mode), notes, report; Gate: The scorer agrees with the user's call on the attempts; no unsafe behaviour. The next hardware run
+- **G2**: What: Several goals: task and standing kinds, the walls goal (learned both ways in exploration and the chase, carried over a new calibration), the priority order, "G2, practise"; Gate: Built 2026-10-31
+- **G3**: What: Optional end-of-session Claude review, if the reports show patterns the rules miss; Gate: Its notes beat the local ones in the user's reading, worth the cost
+- **G4**: What: Several goals, G2 picks which to pursue (B24); Gate: A later decision by the user

@@ -73,15 +73,13 @@ An unofficial English summary and translation of the vendor documentation for th
 
 **Developer certification** (page "小智AI 开发者认证", July 2025). In the console, open the avatar menu, choose "认证为开发者" (certify as developer), then **bind a GitHub account**; all models and features unlock. Some commenters could not complete it (the certification screen stalled, or GitHub was unreachable from China).
 
-| Feature | Ordinary user | Developer |
-|---|---|---|
-| Language models | XiaoZhi Lite, quantized DeepSeek | those, plus Qwen 3, full DeepSeek, Doubao, and (preview, time-limited free) GLM 4.7 and Kimi K2 |
-| Vision model | time-limited free | time-limited free |
-| Memory | none, short-term; long-term "coming soon" (time-limited free) | same |
-| Role voices | Mandarin, other languages | plus preview Mandarin voices (time-limited free) |
-| MCP services | weather, jokes, music, news; knowledge base (preview, time-limited free) | plus internal-preview MCP services (time-limited free) |
-| Knowledge base | simple document parsing; 1 knowledge base; 1 document each | AI-optimized parsing (time-limited free); 10 knowledge bases; 10 documents each |
-| Bound open-source devices | 10 | 100 |
+- **Language models**: Ordinary user: XiaoZhi Lite, quantized DeepSeek; Developer: those, plus Qwen 3, full DeepSeek, Doubao, and (preview, time-limited free) GLM 4.7 and Kimi K2
+- **Vision model**: Ordinary user: time-limited free; Developer: time-limited free
+- **Memory**: Ordinary user: none, short-term; long-term "coming soon" (time-limited free); Developer: same
+- **Role voices**: Ordinary user: Mandarin, other languages; Developer: plus preview Mandarin voices (time-limited free)
+- **MCP services**: Ordinary user: weather, jokes, music, news; knowledge base (preview, time-limited free); Developer: plus internal-preview MCP services (time-limited free)
+- **Knowledge base**: Ordinary user: simple document parsing; 1 knowledge base; 1 document each; Developer: AI-optimized parsing (time-limited free); 10 knowledge bases; 10 documents each
+- **Bound open-source devices**: Ordinary user: 10; Developer: 100
 
 **Developer capabilities in the activation design.** The activation design page (section 7) lists, for developers: view a serial number's activation and deregister it, read device status and usage statistics, **real-time notification push (needs an active MQTT connection)**, and read and write an agent's configuration (marked "to be evaluated").
 
@@ -200,50 +198,48 @@ From Petoi's guide ([AI conversation](https://guide.petoi.com/extensible-modules
 
 All addresses are Feishu pages (open in a browser; no login was needed) unless noted; short forms drop the `https://` and the second-level host prefix is the part before `.feishu.cn`. **Read** pages are summarized above. The hub: "小智 AI 聊天机器人百科全书" (XiaoZhi AI Chatbot Encyclopedia), `ccnphfhqs21z.feishu.cn/wiki/F5krwD16viZoF0kKkvDcrZNYnhb` (also `xiaozhi.me/docs`).
 
-| Chinese title | Meaning | Address | Status |
-|---|---|---|---|
-| 小智AI 开发者认证 | Developer certification | `smvsudqc87.feishu.cn/docx/AjtQdM0KpoVQ3YxJfaLco4KsnSe` | **read** |
-| v2.2.4 小智AI终端最新版本固件及源码下载 | v2.2.4 latest firmware and source | `ccnphfhqs21z.feishu.cn/wiki/W14Kw1s1uieoKjkP8N0c1VVvn8d` | **read** |
-| v2.0.5 小智AI终端固件及源码下载 | v2.0.5 firmware and source | `my.feishu.cn/wiki/EuL7wqMOui2Mhgkw6ujcgre0ngg` | **read** |
-| v1.9.4 小智AI终端固件下载 | v1.9.4 firmware | `rcnv1t9vps13.feishu.cn/wiki/WJlMwqOkLigfWhk6YRjc028annf` | not read |
-| 小智AI聊天机器人面包板DIY硬件清单与接线教程 | Breadboard DIY parts list and wiring | `ccnphfhqs21z.feishu.cn/wiki/EH6wwrgvNiU7aykr7HgclP09nCh` | not read |
-| 小智AI终端DIY面包板WIFI-LCD彩屏接线教程 | Breadboard Wi-Fi color LCD wiring | `rcnv1t9vps13.feishu.cn/wiki/Zq62wST38iuNxZkwg9JcjkSSnSd` | not read |
-| 【最新】小智AI面包板带摄像头互动功能接线教程 | Breadboard with camera interaction wiring | `my.feishu.cn/wiki/HDWdwcVGUi3b3dk0IoycXR6pnOc` | not read |
-| Flash工具/Web端烧录固件（无IDF开发环境） | Flash tool and web flashing, no IDF | `ccnphfhqs21z.feishu.cn/wiki/Zpz4wXBtdimBrLk25WdcXzxcnNS` | **read** |
-| 配置设备 Wi-Fi 和添加设备及信号问题 | Set up Wi-Fi, add a device, signal problems | `ccnphfhqs21z.feishu.cn/wiki/KGvIwjTQxiTxPCkRbbjcPnsLnMb` | **read** |
-| 小智AI ESP32S3开发板+面包板DIY模块购买说明 | Buying notes for the S3 board and modules | `rcnv1t9vps13.feishu.cn/wiki/TdBIw5e0GiORQSkVuvmc74jandh` | not read |
-| AI类产品乐鑫设计参考以及要求 | Espressif design reference for AI products | `icnynnzcwou8.feishu.cn/wiki/IgzPwOoSFifXqZku0UkcQCBWn3f` | not read |
-| ESP32-C3小智AI终端面包板DIY硬件接线教程 | C3 breadboard wiring | `rcnv1t9vps13.feishu.cn/wiki/PovjwxG8tiEDrVkybstcqOz0nzf` | not read |
-| ESP32面包板-小智AI 制作说明 | Plain ESP32 breadboard build | `hcngjtwigghb.feishu.cn/wiki/CmZxwV17miwpYHk46ZpcXutOnJ8` | not read |
-| 小智AI声音复刻（公测）控制台操作指引 | Voice cloning console guide | `rcnv1t9vps13.feishu.cn/wiki/Kxw3wBk0EiepeQkOHpncWTOrn4r` | **read** |
-| 小智AI聊天机器人常见问题Q&A【先看】 | FAQ, read first | `rcnv1t9vps13.feishu.cn/wiki/JiQowaSe1itt07kyVvZcHFcQnee` | **read** |
-| 无法接收手机验证码、忘记密码或解绑设备 | No SMS code, forgotten password, unbinding | `ccnphfhqs21z.feishu.cn/wiki/IJmWwu841isfAWkz1dEcrJjznof` | **read** |
-| 小智知识库使用说明 | Knowledge base usage | `pipic77kjb4.feishu.cn/wiki/QS5ewZHh0iOEI0kdbjncmtY1nFg` | **read** |
-| 小智AI 固件在线编译功能操作教程文档 | Online firmware compile | `my.feishu.cn/wiki/MUIdwr3IUiMkngkmhPUcRnThndb` | **read** |
-| Windows搭建 ESP IDF开发环境&编译小智 | Windows ESP-IDF setup and building XiaoZhi | `icnynnzcwou8.feishu.cn/wiki/JEYDwTTALi5s2zkGlFGcDiRknXf` | **read, outline and menu sections** |
-| 小智AI终端开源项目配置修改等操作指引（一） | Open-source project configuration changes, part 1 | `rcnv1t9vps13.feishu.cn/wiki/UwaJwcJQwiuZVtk5QCfcrkS2nmf` | **read, outline only** |
-| 小智AI终端开源项目SDK配置AEC支持操作指引 | SDK configuration for echo cancellation | `rcnv1t9vps13.feishu.cn/wiki/JZ0vw5zcViWJaTkpa7Vccgr7nXb` | **read** |
-| 关于唤醒词更改及配置操作步骤 | Changing the wake word and its configuration | `rcnv1t9vps13.feishu.cn/wiki/H4dywK6ucigEtykKmm3cmZ7Dnog` | **read** |
-| 关于独立串口工具的使用操作指引 | Standalone serial tool guide | `rcnv1t9vps13.feishu.cn/wiki/R3Gmwk9IuiEtnvkXjgxcdRwonhf` | not read |
-| 修改提示音P3文件（例如开机播报和配网播报） | Changing the P3 prompt sounds | `icnynnzcwou8.feishu.cn/wiki/I5Mfw6USWivlRYk5yzzc3nC0nCg` | **read** |
-| 小智AI配置MCP接入点使用说明（官方） | MCP access-point guide (official) | `ccnphfhqs21z.feishu.cn/wiki/HiPEwZ37XiitnwktX13cEM5KnSb` | **read** |
-| 小智接入联网查询教程mcp | Web lookup through MCP | `x0ntkzs0zde.feishu.cn/docx/JKFXd8bLYo6YZtxz9ORcbnA8nbe` | not read |
-| 小智AI 简单操控电脑 超简方案 | Simple computer control (community) | `kcn80f4hacgs.feishu.cn/wiki/RTaHwEOp8iu6ACkXbrNcJ4GMnVg` | not read |
-| xiaozhi-mcphub-小智生态新一代mcp管理平台 | mcphub, an MCP management platform | `rhzmskwk8b.feishu.cn/wiki/VrHAwQRRdiWS8ykHk44cbdpynGe` | not read |
-| 简单赋予小智 MCP 能力（第三方工具接入与玩法示例） | Giving XiaoZhi MCP abilities, third-party examples | `lcn17bfbw6fr.feishu.cn/wiki/OzyBwcRD1i5nONkHmMQcJPQOnwc` | not read |
-| 小智接入联网搜索MCP（闪猫科技） | Web search MCP (a third party) | `pipic77kjb4.feishu.cn/wiki/EprvwfRSSiGtvOk7nQUcJh64nuh` | not read |
-| 小智AI终端固件支持开发板/产品及购买链接 | Supported boards and products with shops | `rcnv1t9vps13.feishu.cn/wiki/LdCrw9neaiGgzrkrFyjclllynYd` | not read |
-| 小智AI终端ASR自定义唤醒词简单方案 | Custom wake-word scheme with an add-on module | `kcn80f4hacgs.feishu.cn/wiki/OxsZwab8iiGYjvkH9SBcFK2anmh` | **read** |
-| 小智AI终端控制GPIO[简单教程] | Controlling GPIO pins | `kcn80f4hacgs.feishu.cn/docx/J2MrdqW27oybcCxu7Sfc4gBcn4g` | not read |
-| 小智ai面包板接电池简单教程 and 面包板小智接音响或者耳机简单教程 | Battery power, and speaker or earphones, on a breadboard | `x0ntkzs0zde.feishu.cn/docx/InARdPRGbo9gUfxYquWceFucnec` and `…/docx/KxASdc423oXIzlx8FLIcRJb5nAh` | not read |
-| 小智AI聊天机器人硬件开源项目汇集（一） | Open hardware projects, part 1 | `rcnv1t9vps13.feishu.cn/wiki/DdgIw4BUgivWDPkhMj1cGIYCnRf` | not read |
-| 通信协议：Websocket 连接 | Protocol: WebSocket connection | `ccnphfhqs21z.feishu.cn/wiki/M0XiwldO9iJwHikpXD5cEx71nKh` | **read** |
-| 通信协议：Emoji 心情显示 | Protocol: emoji mood display | `ccnphfhqs21z.feishu.cn/wiki/LDN2wbdRyi6evQk6xgXcTe6ened` | **read** |
-| OTA 接口文档 | OTA interface document | `ccnphfhqs21z.feishu.cn/wiki/FjW6wZmisimNBBkov6OcmfvknVd` | **read** |
-| 激活设备流程 v2 | Device activation flow v2 | `my.feishu.cn/wiki/LB6iwNFXwixyuwkm2jJcJPUxn3c` | **read** |
-| 固件修复 | Firmware repair, an old 4G version | `my.feishu.cn/wiki/YLpIwacbTim2jXkqz99caQyZnrr` | **read** |
-| Petoi: AI conversation | The Petoi head's guide | `guide.petoi.com/extensible-modules/ai-conversation` | **read** |
-| Petoi: BiBoard V1 guide; Xiaozhi AI (Quaddle) | Board sockets; the Quaddle S3 core board | `guide.petoi.com/biboard/biboard-v1-guide`; `guide.petoi.com/product/quaddle-under-construction/control-and-program/ai-conversation/xiaozhi-ai` | **read** |
+- **小智AI 开发者认证**: Meaning: Developer certification; Address: `smvsudqc87.feishu.cn/docx/AjtQdM0KpoVQ3YxJfaLco4KsnSe`; Status: **read**
+- **v2.2.4 小智AI终端最新版本固件及源码下载**: Meaning: v2.2.4 latest firmware and source; Address: `ccnphfhqs21z.feishu.cn/wiki/W14Kw1s1uieoKjkP8N0c1VVvn8d`; Status: **read**
+- **v2.0.5 小智AI终端固件及源码下载**: Meaning: v2.0.5 firmware and source; Address: `my.feishu.cn/wiki/EuL7wqMOui2Mhgkw6ujcgre0ngg`; Status: **read**
+- **v1.9.4 小智AI终端固件下载**: Meaning: v1.9.4 firmware; Address: `rcnv1t9vps13.feishu.cn/wiki/WJlMwqOkLigfWhk6YRjc028annf`; Status: not read
+- **小智AI聊天机器人面包板DIY硬件清单与接线教程**: Meaning: Breadboard DIY parts list and wiring; Address: `ccnphfhqs21z.feishu.cn/wiki/EH6wwrgvNiU7aykr7HgclP09nCh`; Status: not read
+- **小智AI终端DIY面包板WIFI-LCD彩屏接线教程**: Meaning: Breadboard Wi-Fi color LCD wiring; Address: `rcnv1t9vps13.feishu.cn/wiki/Zq62wST38iuNxZkwg9JcjkSSnSd`; Status: not read
+- **【最新】小智AI面包板带摄像头互动功能接线教程**: Meaning: Breadboard with camera interaction wiring; Address: `my.feishu.cn/wiki/HDWdwcVGUi3b3dk0IoycXR6pnOc`; Status: not read
+- **Flash工具/Web端烧录固件（无IDF开发环境）**: Meaning: Flash tool and web flashing, no IDF; Address: `ccnphfhqs21z.feishu.cn/wiki/Zpz4wXBtdimBrLk25WdcXzxcnNS`; Status: **read**
+- **配置设备 Wi-Fi 和添加设备及信号问题**: Meaning: Set up Wi-Fi, add a device, signal problems; Address: `ccnphfhqs21z.feishu.cn/wiki/KGvIwjTQxiTxPCkRbbjcPnsLnMb`; Status: **read**
+- **小智AI ESP32S3开发板+面包板DIY模块购买说明**: Meaning: Buying notes for the S3 board and modules; Address: `rcnv1t9vps13.feishu.cn/wiki/TdBIw5e0GiORQSkVuvmc74jandh`; Status: not read
+- **AI类产品乐鑫设计参考以及要求**: Meaning: Espressif design reference for AI products; Address: `icnynnzcwou8.feishu.cn/wiki/IgzPwOoSFifXqZku0UkcQCBWn3f`; Status: not read
+- **ESP32-C3小智AI终端面包板DIY硬件接线教程**: Meaning: C3 breadboard wiring; Address: `rcnv1t9vps13.feishu.cn/wiki/PovjwxG8tiEDrVkybstcqOz0nzf`; Status: not read
+- **ESP32面包板-小智AI 制作说明**: Meaning: Plain ESP32 breadboard build; Address: `hcngjtwigghb.feishu.cn/wiki/CmZxwV17miwpYHk46ZpcXutOnJ8`; Status: not read
+- **小智AI声音复刻（公测）控制台操作指引**: Meaning: Voice cloning console guide; Address: `rcnv1t9vps13.feishu.cn/wiki/Kxw3wBk0EiepeQkOHpncWTOrn4r`; Status: **read**
+- **小智AI聊天机器人常见问题Q&A【先看】**: Meaning: FAQ, read first; Address: `rcnv1t9vps13.feishu.cn/wiki/JiQowaSe1itt07kyVvZcHFcQnee`; Status: **read**
+- **无法接收手机验证码、忘记密码或解绑设备**: Meaning: No SMS code, forgotten password, unbinding; Address: `ccnphfhqs21z.feishu.cn/wiki/IJmWwu841isfAWkz1dEcrJjznof`; Status: **read**
+- **小智知识库使用说明**: Meaning: Knowledge base usage; Address: `pipic77kjb4.feishu.cn/wiki/QS5ewZHh0iOEI0kdbjncmtY1nFg`; Status: **read**
+- **小智AI 固件在线编译功能操作教程文档**: Meaning: Online firmware compile; Address: `my.feishu.cn/wiki/MUIdwr3IUiMkngkmhPUcRnThndb`; Status: **read**
+- **Windows搭建 ESP IDF开发环境&编译小智**: Meaning: Windows ESP-IDF setup and building XiaoZhi; Address: `icnynnzcwou8.feishu.cn/wiki/JEYDwTTALi5s2zkGlFGcDiRknXf`; Status: **read, outline and menu sections**
+- **小智AI终端开源项目配置修改等操作指引（一）**: Meaning: Open-source project configuration changes, part 1; Address: `rcnv1t9vps13.feishu.cn/wiki/UwaJwcJQwiuZVtk5QCfcrkS2nmf`; Status: **read, outline only**
+- **小智AI终端开源项目SDK配置AEC支持操作指引**: Meaning: SDK configuration for echo cancellation; Address: `rcnv1t9vps13.feishu.cn/wiki/JZ0vw5zcViWJaTkpa7Vccgr7nXb`; Status: **read**
+- **关于唤醒词更改及配置操作步骤**: Meaning: Changing the wake word and its configuration; Address: `rcnv1t9vps13.feishu.cn/wiki/H4dywK6ucigEtykKmm3cmZ7Dnog`; Status: **read**
+- **关于独立串口工具的使用操作指引**: Meaning: Standalone serial tool guide; Address: `rcnv1t9vps13.feishu.cn/wiki/R3Gmwk9IuiEtnvkXjgxcdRwonhf`; Status: not read
+- **修改提示音P3文件（例如开机播报和配网播报）**: Meaning: Changing the P3 prompt sounds; Address: `icnynnzcwou8.feishu.cn/wiki/I5Mfw6USWivlRYk5yzzc3nC0nCg`; Status: **read**
+- **小智AI配置MCP接入点使用说明（官方）**: Meaning: MCP access-point guide (official); Address: `ccnphfhqs21z.feishu.cn/wiki/HiPEwZ37XiitnwktX13cEM5KnSb`; Status: **read**
+- **小智接入联网查询教程mcp**: Meaning: Web lookup through MCP; Address: `x0ntkzs0zde.feishu.cn/docx/JKFXd8bLYo6YZtxz9ORcbnA8nbe`; Status: not read
+- **小智AI 简单操控电脑 超简方案**: Meaning: Simple computer control (community); Address: `kcn80f4hacgs.feishu.cn/wiki/RTaHwEOp8iu6ACkXbrNcJ4GMnVg`; Status: not read
+- **xiaozhi-mcphub-小智生态新一代mcp管理平台**: Meaning: mcphub, an MCP management platform; Address: `rhzmskwk8b.feishu.cn/wiki/VrHAwQRRdiWS8ykHk44cbdpynGe`; Status: not read
+- **简单赋予小智 MCP 能力（第三方工具接入与玩法示例）**: Meaning: Giving XiaoZhi MCP abilities, third-party examples; Address: `lcn17bfbw6fr.feishu.cn/wiki/OzyBwcRD1i5nONkHmMQcJPQOnwc`; Status: not read
+- **小智接入联网搜索MCP（闪猫科技）**: Meaning: Web search MCP (a third party); Address: `pipic77kjb4.feishu.cn/wiki/EprvwfRSSiGtvOk7nQUcJh64nuh`; Status: not read
+- **小智AI终端固件支持开发板/产品及购买链接**: Meaning: Supported boards and products with shops; Address: `rcnv1t9vps13.feishu.cn/wiki/LdCrw9neaiGgzrkrFyjclllynYd`; Status: not read
+- **小智AI终端ASR自定义唤醒词简单方案**: Meaning: Custom wake-word scheme with an add-on module; Address: `kcn80f4hacgs.feishu.cn/wiki/OxsZwab8iiGYjvkH9SBcFK2anmh`; Status: **read**
+- **小智AI终端控制GPIO[简单教程]**: Meaning: Controlling GPIO pins; Address: `kcn80f4hacgs.feishu.cn/docx/J2MrdqW27oybcCxu7Sfc4gBcn4g`; Status: not read
+- **小智ai面包板接电池简单教程 and 面包板小智接音响或者耳机简单教程**: Meaning: Battery power, and speaker or earphones, on a breadboard; Address: `x0ntkzs0zde.feishu.cn/docx/InARdPRGbo9gUfxYquWceFucnec` and `…/docx/KxASdc423oXIzlx8FLIcRJb5nAh`; Status: not read
+- **小智AI聊天机器人硬件开源项目汇集（一）**: Meaning: Open hardware projects, part 1; Address: `rcnv1t9vps13.feishu.cn/wiki/DdgIw4BUgivWDPkhMj1cGIYCnRf`; Status: not read
+- **通信协议：Websocket 连接**: Meaning: Protocol: WebSocket connection; Address: `ccnphfhqs21z.feishu.cn/wiki/M0XiwldO9iJwHikpXD5cEx71nKh`; Status: **read**
+- **通信协议：Emoji 心情显示**: Meaning: Protocol: emoji mood display; Address: `ccnphfhqs21z.feishu.cn/wiki/LDN2wbdRyi6evQk6xgXcTe6ened`; Status: **read**
+- **OTA 接口文档**: Meaning: OTA interface document; Address: `ccnphfhqs21z.feishu.cn/wiki/FjW6wZmisimNBBkov6OcmfvknVd`; Status: **read**
+- **激活设备流程 v2**: Meaning: Device activation flow v2; Address: `my.feishu.cn/wiki/LB6iwNFXwixyuwkm2jJcJPUxn3c`; Status: **read**
+- **固件修复**: Meaning: Firmware repair, an old 4G version; Address: `my.feishu.cn/wiki/YLpIwacbTim2jXkqz99caQyZnrr`; Status: **read**
+- **Petoi: AI conversation**: Meaning: The Petoi head's guide; Address: `guide.petoi.com/extensible-modules/ai-conversation`; Status: **read**
+- **Petoi: BiBoard V1 guide; Xiaozhi AI (Quaddle)**: Meaning: Board sockets; the Quaddle S3 core board; Address: `guide.petoi.com/biboard/biboard-v1-guide`; `guide.petoi.com/product/quaddle-under-construction/control-and-program/ai-conversation/xiaozhi-ai`; Status: **read**
 
 ## 14. Not yet read and open questions
 

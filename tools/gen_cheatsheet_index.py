@@ -6,7 +6,7 @@
 
 The index lists every `g2*` command in docs/guides/cheatsheet.md and cheatsheet-advanced.md with the section it is in. The rules (user, 2026-11-04: a quick reference shows
 an example you can copy, not the grammar of the command):
-  * a command row is | `example` | short description |, one command per row;
+  * a command row is a bullet, - **`example`**: short description, one command per row (no pipe tables in the docs);
   * the example has no [optional] brackets and no \\| choices (write one real example; give each variation its own row);
   * the description is at most 80 characters;
   * a `g2*` command exists in tools/g2_aliases.sh.
@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PAGES = [("cheatsheet.md", "docs/guides/cheatsheet.md"), ("cheatsheet-advanced.md", "docs/guides/cheatsheet-advanced.md")]
 START, END = "<!-- index:start -->", "<!-- index:end -->"
-ROW = re.compile(r"^\| `([^`]+)` \| (.*) \|$")
+ROW = re.compile(r"^- \*\*`([^`]+)`\*\*(?:: (.*))?$")
 MAX_DESC = 80
 
 
@@ -51,7 +51,7 @@ def rows(root: str = ROOT):
                 continue
             m = ROW.match(line)
             if m:
-                out.append((fname, heading, m.group(1), m.group(2), n))
+                out.append((fname, heading, m.group(1), m.group(2) or "", n))
     return out
 
 
@@ -78,10 +78,7 @@ def build_index(root: str = ROOT) -> str:
             link = f"[{heading}]({'' if fname == 'cheatsheet.md' else fname}#{slug(heading)})"
             if link not in where[first]:
                 where[first].append(link)
-    lines = ["| Command | Where |", "|---|---|"]
-    for a in sorted(where):
-        lines.append(f"| `{a}` | {', '.join(where[a])} |")
-    return "\n".join(lines)
+    return "\n".join(f"- **`{a}`**: {', '.join(where[a])}" for a in sorted(where))
 
 
 def build(root: str = ROOT) -> str:

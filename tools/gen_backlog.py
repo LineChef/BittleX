@@ -12,6 +12,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_lists  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
@@ -50,7 +53,7 @@ def build():
             link = (path[5:] if path.startswith("docs/") else "../" + path) + "#" + slug(heading_text)
             out.append(f"| [{iid}]({link}) | {item.replace('|', '/')} | {status.replace('|', '/')} |")
         out.append("")
-    return "\n".join(out).rstrip() + "\n"
+    return md_lists.convert("\n".join(out).rstrip() + "\n")[0]          # no pipe tables in the docs (tools/md_lists.py)
 
 
 def main():

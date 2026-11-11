@@ -32,18 +32,16 @@ header, no adapter needed:
 **Full pinout, confirmed no conflicts with each other or with BiBoard's
 existing wiring above:**
 
-| Signal | Pi pin | Used by |
-|---|---|---|
-| BiBoard GND | 6 | already wired |
-| BiBoard RX2 | 8 (GPIO14/TXD) | already wired |
-| BiBoard TX2 | 10 (GPIO15/RXD) | already wired |
-| Mic `VIN` | 1 or 17 (3.3V) | mic only — **not the amp's 5V pin** |
-| Amp `VIN` | 2 (5V) | amp only |
-| Amp/Mic `GND` | 9 (or any other free ground pin) | shared — all Pi ground pins are one common net |
-| Amp/Mic `BCLK` | 12 (GPIO18) | shared **by design** — one I2S clock line, both boards listen to it |
-| Amp/Mic `LRCLK` | 35 (GPIO19) | shared **by design**, same reasoning |
-| Mic `DOUT` | 38 (GPIO20) | mic only, audio data mic → Pi |
-| Amp `DIN` | 40 (GPIO21) | amp only, audio data Pi → amp |
+- **BiBoard GND**: Pi pin: 6; Used by: already wired
+- **BiBoard RX2**: Pi pin: 8 (GPIO14/TXD); Used by: already wired
+- **BiBoard TX2**: Pi pin: 10 (GPIO15/RXD); Used by: already wired
+- **Mic `VIN`**: Pi pin: 1 or 17 (3.3V); Used by: mic only — **not the amp's 5V pin**
+- **Amp `VIN`**: Pi pin: 2 (5V); Used by: amp only
+- **Amp/Mic `GND`**: Pi pin: 9 (or any other free ground pin); Used by: shared — all Pi ground pins are one common net
+- **Amp/Mic `BCLK`**: Pi pin: 12 (GPIO18); Used by: shared **by design** — one I2S clock line, both boards listen to it
+- **Amp/Mic `LRCLK`**: Pi pin: 35 (GPIO19); Used by: shared **by design**, same reasoning
+- **Mic `DOUT`**: Pi pin: 38 (GPIO20); Used by: mic only, audio data mic → Pi
+- **Amp `DIN`**: Pi pin: 40 (GPIO21); Used by: amp only, audio data Pi → amp
 
 ### Connectors, header pins, and the BCLK/LRCLK splice — confirmed 2026-09-30
 

@@ -3,20 +3,18 @@
 Run under a code freeze (owner, 2026-11-07): all tests back to back, no code changes during the run, updates made afterwards from this data. Raw data (per-round output, status lines, notes) is on the Pi in `~/g2_runs/hw_20261107/`. Hardwood, the drill is `behavior/transition_drill.py` (10 cycles a round: attention pose, claw look, stand-up from the attention pose, turn, turn back). The pack was read before every round and is not a gate: falls happened at 100% (8.39 V) and 95% as well as at 74-86%.
 
 ## Rounds
-| Variant | Round | Result | Where it fell |
-|---|---|---|---|
-| baseline | 1 | fell, 0 clean cycles | stand-up from attention (front right leg folded up) |
-| baseline | 2 | 10/10 clean, worst swing 6.2 deg | - |
-| baseline | 3 | fell, 0 clean cycles | attention-pose entry / claw look (tilt pitch -177..+150) |
-| cycle | 1 | fell after at least 1 clean cycle | stand-up from attention (back right leg out backwards); the drill did not detect it, stopped by hand about a minute later; output lost to buffering |
-| cycle | 2 | 10/10 clean, swing 6.5 | - |
-| cycle | 3 | fell in cycle 4 (3 clean), swing 20.6 | stand-up from attention |
-| pre* | 1 | fell in cycle 3 (2 clean) | during a turn right (pitch -115) |
-| pre* | 2 | 10/10 clean, 1 near fall (20.9) | - |
-| pre* | 3 | fell in cycle 2 (1 clean), 1 near fall (21.1) | stand-up from attention |
-| eased* | 1 | fell, 0 clean | stand-up from attention (back left leg went backwards); fell again after a krest from the stop script |
-| eased* | 2 | fell in cycle 4 (3 clean) | right after a level stand-up |
-| eased* | 3 | fell in cycle 6 (5 clean), 3 near falls | stand-up from attention swung 37 deg, then the turn went to pitch -68 |
+- **baseline**: Round: 1; Result: fell, 0 clean cycles; Where it fell: stand-up from attention (front right leg folded up)
+- **baseline**: Round: 2; Result: 10/10 clean, worst swing 6.2 deg; Where it fell: -
+- **baseline**: Round: 3; Result: fell, 0 clean cycles; Where it fell: attention-pose entry / claw look (tilt pitch -177..+150)
+- **cycle**: Round: 1; Result: fell after at least 1 clean cycle; Where it fell: stand-up from attention (back right leg out backwards); the drill did not detect it, stopped by hand about a minute later; output lost to buffering
+- **cycle**: Round: 2; Result: 10/10 clean, swing 6.5; Where it fell: -
+- **cycle**: Round: 3; Result: fell in cycle 4 (3 clean), swing 20.6; Where it fell: stand-up from attention
+- **pre***: Round: 1; Result: fell in cycle 3 (2 clean); Where it fell: during a turn right (pitch -115)
+- **pre***: Round: 2; Result: 10/10 clean, 1 near fall (20.9); Where it fell: -
+- **pre***: Round: 3; Result: fell in cycle 2 (1 clean), 1 near fall (21.1); Where it fell: stand-up from attention
+- **eased***: Round: 1; Result: fell, 0 clean; Where it fell: stand-up from attention (back left leg went backwards); fell again after a krest from the stop script
+- **eased***: Round: 2; Result: fell in cycle 4 (3 clean); Where it fell: right after a level stand-up
+- **eased***: Round: 3; Result: fell in cycle 6 (5 clean), 3 near falls; Where it fell: stand-up from attention swung 37 deg, then the turn went to pitch -68
 
 \* Low confidence: the voice service was running beside the drill from 10:25:53 PM (the owner ran `g2english`, which restarts it), sharing the serial port. Baseline and cycle rounds ran with it stopped. `cycle_pre` and the guards (`calm`, `gate`, `both`) were not run. One `pre` round was void (the board had gone silent after a fall; the owner power-cycled it).
 

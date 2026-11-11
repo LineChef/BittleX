@@ -4,11 +4,9 @@ Approved by the user 2026-10-10 (levels 1 to 3; level 4, reflection that changes
 
 ## The three levels (built 2026-10-10)
 
-| Level | What | Where | API |
-|---|---|---|---|
-| 1 Recap | At the end of each exploration session: duration, why it ended, turns away from walls, hits, falls, survey stops, what the camera saw at the stops, the closest wall, and (from place memory P2) the rooms. One JSON line per session in `~/.local/share/g2/experiences.jsonl` on the Pi. | `reflection/recap.py`, written by `explore_session.py` | none |
-| 2 Notes | While idle, one Claude call over the last 3 recaps writes at most 3 short first-person notes about his own experience. Saved as facts with source "experience" (importance 1 to 2, never core): visible and deletable in `g2pimem`, and in his prompt when a conversation touches them. | `reflection/reflect.py` | one call per new session |
-| 3 Speaking | "What did you do?" / "How was your exploration?" reads the latest recap; "What have you learned?" reads the notes. Both are local voice commands. ("How was your day?" stays an ordinary conversation.) | `voice/commands.py`, `voice/loop.py` | none |
+- **1 Recap**: What: At the end of each exploration session: duration, why it ended, turns away from walls, hits, falls, survey stops, what the camera saw at the stops, the closest wall, and (from place memory P2) the rooms. One JSON line per session in `~/.local/share/g2/experiences.jsonl` on the Pi.; Where: `reflection/recap.py`, written by `explore_session.py`; API: none
+- **2 Notes**: What: While idle, one Claude call over the last 3 recaps writes at most 3 short first-person notes about his own experience. Saved as facts with source "experience" (importance 1 to 2, never core): visible and deletable in `g2pimem`, and in his prompt when a conversation touches them.; Where: `reflection/reflect.py`; API: one call per new session
+- **3 Speaking**: What: "What did you do?" / "How was your exploration?" reads the latest recap; "What have you learned?" reads the notes. Both are local voice commands. ("How was your day?" stays an ordinary conversation.); Where: `voice/commands.py`, `voice/loop.py`; API: none
 
 ## Guardrails
 

@@ -27,32 +27,30 @@ session records exactly what ran.
 
 ## The flags
 
-| Layer | Flag | Depends on | Meaning |
-|---|---|---|---|
-| foundation | `link` | — | BiBoard serial link |
-| | `estop` | — | master safe-hold: forces all actuation/autonomy off |
-| sensing | `imu` | link | orientation estimate (feeds gait + fall detect) |
-| | `fall_detect` | imu | `off` / `alert` (log only) / `act` (run recovery) |
-| | `vision_safety` | camera | cliff/edge + obstacle, safety-critical |
-| | `vision_perception` | camera | scene / object / individual recognition, novelty |
-| | `mic` | — | audio input stream |
-| | `wake_word` | mic | continuous wake-word vs. push-to-talk |
-| actuation | `gait` | link, imu | `off` / `scripted` (firmware wkF) / `policy` (RL) |
-| | `thermal_guard` | gait | servo thermal protection |
-| | `sound_cues` | — | buzzer / chirp expressive output (≠ TTS) |
-| | `leds` | — | status / listening indicator |
-| cognition | `stt` | mic | speech-to-text |
-| | `tts` | — | text-to-speech |
-| | `claude` | network | LLM conversation layer (text-mode if no stt/tts) |
-| | `memory` | — | persistent store + recall |
-| | `personality` | — | trait biasing + bonds |
-| autonomy | `mode_controller` | — | mode FSM (IDLE / CONVERSE / EXPLORE …) |
-| | `explore` | gait, vision_safety | autonomous wander / investigate |
-| | `idle_rest` | gait | staged ACTIVE→SIT→RESTING descent |
-| | `avoidance_act` | vision_safety, gait | vision avoidance drives the actuator (vs. log only) |
-| | `object_gallery` | vision, explore | B20 recognition-by-instance library — opportunistic capture during explore, off by default |
-| cross | `power_profile` | — | `off` / `interactive` / `headless` |
-| | `diag` | — | black-box logging; kept on for bring-up |
+- **foundation**: Flag: `link`; Depends on: —; Meaning: BiBoard serial link
+- : Flag: `estop`; Depends on: —; Meaning: master safe-hold: forces all actuation/autonomy off
+- **sensing**: Flag: `imu`; Depends on: link; Meaning: orientation estimate (feeds gait + fall detect)
+- : Flag: `fall_detect`; Depends on: imu; Meaning: `off` / `alert` (log only) / `act` (run recovery)
+- : Flag: `vision_safety`; Depends on: camera; Meaning: cliff/edge + obstacle, safety-critical
+- : Flag: `vision_perception`; Depends on: camera; Meaning: scene / object / individual recognition, novelty
+- : Flag: `mic`; Depends on: —; Meaning: audio input stream
+- : Flag: `wake_word`; Depends on: mic; Meaning: continuous wake-word vs. push-to-talk
+- **actuation**: Flag: `gait`; Depends on: link, imu; Meaning: `off` / `scripted` (firmware wkF) / `policy` (RL)
+- : Flag: `thermal_guard`; Depends on: gait; Meaning: servo thermal protection
+- : Flag: `sound_cues`; Depends on: —; Meaning: buzzer / chirp expressive output (≠ TTS)
+- : Flag: `leds`; Depends on: —; Meaning: status / listening indicator
+- **cognition**: Flag: `stt`; Depends on: mic; Meaning: speech-to-text
+- : Flag: `tts`; Depends on: —; Meaning: text-to-speech
+- : Flag: `claude`; Depends on: network; Meaning: LLM conversation layer (text-mode if no stt/tts)
+- : Flag: `memory`; Depends on: —; Meaning: persistent store + recall
+- : Flag: `personality`; Depends on: —; Meaning: trait biasing + bonds
+- **autonomy**: Flag: `mode_controller`; Depends on: —; Meaning: mode FSM (IDLE / CONVERSE / EXPLORE …)
+- : Flag: `explore`; Depends on: gait, vision_safety; Meaning: autonomous wander / investigate
+- : Flag: `idle_rest`; Depends on: gait; Meaning: staged ACTIVE→SIT→RESTING descent
+- : Flag: `avoidance_act`; Depends on: vision_safety, gait; Meaning: vision avoidance drives the actuator (vs. log only)
+- : Flag: `object_gallery`; Depends on: vision, explore; Meaning: B20 recognition-by-instance library — opportunistic capture during explore, off by default
+- **cross**: Flag: `power_profile`; Depends on: —; Meaning: `off` / `interactive` / `headless`
+- : Flag: `diag`; Depends on: —; Meaning: black-box logging; kept on for bring-up
 
 ## Dependency rules (`Features.resolve()`)
 
@@ -73,18 +71,16 @@ Adjustments are applied and reported, never silent:
 Each = the previous + one layer, so a regression is isolated to the layer just
 added:
 
-| Profile | Adds |
-|---|---|
-| `p0-link` | `link` |
-| `p1-sensing` | `imu`, `fall_detect=alert` |
-| `p2-gait` | `fall_detect=act`, `gait=scripted`, `thermal_guard`, `leds`, `sound_cues` |
-| `p3-safety` | `vision_safety`, `avoidance_act` |
-| `p4-perception` | `vision_perception` |
-| `p5-voice` | `mic`, `stt`, `tts`, `claude` (push-to-talk) |
-| `p6-wake` | `wake_word` |
-| `p7-memory` | `memory`, `personality` |
-| `p8-autonomy` | `mode_controller`, `explore`, `idle_rest` |
-| `p9-full` | `gait=policy`, `power_profile=headless` — the default |
+- **`p0-link`**: `link`
+- **`p1-sensing`**: `imu`, `fall_detect=alert`
+- **`p2-gait`**: `fall_detect=act`, `gait=scripted`, `thermal_guard`, `leds`, `sound_cues`
+- **`p3-safety`**: `vision_safety`, `avoidance_act`
+- **`p4-perception`**: `vision_perception`
+- **`p5-voice`**: `mic`, `stt`, `tts`, `claude` (push-to-talk)
+- **`p6-wake`**: `wake_word`
+- **`p7-memory`**: `memory`, `personality`
+- **`p8-autonomy`**: `mode_controller`, `explore`, `idle_rest`
+- **`p9-full`**: `gait=policy`, `power_profile=headless` — the default
 
 Bring-up: assemble → `p0-link`, work through the day-1 checklist for that layer,
 then advance. Move `gait` to `policy` only after `scripted` is validated on the

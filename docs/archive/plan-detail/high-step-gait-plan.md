@@ -8,12 +8,10 @@ Goal: real extra ground clearance for G2 (cables, thresholds, rubble) behind the
 
 Every scripted option so far is a knee-folded crouch or fell in the sim:
 
-| Gait | Foot clearance (sim) | Result |
-|---|---|---|
-| normal walk (`wkF`) | 13.5 mm | the reference |
-| `hsF` (what "hi step" plays today) | 17.8 mm | stays up open loop, but does not lift the feet; G2 does a crouching walk (user, 2026-10-10) |
-| `hsB`, `hsC` | 25-27 mm | fell about 90% of episodes open loop |
-| `carpetF` (firmware gait) | -- | tried on G2 2026-10-10, rejected by eye |
+- **normal walk (`wkF`)**: Foot clearance (sim): 13.5 mm; Result: the reference
+- **`hsF` (what "hi step" plays today)**: Foot clearance (sim): 17.8 mm; Result: stays up open loop, but does not lift the feet; G2 does a crouching walk (user, 2026-10-10)
+- **`hsB`, `hsC`**: Foot clearance (sim): 25-27 mm; Result: fell about 90% of episodes open loop
+- **`carpetF` (firmware gait)**: Foot clearance (sim): --; Result: tried on G2 2026-10-10, rejected by eye
 
 A tall step needs active balance, which is what a learned correction on top of a scripted base gives. The gait mode input, the voice switch and the mid-walk blend are already built; they wait for a policy trained for the mode (V6 sidecar has no `"modes"` key). Background: [`v6-staged-training-plan.md`](../../plan-detail/v6-staged-training-plan.md) "Track A / Track C".
 

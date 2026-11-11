@@ -29,16 +29,14 @@ One day of work on getting G2 (with the pod payload) to walk on carpet. **Result
 
 ## What was measured on the real carpet
 
-| Walk | Result |
-|---|---|
-| V7, 6 walks (balance on and off, two speeds) | all fell right in 1 to 1.5 s |
-| `adapt3m` carpet policy, 3 walks (0.10, 0.10, 0.05 m/s) | tilt past 45 degrees at 1.0, 1.6, 1.6 s; right, left, right |
-| Stall-model policy (`astall3mb`), 1 walk | stepped in place, slow lean to the left, over at 3.4 s (longest so far, never walked) |
-| Scripted walk with longer, higher strokes (knees x1.6, shoulders x1.3) | fell right at 1.4 s |
-| Scripted crawl (one leg at a time, order FR, BL, FL, BR; `creepfr_ref.npy`), **held by hand** | completed 10 s and **propelled him across the carpet** (owner's observation); IMU log sparse |
-| Petoi firmware `kcarpetF`, **held** | 10 s, roll within about +/-10 degrees, heading turned 35 degrees; **promising but the body bounced a lot and the payload travelled a lot** |
-| Open-loop replay of Petoi's carpet reference (`carpet_ref.npy`) | worse than the firmware gait and stopped walking forward: the replay is not the firmware gait |
-| `kcarpetF` three runs after the replay tests | G2 only stood and rested (roll +/-2 degrees); the board was probably left in joint-command mode; power-cycle the BiBoard before firmware-skill tests |
+- **V7, 6 walks (balance on and off, two speeds)**: all fell right in 1 to 1.5 s
+- **`adapt3m` carpet policy, 3 walks (0.10, 0.10, 0.05 m/s)**: tilt past 45 degrees at 1.0, 1.6, 1.6 s; right, left, right
+- **Stall-model policy (`astall3mb`), 1 walk**: stepped in place, slow lean to the left, over at 3.4 s (longest so far, never walked)
+- **Scripted walk with longer, higher strokes (knees x1.6, shoulders x1.3)**: fell right at 1.4 s
+- **Scripted crawl (one leg at a time, order FR, BL, FL, BR; `creepfr_ref.npy`), **held by hand****: completed 10 s and **propelled him across the carpet** (owner's observation); IMU log sparse
+- **Petoi firmware `kcarpetF`, **held****: 10 s, roll within about +/-10 degrees, heading turned 35 degrees; **promising but the body bounced a lot and the payload travelled a lot**
+- **Open-loop replay of Petoi's carpet reference (`carpet_ref.npy`)**: worse than the firmware gait and stopped walking forward: the replay is not the firmware gait
+- **`kcarpetF` three runs after the replay tests**: G2 only stood and rested (roll +/-2 degrees); the board was probably left in joint-command mode; power-cycle the BiBoard before firmware-skill tests
 
 **No walk with the weight fully on G2's feet stayed up past 3.4 s.** Every hand-held run is excluded from "it works": the hands damp the roll.
 
@@ -64,13 +62,11 @@ One day of work on getting G2 (with the pod payload) to walk on carpet. **Result
 
 ## Tools and knobs added (all in `rl_training/opencat-gym/`, uncommitted unless noted)
 
-| What | Where |
-|---|---|
-| Carpet pad, servo-strength and pod-offset draws, adaptive level, stall | `opencat_gym_env.py` knobs `CARPET_*`, `MOTOR_FORCE_LO`, `POD_RIGHT_MAX`, `CARPET_STALL` |
-| Short-probe runner (variants, fixed or adaptive carpet, scored on four carpets) | `phase_probe.py` (`run NAME...`, `show`) |
-| Closed-loop carpet scorer | `carpet_fit.py` |
-| Open-loop replay of real logs | `replay_carpet.py` |
-| Chain runner for the carpet ground (round 1) | `phase_carpet.py` |
-| Carpet mode on G2 (committed): "G2, carpet mode" plays Petoi's firmware carpet gait; "G2, switch to default gait" goes back | `pi_pipeline/gait/gait_mode.py`, `policy_walker.py`, `fw_skill_log.py` |
+- **Carpet pad, servo-strength and pod-offset draws, adaptive level, stall**: `opencat_gym_env.py` knobs `CARPET_*`, `MOTOR_FORCE_LO`, `POD_RIGHT_MAX`, `CARPET_STALL`
+- **Short-probe runner (variants, fixed or adaptive carpet, scored on four carpets)**: `phase_probe.py` (`run NAME...`, `show`)
+- **Closed-loop carpet scorer**: `carpet_fit.py`
+- **Open-loop replay of real logs**: `replay_carpet.py`
+- **Chain runner for the carpet ground (round 1)**: `phase_carpet.py`
+- **Carpet mode on G2 (committed): "G2, carpet mode" plays Petoi's firmware carpet gait; "G2, switch to default gait" goes back**: `pi_pipeline/gait/gait_mode.py`, `policy_walker.py`, `fw_skill_log.py`
 
 Real-walk logs of the day (raw CSVs) are kept on the dev machine, not in the repo.

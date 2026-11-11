@@ -28,11 +28,9 @@ either way.
 
 ## Three runs
 
-| tag | what | steps | purpose |
-|---|---|---|---|
-| `probe_ref` | from scratch, single skill (high-step only) | 2e6 | yardstick — what learning this skill looks like with nothing competing |
-| `probe_adapterA` | frozen `run20m_ppo` + zero-init adapter, **adapter-only** training, high-step skill | 2e6 | the actual test |
-| `probe_ctrlB` | from scratch, 2-skill (normal + high-step, per-episode one-hot) | 3e6 | control — can a net of this class hold skill + normal, both intact |
+- **`probe_ref`**: what: from scratch, single skill (high-step only); steps: 2e6; purpose: yardstick — what learning this skill looks like with nothing competing
+- **`probe_adapterA`**: what: frozen `run20m_ppo` + zero-init adapter, **adapter-only** training, high-step skill; steps: 2e6; purpose: the actual test
+- **`probe_ctrlB`**: what: from scratch, 2-skill (normal + high-step, per-episode one-hot); steps: 3e6; purpose: control — can a net of this class hold skill + normal, both intact
 
 `probe_ref` is the shared yardstick both A and B are measured against (A-vs-B
 head-to-head is NOT a controlled comparison — different init/params/budget — and
@@ -125,11 +123,9 @@ Log → `trained/adapter_probe_results.log`. Milestone lines: `probe_ref done`,
 
 ## Verdict (2×2)
 
-| A learns skill | B learns skill | Read |
-|---|---|---|
-| yes | — | **adapters viable** → architecture = stable base + cheap per-skill adapters |
-| no | yes | base too specialized → need a fresh **multi-skill base** first (seed from `run20m_ppo`), then adapters on that |
-| no | no | skill too hard at this budget OR this net class can't hold it → rethink the target skill, not the architecture |
+- **yes**: B learns skill: —; Read: **adapters viable** → architecture = stable base + cheap per-skill adapters
+- **no**: B learns skill: yes; Read: base too specialized → need a fresh **multi-skill base** first (seed from `run20m_ppo`), then adapters on that
+- **no**: B learns skill: no; Read: skill too hard at this budget OR this net class can't hold it → rethink the target skill, not the architecture
 
 Run A must ALSO show ~0 regression on the obstacle-free cells (expected by
 construction with a frozen base — confirm it).

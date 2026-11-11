@@ -12,6 +12,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_lists  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "g2_aliases.sh")
@@ -72,7 +75,7 @@ def build():
             desc = re.sub(r"\s+", " ", desc).strip()[:420] or "—"
             out.append(f"| `{use.replace('|', '/')}` | {desc.replace('|', '/')} |")
         out.append("")
-    return "\n".join(out).rstrip() + "\n"
+    return md_lists.convert("\n".join(out).rstrip() + "\n")[0]          # no pipe tables in the docs (tools/md_lists.py)
 
 
 def main():

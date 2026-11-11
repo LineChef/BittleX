@@ -28,15 +28,13 @@ S0 flat foundation 2M (flat only, light nudges, strong mirror loss) | S1 terrain
 
 ## Foot-clearance probe, both rounds (open-loop base gaits in the sim, no policy; `rl_training/opencat-gym/gait_probe.py`)
 
-| Base gait | Clearance p90 | Calm-walk roll | Calm-walk speed | Calm-walk falls | Boxes falls | Rubble falls | 15 mm ledge falls |
-|---|---|---|---|---|---|---|---|
-| wkF (scripted) | 13.5 mm | 2.5 deg | 0.091 | 0.00 | 0.08 | 0.06 | 0.04 |
-| A (+20 sh, +32 kn, rear x1.35) | 20.2 | 15.6 | 0.034 | 0.65 | 0.13 | 0.15 | 0.58 |
-| B (+26, +42) | 25.5 | 19.2 | 0.021 | 0.91 | 0.42 | 0.29 | 0.57 |
-| C (+32, +52) | 27.5 | 20.8 | 0.011 | 0.89 | 0.31 | 0.17 | 0.32 |
-| D (+14, +40, rear x1.0) | 16.9 | 6.3 | 0.050 | 0.01 | 0.00 | 0.00 | 0.15 |
-| E (+20, +32, rear x1.0) | 17.1 | 9.9 | 0.040 | 0.17 | 0.05 | 0.08 | 0.50 |
-| F (+8, +46, rear x1.0) | 17.8 | 6.8 | 0.040 | 0.04 | 0.01 | 0.01 | 0.00 |
+- **wkF (scripted)**: Clearance p90: 13.5 mm; Calm-walk roll: 2.5 deg; Calm-walk speed: 0.091; Calm-walk falls: 0.00; Boxes falls: 0.08; Rubble falls: 0.06; 15 mm ledge falls: 0.04
+- **A (+20 sh, +32 kn, rear x1.35)**: Clearance p90: 20.2; Calm-walk roll: 15.6; Calm-walk speed: 0.034; Calm-walk falls: 0.65; Boxes falls: 0.13; Rubble falls: 0.15; 15 mm ledge falls: 0.58
+- **B (+26, +42)**: Clearance p90: 25.5; Calm-walk roll: 19.2; Calm-walk speed: 0.021; Calm-walk falls: 0.91; Boxes falls: 0.42; Rubble falls: 0.29; 15 mm ledge falls: 0.57
+- **C (+32, +52)**: Clearance p90: 27.5; Calm-walk roll: 20.8; Calm-walk speed: 0.011; Calm-walk falls: 0.89; Boxes falls: 0.31; Rubble falls: 0.17; 15 mm ledge falls: 0.32
+- **D (+14, +40, rear x1.0)**: Clearance p90: 16.9; Calm-walk roll: 6.3; Calm-walk speed: 0.050; Calm-walk falls: 0.01; Boxes falls: 0.00; Rubble falls: 0.00; 15 mm ledge falls: 0.15
+- **E (+20, +32, rear x1.0)**: Clearance p90: 17.1; Calm-walk roll: 9.9; Calm-walk speed: 0.040; Calm-walk falls: 0.17; Boxes falls: 0.05; Rubble falls: 0.08; 15 mm ledge falls: 0.50
+- **F (+8, +46, rear x1.0)**: Clearance p90: 17.8; Calm-walk roll: 6.8; Calm-walk speed: 0.040; Calm-walk falls: 0.04; Boxes falls: 0.01; Rubble falls: 0.01; 15 mm ledge falls: 0.00
 
 - The back-hip boost (x1.35) was the main source of the sway: without it and with the lift moved from the shoulders to the knees, D and F are stable (roll 6-7 deg, flat falls under 5%) and clear boxes and rubble better than scripted.
 - No base gait crosses a ledge on its own (success 0.00 at every size for A-F; the stable ones also walk at under half the commanded speed). The tall ones that reach 25 mm of clearance (B, C) are not walkable open loop.
@@ -46,13 +44,11 @@ S0 flat foundation 2M (flat only, light nudges, strong mirror loss) | S1 terrain
 ## Status log (2026-10-09 evening) -- runner `rl_training/opencat-gym/phase_v6.py`, log `trained/phase_v6.log`, state `trained/v6_state.json`, watchdog `tools/v6_watchdog.sh`
 Resume: `cd rl_training/opencat-gym && ../../.venv/bin/python phase_v6.py status`; if the watchdog is not running and `trained/v6_halt` does not exist: `nohup bash ../../tools/v6_watchdog.sh > /dev/null 2>&1 &`. A halt is Claude's own review point (the user delegated the 20M call): read the halt line, decide, `rm trained/v6_halt`, restart the watchdog. Never type the runner's or a tag's process text in a shell command (`pgrep` matches your own shell).
 
-| Stage (steps) | Result (40 episodes per cell, 20 per ladder size) |
-|---|---|
-| S0 flat, 2M | flat falls 0; speed 0.103; heading 16 deg; asymmetry 1.3; ladder falls 0.07; crossing 0.31 |
-| S1 terrain, 3M | rubble and snag cells 0.00; slopes got worse (no slope episodes): 10 deg cross-slope 0.97; heading 16, asymmetry 1.2 |
-| S2 ledges, 3M, **first attempt** | loophole: falls fell (step-up 0.15/0.00/0.05 at 15/22.5/30 mm) but success 0.00 above 7.5 mm and 0.15 at 7.5 mm. The per-step paw-lift bonus cancelled the stall cost (hover with a paw raised). Kept as `trained/v6_a1s2_*`, score `trained/v6_a1_score_s2.json` |
-| S2, **second attempt** | lift bonus paid ONCE per episode (20), stall cost 2, ledge sizes start at 2.5 / 10 mm: 7.5 mm step-up success 0.65 (scripted 0.47), 15 mm step-down 0.00 falls / 1.00 success (scripted 0.05 / 0.95); 15-30 mm step-ups fall 0.45-0.70 (they try, none crossed); calm walk heading 13, asymmetry 0.5, roll 2.4 |
-| S3 slopes, 1M | mean falls over 31 cells 0.293 (V5 0.230, V4 0.189); flat 0; heading 15, asymmetry 0.8; 7.5 mm step-up success 0.60 |
+- **S0 flat, 2M**: flat falls 0; speed 0.103; heading 16 deg; asymmetry 1.3; ladder falls 0.07; crossing 0.31
+- **S1 terrain, 3M**: rubble and snag cells 0.00; slopes got worse (no slope episodes): 10 deg cross-slope 0.97; heading 16, asymmetry 1.2
+- **S2 ledges, 3M, **first attempt****: loophole: falls fell (step-up 0.15/0.00/0.05 at 15/22.5/30 mm) but success 0.00 above 7.5 mm and 0.15 at 7.5 mm. The per-step paw-lift bonus cancelled the stall cost (hover with a paw raised). Kept as `trained/v6_a1s2_*`, score `trained/v6_a1_score_s2.json`
+- **S2, **second attempt****: lift bonus paid ONCE per episode (20), stall cost 2, ledge sizes start at 2.5 / 10 mm: 7.5 mm step-up success 0.65 (scripted 0.47), 15 mm step-down 0.00 falls / 1.00 success (scripted 0.05 / 0.95); 15-30 mm step-ups fall 0.45-0.70 (they try, none crossed); calm walk heading 13, asymmetry 0.5, roll 2.4
+- **S3 slopes, 1M**: mean falls over 31 cells 0.293 (V5 0.230, V4 0.189); flat 0; heading 15, asymmetry 0.8; 7.5 mm step-up success 0.60
 
 **V6 20M result (finished 10:50 PM, scored 11:02 PM; average of the last 5 checkpoints chosen, exported as `trained/V6cand_ppo.onnx`): NOT promoted, V4 stays the default.** Mean falls over 31 cells 0.215 (V5 0.230, V4 0.189, scripted 0.216); flat falls none; heading 14 (V4 14); asymmetry 0.7 (V4 0.5, limit 0.5); 7.5 mm step-up success 0.85 (V4 0.62, V5 0.95); no step-up above 7.5 mm is ever crossed (V4 neither); step-downs about equal to V4/scripted; the 25 mm step-up cell is 0.18 worse than V4. Per the rule fixed beforehand it was not promoted; **the user promoted it anyway at 11:20 PM (to calibrate on hardware) and it was deployed 11:23 PM** (STATUS item 0f; hardware plan [`hardware-session-plan-2026-10-09.md`](hardware-session-plan-2026-10-09.md)). The short report replaced the long one (`report_summary.py`; the long one is `report_full.html`).
 

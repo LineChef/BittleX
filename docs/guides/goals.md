@@ -16,13 +16,11 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
 
 ## 2. Start and stop
 
-| | |
-|---|---|
-| Start | **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt") |
-| Old way | `g2goal run ball_punt --standalone`, or `G2_GOAL_INPROCESS=0` in the Pi's `.env`: the voice service is stopped, the session runs in its own process, the service is started again |
-| Stop | **"emergency stop"** is not heard during a session (the voice loop is busy running it; the BiBoard's own voice module still hears spoken commands) |
-| It ends by itself | after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand) |
-| A fall after a good punt | the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit (see below) |
+- **Start**: **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt")
+- **Old way**: `g2goal run ball_punt --standalone`, or `G2_GOAL_INPROCESS=0` in the Pi's `.env`: the voice service is stopped, the session runs in its own process, the service is started again
+- **Stop**: **"emergency stop"** is not heard during a session (the voice loop is busy running it; the BiBoard's own voice module still hears spoken commands)
+- **It ends by itself**: after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand)
+- **A fall after a good punt**: the attempt keeps its data: when the ball was punted and seen afterwards with a hit, it is scored as that hit (see below)
 
 - **Start:** He says "Starting the goal: punt the ball." and the session runs **inside the running voice service** (since 2026-11-05): nothing is stopped or restarted, the serial port to the BiBoard is never closed, and the service's camera and IMU stream are used. Without voice: `g2ball` (same as `g2goal run ball_punt`): it asks the running service to start the goal and follows its log in your terminal
 - **Old way:** It is also the fallback when the service has no camera or serial link. After a stop and restart the BiBoard often went silent to the Pi (no answer to `P`, no IMU frames, the session ended `board_silent`, [`../STATUS.md`](../STATUS.md) open problems 15 and 18)
@@ -38,11 +36,9 @@ Most settings are his to change ("free"). A few belong to the operator: he may o
 When the voice service comes back after a session, he says each new suggestion, for example *"I have a suggestion from my practice at punt the ball: a lunge time of 0.1 s instead of
 0.12 s, because I punched from 3.1 in but the ball only went 4 in. Say confirm, cancel, or review."* No wake word is needed for the answer.
 
-| Say | What happens |
-|---|---|
-| "confirm" (or "yes") | the change goes into the punt settings file |
-| "cancel" (or "no") | dropped; he will not suggest that value again for a while |
-| "review", or nothing | kept for later, in the report and in `g2goal suggestions`; he does not say it again. Later: `g2goal confirm ball_punt punch_lunge_s` or `g2goal cancel ...` |
+- **"confirm" (or "yes")**: the change goes into the punt settings file
+- **"cancel" (or "no")**: dropped; he will not suggest that value again for a while
+- **"review", or nothing**: kept for later, in the report and in `g2goal suggestions`; he does not say it again. Later: `g2goal confirm ball_punt punch_lunge_s` or `g2goal cancel ...`
 
 ## 4. Reading what he learned
 
@@ -146,14 +142,12 @@ It needs an exploration to run: inside the voice service that is `G2_EXPLORE_INP
 
 ## 9. Where things live on the Pi
 
-| File | What |
-|---|---|
-| `~/.local/share/g2/goals.json` | changes to a goal (`g2goal set ball_punt --attempts 8 --control punt_max_in=fixed`); missing = the built-in goal |
-| `~/.local/share/g2/goal_journal.jsonl` | every session, attempt (with its full trace), decision, suggestion answer |
-| `~/.local/share/g2/goal_state.json` | what he learned, per goal, attachment and floor |
-| `~/.local/share/g2/punt_settings.json` | the operator's own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md)) |
-| `~/.local/share/g2/chase_pace.json` | his measured pace and turn rates |
-| `~/.local/share/g2/goal_overrides.json` | pins, limits and undone values |
-| `~/.local/share/g2/wall_settings.json` | the operator's own wall settings: where the walls goal starts |
+- **`~/.local/share/g2/goals.json`**: changes to a goal (`g2goal set ball_punt --attempts 8 --control punt_max_in=fixed`); missing = the built-in goal
+- **`~/.local/share/g2/goal_journal.jsonl`**: every session, attempt (with its full trace), decision, suggestion answer
+- **`~/.local/share/g2/goal_state.json`**: what he learned, per goal, attachment and floor
+- **`~/.local/share/g2/punt_settings.json`**: the operator's own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md))
+- **`~/.local/share/g2/chase_pace.json`**: his measured pace and turn rates
+- **`~/.local/share/g2/goal_overrides.json`**: pins, limits and undone values
+- **`~/.local/share/g2/wall_settings.json`**: the operator's own wall settings: where the walls goal starts
 
 Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE`, `G2_GOAL_OVERRIDES`, `G2_WALL_SETTINGS` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).

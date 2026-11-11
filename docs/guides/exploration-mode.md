@@ -16,10 +16,8 @@ Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test hi
 
 ## Two tiers
 
-| Tier | What | Starts |
-|---|---|---|
-| 0, attentive | stands still, turns toward sounds, follows faces with his gaze, reacts | always, as soon as the session is up |
-| 1, roam | walks legs, looks, takes pictures, steers away from walls | armed by the start command; capped by the roam time |
+- **0, attentive**: What: stands still, turns toward sounds, follows faces with his gaze, reacts; Starts: always, as soon as the session is up
+- **1, roam**: What: walks legs, looks, takes pictures, steers away from walls; Starts: armed by the start command; capped by the roam time
 
 ## What a roam does
 
@@ -44,16 +42,14 @@ Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test hi
 
 ## Sounds
 
-| Moment | Sound |
-|---|---|
-| start | "Exploration mode.", 1 s, the Viking horn |
-| turning away from a wall | two soft falling notes |
-| hit a wall | a long "ooooof" |
-| a picture is taken | the shutter double click |
-| the camera does not answer | he says "My camera isn't answering." |
-| a command fails | the losing horn |
-| fell over | the losing horn |
-| end | "Exploration complete.", the ta-da, he lies down; "G2 online." when the voice service is back |
+- **start**: "Exploration mode.", 1 s, the Viking horn
+- **turning away from a wall**: two soft falling notes
+- **hit a wall**: a long "ooooof"
+- **a picture is taken**: the shutter double click
+- **the camera does not answer**: he says "My camera isn't answering."
+- **a command fails**: the losing horn
+- **fell over**: the losing horn
+- **end**: "Exploration complete.", the ta-da, he lies down; "G2 online." when the voice service is back
 
 ## Ending it
 

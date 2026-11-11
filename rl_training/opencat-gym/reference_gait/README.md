@@ -25,15 +25,13 @@ Rebuild: `python build_wkf_reference.py && python verify_wkf_reference.py`
 resampled to 100; behaviours → keyframes, approximate; `period == 1` postures →
 `(1, 8)`). Decoded so far:
 
-| ref | skill | what / used for |
-|---|---|---|
-| `tr_ref` `bk_ref` `wkl_ref` `wkr_ref` `vt_ref` `cr_ref` `rc_ref` `highstep_ref` | trot / back / turn-L/R / vault / crouch / recover / authored high-step | SkillSwitch gaits + get-up |
-| `cmh_ref` | `cmh` climb (22 kf, 3× crawl loop) | Phase F climb base — **does not climb in sim** (see plan doc); kept for hardware |
-| `carpet_ref` | `carpetF` | carpet-tuned walk — `CarpetDetector` (`pi_pipeline/gait/carpet.py`) recommends it on sustained slip |
-| `buttUp_ref` | `buttUp` play-bow | **INSPECT peer pose** — holds a real +22° nose-down bow (a level `cr_ref` crouch did not); wired as `SkillRefs.inspect` |
-| `jp_ref` | `jpF` jump forward | dynamic crouch-load-then-hop — expressive "excited" tell; untested obstacle-clear avenue |
-| `str_ref` `sit_ref` `zz_ref` | stretch / sit / sleep postures | personality idle / sleep |
-| `snf_ref` `scrh_ref` `nd_ref` `gdb_ref` `fiv_ref` `hi_ref` | sniff / scratch / nod / shake-paw / high-five / wave | expressive gestures — `pi_pipeline/behavior/gestures.py` decides when |
+- **`tr_ref` `bk_ref` `wkl_ref` `wkr_ref` `vt_ref` `cr_ref` `rc_ref` `highstep_ref`**: skill: trot / back / turn-L/R / vault / crouch / recover / authored high-step; what / used for: SkillSwitch gaits + get-up
+- **`cmh_ref`**: skill: `cmh` climb (22 kf, 3× crawl loop); what / used for: Phase F climb base — **does not climb in sim** (see plan doc); kept for hardware
+- **`carpet_ref`**: skill: `carpetF`; what / used for: carpet-tuned walk — `CarpetDetector` (`pi_pipeline/gait/carpet.py`) recommends it on sustained slip
+- **`buttUp_ref`**: skill: `buttUp` play-bow; what / used for: **INSPECT peer pose** — holds a real +22° nose-down bow (a level `cr_ref` crouch did not); wired as `SkillRefs.inspect`
+- **`jp_ref`**: skill: `jpF` jump forward; what / used for: dynamic crouch-load-then-hop — expressive "excited" tell; untested obstacle-clear avenue
+- **`str_ref` `sit_ref` `zz_ref`**: skill: stretch / sit / sleep postures; what / used for: personality idle / sleep
+- **`snf_ref` `scrh_ref` `nd_ref` `gdb_ref` `fiv_ref` `hi_ref`**: skill: sniff / scratch / nod / shake-paw / high-five / wave; what / used for: expressive gestures — `pi_pipeline/behavior/gestures.py` decides when
 
 On hardware these are just `k<name>` serial calls (`pi_pipeline/link/opencat.py`);
 the `_ref.npy` files are for sim replay / SkillSwitch.

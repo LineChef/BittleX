@@ -17,27 +17,23 @@ Read these three pages in order.
 
 ## Build and operate G2
 
-| To do this | Go to |
-|---|---|
-| Run G2 day to day, stop it safely and handle the batteries | [Operating G2](guides/operating-g2.md) |
-| Look up a command | [Cheat sheet](guides/cheatsheet.md) |
-| See every spoken command | [Voice commands](guides/voice-commands.md) |
-| Set up the Raspberry Pi | [Pi bring-up](guides/pi-bring-up.md) |
-| Bring the hardware up step by step | [Bring-up sequence](guides/bring-up-sequence.md) |
-| Change settings and switches | [Settings and switches](guides/settings-switches.md) |
-| Understand what G2 is made of | [As built](hardware/as-built.md) |
-| Follow the wiring, mounting and calibration record | [Blueprints](../blueprints/README.md) |
+- **Run G2 day to day, stop it safely and handle the batteries**: [Operating G2](guides/operating-g2.md)
+- **Look up a command**: [Cheat sheet](guides/cheatsheet.md)
+- **See every spoken command**: [Voice commands](guides/voice-commands.md)
+- **Set up the Raspberry Pi**: [Pi bring-up](guides/pi-bring-up.md)
+- **Bring the hardware up step by step**: [Bring-up sequence](guides/bring-up-sequence.md)
+- **Change settings and switches**: [Settings and switches](guides/settings-switches.md)
+- **Understand what G2 is made of**: [As built](hardware/as-built.md)
+- **Follow the wiring, mounting and calibration record**: [Blueprints](../blueprints/README.md)
 
 The full list of guides is in [Guides](guides/README.md). Hardware pages are in [Hardware](hardware/README.md), and camera and detection pages are in [Vision](vision/README.md).
 
 ## Under the hood
 
-| Topic | Go to |
-|---|---|
-| How the robot, the Pi and the dev machine fit together | [Architecture](architecture.md) |
-| Where each package of code is documented | [Code map](code-map.md) |
-| How the walking policy is trained and deployed | [Gait training](rl/README.md) |
-| The phases of the project and what comes next | [Roadmap](project-plan.md) |
+- **How the robot, the Pi and the dev machine fit together**: [Architecture](architecture.md)
+- **Where each package of code is documented**: [Code map](code-map.md)
+- **How the walking policy is trained and deployed**: [Gait training](rl/README.md)
+- **The phases of the project and what comes next**: [Roadmap](project-plan.md)
 
 ## Conventions
 

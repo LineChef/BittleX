@@ -10,17 +10,15 @@ Wiring is in [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html); the p
 
 Front is the head end; left and right are G2's left and right.
 
-| Part | Where and how it is attached |
-|---|---|
-| Platform cover | The stock Petoi back cover, replaced by the platform cover (`cover_pegs_foot.stl`, the Petoi cover with four teardrop pegs on top). The Pi slot and the BiBoard header are at the front left |
-| Pod (body + top panel) | Clicks onto the four pegs: set it 7 mm behind its place with the grille to the rear, slide it 7 mm (see below) |
-| Pi Zero 2 W + PiSugar S | In the pod, held in the grooves of the two end posts: ports up, 40-pin header down and toward the left wall, SD card at the rear |
-| Camera | **On top of the pod, front of the panel**, in a printed camera mount (a bayonet socket in the panel: turn 40° (see below) |
-| Speaker | **At the rear of the pod**, wings in the side grooves, body toward the rear grille. Its 2-pin lead goes to the rear end of the amp |
-| Amplifier (NS4168) | On the **right wall**, bottom edge in a slot, top edge under two nubs, set with a dab of glue |
-| Microphone (SPH0645) | On the **right wall near the front**, in slots in a post and a ledge; the port faces the wall, the header is at the front edge. A fork under the panel holds its top edge |
-| Petoi AI head | On the neck in place of the stock head (2026-10-18): its servo in the stock head's servo port |
-| BiBoard link | Three jumpers (TX2, RX2, GND) from the Pi header to BiBoard's 5-pin socket; the two +5V sockets stay empty (the Pi has its own power). Wire detail: [`build-logs/pi-biboard-build-notes.md`](../docs/hardware/build-logs/pi-biboard-build-notes.md) |
+- **Platform cover**: The stock Petoi back cover, replaced by the platform cover (`cover_pegs_foot.stl`, the Petoi cover with four teardrop pegs on top). The Pi slot and the BiBoard header are at the front left
+- **Pod (body + top panel)**: Clicks onto the four pegs: set it 7 mm behind its place with the grille to the rear, slide it 7 mm (see below)
+- **Pi Zero 2 W + PiSugar S**: In the pod, held in the grooves of the two end posts: ports up, 40-pin header down and toward the left wall, SD card at the rear
+- **Camera**: **On top of the pod, front of the panel**, in a printed camera mount (a bayonet socket in the panel: turn 40° (see below)
+- **Speaker**: **At the rear of the pod**, wings in the side grooves, body toward the rear grille. Its 2-pin lead goes to the rear end of the amp
+- **Amplifier (NS4168)**: On the **right wall**, bottom edge in a slot, top edge under two nubs, set with a dab of glue
+- **Microphone (SPH0645)**: On the **right wall near the front**, in slots in a post and a ledge; the port faces the wall, the header is at the front edge. A fork under the panel holds its top edge
+- **Petoi AI head**: On the neck in place of the stock head (2026-10-18): its servo in the stock head's servo port
+- **BiBoard link**: Three jumpers (TX2, RX2, GND) from the Pi header to BiBoard's 5-pin socket; the two +5V sockets stay empty (the Pi has its own power). Wire detail: [`build-logs/pi-biboard-build-notes.md`](../docs/hardware/build-logs/pi-biboard-build-notes.md)
 
 - **Pod (body + top panel):** Clicks onto the four pegs: set it 7 mm behind its place with the grille to the rear, slide it 7 mm forward until it clicks (about 3.2 N). No tools, glue or tape. To remove: open the panel, pull the three BiBoard plugs off, slide the body 7 mm rearward and lift
 - **Pi Zero 2 W + PiSugar S:** The Pi plugs and the BiBoard header are in the left well. The PiSugar switch is under a window in the panel beside the HDMI opening (move it with a fingernail)
@@ -40,15 +38,13 @@ The sim uses these numbers ([`../docs/hardware/specs.md`](../docs/hardware/specs
 
 G2's own wiring guide ([`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html), [I²S build log](../docs/hardware/build-logs/i2s-audio-build-log.md)) is the source of truth for the pins and is not changed by the pod. The project's build guide shows the same pins except the amp ground on pin 14 (G2's is on pin 9); the table below is the project's, for comparison.
 
-| Signal | Pi pin |
-|---|---|
-| Mic 3V / mic GND | 1 / 9 |
-| Amp V (5 V) / amp G | 2 / 14 |
-| BiBoard GND / RX2 / TX2 | 6 / 8 / 10 (TX and RX cross) |
-| BCLK (mic and amp, one splice) | 12 |
-| LRCLK (mic and amp, one splice) | 35 |
-| Mic DOUT / mic SEL | 38 / 39 |
-| Amp DIN | 40 |
+- **Mic 3V / mic GND**: 1 / 9
+- **Amp V (5 V) / amp G**: 2 / 14
+- **BiBoard GND / RX2 / TX2**: 6 / 8 / 10 (TX and RX cross)
+- **BCLK (mic and amp, one splice)**: 12
+- **LRCLK (mic and amp, one splice)**: 35
+- **Mic DOUT / mic SEL**: 38 / 39
+- **Amp DIN**: 40
 
 The mic's SEL is on pin 39 (a ground, left channel), as before. All wire lengths and the route of every wire are in the project's build guide ("Wire table").
 

@@ -79,15 +79,13 @@ step, then a residual policy on real IMU. The reusable output is the method
 All on `development`, off by default — kept so a future run with real hardware
 doesn't start from zero:
 
-| Piece | What |
-|---|---|
-| `G2E_TERRAIN_FEATURE` | the 4-float forward scan in the sim obs (`opencat_gym_env._scan_terrain`), off by default |
-| `G2E_GOAL_MODE` / `G2E_TRAIN_YAW` / `CLIFF` / `TURN_BLEND` | goal-bearing command, yaw curriculum, cliff feature, `wkF`→`wkL/wkR` blend — all dormant |
-| `run20m_graft282/285/289` | grafted obs-width checkpoints (not adopted) |
-| `benchmark_goal.py` / `eval_obstacle_response.py` / `gate_check.py` | the campaign's eval harness |
-| `pi_pipeline/gait/skill_layer.py` | `SkillLayer` = `GaitSelector` + `SkillSwitch` + `CliffGuard`; `run_gait.py --skills` (serial Grove Vision feed or mock) |
-| scripted skill refs | `STEP_OVER` (trot) / `BACK_OUT` (bk) / `HALT` / `CAREFUL` / `INSPECT` (buttUp bow) / `BRACE`, `reference_gait/*_ref.npy`, the `G2E_SKILL_REF` hook |
-| `climb_env.py` + `train_climb.py` + `eval_climb.py` | the Phase F climb harness |
+- **`G2E_TERRAIN_FEATURE`**: the 4-float forward scan in the sim obs (`opencat_gym_env._scan_terrain`), off by default
+- **`G2E_GOAL_MODE` / `G2E_TRAIN_YAW` / `CLIFF` / `TURN_BLEND`**: goal-bearing command, yaw curriculum, cliff feature, `wkF`→`wkL/wkR` blend — all dormant
+- **`run20m_graft282/285/289`**: grafted obs-width checkpoints (not adopted)
+- **`benchmark_goal.py` / `eval_obstacle_response.py` / `gate_check.py`**: the campaign's eval harness
+- **`pi_pipeline/gait/skill_layer.py`**: `SkillLayer` = `GaitSelector` + `SkillSwitch` + `CliffGuard`; `run_gait.py --skills` (serial Grove Vision feed or mock)
+- **scripted skill refs**: `STEP_OVER` (trot) / `BACK_OUT` (bk) / `HALT` / `CAREFUL` / `INSPECT` (buttUp bow) / `BRACE`, `reference_gait/*_ref.npy`, the `G2E_SKILL_REF` hook
+- **`climb_env.py` + `train_climb.py` + `eval_climb.py`**: the Phase F climb harness
 
 ## What would reopen this
 

@@ -31,12 +31,10 @@ Dollars are estimated from two prices set in `.env`: `G2_PRICE_IN_PER_MTOK` and 
 
 Every limit follows one rule: warn before it is hit, and say or log clearly when it is hit. A failure is never silent and never a raw error. G2 classifies what the API returns and speaks a plain line for each case:
 
-| Failure | What happens | Spoken line (setting that changes it) |
-|---|---|---|
-| Authentication error (revoked, expired or wrong key) | No retry. | `G2_SPEECH_API_AUTH`, by default "I can't reach my brain right now -- my API key may be invalid or expired." |
-| Rate limit | Backs off and retries up to three times. | `G2_SPEECH_API_RATE` |
-| Billing or quota error | No retry. | `G2_SPEECH_API_BILLING` |
-| Anything else | The voice loop stays alive. | A generic "I glitched." |
+- **Authentication error (revoked, expired or wrong key)**: What happens: No retry.; Spoken line (setting that changes it): `G2_SPEECH_API_AUTH`, by default "I can't reach my brain right now -- my API key may be invalid or expired."
+- **Rate limit**: What happens: Backs off and retries up to three times.; Spoken line (setting that changes it): `G2_SPEECH_API_RATE`
+- **Billing or quota error**: What happens: No retry.; Spoken line (setting that changes it): `G2_SPEECH_API_BILLING`
+- **Anything else**: What happens: The voice loop stays alive.; Spoken line (setting that changes it): A generic "I glitched."
 
 The voice loop catches the error, speaks the line and logs the failure kind. The phrases can all be overridden in `.env`.
 

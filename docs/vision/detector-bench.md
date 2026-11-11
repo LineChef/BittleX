@@ -10,29 +10,25 @@ fixed to G2 and measured against known distances.
 
 ## Firmware / module facts
 
-| | |
-|---|---|
-| Name / FW | "Grove Vision AI V2", software `2025.01.02`, `at_api v0` |
-| USB serial | CH343 bridge (VID `1a86` / PID `55d3`), `/dev/ttyACM0` / `/dev/cu.usbmodem*`, 921600 |
-| Model slots | **one** — `AT+MODELS?` returns a single entry. Switching models = a full reflash (~1–2 min), *not* an instant `AT+MODEL=<id>` swap on this FW. |
-| Sensor resolutions | 240×240 (default), 480×480, 640×480 — but the model runs at its own input size (192 here) and **reports boxes in the 240 frame** (`resolution:[240,240]`). `frame_px=240` is correct. |
-| Box format | `[cx, cy, w, h, score, class_id]`, `(cx,cy)` = **centre**, pixels in the 240 frame, score 0–100. Only `type==1` INVOKE messages carry results. |
-| Start / stop | module does not self-stream — send `AT+INVOKE=-1,0,1` (loop, results-only, no JPEG) to start, `AT+BREAK` to stop. `feed.py` does this. |
-| Model-reselect + inference restart | ~0.5 s |
+- **Name / FW**: "Grove Vision AI V2", software `2025.01.02`, `at_api v0`
+- **USB serial**: CH343 bridge (VID `1a86` / PID `55d3`), `/dev/ttyACM0` / `/dev/cu.usbmodem*`, 921600
+- **Model slots**: **one** — `AT+MODELS?` returns a single entry. Switching models = a full reflash (~1–2 min), *not* an instant `AT+MODEL=<id>` swap on this FW.
+- **Sensor resolutions**: 240×240 (default), 480×480, 640×480 — but the model runs at its own input size (192 here) and **reports boxes in the 240 frame** (`resolution:[240,240]`). `frame_px=240` is correct.
+- **Box format**: `[cx, cy, w, h, score, class_id]`, `(cx,cy)` = **centre**, pixels in the 240 frame, score 0–100. Only `type==1` INVOKE messages carry results.
+- **Start / stop**: module does not self-stream — send `AT+INVOKE=-1,0,1` (loop, results-only, no JPEG) to start, `AT+BREAK` to stop. `feed.py` does this.
+- **Model-reselect + inference restart**: ~0.5 s
 
 ## Detector behaviour
 
 Empty bench, 22 s / 340 frames → **0 false positives**.
 Clear target (person, ~3–5 ft, centred, holding still), 25 s / 384 frames:
 
-| Metric | Value | Note |
-|---|---|---|
-| Output rate | **~15 fps** | serial-limited |
-| Inference time | **48 ms, deterministic** (min=max) | ~20 Hz raw; NPU is fixed-cost |
-| Detection rate while present | **~83 %** → **~17 % dropout** | frames with 0 boxes despite the target being there |
-| Confidence | mean **66**, range **50–87** (threshold 50) | sits close to threshold — winks in/out near range limits |
-| Centre jitter (static target) | cx σ ≈ **5 px**, cy σ ≈ **3 px** | ~2 % of frame — bearing is fairly stable |
-| Box-size jitter (static target) | w σ ≈ **18 px**, h σ ≈ **16 px** | **~7–8 % of frame — large.** area-as-distance will be noisy |
+- **Output rate**: Value: **~15 fps**; Note: serial-limited
+- **Inference time**: Value: **48 ms, deterministic** (min=max); Note: ~20 Hz raw; NPU is fixed-cost
+- **Detection rate while present**: Value: **~83 %** → **~17 % dropout**; Note: frames with 0 boxes despite the target being there
+- **Confidence**: Value: mean **66**, range **50–87** (threshold 50); Note: sits close to threshold — winks in/out near range limits
+- **Centre jitter (static target)**: Value: cx σ ≈ **5 px**, cy σ ≈ **3 px**; Note: ~2 % of frame — bearing is fairly stable
+- **Box-size jitter (static target)**: Value: w σ ≈ **18 px**, h σ ≈ **16 px**; Note: **~7–8 % of frame — large.** area-as-distance will be noisy
 
 ## Implications for the sim noise model
 

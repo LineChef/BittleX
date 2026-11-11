@@ -89,22 +89,18 @@ ground truth first, so the next capture pass targets the actual gaps.
 the Device Logger stream headless: score-floor + NMS + top-K, flags "PLANTED"
 box locations). Narrate or script the ground truth; fill the table after.
 
-| session | what to do | reading to record |
-|---|---|---|
-| `<you>` distance sweep | walk 3ft → 6ft → 10ft → back, slowly, centre of frame | score at each distance; the distance where it drops below ~50 or stops firing |
-| `<you>` position sweep | stand left / centre / right / half-out-of-frame at ~5ft | does the box track, or stay frozen? score per position |
-| `cat` pose sweep | facing toward / away / curled / low light, mid-distance | score; every frame the class flips to `dog` (note the pose) |
-| `dog` pose sweep | same poses | score; flips to `cat`; false-negatives (no box on a clearly-visible dog) |
-| empty room | 60s, nobody/no pet in frame | any box at all = a false positive → that scene becomes a negative |
-| post-retrain re-run | repeat the above on the new model | box coords tracking (not frozen) = localization fixed; score deltas per cell |
+- **`<you>` distance sweep**: what to do: walk 3ft → 6ft → 10ft → back, slowly, centre of frame; reading to record: score at each distance; the distance where it drops below ~50 or stops firing
+- **`<you>` position sweep**: what to do: stand left / centre / right / half-out-of-frame at ~5ft; reading to record: does the box track, or stay frozen? score per position
+- **`cat` pose sweep**: what to do: facing toward / away / curled / low light, mid-distance; reading to record: score; every frame the class flips to `dog` (note the pose)
+- **`dog` pose sweep**: what to do: same poses; reading to record: score; flips to `cat`; false-negatives (no box on a clearly-visible dog)
+- **empty room**: what to do: 60s, nobody/no pet in frame; reading to record: any box at all = a false positive → that scene becomes a negative
+- **post-retrain re-run**: what to do: repeat the above on the new model; reading to record: box coords tracking (not frozen) = localization fixed; score deltas per cell
 
 **Shot list (fill from the readings above):**
 
-| class | weak condition found | capture target |
-|---|---|---|
-| `<you>` | _(e.g. "no detect past 6ft")_ | _(e.g. "40 frames at 6–12ft, walking")_ |
-| `cat` | _(e.g. "rear-view flips to dog")_ | |
-| `dog` | | |
+- **`<you>`**: weak condition found: _(e.g. "no detect past 6ft")_; capture target: _(e.g. "40 frames at 6–12ft, walking")_
+- **`cat`**: weak condition found: _(e.g. "rear-view flips to dog")_
+- **`dog`**
 
 **Independent of the logging:** rebuild the INT8 calibration set to **300+
 varied images** (was 100) — highest-probability fix for "up close only", no
@@ -156,12 +152,10 @@ New standard per class: **150 images, with this distance-bucket mix**
 (bucket = `sqrt(box_w * box_h)` from the YOLO label — box size as a fraction
 of the frame):
 
-| bucket | range (sz) | target % | target count @150 |
-|---|---|---|---|
-| far | < 0.30 | 20% | 30 |
-| mid | 0.30–0.50 | 30% | 45 |
-| close | 0.50–0.70 | 30% | 45 |
-| vclose | ≥ 0.70 | 20% | 30 |
+- **far**: range (sz): < 0.30; target %: 20%; target count @150: 30
+- **mid**: range (sz): 0.30–0.50; target %: 30%; target count @150: 45
+- **close**: range (sz): 0.50–0.70; target %: 30%; target count @150: 45
+- **vclose**: range (sz): ≥ 0.70; target %: 20%; target count @150: 30
 
 **Tooling — analyze and (re)optimize a class against this target any time the
 library grows:**
@@ -199,14 +193,12 @@ severely imbalanced class distribution biases the shared multi-class model.
 This is a process habit, not a retroactive fix: don't prune a class that's
 already ahead, just don't let the gap widen further without a reason.
 
-| id | class | target | difficulty | pre-label base | notes |
-|---|---|---|---|---|---|
-| 0 | `<you>` | 150 (see mix above) | fine-grained (individual recognition) | Person Detection → auto boxes | close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed (see below) |
-| 1 | `<spouse>` | 150 (see mix above) | fine-grained | Person Detection → auto boxes | same routine, separate sessions. Not started as of 2026-09-14 (0 images) — capture from scratch targeting the mix above from session 1, rather than discovering the same close-up-only gap later. |
-| 2 | `dog` | 150 (see mix above) | coarse, poor cooperation | COCO-80 model → boxes on frames it catches; hand-label rest | burst-capture during normal activity, many short sessions, low yield each. As of 2026-09-14, 123 of 250 library files have no label at all (hand-labeling was never finished) — resolve that before counting toward the target. |
-| 3 | `cat` | 150 (see mix above) | coarse, poor cooperation | COCO-80 model → boxes; hand-label rest | same. |
-| 4 | `ledge` | ~200–250 | fine-grained | none — hand-box every frame (Roboflow faster for bulk) | **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered |
-| — | negatives | ~40–50 | — | — | empty floor, plain walls, non-target edges (rug borders, grout) so `ledge` doesn't fire on any line; other people / portraits / coat racks so `<you>`/`<spouse>` don't fire on strangers. |
+- **0**: class: `<you>`; target: 150 (see mix above); difficulty: fine-grained (individual recognition); pre-label base: Person Detection → auto boxes; notes: close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed (see below)
+- **1**: class: `<spouse>`; target: 150 (see mix above); difficulty: fine-grained; pre-label base: Person Detection → auto boxes; notes: same routine, separate sessions. Not started as of 2026-09-14 (0 images) — capture from scratch targeting the mix above from session 1, rather than discovering the same close-up-only gap later.
+- **2**: class: `dog`; target: 150 (see mix above); difficulty: coarse, poor cooperation; pre-label base: COCO-80 model → boxes on frames it catches; hand-label rest; notes: burst-capture during normal activity, many short sessions, low yield each. As of 2026-09-14, 123 of 250 library files have no label at all (hand-labeling was never finished) — resolve that before counting toward the target.
+- **3**: class: `cat`; target: 150 (see mix above); difficulty: coarse, poor cooperation; pre-label base: COCO-80 model → boxes; hand-label rest; notes: same.
+- **4**: class: `ledge`; target: ~200–250; difficulty: fine-grained; pre-label base: none — hand-box every frame (Roboflow faster for bulk); notes: **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered
+- **—**: class: negatives; target: ~40–50; difficulty: —; pre-label base: —; notes: empty floor, plain walls, non-target edges (rug borders, grout) so `ledge` doesn't fire on any line; other people / portraits / coat racks so `<you>`/`<spouse>` don't fire on strangers.
 
 - **0:** close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed 2026-09-14: the standard pose set's "far (~5–6 ft)" pose still produced close/vclose-bucket boxes — genuinely far shots need more distance than that pose implies; verify with the bucket math above, not by eye.
 - **4:** **Do this after the G2 mount** — most POV-sensitive class. Apply the same distance-mix discipline once capture starts; "approach angle" variety maps to the same far→close spectrum.
@@ -331,16 +323,14 @@ G2_FEATURES="+vision"
 
 Read the counts off `~/Desktop/G2Memory/g2_vision_library/_MANIFEST.md` after each promote.
 
-| date | class | session | promoted pos | promoted neg | library total (class) | notes |
-|---|---|---|---|---|---|---|
-| 2026-09-09 | `<you>` | 1–3 | 238 | 10 | 238 | re-curated from the earlier single-class face set |
-| 2026-09-09 | `dog` | 1 | 120 | — | 120 | daylight session, subject-prominence `--limit 120` |
-| 2026-09-09 | `cat` | 1 | 120 | — | 120 | same |
-| 2026-09-09 | — | — | — | — | — | Built `custom_data.zip` (`<you>`/dog/cat, YOLO fmt) → trained YOLOv8n in `g2_yolov8_3class.ipynb` (mAP@50 **0.995**) → vela → flashed. **Dead on device** (thought Swift-YOLO required — wrong; see below). |
-| 2026-09-09 | — | — | — | — | — | Re-labelled dog/cat with `autobox_coco.py` (`<you>` 230, cat 218, dog 127), rebuilt `custom_data_yolo_v3.zip` (nc:3, 224px), retrained YOLOv8n (mAP@50 **0.907**) |
-| 2026-09-14 | `<you>` | — | — | — | 238 (230 labeled) | **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) (see below) |
-| 2026-09-14 | — | — | — | — | — | **Decisions:** (1) target raised **120 → 150/class**, now with a mandatory distance-bucket mix (far 20% / mid 30% / close 30% / (see below) |
-| 2026-09-14 | — | — | — | — | — | **New tooling**, both reusing `curate_captures.py`'s tested hash/quality functions rather than reimplementing |
+- **2026-09-09**: class: `<you>`; session: 1–3; promoted pos: 238; promoted neg: 10; library total (class): 238; notes: re-curated from the earlier single-class face set
+- **2026-09-09**: class: `dog`; session: 1; promoted pos: 120; promoted neg: —; library total (class): 120; notes: daylight session, subject-prominence `--limit 120`
+- **2026-09-09**: class: `cat`; session: 1; promoted pos: 120; promoted neg: —; library total (class): 120; notes: same
+- **2026-09-09**: class: —; session: —; promoted pos: —; promoted neg: —; library total (class): —; notes: Built `custom_data.zip` (`<you>`/dog/cat, YOLO fmt) → trained YOLOv8n in `g2_yolov8_3class.ipynb` (mAP@50 **0.995**) → vela → flashed. **Dead on device** (thought Swift-YOLO required — wrong; see below).
+- **2026-09-09**: class: —; session: —; promoted pos: —; promoted neg: —; library total (class): —; notes: Re-labelled dog/cat with `autobox_coco.py` (`<you>` 230, cat 218, dog 127), rebuilt `custom_data_yolo_v3.zip` (nc:3, 224px), retrained YOLOv8n (mAP@50 **0.907**)
+- **2026-09-14**: class: `<you>`; session: —; promoted pos: —; promoted neg: —; library total (class): 238 (230 labeled); notes: **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) (see below)
+- **2026-09-14**: class: —; session: —; promoted pos: —; promoted neg: —; library total (class): —; notes: **Decisions:** (1) target raised **120 → 150/class**, now with a mandatory distance-bucket mix (far 20% / mid 30% / close 30% / (see below)
+- **2026-09-14**: class: —; session: —; promoted pos: —; promoted neg: —; library total (class): —; notes: **New tooling**, both reusing `curate_captures.py`'s tested hash/quality functions rather than reimplementing
 
 - **2026-09-09:** **Exported locally on arm64 py3.9** (`ultralytics==8.2.8` + onnx2tf 1.17.5, 3 workarounds) → vela 100% NPU → `g2_3class_yolov8_828_vela.tflite` (2.31 MB). **WORKS on device** — clean single boxes. Detects up close only (100-image INT8 calib; box frozen near training-avg position).
 - **2026-09-14:** **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) 0.67–0.90, with 14+ s stretches of zero raw detections during the mid/far part of the sweep.
@@ -378,13 +368,11 @@ VERDICT against the bar (det ≥ 80%, conf floor ≥ `VISION_MIN_SCORE` = 45).
 up doesn't beat by ≥ 5 pts detection or ≥ 8 pts floor. If even `upload_all`
 (238) fails the bar → it's a data-quality problem, not a count one.
 
-| subset | det rate | conf mean | conf p10 (floor) | flicker /min | verdict |
-|---|---|---|---|---|---|
-| 40 | 0% | — | — | 0 | **FAIL** — 0/462 frames, incl. point-blank |
-| 80 (eff. ~75) | 0% (1/384) | 79 | 79 | 2.4 | **FAIL** — fired once at conf 79, then nothing. High precision, ~zero recall — underfit. |
-| 120 (eff. ~118) | **100%** (461/461) | 91 | 84 | 0 | **PASS** — maxed out: 100% detection, floor 84 (≈2× the bar), zero flicker. Tested in a non-training room. |
-| 160 | _not run_ | | | | can't beat 100% detection; floor 84 leaves no meaningful headroom |
-| 238 (all) | _not run_ | | | | ceiling already known; 120 settles it |
+- **40**: det rate: 0%; conf mean: —; conf p10 (floor): —; flicker /min: 0; verdict: **FAIL** — 0/462 frames, incl. point-blank
+- **80 (eff. ~75)**: det rate: 0% (1/384); conf mean: 79; conf p10 (floor): 79; flicker /min: 2.4; verdict: **FAIL** — fired once at conf 79, then nothing. High precision, ~zero recall — underfit.
+- **120 (eff. ~118)**: det rate: **100%** (461/461); conf mean: 91; conf p10 (floor): 84; flicker /min: 0; verdict: **PASS** — maxed out: 100% detection, floor 84 (≈2× the bar), zero flicker. Tested in a non-training room.
+- **160**: det rate: _not run_; verdict: can't beat 100% detection; floor 84 leaves no meaningful headroom
+- **238 (all)**: det rate: _not run_; verdict: ceiling already known; 120 settles it
 
 - **40:** camera_preview hit-rate 0% too. Same images trained a working single-class model earlier at ~161, so it's a convergence-floor thing: 40 is too few for the nano detector. (SenseCraft auto-label: 43 labelled / 9 unlabelled — 3 negatives got a spurious box for the class.)
 
@@ -405,6 +393,4 @@ Auto-label attrition ran ~10–15% (120 uploaded → ~118 trained), so capture
 > the count can go. Testing the full 238 re-proves the ceiling and wastes a
 > cycle unless 120 fails and a pipeline regression needs to be ruled out.
 
-| empty-scene run | false-fire rate | worst score | verdict |
-|---|---|---|---|
-| (best subset) | | | |
+- **(best subset)**

@@ -21,10 +21,8 @@ through the 8 leg joints via `POSITION_CONTROL` (`FORCE = 0.40` N·m/joint, abov
 
 ## Result — 0 / 2 recovered
 
-| fall state | start \|roll\|/\|pitch\| | end \|roll\|/\|pitch\| | end z | verdict |
-|---|---|---|---|---|
-| prone, belly-down flat | 0.00 / 0.00 | 0.00 / 0.00 | 0.022 m | **no** — `rc` reaches a transient 4-leg crouch mid-play (tilt-sum hits 0.0) then collapses flat again |
-| supine, on its back | 3.14 / 0.00 | 3.02 / 0.07 | 0.030 m | **no** — `rl` → `rc` flails the legs; the roll-over never happens, ends still on its back |
+- **prone, belly-down flat**: start |roll|/|pitch|: 0.00 / 0.00; end |roll|/|pitch|: 0.00 / 0.00; end z: 0.022 m; verdict: **no** — `rc` reaches a transient 4-leg crouch mid-play (tilt-sum hits 0.0) then collapses flat again
+- **supine, on its back**: start |roll|/|pitch|: 3.14 / 0.00; end |roll|/|pitch|: 3.02 / 0.07; end z: 0.030 m; verdict: **no** — `rl` → `rc` flails the legs; the roll-over never happens, ends still on its back
 
 ## Why this is expected, and what it does / doesn't show
 
@@ -116,14 +114,12 @@ that's the change most likely to address the failure mode actually observed.
 Exploratory edits to `verify_getup_reference.py` in the working tree only —
 **nothing from this section was committed.**
 
-| # | Intervention | Result |
-|---|---|---|
-| 1 | Balance correction (`--balance K`, same shape as `BalancedLearned`), swept k=0.3/0.6/1.0, plus a pitch-only variant | No improvement; higher k actively worse (broke `supine`'s previously-clean roll). A tilt correction nudges toward *level*, which lying flat already satisfies — no mechanism to push toward *height*. |
-| 2 | Wait for joint convergence before advancing each keyframe (proxy for the dropped IMU-triggered waits) | Identical to baseline — the robot was already converging fine within the original timing; never lagging. |
-| 3 | Torque budget, `FORCE`=0.4/0.6/0.9/1.2 N·m (up to 3x) | No change at all. |
-| 4 | Ground friction, 1.0/2.0/4.0 | No meaningful change — max height reached is friction-insensitive. |
-| 5 | `PLAY_CYCLES`=1/2/3, and holding the final pose 200 extra steps | No change — rules out "the loop drags it back down." |
-| 6 | Slowdown (HumanUP-style 2x/4x/8x), same path played slower | No change — that technique fixes a *policy-discovered* trajectory that's unstable at speed; the project's is a hand-decoded reference that doesn't trace a "stay standing" path regardless of speed. |
+- **1**: Intervention: Balance correction (`--balance K`, same shape as `BalancedLearned`), swept k=0.3/0.6/1.0, plus a pitch-only variant; Result: No improvement; higher k actively worse (broke `supine`'s previously-clean roll). A tilt correction nudges toward *level*, which lying flat already satisfies — no mechanism to push toward *height*.
+- **2**: Intervention: Wait for joint convergence before advancing each keyframe (proxy for the dropped IMU-triggered waits); Result: Identical to baseline — the robot was already converging fine within the original timing; never lagging.
+- **3**: Intervention: Torque budget, `FORCE`=0.4/0.6/0.9/1.2 N·m (up to 3x); Result: No change at all.
+- **4**: Intervention: Ground friction, 1.0/2.0/4.0; Result: No meaningful change — max height reached is friction-insensitive.
+- **5**: Intervention: `PLAY_CYCLES`=1/2/3, and holding the final pose 200 extra steps; Result: No change — rules out "the loop drags it back down."
+- **6**: Intervention: Slowdown (HumanUP-style 2x/4x/8x), same path played slower; Result: No change — that technique fixes a *policy-discovered* trajectory that's unstable at speed; the project's is a hand-decoded reference that doesn't trace a "stay standing" path regardless of speed.
 
 **Root cause, found via a frame-by-frame trace of `supine`** (`rl` = frames
 0-99, `rc` = frames 100-199, chained): the reference *can* reach a genuinely

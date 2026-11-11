@@ -30,11 +30,9 @@ In this order: `G2_ATTACHMENT` in the environment (or `.env`), else the state fi
 
 [`pi_pipeline/attachments/gait_profiles.json`](../../pi_pipeline/attachments/gait_profiles.json) holds, for each of `none`, `head` and `arm`:
 
-| Field | Meaning |
-|---|---|
-| `payload_profile` | The sim payload the attachment's policies must be trained on (`pod` = the 185 g pod + the 42 g AI head; `none` and the arm get theirs when a policy is trained for them) |
-| `current` | The policy in use, its foot trim, the payload it was trained on, the date it was saved |
-| `history` | Earlier policies, newest last: the last-known-good when the current one cannot be used |
+- **`payload_profile`**: The sim payload the attachment's policies must be trained on (`pod` = the 185 g pod + the 42 g AI head; `none` and the arm get theirs when a policy is trained for them)
+- **`current`**: The policy in use, its foot trim, the payload it was trained on, the date it was saved
+- **`history`**: Earlier policies, newest last: the last-known-good when the current one cannot be used
 
 At start-up the fitted attachment's `current` runs. It is skipped when its file is missing or when its sidecar's `payload_profile` names a different payload; the newest usable history entry runs instead. If nothing saved is usable, the legacy `DEFAULT_POLICY` runs and the reason is logged (`g2attach status` and `python -m pi_pipeline.doctor` show it). A policy without a recorded payload is allowed and flagged. `G2_FOOT_TRIM` still overrides the saved trim.
 
@@ -53,11 +51,9 @@ Saving a gait:
 
 Each attachment names the BiBoard firmware it needs: the first line of the BiBoard's `?` banner. The arm is a separate build of Petoi's firmware (compile-time option `ROBOT_ARM`, model "Bittle X+Arm": its own skill table, the claw on the tail joint, index 2, and a wider range for joint 1). At start-up the voice service and the app ask `?` when an attachment other than `none` is fitted; if the firmware does not fit, they log it and take the attachment's skills out. `python -m pi_pipeline.doctor --serial` shows the same check.
 
-| Attachment | Firmware accepted |
-|---|---|
-| `none` | not checked |
-| `head` | `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head) |
-| `arm` | `Bittle X+Arm` |
+- **`none`**: not checked
+- **`head`**: `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head)
+- **`arm`**: `Bittle X+Arm`
 
 The arm's skills (15, enabled for voice 2026-11-02: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet (the user switched them on anyway, 2026-11-02: hands near; `hunt` and `showOff` are names the arm build is only inferred to redefine).
 
@@ -65,14 +61,12 @@ The arm's skills (15, enabled for voice 2026-11-02: `pick_up` / `put_down` also 
 
 A profile in `gait_profiles.json` can switch Pi behaviour off while its attachment is fitted. A missing key means on, so `none` and `head` behave as before.
 
-| Key | Off means | Arm |
-|---|---|---|
-| `easing` | smoothing a skill's own motion and the stock stand-up ramp stay off (`G2_STAND_RAMP_S` is ignored; the arm stands up with the plain firmware `kbalance`, `poses.stand_via`) | off |
-| `blending` | pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first (see below) | on for the arm since 2026-10-25 |
-| `gyro_balance` | the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb` | **on for the arm since 2026-11-08** (user): the Pi sends no `gb` after a skill or at start-up |
-| `gait_switching` | the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it | off |
-| `skills` | the attachment's own skills stay out of the conversation | off (the arm: on since 2026-11-02) |
-| `fall_recovery` | the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (see below) | off |
+- **`easing`**: Off means: smoothing a skill's own motion and the stock stand-up ramp stay off (`G2_STAND_RAMP_S` is ignored; the arm stands up with the plain firmware `kbalance`, `poses.stand_via`); Arm: off
+- **`blending`**: Off means: pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first (see below); Arm: on for the arm since 2026-10-25
+- **`gyro_balance`**: Off means: the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb`; Arm: **on for the arm since 2026-11-08** (user): the Pi sends no `gb` after a skill or at start-up
+- **`gait_switching`**: Off means: the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it; Arm: off
+- **`skills`**: Off means: the attachment's own skills stay out of the conversation; Arm: off (the arm: on since 2026-11-02)
+- **`fall_recovery`**: Off means: the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (see below); Arm: off
 
 - **blending:** pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first frame before sending it (`link/transitions.py`; for the arm it blends into the ARM variant of a gait, `wkArmF`, and the arm's own shifted rest and balance poses), and a policy walk ends with a blend to balance (`G2_TRANSITION_RAMP_S` caps it). Off: the firmware jumps the legs there at full servo speed
 - **gyro_balance:** only the idle policy turns it off once he has been still. The catch: with it on the firmware's own self-right (`rc`) can run after a fall (it shook the Pi plug loose on 2026-10-25); `"gyro_balance": false` in the arm profile puts it back

@@ -14,6 +14,9 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import md_lists  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_docs_bundle import is_excluded  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -81,7 +84,7 @@ def build():
         out += ["## Not described in any guide yet", "", "Add a line for each to `settings-switches.md` (or the guide for its subsystem), then regenerate this page.", "",
                 "| Variable | Default at the read | Read in | Documented in |", "|---|---|---|---|"] + [row(v) for v in undocumented] + [""]
     out += ["## All variables", "", "| Variable | Default at the read | Read in | Documented in |", "|---|---|---|---|"] + [row(v) for v in names] + [""]
-    return "\n".join(out).rstrip() + "\n"
+    return md_lists.convert("\n".join(out).rstrip() + "\n")[0]          # no pipe tables in the docs (tools/md_lists.py)
 
 
 def main():

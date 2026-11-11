@@ -2,10 +2,8 @@
 
 G2 reflecting on his own experience. The notes are stored as ordinary memory facts: [`../memory/README.md`](../memory/README.md).
 
-| Module | Level | What it does |
-|---|---|---|
-| `recap.py` | 1 | A recap of each exploration session, counted from events the behavior layer already emits (turns away from a wall, hits, survey stops). No picture, no API call. The recap is appended to `experiences.jsonl` when a session ends |
-| `reflect.py` | 2 | While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep (see below) |
+- **`recap.py`**: Level: 1; What it does: A recap of each exploration session, counted from events the behavior layer already emits (turns away from a wall, hits, survey stops). No picture, no API call. The recap is appended to `experiences.jsonl` when a session ends
+- **`reflect.py`**: Level: 2; What it does: While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep (see below)
 
 - **reflect.py:** While G2 is idle, one Claude call reads the latest recaps and writes up to three short notes about himself ("I keep turning away from walls in the kitchen"). Saved as facts with source `experience`, importance 1 or 2, never core; guarded so a note is never about a person or about where or when anyone was
 

@@ -42,12 +42,10 @@ The full roadmap and decision log are in
 
 ## Hardware
 
-| Component | Notes |
-|---|---|
-| Petoi Bittle X V2 (alloy servos) | Core quadruped platform, built on OpenCat / BiBoard V1 (ESP32) |
-| Raspberry Pi Zero 2 W | Runs the voice / memory / vision / Claude pipeline |
-| PiSugar S 1200 mAh | Independent Pi power, not shared with the servo battery — see [`docs/hardware/pi-power.md`](docs/hardware/pi-power.md) |
-| Petoi AI Vision Camera Module | Grove Vision AI V2, onboard neural processor for on-device inference |
+- **Petoi Bittle X V2 (alloy servos)**: Core quadruped platform, built on OpenCat / BiBoard V1 (ESP32)
+- **Raspberry Pi Zero 2 W**: Runs the voice / memory / vision / Claude pipeline
+- **PiSugar S 1200 mAh**: Independent Pi power, not shared with the servo battery — see [`docs/hardware/pi-power.md`](docs/hardware/pi-power.md)
+- **Petoi AI Vision Camera Module**: Grove Vision AI V2, onboard neural processor for on-device inference
 
 Full parts list, costs, and vendor-doc specs: [`docs/hardware/parts-and-decisions.md`](docs/hardware/parts-and-decisions.md)
 and [`docs/hardware/specs.md`](docs/hardware/specs.md).
@@ -67,16 +65,14 @@ The current state — what is deployed, what has been tested on the robot, open 
 Say the wake word, "gee two" (or "hey buddy"), then the command. A short beep means he is listening, a lower boop means he has your words. The full list, with what each one does, is in
 **[`docs/guides/voice-commands.md`](docs/guides/voice-commands.md)**; the ones you will use most:
 
-| Say | What happens |
-|---|---|
-| "G2, explore" / "go ahead and look around" | exploration mode ([how it works](docs/guides/exploration-mode.md)) |
-| "G2, ball goal" | a goal session: up to 10 ball-punt attempts, each one changing the next ([how it works](docs/guides/goals.md)) |
-| "that's enough" / "end exploration mode" | ends the exploration |
-| "walk forward for ten seconds", "come here" | a walk, or a walk to you |
-| "hi step" / "walk normally" | switches the walking gait |
-| "emergency stop" / "resume" | freezes him now / lets him move again |
-| "go to sleep" / "shut down" | curls up and sleeps / lies down and goes dormant |
-| "switch to English" | resets the voice module's language (when it falls back to Korean) |
+- **"G2, explore" / "go ahead and look around"**: exploration mode ([how it works](docs/guides/exploration-mode.md))
+- **"G2, ball goal"**: a goal session: up to 10 ball-punt attempts, each one changing the next ([how it works](docs/guides/goals.md))
+- **"that's enough" / "end exploration mode"**: ends the exploration
+- **"walk forward for ten seconds", "come here"**: a walk, or a walk to you
+- **"hi step" / "walk normally"**: switches the walking gait
+- **"emergency stop" / "resume"**: freezes him now / lets him move again
+- **"go to sleep" / "shut down"**: curls up and sleeps / lies down and goes dormant
+- **"switch to English"**: resets the voice module's language (when it falls back to Korean)
 
 Switches for sounds and behaviours: [`docs/guides/settings-switches.md`](docs/guides/settings-switches.md).
 

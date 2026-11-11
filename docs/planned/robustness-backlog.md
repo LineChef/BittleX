@@ -40,20 +40,18 @@ first hardware run. Do those first.
 
 ## Triage — 2026-09-03 (user)
 
-| Item | Call |
-|---|---|
-| R1 single weak/dead servo | **DROPPED** |
-| R2 IMU bias & mount tilt | **DEFERRED** — decide after seeing how sturdy the real Pi↔PiSugar connector is on hardware (a flaky power/data seat changes whether IMU-bias hardening is the right lever) |
-| R3 pick-up & set-down | **EXPLORE** (user 2026-09-03) — but test the frozen base first, may be a no-train win |
-| R4 directional terrain catches | **TEST FIRST** — run the `run20m_carpet` checkpoint against a 12–15 mm threshold strip (head-on + angled) before deciding; overlaps carpet + `FAC_BALANCE` |
-| R5 slope transitions | **LATER** |
-| R6 left/right friction asymmetry | **LATER** |
-| R7 servo backlash / deadband | **DROPPED** |
-| R8 aggressive command dynamics | **DROPPED** |
-| R9 within-episode degradation (battery sag / latency ramp) | **DROPPED** |
-| R10 long-duration drift | **YES — priority** (it's an eval, not training; cheap) |
-| R11 lateral link collision | **DROPPED** |
-| R12 uneven left/right surface (side-hill + stepped split) | **EXPLORE** (user 2026-09-03) |
+- **R1 single weak/dead servo**: **DROPPED**
+- **R2 IMU bias & mount tilt**: **DEFERRED** — decide after seeing how sturdy the real Pi↔PiSugar connector is on hardware (a flaky power/data seat changes whether IMU-bias hardening is the right lever)
+- **R3 pick-up & set-down**: **EXPLORE** (user 2026-09-03) — but test the frozen base first, may be a no-train win
+- **R4 directional terrain catches**: **TEST FIRST** — run the `run20m_carpet` checkpoint against a 12–15 mm threshold strip (head-on + angled) before deciding; overlaps carpet + `FAC_BALANCE`
+- **R5 slope transitions**: **LATER**
+- **R6 left/right friction asymmetry**: **LATER**
+- **R7 servo backlash / deadband**: **DROPPED**
+- **R8 aggressive command dynamics**: **DROPPED**
+- **R9 within-episode degradation (battery sag / latency ramp)**: **DROPPED**
+- **R10 long-duration drift**: **YES — priority** (it's an eval, not training; cheap)
+- **R11 lateral link collision**: **DROPPED**
+- **R12 uneven left/right surface (side-hill + stepped split)**: **EXPLORE** (user 2026-09-03)
 
 Next after `run20m_carpet` evals: **R10**, the R3 base test, then the R4 threshold test.
 
@@ -225,8 +223,6 @@ One body side persistently lower/higher than the other. Two sub-cases:
 
 ## Log
 
-| Date | Item | Run | Verdict | Notes |
-|---|---|---|---|---|
-| 2026-09-03 | R0 (baseline: continuous rough terrain) | `run20m_carpet` | **REVERT** | `CARPET` 13 mm bumps + 22 mm swell, 50 % of DR episodes; from `run20m_ppo`, 4 M steps, `--finetune-lr 1e-4`. No new capability — base already 0 % falls on carpet + all 27 decathlon cells — and ~8–10 % forward-speed loss on flat **and** carpet (monotonic with checkpoint; tracks a reward curve that fell 3.32k→2.04k). The constant-LR fine-tune drifted a converged gait downhill with nothing to learn. `CARPET` set back to 0.0; course kept for eval/viz; checkpoints discarded. **Lesson: probe the frozen base against a scenario before training on it — fine-tuning on something it already handles can only erode it.** |
-| 2026-09-03 | Probe batch R10 / R12a / R4 / R12b / R3 vs frozen `run20m_ppo` | (eval only) | **1 real gap: "stalls"** | 300+ rollouts, **1 fall** (a bad pick-up drop). Everywhere else the base *stops* rather than fights forward: carpet 90 s → 0.00 m/s by 60 s; side-hill 10–15° → ~0.025 m/s (−73 %); 15 mm thin raised lip → 0/16 crossed, recoils; stepped split → −92 % with a step under the **left** feet (−9 % under the right — lead-leg handedness). Pick-up/set-down → 31/32 re-acquire, **no training needed**. Report: "Gait Probe Report" artifact. → **R-NOSTALL** training designed (below). |
-| 2026-09-03 | **R-NOSTALL** — "don't stall" training | **IMPLEMENTED 2026-09-07** as `G2E_FAC_NOSTALL` (dense window-speed bleed + per-0.15 m breakthrough bonus while an obstacle is in view). First live use: Phase D vision-vs-blind A/B (`docs/archive/rl/vision-in-gait.md`) — fresh 20M, terrain feature ON, as the reward that gives vision leverage. Original design note kept: dense = net fwd displacement over ~1 s (proj. on cmd heading), bleeds every stalled tick; sparse = +reward each ~0.15 m cleared while resisted; real-move-cmd only. The "only makes sense trained WITH the forward terrain feature" call held — that's exactly the Phase D setup. |
+- **2026-09-03**: Item: R0 (baseline: continuous rough terrain); Run: `run20m_carpet`; Verdict: **REVERT**; Notes: `CARPET` 13 mm bumps + 22 mm swell, 50 % of DR episodes; from `run20m_ppo`, 4 M steps, `--finetune-lr 1e-4`. No new capability — base already 0 % falls on carpet + all 27 decathlon cells — and ~8–10 % forward-speed loss on flat **and** carpet (monotonic with checkpoint; tracks a reward curve that fell 3.32k→2.04k). The constant-LR fine-tune drifted a converged gait downhill with nothing to learn. `CARPET` set back to 0.0; course kept for eval/viz; checkpoints discarded. **Lesson: probe the frozen base against a scenario before training on it — fine-tuning on something it already handles can only erode it.**
+- **2026-09-03**: Item: Probe batch R10 / R12a / R4 / R12b / R3 vs frozen `run20m_ppo`; Run: (eval only); Verdict: **1 real gap: "stalls"**; Notes: 300+ rollouts, **1 fall** (a bad pick-up drop). Everywhere else the base *stops* rather than fights forward: carpet 90 s → 0.00 m/s by 60 s; side-hill 10–15° → ~0.025 m/s (−73 %); 15 mm thin raised lip → 0/16 crossed, recoils; stepped split → −92 % with a step under the **left** feet (−9 % under the right — lead-leg handedness). Pick-up/set-down → 31/32 re-acquire, **no training needed**. Report: "Gait Probe Report" artifact. → **R-NOSTALL** training designed (below).
+- **2026-09-03**: Item: **R-NOSTALL** — "don't stall" training; Run: **IMPLEMENTED 2026-09-07** as `G2E_FAC_NOSTALL` (dense window-speed bleed + per-0.15 m breakthrough bonus while an obstacle is in view). First live use: Phase D vision-vs-blind A/B (`docs/archive/rl/vision-in-gait.md`) — fresh 20M, terrain feature ON, as the reward that gives vision leverage. Original design note kept: dense = net fwd displacement over ~1 s (proj. on cmd heading), bleeds every stalled tick; sparse = +reward each ~0.15 m cleared while resisted; real-move-cmd only. The "only makes sense trained WITH the forward terrain feature" call held — that's exactly the Phase D setup.

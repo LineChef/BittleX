@@ -6,16 +6,14 @@ hardware results: [`arm-policy-plan.md`](arm-policy-plan.md). The parts: [`../..
 
 ## Decisions (user, 2026-10-31)
 
-| | |
-|---|---|
-| Recipe | ARM1X's, with what its screens adopted (PPO batch 512 x 5, entropy bonus 0.005) |
-| Paw grip | Not varied in training: CLpaw trains with a free pivot; the finished policy is scored at 1.8 and 3.6 mN.m as a check only |
-| Servo strength | Not varied |
-| Two 20Ms | Both from the same S3 stage, seeds 42 and 7; the better of the four candidates (final and avg5 of each) is picked |
-| The 20Ms | Run after the screens and stages without waiting for a go |
-| Leg build | A setting, off by default, so a stock-leg policy can be trained again: `G2_BUILD=arm_wide_clpaw` |
-| Snags | Kept, fixed for all training (round cords, a measured top per build); see below |
-| Final report | ARM2 against Petoi's scripted arm walk on the same legs, as well as ARM1X |
+- **Recipe**: ARM1X's, with what its screens adopted (PPO batch 512 x 5, entropy bonus 0.005)
+- **Paw grip**: Not varied in training: CLpaw trains with a free pivot; the finished policy is scored at 1.8 and 3.6 mN.m as a check only
+- **Servo strength**: Not varied
+- **Two 20Ms**: Both from the same S3 stage, seeds 42 and 7; the better of the four candidates (final and avg5 of each) is picked
+- **The 20Ms**: Run after the screens and stages without waiting for a go
+- **Leg build**: A setting, off by default, so a stock-leg policy can be trained again: `G2_BUILD=arm_wide_clpaw`
+- **Snags**: Kept, fixed for all training (round cords, a measured top per build); see below
+- **Final report**: ARM2 against Petoi's scripted arm walk on the same legs, as well as ARM1X
 
 ## The simulator
 
@@ -78,14 +76,12 @@ the open details in "The arm in the sim against the real arm" below.
 
 The real-size claw was off; it is now on. Others that exist in the simulator to narrow the gap and are off in the ARM2 recipe. **Owner decision 2026-11-01: no changes to these.** They stay off; the table is the record of what they are:
 
-| Setting | What it models | Why it is off / state |
-|---|---|---|
-| `G2E_MOTOR_SCALE_RAND` (in the `faults` lever, 0.12) | Battery sag: a full pack sags 0.3 to 0.45 V walking, motors lose strength | Not in the V5 to ARM2 recipe; the faults lever was left out of the 20M plans (`archive/rl/next-20m-plan.md`) and no measured negative result is recorded. Owner's call: the real sag is measured, so it fits the "on if it narrows the gap" rule |
-| `G2E_FAULT_STUCK_PROB`, `FAULT_WEAK_PROB`, `FAULT_OFFSET_PROB` (the `faults` lever) | Sticky, weak or offset servos (the real front-left shoulder sticks) | Same as above |
-| `G2E_DRIFT_TORQUE`, `DRIFT_STROKE`, `DRIFT_SHOULDER_DEG` | One-sided drift in training | Owner decision 2026-10-07: no drift training; the policy is heading-blind and the Pi steers |
-| `G2E_PAW_PIN_DAMP`, `PAW_SPRING_K`, `PAW_REST_DEG` | The paw pivot's friction, return spring and resting angle | Unknown real values (owner: paw grip not varied in training); see the open details below |
-| Roll disturbance | Real roll about 1.7 to 2 times the sim's (ARM2 sim 1.8 deg) | No setting yet. The largest known and measured gap. Candidate for the next training plan once real ARM2 walks exist to calibrate against |
-| Foot slip / friction | Real G2 travels about 16% further than the sim for the same command (2026-10-06 note) | Friction and servo-gain sweeps did not help in 2026-10; the Pi scales the commanded speed instead |
+- **`G2E_MOTOR_SCALE_RAND` (in the `faults` lever, 0.12)**: What it models: Battery sag: a full pack sags 0.3 to 0.45 V walking, motors lose strength; Why it is off / state: Not in the V5 to ARM2 recipe; the faults lever was left out of the 20M plans (`archive/rl/next-20m-plan.md`) and no measured negative result is recorded. Owner's call: the real sag is measured, so it fits the "on if it narrows the gap" rule
+- **`G2E_FAULT_STUCK_PROB`, `FAULT_WEAK_PROB`, `FAULT_OFFSET_PROB` (the `faults` lever)**: What it models: Sticky, weak or offset servos (the real front-left shoulder sticks); Why it is off / state: Same as above
+- **`G2E_DRIFT_TORQUE`, `DRIFT_STROKE`, `DRIFT_SHOULDER_DEG`**: What it models: One-sided drift in training; Why it is off / state: Owner decision 2026-10-07: no drift training; the policy is heading-blind and the Pi steers
+- **`G2E_PAW_PIN_DAMP`, `PAW_SPRING_K`, `PAW_REST_DEG`**: What it models: The paw pivot's friction, return spring and resting angle; Why it is off / state: Unknown real values (owner: paw grip not varied in training); see the open details below
+- **Roll disturbance**: What it models: Real roll about 1.7 to 2 times the sim's (ARM2 sim 1.8 deg); Why it is off / state: No setting yet. The largest known and measured gap. Candidate for the next training plan once real ARM2 walks exist to calibrate against
+- **Foot slip / friction**: What it models: Real G2 travels about 16% further than the sim for the same command (2026-10-06 note); Why it is off / state: Friction and servo-gain sweeps did not help in 2026-10; the Pi scales the commanded speed instead
 
 ## The arm in the sim against the real arm (2026-11-01, from the user's photos)
 
@@ -104,15 +100,13 @@ What the photos settled and what changed:
 
 ARM2 (final weights) and Petoi's walk scored again on the new legs with the claw's real outline as the collision shape (`G2E_CLAW_REAL=1`: 1.9 in wide, 0.6 in tall, about 1.3 in further forward), same scorer, seeds and episode counts as the results above (`trained/arm2_report/arm2_realclaw.json`, `scripted_realclaw.json`). Ladder success, thin bars -> real-size claw:
 
-| | ARM2 | Petoi's walk |
-|---|---|---|
-| Overall | 76.4 -> 76.8% | 66.8 -> 67.0% |
-| Step-up | 27.5 -> 24.4% | 20.0 -> 18.8% |
-| Rubble | 38.8 -> 38.8% | 20.0 -> 21.2% |
-| Boxes | 43.1 -> 44.4% | 18.8 -> 20.0% |
-| Snag cord | 38.8 -> 45.0% | 1.9 -> 1.2% |
-| Switchback turn | 91.9 -> 91.9% | 85.0 -> 85.6% |
-| Slopes, step-down, rough floor | 100% unchanged | 93 to 100% unchanged |
+- **Overall**: ARM2: 76.4 -> 76.8%; Petoi's walk: 66.8 -> 67.0%
+- **Step-up**: ARM2: 27.5 -> 24.4%; Petoi's walk: 20.0 -> 18.8%
+- **Rubble**: ARM2: 38.8 -> 38.8%; Petoi's walk: 20.0 -> 21.2%
+- **Boxes**: ARM2: 43.1 -> 44.4%; Petoi's walk: 18.8 -> 20.0%
+- **Snag cord**: ARM2: 38.8 -> 45.0%; Petoi's walk: 1.9 -> 1.2%
+- **Switchback turn**: ARM2: 91.9 -> 91.9%; Petoi's walk: 85.0 -> 85.6%
+- **Slopes, step-down, rough floor**: ARM2: 100% unchanged; Petoi's walk: 93 to 100% unchanged
 
 No falls either way; flat-ground speed, roll and heading unchanged. Every difference is inside the scorer's noise (about 5 points). The claw's real size does not change the sim results because the obstacles in the course are lower than the claw is held (about 1.25 in), so the claw rarely meets them. It is on in the arm builds anyway: it is the more accurate claw, and the earlier numbers stand. What could still change this: the claw's real height and reach while walking (the open details below), and a claw held lower.
 
@@ -143,12 +137,10 @@ The run needed no fixes and never halted. Baselines on the new legs: ARM1X succe
 
 All in the new-leg world, 100 episodes per test:
 
-| | Petoi's walk | ARM1X | ARM2 |
-|---|---|---|---|
-| Calm-walk speed (m/s) | 0.101 | 0.114 | 0.111 |
-| Roll / heading (deg) | 1.2 / 1 | 1.6 / 3 | 1.8 / 3 |
-| Ladder success | 67% | 74% | 76% |
-| Snag / boxes / rubble / step-up | 2 / 19 / 20 / 20% | 30 / 33 / 35 / 22% | 39 / 43 / 39 / 28% |
+- **Calm-walk speed (m/s)**: Petoi's walk: 0.101; ARM1X: 0.114; ARM2: 0.111
+- **Roll / heading (deg)**: Petoi's walk: 1.2 / 1; ARM1X: 1.6 / 3; ARM2: 1.8 / 3
+- **Ladder success**: Petoi's walk: 67%; ARM1X: 74%; ARM2: 76%
+- **Snag / boxes / rubble / step-up**: Petoi's walk: 2 / 19 / 20 / 20%; ARM1X: 30 / 33 / 35 / 22%; ARM2: 39 / 43 / 39 / 28%
 
 Promotion checks against ARM1X on the new legs: all five pass (reported only; nothing promoted or deployed). Paw pivot at 1.8 and 3.6 mN.m: no falls, success 80 and 81%, step-ups 37 and 36%, heading 6 and 5 deg.
 
@@ -165,13 +157,11 @@ export `ARMWcand`, verdict against ARM1X on the same legs. Promotion and deploy 
 
 Training 12:57 AM to 4:31 AM; the 20M took 2:12 AM to 4:14 AM. No flat-ground falls at any 2M check; ledge-up, rubble and boxes were marked stuck by the frontier from 8M (as for ARM2); snag crossing rose to 84% at 20M. The pick was avg5 (0.000 against 0.001 ladder falls for the final weights). All on the new legs, 100 episodes a test (40 for the ladder):
 
-| | ARMW | ARM1X (the arm's gait until now) | ARM2 (trained with paws) | Petoi's walk |
-|---|---|---|---|---|
-| Flat-ground falls | 0.00 | 0.00 | 0.00 | 0.00 |
-| Calm speed (m/s) | 0.113 | 0.112 | 0.109 | 0.096 |
-| Roll / heading (deg) | 2.0 / 7 | 1.8 / 6 | 1.9 / 6 | 1.3 / 4 |
-| Ladder falls | 0.000 | 0.002 | 0.002 | 0.003 |
-| Ladder success | 80% | 75% | 77% | 60% |
-| Step-up success | 39% | 27% | 34% | 16% |
+- **Flat-ground falls**: ARMW: 0.00; ARM1X (the arm's gait until now): 0.00; ARM2 (trained with paws): 0.00; Petoi's walk: 0.00
+- **Calm speed (m/s)**: ARMW: 0.113; ARM1X (the arm's gait until now): 0.112; ARM2 (trained with paws): 0.109; Petoi's walk: 0.096
+- **Roll / heading (deg)**: ARMW: 2.0 / 7; ARM1X (the arm's gait until now): 1.8 / 6; ARM2 (trained with paws): 1.9 / 6; Petoi's walk: 1.3 / 4
+- **Ladder falls**: ARMW: 0.000; ARM1X (the arm's gait until now): 0.002; ARM2 (trained with paws): 0.002; Petoi's walk: 0.003
+- **Ladder success**: ARMW: 80%; ARM1X (the arm's gait until now): 75%; ARM2 (trained with paws): 77%; Petoi's walk: 60%
+- **Step-up success**: ARMW: 39%; ARM1X (the arm's gait until now): 27%; ARM2 (trained with paws): 34%; Petoi's walk: 16%
 
 Verdict PASS on all five rules (the scorer's noise is about 5 points, so the gain over ARM1X is modest; ARM2 transfers to the paw-less legs about as well). Not done: the real weight (retrain if more than 15 g off 540 g), the hazard tops re-measured on these legs, a second 20M seed. The first walks on G2 are the real test; deployed to the Pi when it next comes online.

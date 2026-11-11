@@ -24,22 +24,20 @@ Bailout gates: both PASS, but 3M on-track flat-eval nominal speed was
 
 Full eval (eval_p4a.log, 10:11 AM 2026-09-03):
 
-| metric | run20m_ppo | p4a | verdict |
-|---|---|---|---|
-| cruise (cmd 0.10) | ~0.10 | **0.050** | halved |
-| fast (cmd 0.13) | ~0.137 | **0.060** | halved |
-| creep (cmd 0.04) | ~0.033 | 0.009 | worse |
-| backward (cmd -0.06) | ~-0.060 | -0.027 | worse |
-| speed-track err | 0.007 "good" | **0.050 "loose"** | broke |
-| decathlon falls (payload, 25 cells) | 0% | 0% | unchanged (payload masks) |
-| decathlon speeds | ~0.06-0.10 | ~0.03-0.05 | crawling everywhere |
-| gauntlet T5.1 progress | 0.083 | 0.065 | slower |
-| T6.1 -24deg descent | 0.058 | 0.019 | much slower |
-| T6.3 brutal shoves | 0.088 | 0.040 | much slower |
-| ledge probe up-15 (mean end x) | 0.141 | **0.014** | WORSE |
-| ledge probe up-25 / up-30 | 0.042 / 0.033 | 0.008 / 0.008 | WORSE |
-| ledge probe dn-15 / dn-30 | 0.226 / 0.224 | 0.116 / 0.142 | WORSE |
-| ledge probe min-x (up cells) | +0.03 | **-0.066** | robot backs AWAY from the ledge |
+- **cruise (cmd 0.10)**: run20m_ppo: ~0.10; p4a: **0.050**; verdict: halved
+- **fast (cmd 0.13)**: run20m_ppo: ~0.137; p4a: **0.060**; verdict: halved
+- **creep (cmd 0.04)**: run20m_ppo: ~0.033; p4a: 0.009; verdict: worse
+- **backward (cmd -0.06)**: run20m_ppo: ~-0.060; p4a: -0.027; verdict: worse
+- **speed-track err**: run20m_ppo: 0.007 "good"; p4a: **0.050 "loose"**; verdict: broke
+- **decathlon falls (payload, 25 cells)**: run20m_ppo: 0%; p4a: 0%; verdict: unchanged (payload masks)
+- **decathlon speeds**: run20m_ppo: ~0.06-0.10; p4a: ~0.03-0.05; verdict: crawling everywhere
+- **gauntlet T5.1 progress**: run20m_ppo: 0.083; p4a: 0.065; verdict: slower
+- **T6.1 -24deg descent**: run20m_ppo: 0.058; p4a: 0.019; verdict: much slower
+- **T6.3 brutal shoves**: run20m_ppo: 0.088; p4a: 0.040; verdict: much slower
+- **ledge probe up-15 (mean end x)**: run20m_ppo: 0.141; p4a: **0.014**; verdict: WORSE
+- **ledge probe up-25 / up-30**: run20m_ppo: 0.042 / 0.033; p4a: 0.008 / 0.008; verdict: WORSE
+- **ledge probe dn-15 / dn-30**: run20m_ppo: 0.226 / 0.224; p4a: 0.116 / 0.142; verdict: WORSE
+- **ledge probe min-x (up cells)**: run20m_ppo: +0.03; p4a: **-0.066**; verdict: robot backs AWAY from the ledge
 
 Decision: **REVERT.** Fails all three bar criteria at once -- (b) nominal walk
 ~50% slower, (c) ledge handling measurably WORSE not better. 0% falls is not a
@@ -177,13 +175,11 @@ it kept the capability.
 **Bare-robot recovery probe (benchmark_recovery.py -- payload OFF, rough
 terrain, calibrated shoves 0.20-0.44, 64 eps/ckpt):**
 
-| metric | run20m_ppo | p4c |
-|---|---|---|
-| fall rate | 48% | 50% |
-| big tilt spikes (>0.6 rad) | 42 | 39 |
-| spikes that re-settled | 1 | 4 |
-| resettle time (steps) | 20.0 | 22.8 |
-| net forward x (mean) | 0.166 | 0.161 |
+- **fall rate**: run20m_ppo: 48%; p4c: 50%
+- **big tilt spikes (>0.6 rad)**: run20m_ppo: 42; p4c: 39
+- **spikes that re-settled**: run20m_ppo: 1; p4c: 4
+- **resettle time (steps)**: run20m_ppo: 20.0; p4c: 22.8
+- **net forward x (mean)**: run20m_ppo: 0.166; p4c: 0.161
 
 Fall rate is the metric that matters and it's **identical** (48 vs 50%, n=64,
 +-6% noise). Recovered-spike counts are single digits -- noise, would flip on a

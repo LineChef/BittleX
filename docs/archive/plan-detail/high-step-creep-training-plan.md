@@ -95,19 +95,17 @@ standing on the step top is paid: rear 100, front 30), face-contact cost 0.15, i
 
 ## 4. The chain (`phase_hs.py run`)
 
-| Step | What | About |
-|---|---|---|
-| V6 baseline | V6 through `hs_probe` at 0.10 m/s (20 flat walks, 40 episodes per step-up size): the bar | 4 min |
-| Base sweep | 36 creep candidates open loop on flat ground, gates below; every passing one gets step-ups at 7.5 / 12.5 / 15 mm; the best score (success + all four up - falls / 4) wins | 15 min |
-| Base check | the winner, open loop, full flat + ladder (the "no policy" row of the report) | 3 min |
-| Preflight | `preflight.py` on the recipe with the S2 stage: tests, wiring, audits, a 100k smoke run, replay check | 15 min |
-| S0 flat | 2M, fresh, 85% flat (small rubble/snags, cutback) | 20 min |
-| S1 low steps | 3M from S0, 55% step-ups 0-15 mm (frontier) | 30 min |
-| S2 tall steps | 3M from S1, 60% step-ups, frontier floor 8.3 mm, top 25 mm | 30 min |
-| Go / no-go | flat-ground safety and posture (Claude's) | - |
-| S4 20M | from S2, 45% step-ups (floor 6 mm, top 25 mm), 35% flat, plateau stop on; a tracker every 2M (10 flat walks, 10 episodes at 10 / 12.5 / 15 / 20 mm) | 141 min |
-| Pick + export | the final and the average of the last 5 checkpoints, both scored in full (30 flat, 40 per size); export `trained/HS1cand_ppo.onnx` | 15 min |
-| Report | `trained/hs_report/report.html` | 1 min |
+- **V6 baseline**: What: V6 through `hs_probe` at 0.10 m/s (20 flat walks, 40 episodes per step-up size): the bar; About: 4 min
+- **Base sweep**: What: 36 creep candidates open loop on flat ground, gates below; every passing one gets step-ups at 7.5 / 12.5 / 15 mm; the best score (success + all four up - falls / 4) wins; About: 15 min
+- **Base check**: What: the winner, open loop, full flat + ladder (the "no policy" row of the report); About: 3 min
+- **Preflight**: What: `preflight.py` on the recipe with the S2 stage: tests, wiring, audits, a 100k smoke run, replay check; About: 15 min
+- **S0 flat**: What: 2M, fresh, 85% flat (small rubble/snags, cutback); About: 20 min
+- **S1 low steps**: What: 3M from S0, 55% step-ups 0-15 mm (frontier); About: 30 min
+- **S2 tall steps**: What: 3M from S1, 60% step-ups, frontier floor 8.3 mm, top 25 mm; About: 30 min
+- **Go / no-go**: What: flat-ground safety and posture (Claude's); About: -
+- **S4 20M**: What: from S2, 45% step-ups (floor 6 mm, top 25 mm), 35% flat, plateau stop on; a tracker every 2M (10 flat walks, 10 episodes at 10 / 12.5 / 15 / 20 mm); About: 141 min
+- **Pick + export**: What: the final and the average of the last 5 checkpoints, both scored in full (30 flat, 40 per size); export `trained/HS1cand_ppo.onnx`; About: 15 min
+- **Report**: What: `trained/hs_report/report.html`; About: 1 min
 
 Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4:30-6:30 AM).
 
@@ -127,14 +125,12 @@ Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4
 
 ## 6. Success criteria (set before the run; the report checks each)
 
-| | |
-|---|---|
-| Minimum | 80% step-up success at 12.5 mm (0.49 in) |
-| Target | 80% at 15 mm (0.59 in), about double V6 |
-| Stretch | 60% at 20 mm (0.79 in) |
-| Flat ground | at most 5% falls on calm walks, at least 0.025 m/s, no crouch |
-| Clearance | rear paw lift at least 2x V6's; front paw lift at least 1.25x V6's |
-| Higher than V6 | 80% step-up ceiling above V6's |
+- **Minimum**: 80% step-up success at 12.5 mm (0.49 in)
+- **Target**: 80% at 15 mm (0.59 in), about double V6
+- **Stretch**: 60% at 20 mm (0.79 in)
+- **Flat ground**: at most 5% falls on calm walks, at least 0.025 m/s, no crouch
+- **Clearance**: rear paw lift at least 2x V6's; front paw lift at least 1.25x V6's
+- **Higher than V6**: 80% step-up ceiling above V6's
 
 ## 7. Files
 

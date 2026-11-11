@@ -5,18 +5,16 @@
 
 ## Parts list (finalized)
 
-| Item |
-|---|
-| Petoi Bittle X V2 (alloy servos) |
-| Raspberry Pi Zero 2 WH kit (pre-soldered headers, heatsink, mini-HDMI adapter, OTG cable) |
-| SanDisk 32 GB Ultra microSDHC (A1, Class 10, UHS-I) |
-| 5 V / 2.5 A micro-USB power supply |
-| Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) |
-| PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") |
-| Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6 |
-| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run |
-| [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera) |
-| [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above) |
+- Petoi Bittle X V2 (alloy servos)
+- Raspberry Pi Zero 2 WH kit (pre-soldered headers, heatsink, mini-HDMI adapter, OTG cable)
+- SanDisk 32 GB Ultra microSDHC (A1, Class 10, UHS-I)
+- 5 V / 2.5 A micro-USB power supply
+- Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55)
+- PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus")
+- Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6
+- Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run
+- [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera)
+- [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above)
 
 ### Resolved
 

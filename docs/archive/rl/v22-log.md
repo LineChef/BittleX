@@ -37,12 +37,10 @@ best 3M policy can be walked on G2; the user will also swap the front-left shoul
 ## Rounds
 (filled in as they finish; machine-readable results: `rl_training/opencat-gym/trained/v22_results.json`)
 
-| Round | Recipe | State |
-|---|---|---|
-| V2.1 reference (same sim) | frozen `Release_CandidateV2.1` | calm walk: 29% falls, 0.043 m/s (probe), roll std 6.0 deg; under the reference yaw disturbance (torque up to 0.5): heading error 49 deg, 58% falls; cells fell T2.2 0.20, T3.2 0.30, T5.2 0.20, T7.2 0.20, T8.1 1.00, T10.1 0.20, T10.2 0.25 |
-| R1 `v22_r1_drift` | yaw torque up to 0.5 N*m on 70% of episodes, 422 g payload, nothing else | **FAIL** (10:12 AM): drift under the reference disturbance 56 deg (V2.1 49), calm walk 50% falls (V2.1 29%), speed 0.024 m/s (V2.1 0.043), yaw rms 0.271 (V2.1 0.183). Cells fell: T2.2 0.0, T3.2 0.8, T5.2 0.2, T7.2 0.0, T8.1 0.8, T10.1 0.0, T10.2 0.05 (the new payload weights alone help several cells). Reading: training episodes are 250 steps (3.1 s) while real walks and the probe are 12.5 s, so a drift disturbance barely accumulates in training and 12.5 s stability is never trained. |
-| R2 `v22_r2_len` | training episodes 1000 steps (12.5 s), 422 g payload, no drift torque (single lever) | **FAIL** (11:20 AM): under the first (too harsh) probe calm falls 54% / drift 80 deg. Re-scored with the corrected probe: calm falls 1/24, heading error 24.8 deg, speed 0.044; under the disturbance 8/24 fall, heading error 62 deg (V2.1: 27 deg, 1/24). Longer episodes alone did not help. |
-| R3 `v22_r3_control` | CONTROL: 422 g payload, standard episodes, no drift torque | started 11:20 AM; expected done about 12:27 PM, scored about 12:35 PM. The 3M reference for every round (V2.1 has had ~30M steps, so it is context only) |
+- **V2.1 reference (same sim)**: Recipe: frozen `Release_CandidateV2.1`; State: calm walk: 29% falls, 0.043 m/s (probe), roll std 6.0 deg; under the reference yaw disturbance (torque up to 0.5): heading error 49 deg, 58% falls; cells fell T2.2 0.20, T3.2 0.30, T5.2 0.20, T7.2 0.20, T8.1 1.00, T10.1 0.20, T10.2 0.25
+- **R1 `v22_r1_drift`**: Recipe: yaw torque up to 0.5 N*m on 70% of episodes, 422 g payload, nothing else; State: **FAIL** (10:12 AM): drift under the reference disturbance 56 deg (V2.1 49), calm walk 50% falls (V2.1 29%), speed 0.024 m/s (V2.1 0.043), yaw rms 0.271 (V2.1 0.183). Cells fell: T2.2 0.0, T3.2 0.8, T5.2 0.2, T7.2 0.0, T8.1 0.8, T10.1 0.0, T10.2 0.05 (the new payload weights alone help several cells). Reading: training episodes are 250 steps (3.1 s) while real walks and the probe are 12.5 s, so a drift disturbance barely accumulates in training and 12.5 s stability is never trained.
+- **R2 `v22_r2_len`**: Recipe: training episodes 1000 steps (12.5 s), 422 g payload, no drift torque (single lever); State: **FAIL** (11:20 AM): under the first (too harsh) probe calm falls 54% / drift 80 deg. Re-scored with the corrected probe: calm falls 1/24, heading error 24.8 deg, speed 0.044; under the disturbance 8/24 fall, heading error 62 deg (V2.1: 27 deg, 1/24). Longer episodes alone did not help.
+- **R3 `v22_r3_control`**: Recipe: CONTROL: 422 g payload, standard episodes, no drift torque; State: started 11:20 AM; expected done about 12:27 PM, scored about 12:35 PM. The 3M reference for every round (V2.1 has had ~30M steps, so it is context only)
 
 ## Probe correction and a scoring lesson (2026-10-06, 11:30 AM)
 The first probe turned on every default random hazard of the training sim (ground tilt up to 14 deg, rubble, ledges), so its "calm walk" was not calm: V2.1 fell 29% on it, R1 50%, R2 54%.
@@ -86,14 +84,12 @@ a round passes if its calm falls are no more than the control's + 0.05 (and <= 0
 
 **Single-lever sim sweeps (`drift_probe.py --lever`, V2.1 frozen, 12 episodes):**
 
-| Lever | Result |
-|---|---|
-| servo zero offset FL shoulder -8 / -14 deg | heading abs 8 / 19 deg; falls 2 / 5 of 12 |
-| shortened FL shoulder swing (scale 0.5 / 0.2) | heading mean -15 / -11 deg; falls 4 / 3 |
-| motor force cut FL shoulder (0.4 / 0.15), FL knee 0.2 | abs 14 / 13 deg; knee cut: 10 of 12 fall |
-| one foot at 30% friction | abs 12-17 deg |
-| constant yaw torque 0.003-0.4 | little effect; 1.0 gives -43 deg, falls 2/12 |
-| FL shoulder capped at 42 / 46 / 38 deg (the stuck servo) | abs 18 / 15 / 10 deg, falls 6 / 5 / 5 of 12: does not reproduce 140 deg |
+- **servo zero offset FL shoulder -8 / -14 deg**: heading abs 8 / 19 deg; falls 2 / 5 of 12
+- **shortened FL shoulder swing (scale 0.5 / 0.2)**: heading mean -15 / -11 deg; falls 4 / 3
+- **motor force cut FL shoulder (0.4 / 0.15), FL knee 0.2**: abs 14 / 13 deg; knee cut: 10 of 12 fall
+- **one foot at 30% friction**: abs 12-17 deg
+- **constant yaw torque 0.003-0.4**: little effect; 1.0 gives -43 deg, falls 2/12
+- **FL shoulder capped at 42 / 46 / 38 deg (the stuck servo)**: abs 18 / 15 / 10 deg, falls 6 / 5 / 5 of 12: does not reproduce 140 deg
 
 **Rounds (fresh 3M runs, 422 g payload `G2E_PAYLOAD_PROFILE=case`):** R1 `v22_r1_drift` (yaw torque up to 0.5 on 70% of episodes): calm 0/24 falls, heading 9.3 deg, speed 0.018 (slow). R2 `v22_r2_len` (1000-step episodes): calm 1/24, speed 0.044, 8/24 falls under disturbance. V2.1 for context: 0/24, 9.7 deg, 0.051. R3 `v22_r3_control` was the 3M reference. Lessons: the first probe left random slopes and rubble on, so its "calm" falls meant nothing (use the decathlon `_apply({})` environment); a 3M scratch policy is not comparable with a 30M policy, judge rounds against the 3M control; 24-episode fall rates carry about ±15 points of noise.
 

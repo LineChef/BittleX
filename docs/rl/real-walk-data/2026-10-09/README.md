@@ -6,28 +6,24 @@ Logs in this folder (CSV, `run_gait --log-extra` columns). Logged yaw = firmware
 
 ## Air walk and lane, heading hold ON (front-left foot hold, trim limit -0.6)
 
-| Log | What | Result |
-|---|---|---|
-| v4_air_01 | V4 held in the air, 6 s | level (roll +1.5, pitch -1.4), yaw +5, no faults |
-| v4_lane_20261009_run01 | V4 12.5 s | 4 ft, 10 in left of the line; yaw +31; hold pinned at -0.6 |
-| v4_laneB_run01 / 02 / 03 | V4 12.5 s | run 2: 4 ft 1 in, 9 in left; run 3: 4 ft, centered with the body turned left at the end; yaw +27 / +23 / +24 |
+- **v4_air_01**: What: V4 held in the air, 6 s; Result: level (roll +1.5, pitch -1.4), yaw +5, no faults
+- **v4_lane_20261009_run01**: What: V4 12.5 s; Result: 4 ft, 10 in left of the line; yaw +31; hold pinned at -0.6
+- **v4_laneB_run01 / 02 / 03**: What: V4 12.5 s; Result: run 2: 4 ft 1 in, 9 in left; run 3: 4 ft, centered with the body turned left at the end; yaw +27 / +23 / +24
 
 ## Capture A, heading hold OFF, 12.5 s, alternating scripted / V4 (sysidA2_run01..12)
 
-| Run | Walk | Tape (fwd, side) | Logged yaw |
-|---|---|---|---|
-| 1 | scripted | 48, +12 | +1 |
-| 2 | V4 | 55, +6 | +72 |
-| 3 | scripted | 48, +10 | +2 |
-| 4 | V4 | 48, +6 | +108 |
-| 5 | scripted | 48, +4 | +1 |
-| 6 | V4 | 54, +6 | +101 |
-| 7 | scripted | 48, +8 | +2 |
-| 8 | V4 | 51, +4 | +112 |
-| 9 | scripted | 52, +6 | +2 |
-| 10 | V4 | 51, +6 | +112 |
-| 11 | scripted | 48, +6 | -5 |
-| 12 | V4 | 54, +6 | +103 |
+- **1**: Walk: scripted; Tape (fwd, side): 48, +12; Logged yaw: +1
+- **2**: Walk: V4; Tape (fwd, side): 55, +6; Logged yaw: +72
+- **3**: Walk: scripted; Tape (fwd, side): 48, +10; Logged yaw: +2
+- **4**: Walk: V4; Tape (fwd, side): 48, +6; Logged yaw: +108
+- **5**: Walk: scripted; Tape (fwd, side): 48, +4; Logged yaw: +1
+- **6**: Walk: V4; Tape (fwd, side): 54, +6; Logged yaw: +101
+- **7**: Walk: scripted; Tape (fwd, side): 48, +8; Logged yaw: +2
+- **8**: Walk: V4; Tape (fwd, side): 51, +4; Logged yaw: +112
+- **9**: Walk: scripted; Tape (fwd, side): 52, +6; Logged yaw: +2
+- **10**: Walk: V4; Tape (fwd, side): 51, +6; Logged yaw: +112
+- **11**: Walk: scripted; Tape (fwd, side): 48, +6; Logged yaw: -5
+- **12**: Walk: V4; Tape (fwd, side): 54, +6; Logged yaw: +103
 
 V4 mean 52.2 in forward, 5.7 in right, roll sd 3.9 deg; scripted mean 48.7 in, 7.7 in right, roll sd 4.6 deg. No falls in any run.
 

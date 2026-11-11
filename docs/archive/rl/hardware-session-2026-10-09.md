@@ -6,15 +6,13 @@ needs real step-up and step-down data. G2 is charged. Training runs on the Mac m
 Rules: the user is the hands-on agent (G2 is held upright in the air for the first walk; never on its back). Ask the floor first and label it (`g2floor <label>`). Capture walks use `--foot-hold off`
 (the heading hold changes the legs' motion); the everyday-behavior check uses the hold on. Real data sets sim numbers and scores; it never feeds drift.
 
-| Part | What | Runs | About |
-|---|---|---|---|
-| 0 Setup | floor label; pack voltage at rest (write it down); deploy check; tape the lane (start spot + a 1.5 m line); know the halt (`python -m pi_pipeline.app --halt`) | - | 10 min |
-| 1 First V4 walk | held upright in the air: `run_gait.py --cmd 0.10 --seconds 6` | 1 | 3 min |
-| 2 V4 on the lane, hold on | the real behavior check ([`../status-2026-10-detail.md`](../status-2026-10-detail.md) 0c): `--cmd 0.10 --seconds 12.5 --log ~/g2_runs/v4_a.csv` ; expect about 0.09 m/s and heading within about 10 deg | 3 | 10 min |
-| 3 Capture A | hold off: 6 V4 walks and 6 scripted `wkF` walks alternating (`g2_baseline.sh start 12 sysidA --scripted-mix abab`); tape forward distance and sideways offset (cm, + = right) after every run | 12 | 30 min |
-| 4 Ledges | a book at about 12 mm and one at about 25 mm, taped down, height by ruler. Step UP: 3 V4 runs into each; step DOWN: G2 starts on the book and walks off, 3 V4 runs each; 3 scripted runs at 12 mm each way for comparison. Note success, or where it caught | about 21 | 30 min |
-| 5 Low pack (same day if time, else another day) | the 6 V4 walks again when the resting pack reads about 7.9 V | 6 | 15 min |
-| 6 Bench servo tests (optional) | lid off, Mac USB: `tools/servo_static_test.py`, the H13 step test | - | 20 min |
+- **0 Setup**: What: floor label; pack voltage at rest (write it down); deploy check; tape the lane (start spot + a 1.5 m line); know the halt (`python -m pi_pipeline.app --halt`); Runs: -; About: 10 min
+- **1 First V4 walk**: What: held upright in the air: `run_gait.py --cmd 0.10 --seconds 6`; Runs: 1; About: 3 min
+- **2 V4 on the lane, hold on**: What: the real behavior check ([`../status-2026-10-detail.md`](../status-2026-10-detail.md) 0c): `--cmd 0.10 --seconds 12.5 --log ~/g2_runs/v4_a.csv` ; expect about 0.09 m/s and heading within about 10 deg; Runs: 3; About: 10 min
+- **3 Capture A**: What: hold off: 6 V4 walks and 6 scripted `wkF` walks alternating (`g2_baseline.sh start 12 sysidA --scripted-mix abab`); tape forward distance and sideways offset (cm, + = right) after every run; Runs: 12; About: 30 min
+- **4 Ledges**: What: a book at about 12 mm and one at about 25 mm, taped down, height by ruler. Step UP: 3 V4 runs into each; step DOWN: G2 starts on the book and walks off, 3 V4 runs each; 3 scripted runs at 12 mm each way for comparison. Note success, or where it caught; Runs: about 21; About: 30 min
+- **5 Low pack (same day if time, else another day)**: What: the 6 V4 walks again when the resting pack reads about 7.9 V; Runs: 6; About: 15 min
+- **6 Bench servo tests (optional)**: What: lid off, Mac USB: `tools/servo_static_test.py`, the H13 step test; Runs: -; About: 20 min
 
 Stop and tell Claude on: any fall (note the time), a servo that sounds or smells wrong, odd heating, the pack dropping fast. Not today: slopes (secondary), exploration pictures (a separate visit).
 

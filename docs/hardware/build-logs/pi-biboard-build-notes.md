@@ -109,13 +109,11 @@ That matters for where the Pi mounts; see
 
 If it isn't already populated, solder a 5-pin header there. Left to right:
 
-| Pin | Label |
-|---|---|
-| 1 (square pad) | TX2 |
-| 2 | RX2 |
-| 3 | GND |
-| 4 | +5V |
-| 5 | +5V |
+- **1 (square pad)**: TX2
+- **2**: RX2
+- **3**: GND
+- **4**: +5V
+- **5**: +5V
 
 **Done 2026-09-29** — 5-pin female header soldered to BiBoard.
 
@@ -124,11 +122,9 @@ If it isn't already populated, solder a 5-pin header there. Left to right:
 Three wires, crossed — one board's "sending" line goes to the other's
 "listening" line:
 
-| From (BiBoard) | To (Pi) |
-|---|---|
-| TX2 | pin 10 (GPIO15, RXD) |
-| RX2 | pin 8 (GPIO14, TXD) |
-| GND | pin 6 |
+- **TX2**: pin 10 (GPIO15, RXD)
+- **RX2**: pin 8 (GPIO14, TXD)
+- **GND**: pin 6
 
 Leave BiBoard's two +5V pins and the Pi's pin 2 (5V) **unconnected** — PiSugar
 is already powering the Pi.
@@ -136,12 +132,10 @@ is already powering the Pi.
 Both sides at once, wires drawn crossing between them — the fastest way to
 see exactly which pin goes where:
 
-| Pi header pin | Signal | BiBoard 5-pin socket |
-|---|---|---|
-| 6 | GND (black) | GND |
-| 8 | GPIO14, TXD (amber) | RX2 (9) |
-| 10 | GPIO15, RXD (green) | TX2 (10) |
-| 2 | 5 V | not wired (skip) |
+- **6**: Signal: GND (black); BiBoard 5-pin socket: GND
+- **8**: Signal: GPIO14, TXD (amber); BiBoard 5-pin socket: RX2 (9)
+- **10**: Signal: GPIO15, RXD (green); BiBoard 5-pin socket: TX2 (10)
+- **2**: Signal: 5 V; BiBoard 5-pin socket: not wired (skip)
 
 The two +5V pins on BiBoard's socket stay unused. The drawn version of this table is in [`../wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
 
@@ -183,12 +177,10 @@ standard short ones.
 
 Full pinout, both boards:
 
-| | BiBoard | Pi |
-|---|---|---|
-| Ground | GND | pin 6 |
-| BiBoard sends / Pi receives | TX2 | pin 10 (RXD) |
-| Pi sends / BiBoard receives | RX2 | pin 8 (TXD) |
-| Power (not wired) | +5V, +5V | pin 2 |
+- **Ground**: BiBoard: GND; Pi: pin 6
+- **BiBoard sends / Pi receives**: BiBoard: TX2; Pi: pin 10 (RXD)
+- **Pi sends / BiBoard receives**: BiBoard: RX2; Pi: pin 8 (TXD)
+- **Power (not wired)**: BiBoard: +5V, +5V; Pi: pin 2
 
 ### Pi 40-pin header, full reference
 

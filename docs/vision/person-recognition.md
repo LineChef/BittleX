@@ -23,12 +23,10 @@ detection labels.
 
 ## Which kind of recognition
 
-| Approach | Output | Feasible on Grove Vision AI V2 |
-|---|---|---|
-| Person detection (deployed now) | box around any human | ✅ one model, frame rate |
-| Face detection | box around any face | ✅ — but *less* useful than person detection for "someone's here" (a face only shows close + facing) |
-| **Per-individual detection** (the near-term plan) | `dad`, box, 0.7 | ✅ one model, frame rate — **coarse** at 192–240 px, confuses similar faces, retrain to add anyone |
-| True face recognition (detect → embedding → gallery match) | vector per face, match against a few enrolled photos, **no retrain to add people** | ⚠️ two models — module runs one at a time → face-detect on module + embed on the **Pi**, event-driven (module can't stream a frame *and* detections) |
+- **Person detection (deployed now)**: Output: box around any human; Feasible on Grove Vision AI V2: ✅ one model, frame rate
+- **Face detection**: Output: box around any face; Feasible on Grove Vision AI V2: ✅ — but *less* useful than person detection for "someone's here" (a face only shows close + facing)
+- **Per-individual detection** (the near-term plan): Output: `dad`, box, 0.7; Feasible on Grove Vision AI V2: ✅ one model, frame rate — **coarse** at 192–240 px, confuses similar faces, retrain to add anyone
+- **True face recognition (detect → embedding → gallery match)**: Output: vector per face, match against a few enrolled photos, **no retrain to add people**; Feasible on Grove Vision AI V2: ⚠️ two models — module runs one at a time → face-detect on module + embed on the **Pi**, event-driven (module can't stream a frame *and* detections)
 
 **Near-term:** per-individual detection. One `interaction` model with classes
 `person` + `dad` + `mom` + `dog` + …, trained via SenseCraft (multi-class
@@ -119,22 +117,18 @@ Pure logic + injectable clock, same pattern as `link/recovery.py` /
 `pi_pipeline/behavior/enrollment_driver.py` (or fold into the voice loop's
 command handling). Per tick it must:
 
-| FSM needs | Driver supplies from |
-|---|---|
-| `person_present` | the `interaction`/`person` model via `SerialDetectionFeed` — any `person`/individual box this frame |
-| `face_quality` | brightness of the face-box crop × (box area / frame) — needs the JPEG (`AT+INVOKE=-1,0,0` carries one per frame; reuse `scratchpad/face_preview.py`'s grab path) |
-| `good_frames_this_step` | count of frames it accepted+saved since the last `CAPTURE_ON` |
+- **`person_present`**: the `interaction`/`person` model via `SerialDetectionFeed` — any `person`/individual box this frame
+- **`face_quality`**: brightness of the face-box crop × (box area / frame) — needs the JPEG (`AT+INVOKE=-1,0,0` carries one per frame; reuse `scratchpad/face_preview.py`'s grab path)
+- **`good_frames_this_step`**: count of frames it accepted+saved since the last `CAPTURE_ON`
 
 And it must act on `EnrollTick`:
 
-| action | driver does |
-|---|---|
-| `SPEAK` | `voice.tts.speak(tick.speak)` |
-| `CAPTURE_ON` | `new_session_dir(...)` once per session; start saving accepted frames, tagged with `step_kind`; also save the detection box as a pre-label (YOLO txt) so upload is ~90 % labelled |
-| `CAPTURE_OFF` | stop saving |
-| `ORIENT` | turn body toward `tick.bearing` (only if a body/link is present) |
-| `COMPLETE` | `mark_session_done(session_dir)`; tell the user; if `sessions_left == 0`, surface "ready to train" |
-| `ABORT` | discard or keep partial (config); tell the user |
+- **`SPEAK`**: `voice.tts.speak(tick.speak)`
+- **`CAPTURE_ON`**: `new_session_dir(...)` once per session; start saving accepted frames, tagged with `step_kind`; also save the detection box as a pre-label (YOLO txt) so upload is ~90 % labelled
+- **`CAPTURE_OFF`**: stop saving
+- **`ORIENT`**: turn body toward `tick.bearing` (only if a body/link is present)
+- **`COMPLETE`**: `mark_session_done(session_dir)`; tell the user; if `sessions_left == 0`, surface "ready to train"
+- **`ABORT`**: discard or keep partial (config); tell the user
 
 Trigger: voice command `"(hey )?g2,? meet (<name>)"` in the voice loop's local
 command matcher (sibling of `voice/commands.py` "forget that" / "go to sleep").

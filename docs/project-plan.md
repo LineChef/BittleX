@@ -20,17 +20,15 @@ Walking, vision, voice and memory are separate systems that run side by side. Th
 
 ## Phases
 
-| Phase | Where it stands |
-|---|---|
-| Repo setup and orientation | Done. |
-| Walking policy training in simulation | Done. Several policies were trained, and one is deployed. New gait training starts only on the owner's go-ahead. |
-| Hardware assembly | Done. The Pi sits in a printed pod, the camera is mounted, and a microphone and speaker are fitted. A claw arm is fitted on the neck. See [As built](hardware/as-built.md). |
-| Basic control | Done. A serial link to the control board drives walking, turning and the built-in skills. |
-| Sim-to-real deployment | Walking works on hardwood. Layers for steering, stand-ups, falls and heat protect it. Tile and carpet remain open. |
-| Voice and Claude | Working on the robot. Wake word, spoken commands and conversation run on the Pi. |
-| Perception | The camera detects objects on its own hardware. "What do you see", ball finding and exploration pictures work. Vision-based navigation is switched off for now. |
-| Memory | Working. Facts and past conversations persist on the Pi. |
-| Integration | In progress. Exploration and the ball goal run on G2. A long run of the full application is still to do. |
+- **Repo setup and orientation**: Done.
+- **Walking policy training in simulation**: Done. Several policies were trained, and one is deployed. New gait training starts only on the owner's go-ahead.
+- **Hardware assembly**: Done. The Pi sits in a printed pod, the camera is mounted, and a microphone and speaker are fitted. A claw arm is fitted on the neck. See [As built](hardware/as-built.md).
+- **Basic control**: Done. A serial link to the control board drives walking, turning and the built-in skills.
+- **Sim-to-real deployment**: Walking works on hardwood. Layers for steering, stand-ups, falls and heat protect it. Tile and carpet remain open.
+- **Voice and Claude**: Working on the robot. Wake word, spoken commands and conversation run on the Pi.
+- **Perception**: The camera detects objects on its own hardware. "What do you see", ball finding and exploration pictures work. Vision-based navigation is switched off for now.
+- **Memory**: Working. Facts and past conversations persist on the Pi.
+- **Integration**: In progress. Exploration and the ball goal run on G2. A long run of the full application is still to do.
 
 ## Decisions that shape the project
 

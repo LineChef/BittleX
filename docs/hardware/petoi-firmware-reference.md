@@ -8,11 +8,9 @@ has moved on.
 
 ## Repositories
 
-| repo | what |
-|---|---|
-| `PetoiCamp/OpenCatEsp32` (aka `OpenCatEsp32-Quadruped-Robot`) | **BiBoard/ESP32 firmware — this is G2's.** |
-| `PetoiCamp/OpenCat` | NyBoard/AVR firmware (older boards) |
-| `PetoiCamp/OpenCat-Old` | legacy |
+- **`PetoiCamp/OpenCatEsp32` (aka `OpenCatEsp32-Quadruped-Robot`)**: **BiBoard/ESP32 firmware — this is G2's.**
+- **`PetoiCamp/OpenCat`**: NyBoard/AVR firmware (older boards)
+- **`PetoiCamp/OpenCat-Old`**: legacy
 
 `OpenCatEsp32/src/`: `src.ino` (serial parser / main loop), `imu.h` + `mpu6050/`
 (IMU fusion + exception detection), `reaction.h` (`dealWithExceptions()` — auto
@@ -63,13 +61,11 @@ above and not decoded from the project's own firmware source — confirmed inste
 from [Petoi's official docs](https://docs.petoi.com/extensible-modules/voice-command-module)
 and against the real board 2026-09-28:
 
-| command | action |
-|---|---|
-| `XAa` | set English as default language |
-| `XAb` | set Chinese as default language |
-| `XAc` | enable the voice module |
-| `XAd` | disable the voice module |
-| `XAe` | enter learning mode |
+- **`XAa`**: set English as default language
+- **`XAb`**: set Chinese as default language
+- **`XAc`**: enable the voice module
+- **`XAd`**: disable the voice module
+- **`XAe`**: enter learning mode
 
 Not blocked by `opencat.is_safe()` (only `c`/`cd` are). There's also a
 physical dial switch on the bottom of the BiBoard extension hat (Bittle X
@@ -115,24 +111,22 @@ incident — this module's state lives in the same EEPROM/NVS wiped by
 `esptool erase_flash`, so re-applying this sequence is now an expected
 step after any future full reflash, not a fault to re-diagnose.
 
-| token | name | meaning |
-|---|---|---|
-| `k<skill>` | `T_SKILL` | run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF` |
-| `m<idx> <deg> …` | `T_INDEXED_SIMULTANEOUS_ASC` | move joint(s), chainable — `m0 30 8 -35` |
-| `b<note> <dur> …` | `T_BEEP` | buzzer melody: pairs of (note, duration) |
-| `d` | `T_REST` | rest posture, servos off (ends a looping gait) |
-| `P` | `T_POWER` | **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack) |
-| `j` / `j <idx>` | `T_JOINTS` | **return all joint angles / one joint** |
-| `f` | `T_SERVO_FEEDBACK` | servo position feedback (if the servo chip supports it) |
-| `g` | `T_GYRO` | gyro function toggle (bare `g`) |
-| `gU` / `gu` | `C_GYRO_UPDATE` / `_OFF` | continuous gyro data update on/off (already **on by default from boot** — `updateGyroQ = true` is set during IMU init, so `gU` is rarely needed just to get data flowing) |
-| `gB` / `gb` | `C_GYRO_BALANCE` / `_OFF` | turn gyro balancing on/off |
-| `gc` | `C_GYRO_CALIBRATE` | calibrate the IMU |
-| `gP` | `C_PRINT` (in the `g`-context) | **start CONTINUOUS 6-axis print** — sets `printGyroQ = true`, which is what actually makes `readEnvironment()` call `print6Axis()` every loop |
-| `gp` | `C_PRINT_OFF` | stop it — **NOT symmetric with `gP`**, this is "print once then stop", not a toggle; sending `gP` twice does not turn it off |
-| `p` | `T_PAUSE` | pause |
-| `t` | `T_TILT` | tilt command |
-| `c` / `cd` | calibration / factory | **never send from the pipeline** |
+- **`k<skill>`**: name: `T_SKILL`; meaning: run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF`
+- **`m<idx> <deg> …`**: name: `T_INDEXED_SIMULTANEOUS_ASC`; meaning: move joint(s), chainable — `m0 30 8 -35`
+- **`b<note> <dur> …`**: name: `T_BEEP`; meaning: buzzer melody: pairs of (note, duration)
+- **`d`**: name: `T_REST`; meaning: rest posture, servos off (ends a looping gait)
+- **`P`**: name: `T_POWER`; meaning: **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack)
+- **`j` / `j <idx>`**: name: `T_JOINTS`; meaning: **return all joint angles / one joint**
+- **`f`**: name: `T_SERVO_FEEDBACK`; meaning: servo position feedback (if the servo chip supports it)
+- **`g`**: name: `T_GYRO`; meaning: gyro function toggle (bare `g`)
+- **`gU` / `gu`**: name: `C_GYRO_UPDATE` / `_OFF`; meaning: continuous gyro data update on/off (already **on by default from boot** — `updateGyroQ = true` is set during IMU init, so `gU` is rarely needed just to get data flowing)
+- **`gB` / `gb`**: name: `C_GYRO_BALANCE` / `_OFF`; meaning: turn gyro balancing on/off
+- **`gc`**: name: `C_GYRO_CALIBRATE`; meaning: calibrate the IMU
+- **`gP`**: name: `C_PRINT` (in the `g`-context); meaning: **start CONTINUOUS 6-axis print** — sets `printGyroQ = true`, which is what actually makes `readEnvironment()` call `print6Axis()` every loop
+- **`gp`**: name: `C_PRINT_OFF`; meaning: stop it — **NOT symmetric with `gP`**, this is "print once then stop", not a toggle; sending `gP` twice does not turn it off
+- **`p`**: name: `T_PAUSE`; meaning: pause
+- **`t`**: name: `T_TILT`; meaning: tilt command
+- **`c` / `cd`**: name: calibration / factory; meaning: **never send from the pipeline**
 
 - **b<note> <dur> …:** Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it
 
@@ -238,13 +232,11 @@ to catching the reflash-worthy bug, but its premise no longer holds.
 Separate from the serial tokens above — a status/enable table for
 BiBoard's extension modules, confirmed from `src/moduleManager.h`:
 
-| letter | module | | letter | module |
-|---|---|---|---|---|
-| `S` | Serial (Grove_Serial, i.e. Pi/UART2) | | `B` | Backtouch |
-| `A` | Voice | | `U` | Ultrasonic |
-| `T` | Touch | | `G` | Gesture |
-| `L` | Light | | `C` | Camera |
-| `D` | infrared Distance | | `Q` | Quick_demo |
+- **`S`**: module: Serial (Grove_Serial, i.e. Pi/UART2); letter: `B`; module: Backtouch
+- **`A`**: module: Voice; letter: `U`; module: Ultrasonic
+- **`T`**: module: Touch; letter: `G`; module: Gesture
+- **`L`**: module: Light; letter: `C`; module: Camera
+- **`D`**: module: infrared Distance; letter: `Q`; module: Quick_demo
 
 Printed as `?`'s status dump: a header row of these letters, then a `0`/`1`
 row (also reachable via `X`+letter, e.g. `XC`'s enable prints it). **`G`
@@ -356,14 +348,12 @@ Desktop App release newer than 1.2.9.
 
 ### Exception detection (`imu.h` `getImuException()`)
 
-| exception | trigger |
-|---|---|
-| `IMU_EXCEPTION_FLIPPED` (-1) | `fabs(ypr[roll]) > 85°` **and** accel-Z near/below 0 |
-| `IMU_EXCEPTION_LIFTED` (-2) | `pitch < -50°` or `pitch > 75°` |
-| `IMU_EXCEPTION_KNOCKED` (-3) | Z-axis accel shock vs previous frame |
-| `IMU_EXCEPTION_PUSHED` (-4) | X/Y accel shock ≈ 4.9 g (X) / 7.3 g (Y) |
-| `IMU_EXCEPTION_FREEFALL` (-6) | — |
-| `IMU_EXCEPTION_TURNING` (-7) | — |
+- **`IMU_EXCEPTION_FLIPPED` (-1)**: `fabs(ypr[roll]) > 85°` **and** accel-Z near/below 0
+- **`IMU_EXCEPTION_LIFTED` (-2)**: `pitch < -50°` or `pitch > 75°`
+- **`IMU_EXCEPTION_KNOCKED` (-3)**: Z-axis accel shock vs previous frame
+- **`IMU_EXCEPTION_PUSHED` (-4)**: X/Y accel shock ≈ 4.9 g (X) / 7.3 g (Y)
+- **`IMU_EXCEPTION_FREEFALL` (-6)**: —
+- **`IMU_EXCEPTION_TURNING` (-7)**: —
 
 `gFactor = GRAVITY / 8192 ≈ 0.00122`.
 
@@ -418,11 +408,9 @@ From `PetoiCamp/OpenCat` (AVR/NyBoard) and `PetoiCamp/OpenCatEsp32` (ESP32/BiBoa
 
 `InstinctBittleESP.h` stores each skill as `const int8_t <name>[] PROGMEM = {…}`.
 
-| period `p` | kind | header | frame |
-|---|---|---|---|
-| `p > 1` | **gait** (loops) | 4 bytes `[period, expRoll, expPitch, ratio]` | 8 int8 leg-joint angles (DOF 8..15) |
-| `p == 1` | **posture** | 4 bytes | 16 int8 full-DOF angles |
-| `p < -1` | **behaviour** | 7 bytes `[period, expRoll, expPitch, ratio, loopStart, loopEnd, loopCycles]` | 16 angles + 4 timing params |
+- **`p > 1`**: kind: **gait** (loops); header: 4 bytes `[period, expRoll, expPitch, ratio]`; frame: 8 int8 leg-joint angles (DOF 8..15)
+- **`p == 1`**: kind: **posture**; header: 4 bytes; frame: 16 int8 full-DOF angles
+- **`p < -1`**: kind: **behaviour**; header: 7 bytes `[period, expRoll, expPitch, ratio, loopStart, loopEnd, loopCycles]`; frame: 16 angles + 4 timing params
 
 `ratio` (`angleDataRatio`): 1 or 2 — angles are divided by it on storage if any
 exceed 128, so multiply back on read. Petoi leg-column order
@@ -436,14 +424,12 @@ Generalises `build_wkf_reference.py` to any skill → `<name>_ref.npy`, shape
 drop-in `FAC_IMITATION` anchor via `G2E_SKILL_REF=<name>` (env re-loads
 `WKF_REF`/`STAND_POSE`; unset = wkF, byte-identical).
 
-| ref | firmware | period | per-joint deg (min…max) | vs wkF | what it is |
-|---|---|---|---|---|---|
-| `wkf_ref` | `wkF` | 116 | knee-swing ≈ 42° | — | the standing walk (current anchor) |
-| `cr_ref` | `crF` | 103 | shoulders 22…110, **knees −52…−29 (always flexed)** | **mean 34.8°** | **crawl — deep crouch, biggest coordination delta.** Best "add a skill" test anchor. |
-| `tr_ref` | `trF` | 48 | knee-swing **48°** (widest) | mean 20.5° | trot — faster, bouncier, biggest foot lift |
-| `vt_ref` | `vtF` | 37 | knees −22…9, higher shoulders | mean 11.7° | "step" — stiff marching step, *smaller* knee swing than wkF (not a high-step) |
-| `bk_ref` | `bkF` | 43 | knee-swing 21° | mean 11.6° | backward walk |
-| `rc_ref` | `rc` | 5 (behaviour) | knees to 200°, shoulders to −176° | mean 55° | **self-right keyframes** (approx — timing params dropped). Reference for the sim self-right work, not a locomotion gait. |
+- **`wkf_ref`**: firmware: `wkF`; period: 116; per-joint deg (min…max): knee-swing ≈ 42°; vs wkF: —; what it is: the standing walk (current anchor)
+- **`cr_ref`**: firmware: `crF`; period: 103; per-joint deg (min…max): shoulders 22…110, **knees −52…−29 (always flexed)**; vs wkF: **mean 34.8°**; what it is: **crawl — deep crouch, biggest coordination delta.** Best "add a skill" test anchor.
+- **`tr_ref`**: firmware: `trF`; period: 48; per-joint deg (min…max): knee-swing **48°** (widest); vs wkF: mean 20.5°; what it is: trot — faster, bouncier, biggest foot lift
+- **`vt_ref`**: firmware: `vtF`; period: 37; per-joint deg (min…max): knees −22…9, higher shoulders; vs wkF: mean 11.7°; what it is: "step" — stiff marching step, *smaller* knee swing than wkF (not a high-step)
+- **`bk_ref`**: firmware: `bkF`; period: 43; per-joint deg (min…max): knee-swing 21°; vs wkF: mean 11.6°; what it is: backward walk
+- **`rc_ref`**: firmware: `rc`; period: 5 (behaviour); per-joint deg (min…max): knees to 200°, shoulders to −176°; vs wkF: mean 55°; what it is: **self-right keyframes** (approx — timing params dropped). Reference for the sim self-right work, not a locomotion gait.
 
 **Note for the adapter skill probe:** `cr` (crouch) is a better test skill than a
 hand-tuned "high-step" `PAW_Z_TARGET` — it's a real firmware trajectory with the

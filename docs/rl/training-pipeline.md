@@ -12,13 +12,11 @@ Every new mechanic in `opencat_gym_env.py` defaults off, so older checkpoints an
 
 A chain is a plan plus a runner that carries it out unattended and stops only for a judgement call:
 
-| Chain | Runner | State |
-|---|---|---|
-| V3 | `phase_v3.py` (also the scoring code the others reuse) | done |
-| V4 (screens, then a 20M) | `phase_v4.py` | done, deployed 2026-10-09 |
-| V5 | `phase_v5.py` | done, not promoted |
-| V6 (staged skills, then a 20M) | `phase_v6.py` | done, deployed |
-| High-step creep | `phase_hs.py` | stopped, goal not met |
+- **V3**: Runner: `phase_v3.py` (also the scoring code the others reuse); State: done
+- **V4 (screens, then a 20M)**: Runner: `phase_v4.py`; State: done, deployed 2026-10-09
+- **V5**: Runner: `phase_v5.py`; State: done, not promoted
+- **V6 (staged skills, then a 20M)**: Runner: `phase_v6.py`; State: done, deployed
+- **High-step creep**: Runner: `phase_hs.py`; State: stopped, goal not met
 
 The rules every plan follows: a fresh candidate each time; screens of at most 3M steps with two seeds per lever, judged on learnability and no flat-ground regression; a 20M only after `preflight.py` prints ALL PASS and only on the user's go; difficulty capped by what a capable policy can pass (`passability_audit.py`); nothing trains on a consolidated 20M.
 

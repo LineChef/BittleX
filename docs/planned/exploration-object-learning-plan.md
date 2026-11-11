@@ -7,20 +7,18 @@ so it can learn things the camera model was never trained on.
 
 ## Your feedback, and where each item lives in this plan
 
-| What you asked for | Where |
-|---|---|
-| Does taking a snapshot make an API call? If not, use snapshots | **No.** A snapshot is one USB request to the camera (`AT+INVOKE=1,0,0`); the API is called only when a picture is attached to a message to Claude. Phase 1 uses snapshots only; nothing in this plan calls the API. Tests use fakes (standing rule, 2026-10-07). |
-| G2 walks a bit, stops, does the inspect pose, looks down and up | Phase 1: a survey stop at the end of each exploration leg |
-| One picture looking down, one looking up, then keep exploring | Phase 1: `survey_plan` (bow, stand, one picture once the stance settles, walk on) |
-| Name things by voice; you will try it in exploration testing | Phase 1 (saving a named picture) and Phase 5 (recognition from the saved names) |
-| Explain how naming would work | Phase 5, and the user test script below |
-| A routine to process the exploration pictures, like the capture sessions, so training data is good | Phase 2: `tools/curate_exploration.py` (reuses the capture tools' quality gates) |
-| When G2 sees an object he has not seen and that has no name, he asks "what am I looking at?" | Phase 5: the ask |
-| When he recognizes an object, he says what he sees, so it can be told that it is working as he learns | Phase 5: the announce, plus a log of every recognition |
-| Start recognizing objects outside the AI camera model's training | The whole plan: the gallery recognizes by similarity, not by trained class |
-| A comprehensive plan that includes all of this feedback | This page |
-| "Loop me in when you are in a good spot to talk about it" | Checkpoints below: the first is after Phase 1 is built and tested, before it goes on G2 |
-| Pictures and your privacy | Pictures stay on the Pi; copying them to the Mac for processing needs your OK each time; people are skipped in the curated set (decision 3) |
+- **Does taking a snapshot make an API call? If not, use snapshots**: **No.** A snapshot is one USB request to the camera (`AT+INVOKE=1,0,0`); the API is called only when a picture is attached to a message to Claude. Phase 1 uses snapshots only; nothing in this plan calls the API. Tests use fakes (standing rule, 2026-10-07).
+- **G2 walks a bit, stops, does the inspect pose, looks down and up**: Phase 1: a survey stop at the end of each exploration leg
+- **One picture looking down, one looking up, then keep exploring**: Phase 1: `survey_plan` (bow, stand, one picture once the stance settles, walk on)
+- **Name things by voice; you will try it in exploration testing**: Phase 1 (saving a named picture) and Phase 5 (recognition from the saved names)
+- **Explain how naming would work**: Phase 5, and the user test script below
+- **A routine to process the exploration pictures, like the capture sessions, so training data is good**: Phase 2: `tools/curate_exploration.py` (reuses the capture tools' quality gates)
+- **When G2 sees an object he has not seen and that has no name, he asks "what am I looking at?"**: Phase 5: the ask
+- **When he recognizes an object, he says what he sees, so it can be told that it is working as he learns**: Phase 5: the announce, plus a log of every recognition
+- **Start recognizing objects outside the AI camera model's training**: The whole plan: the gallery recognizes by similarity, not by trained class
+- **A comprehensive plan that includes all of this feedback**: This page
+- **"Loop me in when you are in a good spot to talk about it"**: Checkpoints below: the first is after Phase 1 is built and tested, before it goes on G2
+- **Pictures and your privacy**: Pictures stay on the Pi; copying them to the Mac for processing needs your OK each time; people are skipped in the curated set (decision 3)
 
 ## What exists, what is new
 
@@ -92,20 +90,16 @@ Output location: `training_data/exploration/<session>/` (not tracked by git, lik
 **Model provenance and first comparison (2026-10-09, user's yes to the download):** MobileNetV2 (opset 12, exported from PyTorch 1.8) from the official ONNX Model Zoo, `https://github.com/onnx/models/raw/main/validated/vision/classification/mobilenet/model/mobilenetv2-12.onnx` (one redirect to GitHub's own file host `media.githubusercontent.com`), 13,964,571 bytes, SHA-256 `c0c3f76d93fa3fd6580652a45618618a220fced18babf65774ed169de0432ad5` (the zoo publishes no checksum, so this is a record, not a comparison); license Apache-2.0 (the zoo's). Kept in `~/g2_data/models/mobilenetv2-12/`, outside the repo. Checked read-only: it parses, `onnx.checker` passes, only standard operators (Conv, Clip, Add, GlobalAveragePool, Gemm and the like), no custom-domain operators, and it loads in onnxruntime. The embedder uses a derived copy, `mobilenetv2-12-features.onnx`, whose output is the 1280 x 7 x 7 feature map before the pooling and classifier (the embedder then averages it to 1280 numbers).
 On the 25 readable named pictures of 8 objects (6 cut-off survey pictures were left out), whole-picture vectors, threshold 0.80:
 
-| | within-object | between-object | gap | leave-one-out retrieval | hit rate | survey pictures that "match" |
-|---|---|---|---|---|---|---|
-| histogram baseline | 0.781 | 0.588 | 0.193 | 82% | 82% | 68% |
-| MobileNetV2 features | 0.788 | 0.687 | 0.101 | 77% | 73% | 46% |
+- **histogram baseline**: within-object: 0.781; between-object: 0.588; gap: 0.193; leave-one-out retrieval: 82%; hit rate: 82%; survey pictures that "match": 68%
+- **MobileNetV2 features**: within-object: 0.788; between-object: 0.687; gap: 0.101; leave-one-out retrieval: 77%; hit rate: 73%; survey pictures that "match": 46%
 
 Too little data to choose: most objects have 4-5 pictures, the survey pictures contain the named kitchen fixtures themselves (so some "false" matches are real), and 0.80 is not the right threshold for both scales. Rerun `tools/eval_embedder.py` once more objects have 5 or more labelled pictures. Time on the Pi Zero 2 W is still to measure when the Pi is online.
 
 **Second model, DINOv2-small (2026-10-09, the user's yes):** a self-supervised image model trained to match the same thing across views, which is the property instance recognition needs (MobileNetV2 is a 1,000-category classifier: it groups kinds, not individuals). ONNX conversion by the `onnx-community` organization (a third-party export; Meta publishes only PyTorch weights) of `facebook/dinov2-small` (license Apache-2.0), pinned to commit `8b1f705a3a7f6f062f6bdd21986c1583d3ef105d`, file `onnx/model.onnx`, 88,532,934 bytes, SHA-256 `f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a` (matches the publisher's own checksum from the Hub API). Kept in `~/g2_data/models/dinov2-small/`, outside the repo. Checked read-only: parses, `onnx.checker` passes, only standard operators (MatMul, Softmax, Erf, LayerNorm pieces and the like), no custom-domain operators, loads in onnxruntime; one 224 px picture takes 0.06 s on the Mac. Output (1, 257, 384): class token plus 256 patch tokens, pooled by the embedder as class + mean (768 numbers). The 24 MB int8 file (`model_int8.onnx`, SHA-256 `dfce54a8...`) is the Pi candidate, not fetched.
 
-| | within-object | between-object | gap | leave-one-out retrieval | hit rate at 0.80 | survey pictures that "match" at 0.80 |
-|---|---|---|---|---|---|---|
-| histogram baseline | 0.781 | 0.588 | 0.193 | 82% | 82% | 68% |
-| MobileNetV2 | 0.788 | 0.687 | 0.101 | 77% | 73% | 46% |
-| **DINOv2-small** | 0.756 | 0.534 | **0.222** | **91%** | 45% | 19% |
+- **histogram baseline**: within-object: 0.781; between-object: 0.588; gap: 0.193; leave-one-out retrieval: 82%; hit rate at 0.80: 82%; survey pictures that "match" at 0.80: 68%
+- **MobileNetV2**: within-object: 0.788; between-object: 0.687; gap: 0.101; leave-one-out retrieval: 77%; hit rate at 0.80: 73%; survey pictures that "match" at 0.80: 46%
+- **DINOv2-small**: within-object: 0.756; between-object: 0.534; gap: **0.222**; leave-one-out retrieval: **91%**; hit rate at 0.80: 45%; survey pictures that "match" at 0.80: 19%
 
 DINOv2 separates best (largest gap, best retrieval, fewest false matches) but its similarities sit lower, so the 0.80 threshold (set for the histogram scale) is too high for it: the hit rate at 0.80 is low only because of that. Next: tune the same-instance and duplicate thresholds for it on the labelled pictures (about 0.65-0.70 to start), time the int8 file on the Pi, then switch `G2_EMBEDDER` to it. Still only 25 named pictures of 8 objects; recheck after the first 5 labelled pictures per object.
 
