@@ -13,7 +13,6 @@
  "guides/voice-commands": "Voice commands",
  "guides/exploration-mode": "Exploration mode",
  "guides/settings-switches": "Settings and switches",
- "guides/env-reference": "Environment variables",
  "guides/feature-flags": "Feature flags",
  "guides/attachments": "Attachments",
  "guides/punt": "Punt test",

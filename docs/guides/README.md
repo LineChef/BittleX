@@ -14,7 +14,6 @@ Step-by-step instructions for running, configuring and setting up G2. Start with
 ### Configure
 
 - [`settings-switches.md`](settings-switches.md): Every environment switch (sounds, exploration, walls, power, standing) with its default.
-- [`env-reference.md`](env-reference.md): Every `G2_*` variable the code reads, with its default, where it is read and where it is documented (generated; flags any that no guide mentions).
 - [`feature-flags.md`](feature-flags.md): `G2_FEATURES` staged-bring-up flags.
 - [`attachments.md`](attachments.md): Switch what G2 wears on the neck (none, the AI head, the arm) with `g2attach`; the gait policy saved for each, the firmware check.
 - [`punt.md`](punt.md): Dial in the ball punt: "G2, punt" (one attempt, then rest), the same without voice (`g2punt`, `g2puntset`), every setting, the file it lives in, how to change it.

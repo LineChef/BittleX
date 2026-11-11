@@ -1,44 +1,9 @@
-# Raspberry Pi Zero 2 W bring-up — research notes + runbook
+# Raspberry Pi Zero 2 W setup: flash, configure and deploy
 
-Written before doing it, from web research (Aug/Sep 2026), so the first hands-on
-pass has a map. Sources are linked inline. **This is a learning walkthrough** —
-the builder has never used a Raspberry Pi, so every step says *what* and *why*,
-and flags the specific ways it bites.
+This runbook prepares the Pi from a blank card to a deployed `pi_pipeline`. Each step says what it does and why, and flags the specific ways it fails. The parts are a Pi Zero 2 W, a PiSugar S 1200 mAh battery, a 32 GB microSD card and a micro-USB power supply. None of the steps needs the robot. The wiring from the Pi to the BiBoard is in the [assembly sequence](../../blueprints/assembly-sequence.md).
 
-Hardware in hand: **Pi Zero 2 W** (the plain 2 W, header-less? — confirm; plan
-lists a *WH* kit with pre-soldered headers), **PiSugar S 1200 mAh**, **SanDisk
-32 GB Ultra microSDHC**, **micro-USB power supply**. Not yet here: Bittle X /
-BiBoard, Grove Vision AI camera.
-
-Everything below needs only the Pi + card + power (+ the PiSugar for the last
-bit). None of it needs the robot.
-
-0\. Connectors / adapters to have on hand (order ahead)
-------------------------------------------------------
-
-From the repo's hardware research (`docs/hardware/specs.md`, `pi-power.md`) —
-what is physically needed to join the three boards:
-
-- PiSugar S → Pi Zero 2 W: What connects: pogo pins on the PiSugar mate to the copper pads on the **underside** of the Pi; it clips to the Pi's back with the **standoffs/screws in the PiSugar box**; What to buy: **nothing extra** — no cable, no soldering. Charge it via its **own micro-USB** (have a USB-A→micro-USB cable). Does *not* touch the 40-pin header, so it coexists with the BiBoard wiring.
-- Pi → BiBoard (serial, data-only): What connects: 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays (see below); What to buy: **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them), and possibly a **5-pin header** to solder onto BiBoard if it's not already populated
-- microSD → computer (for flashing): What connects: writing the Pi OS image; What to buy: a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**.
-
-- Pi → BiBoard (serial, data-only): 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power) — BiBoard's 5-pin header has two +5V pins, both also left unconnected. Confirmed pinout: [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos of exactly where to solder: `blueprints/build-logs/pi-biboard-build-notes.md`.
-- Pi → BiBoard (serial, data-only): **Check the Bittle X box first** — Petoi sometimes includes a BiBoard↔Pi cable, which would cover this already.
-
-
-Also nice to have: a small strip of **thermal tape** for the WH heatsink (no
-clip point — §6b), and a **USB-A→micro-USB** cable for both the Pi power supply
-and PiSugar charging.
-
-**One open item** (flag for Petoi support or resolve with the board in hand):
-whether the BiBoard's standard Pi mount ties the 5 V line to the data lines by
-default — if so, physically leave that pin's wire off. (`pi-power.md` "Open item".)
-
----
-
-0\. The headline facts that shape every choice
----------------------------------------------
+Constraints that shape the setup
+--------------------------------
 
 - 512 MB RAM, soldered, not expandable: the whole voice stack (Vosk ~300 MB runtime + Piper/onnxruntime + Python) barely fits; swap is mandatory, running voice+vision together is doubtful, PyTorch is a bad idea (see §7)
 - 4× Cortex-A53 @ 1 GHz (ARMv8, aarch64): must run **64-bit** Pi OS for ML wheels; compiles are slow; real-time TTS/STT is not guaranteed — must be measured
@@ -441,28 +406,3 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
       trains the model (SenseCraft / Roboflow / Colab) receives those images.
 
 ---
-
-Open questions — status after this research
--------------------------------------------
-
-- Serial device name on the Zero 2 W?: `/dev/ttyS0` (mini-UART) by default; **switch to `/dev/ttyAMA0` / `serial0`** via `dtoverlay=disable-bt` for a stable 115200 link. Config file is `/boot/firmware/config.txt` on Bookworm.
-- Can a Pi Zero 2 W run `model.predict()` fast enough?: The MLP is trivial; **run it as ONNX, not PyTorch** (torch's RAM cost is the real problem). Fast enough is very likely; benchmark in §8 when Phase 6 comes.
-- Battery monitoring via PiSugar S?: **No.** The S has no I²C, no fuel gauge, no power query — external ADC or time-boxing only.
-- zram or swapfile?: Both: small lz4 zram + 1 GB SD swapfile backstop, high swappiness. Verify the split under load; some say 512 MB is too little for zram to help — measure.
-- Wi-Fi power-save disable method?: `/etc/NetworkManager/conf.d/wifi-powersave-off.conf` → `wifi.powersave = 2`, restart NetworkManager.
-- Real-time Piper on the Zero 2 W?: **Unknown — the actual risk.** Real-time on Pi 5, lags on Pi 4 for bigger voices. Assume `x_low`/`low` voices; §8 decides.
-- Real-time Vosk on the Zero 2 W?: Small model runs; streaming API keeps latency low; **~300 MB RAM** is the pinch, and small-model accuracy is mediocre.
-- Bookworm vs Trixie?: **Bookworm 64-bit Lite** — Trixie had headless-Wi-Fi regressions.
-- Does the Pi need I²C enabled?: No. Leaving it off also sidesteps the PiSugar auto-boot/I²C clash.
-
-Sources
--------
-- Headless Bookworm / Imager: [zansara](https://www.zansara.dev/posts/2024-01-06-raspberrypi-headless-bookworm-wifi-config/), [skyboo.net](https://skyboo.net/2024/02/preparing-headless-sd-card-for-raspberry-pi-zero-2-w-without-raspberry-pi-imager/), [industrialmonitordirect (Trixie vs Bookworm)](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)
-- Wi-Fi power-save: [Pi forum](https://forums.raspberrypi.com/viewtopic.php?t=357629), [crox.net](https://blog.crox.net/archives/129-Disable-WiFi-Power-Management-on-Raspbian-12-Network-Manager.html)
-- zram / swap: [linuxconfig](https://linuxconfig.org/how-to-enable-zram-on-raspberry-pi), [Pi My Life Up](https://pimylifeup.com/raspberry-pi-zram/), [Pi forum (Zero 2 swap)](https://forums.raspberrypi.com/viewtopic.php?t=396095)
-- UART: [raspberry.tips](https://raspberry.tips/en/raspberrypi-tutorials/enable-uart-raspberry-pi), [Pi forum (double UART on Zero 2 W)](https://forums.raspberrypi.com/viewtopic.php?t=392386)
-- PiSugar S: [PiSugar Docs — S series](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series), [PiSugar/PiSugar#17](https://github.com/PiSugar/PiSugar/issues/17), [#113](https://github.com/PiSugar/PiSugar/issues/113)
-- onnxruntime on ARM: [piwheels](https://www.piwheels.org/project/onnxruntime/), [onnxruntime build docs](https://onnxruntime.ai/docs/build/eps.html)
-- Piper: [hackster TTS-on-Pi guide](https://www.hackster.io/sarakit/easy-offline-text-to-speech-on-raspberry-pi-a-tts-guide-255a0f), [aivideosensei](https://aivideosensei.com/guides/piper-tts-offline-voice-guide)
-- Vosk: [alphacephei models](https://alphacephei.com/vosk/models), [Pi forum (Zero 2 W)](https://forums.raspberrypi.com/viewtopic.php?t=326417)
-- PyTorch on ARM: [PyTorch realtime-RPi tutorial](https://docs.pytorch.org/tutorials/intermediate/realtime_rpi.html), [KumaTea/pytorch-aarch64](https://github.com/KumaTea/pytorch-aarch64)

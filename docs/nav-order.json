@@ -65,8 +65,7 @@
     "guides/attachments",
     "guides/models",
     "guides/swappable-llm",
-    "guides/shell-helpers",
-    "guides/env-reference"
+    "guides/shell-helpers"
    ]
   ],
   [

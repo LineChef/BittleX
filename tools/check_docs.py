@@ -41,7 +41,7 @@ LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 
-GENERATED_PAGES = ("docs/guides/env-reference.md", "docs/guides/shell-helpers.md", "docs/guides/cheatsheet.md")
+GENERATED_PAGES = ("docs/guides/shell-helpers.md", "docs/guides/cheatsheet.md")
 ATTRIBUTION_RE = re.compile(r"\((?:user|owner)[,:] ?20\d\d-\d\d-\d\d")
 # Published pages read as a product specification, not as working notes (docs/maintaining-docs.md, "Writing a published page"): these patterns are the note-taking voice.
 NOTE_PATTERNS = (
@@ -277,21 +277,6 @@ def helpers_doc_errors(root):
     return []
 
 
-def env_reference_errors(root):
-    """docs/guides/env-reference.md is generated from the source; fail if it is stale (only for the real repo tree)."""
-    try:
-        import gen_env_reference
-    except ImportError:
-        return []
-    if os.path.realpath(root) != os.path.realpath(gen_env_reference.ROOT):
-        return []
-    target = os.path.join(root, "docs", "guides", "env-reference.md")
-    cur = open(target).read() if os.path.exists(target) else ""
-    if cur != gen_env_reference.build():
-        return ["docs/guides/env-reference.md is out of date with the code -- run: python tools/gen_env_reference.py"]
-    return []
-
-
 def cheatsheet_errors(root):
     """The cheat sheet stays a quick reference (examples you can copy, short descriptions, real aliases) and its A to Z index is current (tools/gen_cheatsheet_index.py; only for the real repo tree)."""
     try:
@@ -330,7 +315,6 @@ def main():
     errors, warnings = check(root, files)
     errors += backlog_errors(root)
     errors += helpers_doc_errors(root)
-    errors += env_reference_errors(root)
     errors += cheatsheet_errors(root)
     if not args.quiet_warnings:
         for w in warnings:

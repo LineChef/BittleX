@@ -97,7 +97,7 @@ export const docsNav = {
     { label: 'Walking', roots: ['rl'] },
   ],
   order: { guides: ['guides/cheatsheet', 'guides/operating-g2'] },   // parent route to routes to put first, in this order
-  groups: { 'guides/env-reference': 'Configure' },                    // route to a group label, overriding the bundle's
+  groups: { 'guides/feature-flags': 'Configure' },                    // route to a group label, overriding the bundle's
   hidden: ['guides/docs-bundle'],                                    // routes left out of the menus (still reachable by URL)
 }
 

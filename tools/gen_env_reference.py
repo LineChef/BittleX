@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate docs/guides/env-reference.md -- every `G2_*` environment variable the code reads -- from the source. Stdlib only.
+"""List the `G2_*` environment variables the code reads that no guide describes yet (a maintainer check; there is no published page). Stdlib only.
 
-    python tools/gen_env_reference.py           # rewrite docs/guides/env-reference.md
-    python tools/gen_env_reference.py --check   # exit 1 if the page is out of date (the doc checker runs this)
+    python tools/gen_env_reference.py           # print the variables no guide describes
+    python tools/gen_env_reference.py --all     # print every variable with its default and where it is read
 
 For each variable: its default where the code states one in the read (`_env("G2_X", "1")`, `os.environ.get("G2_X", ...)`), the files that read it, and the
 docs that mention it. Variables no doc mentions are listed first, so a new switch cannot go undocumented unnoticed. The curated guide to the switches people
@@ -88,15 +88,14 @@ def build():
 
 
 def main():
-    text = build()
-    if "--check" in sys.argv:
-        cur = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else ""
-        if cur != text:
-            print("docs/guides/env-reference.md is out of date: run python tools/gen_env_reference.py")
-            return 1
-        return 0
-    open(OUT, "w", encoding="utf-8").write(text)
-    print(f"wrote {OUT}")
+    reads, mentions, docs = collect()
+    names = sorted(v for v in set(reads) | set(mentions) if not v.endswith("_"))
+    show = names if "--all" in sys.argv else [v for v in names if v not in docs]
+    for v in show:
+        d = reads.get(v, {}).get("default", "")
+        fs = sorted(reads.get(v, {}).get("files") or mentions.get(v) or [])
+        print(f"{v}  default={d[:40] or '-'}  read in {', '.join(os.path.basename(f) for f in fs[:3])}" + ("" if v in docs else "  (not described in any guide)"))
+    print(f"{len(show)} of {len(names)} variables listed")
     return 0
 
 
