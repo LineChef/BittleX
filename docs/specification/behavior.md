@@ -31,7 +31,7 @@ Parameters
 
 - `G2_WALL_STEER`, `G2_HIT_WALL` and `G2_IMU_CONTACT`: Turn the wall turn-away, the hit sequence and the IMU contact signal on or off (all on)
 - `G2_EXPLORE_INPROCESS`: Runs the exploration inside the voice service
-- The 600 s default roam length and the leg budget bound a bout.
+- The 300 s default roam length and the leg budget bound a bout.
 
 See [Exploration mode](../guides/exploration-mode.md) for the full list.
 

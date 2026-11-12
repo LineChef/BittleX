@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Supervised exploration test on G2's Pi. g2-voice is stopped while it runs and is ALWAYS started again when it ends (systemd ExecStopPost),
 # however it ends: a stop, a crash, a timeout or a reboot-free kill. Needs G2_PI (user@host) in the environment, like the other tools.
-#   g2_explore.sh start [ROAM_S, default 600; 0 = no cap] | stationary [ROAM_S] | arm | disarm | halt | release | stop | status | logs | heard | report [html]
+#   g2_explore.sh start [ROAM_S, default 300; 0 = no cap] | stationary [ROAM_S] | arm | disarm | halt | release | stop | status | logs | heard | report [html]
 #   `start` / `stationary` ask for the floor first when its label is unknown or over an hour old (see floor_gate below); `report` shows the last roam's report.
 #   `start` roams at once (Tier 1 is the default, user 2026-10-07); `stationary` is the opt-in stay-put mode (Tier 0) until `arm`.
 set -euo pipefail
@@ -41,7 +41,7 @@ case "${1:-status}" in
       -p ExecStopPost=\"+/bin/sh -c '\$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.rest_now >/dev/null 2>&1; true'\" \
       -p ExecStopPost='+/bin/systemctl --no-block start g2-voice' \
       -E G2_FEATURES='+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-object_gallery' -E G2_LOG_HEARD=1 -E PYTHONFAULTHANDLER=1 -E G2_PROFILE=${G2_PROFILE:-0} ${G2_STAND_GUARD:+-E G2_STAND_GUARD=$G2_STAND_GUARD} -E VISION_SENSOR_OPT=${VISION_SENSOR_OPT:-0} -E G2_WALL_KEEP_ALL=${G2_WALL_KEEP_ALL:-0} -E G2_SURVEY_LOOKS=${G2_SURVEY_LOOKS:-0} -E G2_SURVEY_CHECK=${G2_SURVEY_CHECK:-1} -E G2_AUDIO_GATE=${G2_AUDIO_GATE:-1} -E G2_NARRATE_START_QUIET_S=${G2_NARRATE_START_QUIET_S:-8} -E G2_WALL_STEER=${G2_WALL_STEER:-1} -E G2_IMU_CONTACT=${G2_IMU_CONTACT:-1} -E G2_INTEREST_FALLBACK_S=${G2_INTEREST_FALLBACK_S:-300} -E G2_SURVEY_FIRST_S=${G2_SURVEY_FIRST_S:-30} -E G2_SURVEY_COOLDOWN_S=${G2_SURVEY_COOLDOWN_S:-60} \
-      \$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.explore_session --roam-s ${2:-600}$EXTRA" ;;
+      \$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.explore_session --roam-s ${2:-300}$EXTRA" ;;
   arm|disarm|halt|release|stop)
     # only while a session is running: a command written to the file with no session would be read by the NEXT session as soon as it starts (a stale halt stopped a fresh run, 2026-10-07)
     ssh "$G2_PI" "if [ \"\$(systemctl is-active $UNIT)\" = active ]; then echo $1 > ~/.g2_explore_cmd; else echo 'no exploration session is running: $1 not sent (and not left behind)'; fi" ;;
@@ -54,5 +54,5 @@ case "${1:-status}" in
     fi ;;
   logs)   ssh "$G2_PI" "journalctl -u $UNIT -n 60 --no-pager | cut -c1-200" ;;
   heard)  ssh "$G2_PI" "journalctl -u $UNIT -n 400 --no-pager | grep -E 'wake word heard|nothing recognized|heard:|naming request|answered|not a command|picture saved|no picture' | cut -c1-190 | tail -${2:-25}" ;;
-  *) echo "usage: $0 start [ROAM_S, default 600; 0 = no cap] | stationary [ROAM_S] | arm | disarm | halt | release | stop | status | logs | heard | report [html]"; exit 2 ;;
+  *) echo "usage: $0 start [ROAM_S, default 300; 0 = no cap] | stationary [ROAM_S] | arm | disarm | halt | release | stop | status | logs | heard | report [html]"; exit 2 ;;
 esac

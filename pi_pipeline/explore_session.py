@@ -125,7 +125,7 @@ class _FellExit(Exception):
 def parse_args(argv=None):
     """Roaming (Tier 1) starts at once by default; `--stationary` is the opt-in stay-put mode (Tier 0 only, until `arm`)."""
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
-    ap.add_argument("--roam-s", type=float, default=600.0, help="a roam bout disarms itself after this long (0 = no cap)")
+    ap.add_argument("--roam-s", type=float, default=300.0, help="a roam bout disarms itself after this long (0 = no cap)")
     ap.add_argument("--stationary", action="store_true", help="opt-in: stay put (Tier 0, the stationary attentive layer) until `arm`; the default is to start roaming at once")
     ap.add_argument("--arm-on-start", action="store_true", help="start roaming at once (now the default; kept for the voice hand-over)")
     ap.add_argument("--exit-when-roam-ends", action="store_true", help="end the session (the voice service comes back) when roaming ends")
@@ -367,6 +367,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         if saver is not None:
             from .behavior import claw_survey
             rt.bindings.claw_look = lambda kind: claw_survey.run_claw_look(link, saver, kind)          # a look is the claw look when the arm is fitted (behavior/claw_survey.py)
+        rt.driver._choreo.hold = rt.bindings.claw_running           # the stand-up after a claw look waits for the look to finish (a slow camera made it overrun)
         hub = getattr(getattr(rt, "_sensors", None), "__self__", None)
         if hub is not None and hasattr(hub, "yaw_deg") and getattr(rt.bindings, "walker", None) is not None:
             rt.bindings.walker.yaw_fn = hub.yaw_deg               # every timed turn logs how far the IMU saw him turn
@@ -475,7 +476,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         guard = StandGuard(consumer(), on_sag=_sag_recover, is_standing=lambda: getattr(link, "last_motion_command", "") not in ("", "d", "krest", "ksit", "kcalib"), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
                            is_walking=lambda: str(getattr(link, "last_motion_command", "") or "")[:3] in ("kwk", "kbk"),
                            balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None,
-                           on_fall=lambda: __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN")).start()   # tipped over at any time (the walker's own fall also plays it once)
+                           on_fall=on_fall).start()   # tipped over at any time: the same handler as the walker's own fall (horn, words, the roam halted and the session ended; 2026-11-12: the guard alone only played the horn and the roam stood him up again 5 s after a fall)
 
         # this session has stopped the voice service, so it must watch G2's battery itself (reads pause while a walk is running;
         # the walk loop checks the voltage under load)

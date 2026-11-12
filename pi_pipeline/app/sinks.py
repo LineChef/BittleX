@@ -103,6 +103,7 @@ class WalkerSink:
     yaw_fn = None                                     # optional: callable() -> current yaw in degrees (+ = right); lets every timed turn log how far he really turned
     TURN_MIN_RAD = 0.12                               # a smaller turn is not worth a gait change
     TURN_MAX_S = 6.0
+    last_turn_deg = None                              # the size of the last timed turn by the gyro stop's own counting (spikes and wraps handled); None when no yaw reading came in
 
     def __init__(self, link, *, turn_threshold: float = 0.15, policy_walker=None, clock=time.monotonic):
         self._link = link
@@ -196,10 +197,12 @@ class WalkerSink:
             if y0 is None:
                 return
             until = self._turn_until
+            self.last_turn_deg = None
 
             def watch():
                 nonlocal y0
                 t0 = self._clock()
+                acc = d_prev = 0.0                      # yaw counted before a spike restarted the count, and since
                 while self._clock() < until and self._turn_until == until:
                     time.sleep(0.05)
                     y = fn()
@@ -208,8 +211,11 @@ class WalkerSink:
                     run = self._clock() - t0
                     d = abs(_yaw_diff(y, y0))
                     if d > YAW_SPIKE_RATE_DEG_S * run + YAW_SPIKE_MARGIN_DEG:
-                        y0 = y                         # faster than a turn can be: a sensor spike, count from here
+                        acc += d_prev
+                        y0, d_prev = y, 0.0             # faster than a turn can be: a sensor spike, count from here
                         continue
+                    d_prev = d
+                    self.last_turn_deg = acc + d        # what the turn really did, by the same counting that ends it on the gyro (the turn result line reports this)
                     if run >= ALIGN_MIN_RUN_S and d >= max(0.0, want_deg - ALIGN_STOP_LEAD_DEG):
                         if self._turn_until == until:  # still the same turn: end it now; walk() restarts cleanly
                             self._turn_until = self._clock()
@@ -234,7 +240,9 @@ class WalkerSink:
             def report():
                 try:
                     y1 = fn()
-                    if y1 is not None and y1 == y0 and dur >= 1.0:
+                    if self.last_turn_deg is not None and self.yaw_fn is not None and y1 is not None and y1 != y0:
+                        log.info("turn result: asked %s %.0f deg, the IMU counted %.0f deg", side, asked_deg, self.last_turn_deg)
+                    elif y1 is not None and y1 == y0 and dur >= 1.0:
                         log.warning("turn result: asked %s %.0f deg, but the yaw reading did not change at all over %.1f s: no IMU frames came in (the IMU print is off?), so this is NO measurement of the turn", side, asked_deg, dur)
                     elif y1 is not None:
                         got = (y1 - y0 + 180.0) % 360.0 - 180.0

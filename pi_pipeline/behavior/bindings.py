@@ -53,6 +53,7 @@ class DriverBindings:
         self.walker = walker
         self.head = head
         self.power = power
+        self._claw_thread = None
         self.claw_look = claw_look               # callable(kind): the claw look, started in a worker thread (explore_session sets it; behavior/claw_survey.py)
         self.contact = contact                   # callable(reason): instant diagnosis pictures when he hits a wall (vision/contact_pictures.py)
         self.hit_sound = hit_sound               # callable() -> bool: the "ooooof" on the speaker when he hits a wall (True = it played)
@@ -61,6 +62,11 @@ class DriverBindings:
         self._warned: set[str] = set()
 
     # -- routing ---------------------------------------------------------------
+    def claw_running(self) -> bool:
+        """True while a claw look worker thread is still moving the arm or taking pictures (the survey choreography holds its stand-up until it is done)."""
+        th = self._claw_thread
+        return bool(th is not None and th.is_alive())
+
     def dispatch(self, tick_or_effects) -> list[str]:
         effects = (tick_or_effects.effects if isinstance(tick_or_effects, DriverTick)
                    else list(tick_or_effects))
@@ -132,7 +138,9 @@ class DriverBindings:
                 if not fn:
                     return self._miss("claw_look")
                 import threading
-                threading.Thread(target=fn, args=(kind,), name="claw-look", daemon=True).start()
+                th = threading.Thread(target=fn, args=(kind,), name="claw-look", daemon=True)
+                self._claw_thread = th
+                th.start()
                 return f"claw:{kind}"
             if on == "shot":                      # take ONE picture now (survey / naming): a camera call, no network
                 fn = self.camera and _call(self.camera, "snapshot")

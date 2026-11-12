@@ -199,6 +199,9 @@ class _Choreo:
         self._after_shot = None         # the due time of a picture or skill step just released: the camera call BLOCKS (stillness wait, warm-up) and so does an eased skill (up to 2 s of ramp), so the steps behind it keep their gaps from the end of it (2026-10-18: the check was given 2 s of its 3 and the stand cut it off mid-lean)
         self._on_done = None
         self._label = ""
+        self.hold = None                # callable() -> bool: True while a worker the steps depend on is still running (the claw look); due steps wait, up to HOLD_MAX_S
+        self.hold_max_s = 40.0
+        self._held_since: float | None = None
 
     @property
     def busy(self) -> bool:
@@ -226,6 +229,18 @@ class _Choreo:
             shift = t + (self._queue[0][0] - self._after_shot) - self._queue[0][0]
             self._queue = [(d + shift, e) for d, e in self._queue]
         self._after_shot = None
+        if self.hold is not None and self._queue and self._queue[0][0] <= t:       # the claw look runs in a worker thread timed by an estimate; a slow camera made it overrun and the stand-up and the next walk started with the arm still swinging (2026-11-12)
+            try:
+                waiting = bool(self.hold())
+            except Exception:  # noqa: BLE001
+                waiting = False
+            if waiting and self._held_since is None:
+                self._held_since = t
+            if waiting and t - self._held_since < self.hold_max_s:
+                late = t - self._queue[0][0] + 0.25
+                self._queue = [(d + late, e) for d, e in self._queue]
+                return []
+            self._held_since = None
         while self._queue and self._queue[0][0] <= t:
             due, eff = self._queue.pop(0)
             out.append(eff)

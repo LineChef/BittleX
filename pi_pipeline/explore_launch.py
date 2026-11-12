@@ -21,7 +21,7 @@ EXPLORE_SENSOR_OPT = 0
 FEATURES = "+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-object_gallery"
 
 
-def command(roam_s: float = 600.0, *, python: str | None = None, workdir: str | None = None, user: str | None = None) -> list[str]:
+def command(roam_s: float = 300.0, *, python: str | None = None, workdir: str | None = None, user: str | None = None) -> list[str]:
     python = python or sys.executable
     workdir = workdir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return ["sudo", "-n", "systemd-run", "--no-block", f"--unit={UNIT}", "--collect", f"--uid={user or getpass.getuser()}",
@@ -34,7 +34,7 @@ def command(roam_s: float = 600.0, *, python: str | None = None, workdir: str | 
             python, "-m", "pi_pipeline.explore_session", "--arm-on-start", "--exit-when-roam-ends", "--roam-s", str(int(roam_s))]
 
 
-def launch(roam_s: float = 600.0, *, run=None, platform: str | None = None) -> bool:
+def launch(roam_s: float = 300.0, *, run=None, platform: str | None = None) -> bool:
     """Start the session. True if it was started (the voice service is then stopped by the unit itself)."""
     if (platform or sys.platform) != "linux":
         log.warning("exploration hand-over skipped: not a Pi (%s)", platform or sys.platform)
