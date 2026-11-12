@@ -29,10 +29,14 @@ if [ "$ONCE" = 0 ]; then
   echo $$ > "$PIDFILE"
 fi
 EXPORT=""
-cleanup() { [ "$ONCE" = 0 ] && rm -f "$PIDFILE"; [ -n "$EXPORT" ] && rm -rf "$EXPORT"; return 0; }
+cleanup() { [ "$ONCE" = 0 ] && rm -f "$PIDFILE"; [ -n "$EXPORT" ] && rm -rf "$EXPORT"; [ -n "${CTL:-}" ] && ssh -o ControlPath="$CTL" -O exit "$G2_PI" 2>/dev/null; return 0; }
 trap cleanup EXIT
 say() { echo "$(date '+%I:%M:%S %p')  $*" | tee -a "$LOG"; }
-reachable() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$G2_PI" true 2>/dev/null; }
+# one ssh connection for the whole deploy (each new one cost about half a second; there were ten): every ssh and rsync below reuses it
+CTL="$(mktemp -u "${TMPDIR:-/tmp}/g2ssh.XXXXXX")"
+SSHO="-o ControlMaster=auto -o ControlPath=$CTL -o ControlPersist=120"
+pissh() { ssh $SSHO "$@"; }
+reachable() { ssh -o BatchMode=yes -o ConnectTimeout=5 $SSHO "$G2_PI" true 2>/dev/null; }
 
 rm -f "$LOGDIR/deploy_done"
 say "waiting for the Pi (max ${MAX_H} h, once=$ONCE); log $LOG"
@@ -47,7 +51,7 @@ say "the Pi answers; letting its services settle for 25 s"
 reachable || { say "the Pi stopped answering; not deploying"; exit 1; }
 
 # never deploy while G2 is exploring or walking (user rule 2026-10-10; a deploy mid-run restarted the voice service on top of a running exploration)
-if ssh "$G2_PI" 'systemctl is-active --quiet g2-explore || systemctl is-active --quiet g2-baseline || pgrep -f "[r]un_gait" >/dev/null || [ -n "$(find ~/.local/share/g2/goal_running -mmin -45 2>/dev/null)" ]'; then
+if pissh "$G2_PI" 'systemctl is-active --quiet g2-explore || systemctl is-active --quiet g2-baseline || pgrep -f "[r]un_gait" >/dev/null || [ -n "$(find ~/.local/share/g2/goal_running -mmin -45 2>/dev/null)" ]'; then
   say "an exploration, a baseline run or a walk is running on the Pi: NOT deploying (stop it first: bash tools/g2_safe_stop.sh all)"
   exit 1
 fi
@@ -64,51 +68,51 @@ fi
 say "rsync pi_pipeline/ (commit $HEAD_SHORT)"
 # --checksum and no times: the export's file times are all the commit's, so files are compared by content; the filter drops the
 # "time differs only" lines so the log lists the files that really changed
-rsync -rlpz --checksum --itemize-changes --exclude .venv --exclude __pycache__ --exclude memory/data --exclude .pytest_cache --exclude .env \
+rsync -e "ssh $SSHO" -rlpz --checksum --itemize-changes --exclude .venv --exclude __pycache__ --exclude memory/data --exclude .pytest_cache --exclude .env \
       "$EXPORT/pi_pipeline/" "$G2_PI:bittleX/pi_pipeline/" 2>&1 | grep -Ev '^\.[fdL]\.\.T\.+ ' | tee -a "$LOG" | tail -n 25
 [ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of pi_pipeline failed"; exit 1; }
-POLICY=$(sed -n 's/^DEFAULT_POLICY = "\([^"]*\)".*/\1/p' "$EXPORT/pi_pipeline/gait/residual_policy.py" | head -1)     # (not python: the system python3 has no numpy, the import failed, the name came back empty and rsync copied the whole trained/ folder)
-[ -n "$POLICY" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$POLICY" ] || { say "could not read DEFAULT_POLICY, or its file is missing: NOT syncing the policy"; exit 1; }
-say "rsync policy $POLICY"
-rsync -az "$ROOT/rl_training/opencat-gym/trained/$POLICY" "$ROOT/rl_training/opencat-gym/trained/$POLICY.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
-[ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of the policy failed"; exit 1; }
+POLICY=$(sed -n 's/^DEFAULT_POLICY = "\([^"]*\)".*/\1/p' "$EXPORT/pi_pipeline/gait/residual_policy.py" | head -1)     # (not python: the system python3 has no numpy, the import failed, the name came back empty and rsync copied the wrong thing)
+TR="$ROOT/rl_training/opencat-gym/trained"
+[ -n "$POLICY" ] && [ -f "$TR/$POLICY" ] || { say "could not read DEFAULT_POLICY, or its file is missing: NOT syncing the policy"; exit 1; }
+FILES=("$TR/$POLICY" "$TR/$POLICY.json")
 # every policy an attachment's saved gait names (pi_pipeline/attachments/gait_profiles.json), so switching attachments never needs another deploy
 # (plain json module only: the system python3 has no numpy, and this never imports pi_pipeline)
 EXTRA=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".join(sorted({e["policy"] for p in d.values() for e in ([p["current"]] if p.get("current") else []) + p.get("history", []) if e.get("policy")})))' \
         "$EXPORT/pi_pipeline/attachments/gait_profiles.json" 2>/dev/null || true)
 for P in $EXTRA; do
   [ "$P" = "$POLICY" ] && continue
-  if [ -f "$ROOT/rl_training/opencat-gym/trained/$P" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$P.json" ]; then
-    say "rsync attachment policy $P"
-    rsync -az "$ROOT/rl_training/opencat-gym/trained/$P" "$ROOT/rl_training/opencat-gym/trained/$P.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
-  else
-    say "attachment policy $P (or its sidecar) is missing here: not synced"
-  fi
+  if [ -f "$TR/$P" ] && [ -f "$TR/$P.json" ]; then FILES+=("$TR/$P" "$TR/$P.json"); else say "attachment policy $P (or its sidecar) is missing here: not synced"; fi
 done
 # the carpet-only policy ("G2, carpet mode" loads it; residual_policy.CARPET_POLICY), once one is promoted under that name; without it carpet mode keeps the default policy
 CARPET=$(sed -n 's/^CARPET_POLICY = "\([^"]*\)".*/\1/p' "$EXPORT/pi_pipeline/gait/residual_policy.py" | head -1)
-if [ -n "$CARPET" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$CARPET" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$CARPET.json" ]; then
-  say "rsync carpet policy $CARPET"
-  rsync -az "$ROOT/rl_training/opencat-gym/trained/$CARPET" "$ROOT/rl_training/opencat-gym/trained/$CARPET.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
-fi
+if [ -n "$CARPET" ] && [ -f "$TR/$CARPET" ] && [ -f "$TR/$CARPET.json" ]; then FILES+=("$TR/$CARPET" "$TR/$CARPET.json"); fi
+# the import check runs on the Pi at the same time as the policy copy and the clean-up (about 12 s on the Pi: it was a separate wait)
+IMPORT_OUT="$(mktemp "${TMPDIR:-/tmp}/g2imp.XXXXXX")"
+say "checking the new code imports on the Pi (in parallel with the policy copy)"
+( pissh "$G2_PI" 'cd ~/bittleX && pi_pipeline/.venv/bin/python -c "import pi_pipeline.voice.api_log, pi_pipeline.voice.usage, pi_pipeline.voice.conversation; print(\"imports ok\")"' > "$IMPORT_OUT" 2>&1; echo $? > "$IMPORT_OUT.rc" ) &
+IMPORT_PID=$!
+say "rsync ${#FILES[@]} policy file(s), one transfer"
+rsync -e "ssh $SSHO" -az "${FILES[@]}" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
+[ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of the policies failed"; exit 1; }
 
 # keep the Pi's trained/ folder to the exported release candidates only (stray files there are leftovers of earlier syncs)
-STRAY=$(ssh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained 2>/dev/null && ls -1 | grep -vE "^Release_Candidate[^ /]*_ppo\.onnx(\.json)?$"' 2>/dev/null || true)
+STRAY=$(pissh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained 2>/dev/null && ls -1 | grep -vE "^Release_Candidate[^ /]*_ppo\.onnx(\.json)?$"' 2>/dev/null || true)
 if [ -n "$STRAY" ]; then
   say "removing $(echo "$STRAY" | wc -l | tr -d ' ') stray file(s) from the Pi's trained/ folder: $(echo "$STRAY" | head -5 | tr '\n' ' ')"
-  echo "$STRAY" | ssh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained && xargs -d "\n" rm -rf --' 2>&1 | tee -a "$LOG"
+  echo "$STRAY" | pissh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained && xargs -d "\n" rm -rf --' 2>&1 | tee -a "$LOG"
 fi
 
-say "checking the new code imports on the Pi"
-ssh "$G2_PI" 'cd ~/bittleX && pi_pipeline/.venv/bin/python -c "import pi_pipeline.voice.api_log, pi_pipeline.voice.usage, pi_pipeline.voice.conversation; print(\"imports ok\")"' 2>&1 | tee -a "$LOG"
-[ "${PIPESTATUS[0]}" = 0 ] || { say "the new code does not import on the Pi; NOT restarting g2-voice"; exit 1; }
+wait "$IMPORT_PID" 2>/dev/null
+tee -a "$LOG" < "$IMPORT_OUT"
+IMPORT_RC=$(cat "$IMPORT_OUT.rc" 2>/dev/null || echo 1); rm -f "$IMPORT_OUT" "$IMPORT_OUT.rc"
+[ "$IMPORT_RC" = 0 ] || { say "the new code does not import on the Pi; NOT restarting g2-voice"; exit 1; }
 
-if ssh "$G2_PI" 'systemctl is-active --quiet g2-baseline'; then
+if pissh "$G2_PI" 'systemctl is-active --quiet g2-baseline'; then
   say "a baseline run is active: leaving g2-voice alone (it restarts after the run); the new code loads then"
 else
   say "restarting g2-voice"
-  ssh "$G2_PI" 'sudo -n systemctl restart g2-voice; sleep 3; systemctl is-active g2-voice' 2>&1 | tee -a "$LOG"
+  pissh "$G2_PI" 'sudo -n systemctl restart g2-voice; for i in 1 2 3 4 5 6 7 8 9 10; do systemctl is-active --quiet g2-voice && break; sleep 0.5; done; systemctl is-active g2-voice' 2>&1 | tee -a "$LOG"
 fi
 say "DEPLOYED. API call log on the Pi: ~/.local/share/g2/api_calls.jsonl  (python -m pi_pipeline.voice.api_log --last 40)"
-G2_PI="$G2_PI" bash "$(dirname "$0")/g2_sync.sh" run --force goals 2>&1 | tee -a "$LOG" || true      # a Mac copy of his goal data, readable while he is off (user, 2026-11-01); the other copies run on their own schedule
+( G2_PI="$G2_PI" nohup bash "$(dirname "$0")/g2_sync.sh" run --force goals >> "$LOG" 2>&1 & ) || true      # in the background, the deploy does not wait for it: a Mac copy of his goal data, readable while he is off (user, 2026-11-01); the other copies run on their own schedule
 date > "$LOGDIR/deploy_done"
