@@ -1238,8 +1238,11 @@ def test_with_the_yaw_stop_off_a_line_up_turn_is_the_timed_turn(monkeypatch):
     assert r.last_turn_deg is None and 0.95 <= t["now"] <= 3.0                                  # timed: no yaw was counted
 
 
-def test_a_stand_only_round_rests_stands_and_stops_at_the_first_fall():
+def test_a_stand_only_round_rests_stands_and_stops_at_the_first_fall(monkeypatch):
     from pi_pipeline.behavior import transition_drill as td
+    from pi_pipeline.behavior import ball_chase as bc
+    _rest = bc.ensure_rest
+    monkeypatch.setattr(bc, "ensure_rest", lambda link, sleep=None, tries=3: _rest(link, lambda s: None, tries))      # ensure_rest's default sleep is the real one: 15 s of waiting
     sent = []
 
     class Link:

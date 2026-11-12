@@ -8,6 +8,16 @@ from pi_pipeline.voice.conversation import Conversation
 from pi_pipeline.voice.loop import VoiceLoop, asks_what_g2_sees
 from pi_pipeline.tests._system_text import system_text
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_real_waits(monkeypatch):
+    """The picture pose sequence (look down, look up, stand, settle) waits about 5.6 s of real time per picture; none of these tests is about that timing."""
+    import time
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+
+
 JPEG = b"\xff\xd8\xff\xe0fake-jpeg-bytes\xff\xd9"
 
 
