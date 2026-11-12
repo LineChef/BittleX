@@ -7,6 +7,7 @@ Columns
 
 - Policy walk (`run_gait.py --log`): Columns: `t, roll, pitch, yaw, gx, gy, gz, j0..j7, guard_state, hottest_j, hottest_tier, hottest_frac, duty_s` (+ `steer_u` with heading hold); Rate: one row per control tick (80 Hz); `j0..j7` are the **commanded** joint angles; `gx..gz` are zero (rate mode `zero`)
 - Same, with `--log-extra`: Columns: adds `ax, ay, az, imu_n, imu_age_s, volt`; Rate: `ax..az` from the IMU line, in m/s^2 (the first kitchen logs show about 10 at rest on az, so the unit is m/s^2 and not g)
+- Scripted firmware gait (`kwkF`, `kwkL`, `kwkR`, `kbkF`): Columns: none. The run is a sidecar only, `kind: scripted_walk`, with the token, the start and end, the command that ended it, the floor and the hardware epoch, in `~/g2_runs/auto/<date>/` next to the `policy_walk` runs; Rate: not applicable. It has no CSV, so the ingest quarantines it as `nolog` and no fit reads it
 - Open-loop `wkF` (`--openloop --log`): Columns: `t, roll, pitch, yaw, gx, gy, gz, guard_state, volt`; Rate: the walk's own commands are not logged; `--volt-every S` sets the voltage rate
 
 - Same, with --log-extra: `imu_n` counts IMU frames received (rows with the same number share one held frame, so a fresh reading is where it changes); `volt` is the last pack voltage (asked every 5 s while walking, so it is stale between readings)

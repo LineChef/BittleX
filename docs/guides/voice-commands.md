@@ -24,6 +24,8 @@ Local commands
 Checked in this priority order -- a higher row always wins if a phrase could
 match more than one (e.g. emergency stop beats everything).
 
+Answers to G2's question: After G2 asks "Can I go exploring?", a short "yes", "yeah", "sure", "okay" or "go ahead" (after the wake word, as "Gee Two, yes") starts the roam, and "no", "not now", "later" or "stay here" makes him wait longer. The answer counts for 45 s. Anything longer or different is treated as a normal request.
+
 - "emergency stop", "freeze", "halt", "stop stop stop", "stop moving", "dont move", "hold still", "abort": Does: **Hard stop, latching.** Cuts all motion now.; Notes: Top priority, always wins. Also available offline via `pi_pipeline.app --halt`.
 - "resume", "you can move", "as you were", "unfreeze", "carry on", "at ease", "you can go", "release": Does: Releases the emergency stop.; Notes: Only does something while halted. Also `pi_pipeline.app --release`.
 - "mic off", "mike off", "microphone off", "turn off your mic", "mute your mic"; add "for 20 minutes", "for half an hour", "for an hour": Does: **The wake word off** for 10 minutes (or the length said, at most 2 hours): neither "G2" nor "hey buddy" wakes him; he says "Mic off for N minutes".; Notes: Only the stop words (row above, said on their own) are still heard

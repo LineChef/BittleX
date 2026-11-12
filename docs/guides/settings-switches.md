@@ -21,6 +21,8 @@ Exploration and walls
 
 - `G2_EXPLORE_ROAM_S`: Default: 600; What it does: the roam time of a voice-started exploration
 - `G2_EXPLORE_HANDOVER`: Default: on; What it does: `0` stops "explore" from handing over to an exploration session
+- `G2_EXPLORE_REQUEST`: Default: on; What it does: G2 asks "Can I go exploring?" after idling in the voice service and walks only on a yes. `0` turns the asking off
+- `G2_EXPLORE_ASK_AFTER_S`: Default: 180; What it does: seconds of idling before G2 asks. A no or no answer doubles the wait, up to an hour
 - `G2_WALL_STEER`: Default: on; What it does: `0` turns off wall steering (and the 3 s looks)
 - `G2_HIT_WALL`: Default: on; What it does: `0` turns off the hit-a-wall sequence
 - `G2_WALL_DRYRUN`: Default: on; What it does: `0` turns off the wall estimator and its log entirely

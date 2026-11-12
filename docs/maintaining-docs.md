@@ -40,6 +40,107 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 - Write a section heading as its title on its own line over a line of `---`, never as `## Title` (the page title stays `# Title`, and sub-sections stay `###`). A title that would start like a list item escapes its first marker (`1\\. Title`). `python tools/md_headings.py FILE` converts a page, and `python tools/check_docs.py` fails on a `##` in a published page.
 - Never wrap a title in `**` bold. The title of a list item or a paragraph is its plain lead followed by a colon (`Orientation: G2 is never placed on his back.`); the bundle renders the text before the first colon as an `h4` (see [the bundle guide](guides/docs-bundle.md), "Semantic HTML"), and the site styles it by tag.
 
+Adding new content
+------------------
+
+New content follows the structure the site has now, so a new page reads like the existing ones and the build accepts it.
+
+Where it goes:
+- A subsystem (how something behaves, its settings, how to verify it): `specification/<name>.md`, in the sections Behaviour, Interfaces, Parameters, Constraints, Failure handling and Verification. A change to what a subsystem does updates its page in the same commit.
+- A procedure someone follows (set up, operate, configure, train): `guides/<name>.md`, with prerequisites, numbered steps with exact commands, the expected result and a pass check.
+- Hardware facts and parts: `hardware/`. Camera and detection: `vision/`. Training and the real-data pipeline: `rl/`. The physical build record, with its renders and wiring: `blueprints/`.
+- What is true now, deployed, tested or broken: [`STATUS.md`](STATUS.md) only. Dated findings, plans, run logs and decisions go in `plan-detail/`, `planned/` or the dated `rl/` logs, which the site does not publish.
+- A command: the cheat sheet. A setting: [`guides/settings-switches.md`](guides/settings-switches.md). Never restate either in a subsystem page beyond the one line that names it.
+
+What a new published page needs, in one commit:
+1. The page, with an opening paragraph that says what the page is and who needs it (the site uses it as the summary), and optional front matter (`audience`, `kind`).
+2. A short nav title in `docs/nav-titles.json` (a top-level page is at most two words and 22 characters, a child at most four words and 30) and a place in `docs/nav-order.json`, most important first. The build fails on a page with no place.
+3. A link from its folder README, and from `docs/README.md` when it is a top-level page, so it is not an orphan.
+4. Links to other pages written as relative paths to the `.md` file. A link to a working note, or to a page that is left out of the site, fails the build.
+5. Any new setting in `settings-switches.md`, any new command in the cheat sheet, and the fact it changes in `STATUS.md`.
+
+How it is written, in short (each rule is explained under "Writing a published page" and "Images"):
+- A specification, not notes: present tense, no people, no dates, no first person, no history, and no instructions to a coding assistant.
+- Sections are a title line over `---`, never `## Title`. Sub-sections use `###`. The page title is `# Title`.
+- A list item or a paragraph that has a title starts with the plain title and a colon (`Orientation: G2 is never placed on his back.`), never bold. There are no pipe tables.
+- A figure is an image alone on a line with alt text and a caption, and it respects the size rules. A picture from another project carries its credit in the caption and an entry in `blueprints/images/SOURCES.json`.
+- A requirement is a plain statement, with its reason in one line if it needs one. What is not built yet is said once, in `STATUS.md`.
+
+Before committing:
+- `python tools/check_docs.py` passes (errors block the commit), and `python tools/check_docs.py --notes` lists nothing for the new page.
+- `python tools/build_docs_bundle.py --out <scratch folder> --branch development --assets-url https://linechef.github.io/BittleX/assets` builds, which checks the nav, the links and the images.
+- Generated pages (`backlog.md`, the shell helpers page and the cheat sheet's A to Z index) are regenerated with `g2docsgen`, never edited by hand.
+- When a page is deleted or renamed, every link to it is updated or removed in the same commit (`python tools/check_docs.py` lists the broken ones), its nav entries are removed, and a code comment that cites it is updated.
+
+Starting point for a specification page:
+
+```
+---
+audience: contributor
+kind: reference
+---
+
+# Subsystem name
+
+One or two sentences: what the subsystem does and what it connects to, with a link to the page that covers the guards or the setup.
+
+Behaviour
+---------
+
+- Title: What it does, as a plain statement.
+
+Interfaces
+----------
+
+- Input: What it reads.
+- Output: What it sends.
+
+Parameters
+----------
+
+- `G2_SETTING`: What it sets and its default
+
+Constraints
+-----------
+
+- Title: A rule that always holds, with its reason in one line.
+
+Failure handling
+----------------
+
+- Title: What happens when this fails.
+
+Verification
+------------
+
+- Tests: The command that covers it with no hardware.
+- Robot: The check to run on G2 and its pass criterion.
+```
+
+Starting point for a guide:
+
+```
+# Task name
+
+What the task achieves, who does it, and what it needs.
+
+Before you start
+----------------
+
+- Prerequisites, each one a plain statement.
+
+Steps
+-----
+
+1. Do this: `command`.
+2. Check this: the expected result.
+
+Check
+-----
+
+- Pass criterion: What shows the task worked.
+```
+
 Background jobs on the Mac
 --------------------------
 

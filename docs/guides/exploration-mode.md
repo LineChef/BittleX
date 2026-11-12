@@ -1,9 +1,9 @@
 # Exploration mode: how it works
 
-Exploration is G2 walking around a cleared area by himself, looking at things, taking pictures and keeping away from walls. It is voice-armed only and never starts on its own.
+Exploration is G2 walking around a cleared area by himself, looking at things, taking pictures and keeping away from walls. It starts only on a spoken request or on a yes to G2's own question, and never on its own.
 Code: `pi_pipeline/explore_session.py` (the session), `behavior/explore.py` (legs and headings), `behavior/driver.py` (the priority chain, wall steering, hit detection),
 `behavior/survey.py` (picture stops), `behavior/interest_watch.py` (the peeks), `vision/wall_distance.py` (the wall estimator). Settings: [`settings-switches.md`](settings-switches.md).
-Spoken commands: [`voice-commands.md`](voice-commands.md). Wall work and test history: `../vision/wall-check-plan.md`.
+Spoken commands: [`voice-commands.md`](voice-commands.md).
 
 Starting it
 -----------
@@ -12,6 +12,7 @@ Starting it
   a separate exploration session starts (about 30 s). The session lays him down first, then he stands with the eased stand-up and begins.
 - In the voice service (opt-in, not yet tried on G2) with `G2_EXPLORE_INPROCESS=1` the voice command runs the exploration inside the voice service instead: no stop and restart, no second load of the speech models, the same microphone; the service's stand guard, battery watch and sleep watch stand aside until it ends, then the voice loop carries on. It needs `explore`, `vision` and `vision_safety` on in the service's own `G2_FEATURES`; otherwise the separate session runs as above.
 - By script: `bash tools/g2_explore.sh start [ROAM_S]` (default 600 s; `0` = no cap), or `stationary` for the stay-put mode. Status, logs and a clean stop: `status | logs | halt | stop`.
+- By a yes: After 3 minutes of idling in the voice service, G2 asks "Can I go exploring?". Saying "Gee Two, yes" within 45 s starts the roam as "G2, explore" does, and "Gee Two, no" or no answer makes him wait twice as long before asking again, up to an hour. A yes also resets the wait. G2 asks only while resting or standing, awake, with nothing running and the pack above 40%. `G2_EXPLORE_REQUEST=0` turns the asking off, and `G2_EXPLORE_ASK_AFTER_S` sets the idle time.
 - Needs: a cleared area with no edges (there is no edge detector), G2 on his feet or at rest on the floor, the BiBoard powered, the pack not low. Never on a desk or the stand.
 - Do not deploy to the Pi while a session runs: a deploy at the same moment as a crash left him circling.
 
@@ -39,9 +40,12 @@ What a roam does
    closer on two of the newest three looks (about 50 degrees away, toward the side with more room), or any look at 12 in or closer, or a blocked picture. The turn replaces any turn already running, and a
    two-note falling sound plays so the reason for the turn is audible.
 6. Hit a wall: A blocked look, a wall 6 in or closer on three groups, or two looks in a row at the same close wall with no turn between them: he says a long "ooooof", backs up for 2.4 s, stops, and
-   turns around about 150 degrees toward the open side. Vision only for now; the IMU and servo-strain contact signals are still to build.
+   turns around about 150 degrees toward the open side. An IMU contact signal (pushing without moving) starts the same sequence. The same wall turned away from three times at the same distance within 20 s also starts it, so a turn that does not clear the wall is not repeated.
 7. Always on underneath: The fall guard (a tilt past 60 degrees for 0.3 s plays the losing horn and rests him), the thermal guard, the battery watch (G2 pack alarms at about 30% and 20%), the watchdog
    (a stalled control loop rests him), and the emergency stop.
+8. Sag while walking: A median tilt that moves 12 degrees from the tilt a few seconds into the walk holds the walker and runs the sag recovery: the attention pose, then the eased stand-up, back legs first. The walk then resumes.
+9. Turns: A timed turn ends on the gyro once the yaw has changed by the planned angle, never before 0.25 s, and the timed length is the cap. A turn whose yaw reading never changes is logged as no measurement.
+10. Phase: The driver reports one phase, look (standing or resting and watching), move (walking) or pause (a survey stop, hit sequence or naming look), and logs every change.
 
 Sounds
 ------
@@ -87,3 +91,5 @@ Known limits
 The wall estimator is a prototype: readings are good to 2 to 4 in between 8 and 24 in and only say far from near beyond that; glossy floor and bright patches can fool it; the camera is rolled about 4 degrees
 (not corrected, by decision), so left and right are a little biased; the left 45 degree wall was never seen clearly; there is no edge or step detector. The pictures behind it are a prototype set (some
 overexposed) to be retaken. Test it with a person next to G2.
+
+A roam can stall at a wall that the estimator keeps reading at the same distance, and the legs can sag during a long walk; both have fixes that are deployed and not yet tried on G2. Roam turns have logged no yaw change, so whether the IMU stream is missing during a roam is not known yet. The BiBoard also starts an `up` of its own before some attention stand-ups, which raises the hind legs first, and its cause is not proven.

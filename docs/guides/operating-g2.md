@@ -39,6 +39,7 @@ Power, sleep and shutdown
 
 - Power on: Switch the PiSugar on, which boots the Pi and starts the `g2-voice` service, then switch G2's own pack on. G2 says "G2 online" when ready.
 - Movement: Every stand-up is the eased stand-up (a 0.8 s ramp). Every move into a firmware skill is eased from the known pose. A stop out of a stride is immediate.
+- Exploring: After 3 minutes of idling, G2 asks "Can I go exploring?" and walks only on "Gee Two, yes". A no or no answer makes him wait twice as long, up to an hour, and a sleeping G2 does not ask. `G2_EXPLORE_REQUEST=0` turns the asking off.
 - Sleep: After about 5 minutes at rest, G2 lies down and sleeps. Saying "gee two" wakes G2, and "go to sleep" sleeps G2 on request.
 - Shut down: Say a short, clear "shut down" or "power down". G2 lies down, announces it, and shuts the Pi down after 6 s. Saying "cancel" or "wait" keeps the Pi on. The PiSugar keeps powering the halted Pi, so its switch is flipped by hand. G2's pack is switched off separately.
 - Locked movement: A systemd drop-in that replaces `--actuator serial` with `--actuator mock` for `g2-voice`, followed by a reload and restart, disables all movement.
