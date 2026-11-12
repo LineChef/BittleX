@@ -1,5 +1,7 @@
 # Robotics Project with Bittle X
 
+Documentation: [linechef.github.io/react-bittlex](https://linechef.github.io/react-bittlex/)
+
 A robotics project that teaches a quadruped robot to:
 
 - walk using reinforcement learning
