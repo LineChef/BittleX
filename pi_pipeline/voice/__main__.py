@@ -113,15 +113,6 @@ def main() -> None:
         if not features.tts:
             tts_mode = "print"
         use_wake = voice and features.wake_word
-        tts_job: dict = {}
-        if tts_mode == "piper" and os.environ.get("G2_TTS_PRELOAD", "1") != "0":
-            def _build_tts() -> None:                                  # the Piper voice takes 13 s to load on the Pi and used to start only after the serial link, the attachment check and the stand guard (2026-11-12); it loads now alongside them and the set-up below waits for what is left
-                try:
-                    tts_job["tts"] = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
-                except BaseException as e:  # noqa: BLE001 -- raised again where the voice was needed
-                    tts_job["err"] = e
-            tts_job["thread"] = threading.Thread(target=_build_tts, name="tts-preload", daemon=True)
-            tts_job["thread"].start()
 
         # crash forensics (diag/crashwatch.py): a heartbeat with the loop stage and resources, faulthandler to a file, and a report of the
         # previous process at the next start if it did not end cleanly (`python -m pi_pipeline.diag.crashwatch`)
@@ -193,13 +184,7 @@ def main() -> None:
             api_log.set_call_hook(lambda api, source: api_tone.play())     # a unique tone on every billed Claude call
 
         _mark("gait, stand guard, cues")
-        if "thread" in tts_job:
-            tts_job["thread"].join()
-            if "err" in tts_job:
-                raise tts_job["err"]
-            tts = tts_job["tts"]
-        else:
-            tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
+        tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
         _mark("make_tts")
         if voice and tts_mode == "piper":
             _start_speech_prewarm(tts)

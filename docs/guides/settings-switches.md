@@ -20,7 +20,6 @@ Exploration and walls
 ---------------------
 
 - `G2_EXPLORE_ROAM_S`: Default: 300; What it does: the roam time of a voice-started exploration
-- `G2_TTS_PRELOAD`: Default: on; What it does: the Piper voice loads in the background from the start of the voice service (`0` loads it in the old place, after the attachment checks)
 - `G2_VOSK_PRELOAD`: Default: on; What it does: the speech model loads in the background from the start of the voice service (`0` loads it where the wake word needs it)
 - `G2_FIRMWARE_CHECK`: Default: per attachment profile (arm: off); What it does: `1` asks the BiBoard its firmware at start even when the profile skips it, `0` never asks
 - `G2_ATT_KEEPALIVE_S`: Default: 4; What it does: while the claw look holds the attention pose, the leg angles are sent again this often, seconds (`0` turns it off)
