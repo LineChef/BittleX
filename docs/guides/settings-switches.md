@@ -20,6 +20,7 @@ Exploration and walls
 ---------------------
 
 - `G2_EXPLORE_ROAM_S`: Default: 300; What it does: the roam time of a voice-started exploration
+- `G2_FIRMWARE_CHECK`: Default: per attachment profile (arm: off); What it does: `1` asks the BiBoard its firmware at start even when the profile skips it, `0` never asks
 - `G2_ATT_KEEPALIVE_S`: Default: 4; What it does: while the claw look holds the attention pose, the leg angles are sent again this often, seconds (`0` turns it off)
 - `G2_CLAW_LATE_S`: Default: 4; What it does: a claw look this many seconds past its plan skips the side pictures and lowers the claw
 - `G2_EXPLORE_HANDOVER`: Default: on; What it does: `0` stops "explore" from handing over to an exploration session

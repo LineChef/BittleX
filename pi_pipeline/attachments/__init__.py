@@ -403,6 +403,12 @@ def startup_check(link) -> bool | None:
     log.info("attachment: %s (%s); gait: %s", att, ATTACHMENTS[att].description, gait_for(att).why)
     if link is None or not ATTACHMENTS[att].firmware_models:
         return None
+    if not flag("firmware_check", att):                # the fitted attachment is stored (`g2attach`), so the firmware is not asked at every start (owner, 2026-11-12: the arm is the permanent build; the ask took 1 s with the board on and 7 s, then switched the arm's skills off, with it off). `G2_FIRMWARE_CHECK=1` asks anyway.
+        log.info("attachment %s: firmware check skipped (profile; G2_FIRMWARE_CHECK=1 runs it)", att)
+        if not flag("gyro_balance", att):
+            link.send("gb", read_reply=False, settle=0.0)              # the firmware boots with its gyro balance on; this attachment runs with it off (the same as after a passed check)
+            log.info("attachment %s: firmware gyro balance off (profile)", att)
+        return True
     try:
         from ..link import opencat
         banner = link.send(opencat.QUERY, read_reply=True)

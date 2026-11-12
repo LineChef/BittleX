@@ -71,6 +71,7 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 - `gyro_balance`: Off means: the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb`; Arm: **on**: the Pi sends no `gb` after a skill or at start-up
 - `gait_switching`: Off means: the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it; Arm: off
 - `skills`: Off means: the attachment's own skills stay out of the conversation; Arm: on
+- `firmware_check`: Off means: the BiBoard is not asked its firmware at start; the stored attachment is trusted and the arm's skills stay on (`G2_FIRMWARE_CHECK=1` asks anyway for one run); Arm: off
 - `fall_recovery`: Off means: the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (see below); Arm: off
 
 - blending: pose to pose (this is not easing): the link steps the legs from the pose it knows to the next skill's first frame before sending it (`link/transitions.py`; for the arm it blends into the ARM variant of a gait, `wkArmF`, and the arm's own shifted rest and balance poses), and a policy walk ends with a blend to balance (`G2_TRANSITION_RAMP_S` caps it). Off: the firmware jumps the legs there at full servo speed

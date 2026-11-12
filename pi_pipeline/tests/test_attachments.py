@@ -719,3 +719,30 @@ def test_gyro_gaits_switches_the_gyro_on_just_before_a_gait_and_never_around_pos
     assert on[:2] == ["gB", "kwkR"]                                   # on, then the gait
     assert on.count("gB") == 2 and on[on.index("kwkF") - 1] == "gB"   # before each of the two gaits, nowhere else
     assert on[on.index("kbalance") - 1] == "kwkR" and "gB" not in on[on.index("kbalance"):on.index("kwkF") - 1]      # not before the stop or the attention pose
+
+
+def test_the_arm_does_not_ask_the_firmware_at_start_but_still_turns_the_gyro_off(monkeypatch):
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.delenv("G2_FIRMWARE_CHECK", raising=False)
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    sent = []
+
+    class Silent:                                  # a BiBoard that is off: it never answers
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return ""
+    assert A.startup_check(Silent()) is True       # the stored attachment is trusted: no `?`, no wait, the skills stay
+    assert "?" not in sent and sent[-1] == "gb"
+
+
+def test_the_firmware_check_can_be_forced_on_for_one_run(monkeypatch):
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.setenv("G2_FIRMWARE_CHECK", "1")
+    monkeypatch.setattr(A.time, "sleep", lambda s: None)
+    sent = []
+
+    class Silent:
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return ""
+    assert A.startup_check(Silent()) is False and "?" in sent

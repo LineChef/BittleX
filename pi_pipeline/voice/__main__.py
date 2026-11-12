@@ -11,6 +11,7 @@ import argparse
 import logging
 import os
 import threading
+import time
 
 from ..config import settings
 from ..diag import diag
@@ -24,6 +25,16 @@ from .loop import VoiceLoop
 from .stt import make_stt
 from .tts import make_tts
 from .wake_word import make_wake_word
+
+
+_STARTUP = {"t0": time.monotonic(), "last": time.monotonic()}
+
+
+def _mark(step: str) -> None:
+    """One log line per start-up step with the seconds it took (and the total so far): the service took 47 s to be ready and a 15 s stretch of it logged nothing (2026-11-12)."""
+    now = time.monotonic()
+    logging.getLogger("g2.startup").info("startup: %s done in %.1f s (%.1f s since the process started)", step, now - _STARTUP["last"], now - _STARTUP["t0"])
+    _STARTUP["last"] = now
 
 
 def main() -> None:
@@ -115,7 +126,9 @@ def main() -> None:
 
         link = _open_shared_link(args.actuator)       # ONE locked serial link for the actuator, battery watch and stand guard
         from ..attachments import startup_check
+        _mark("memory and serial link")
         startup_check(link)                            # attachment none: nothing; otherwise logs it and checks the BiBoard firmware fits
+        _mark("attachment check")
         fan = policy_walker = None
         exploring = threading.Event()                  # set while an exploration runs inside this service (explore_session.run_inprocess): the guard, battery and sleep watches stand aside
         if link is not None:
@@ -170,6 +183,7 @@ def main() -> None:
             from . import api_log, api_tone
             api_log.set_call_hook(lambda api, source: api_tone.play())     # a unique tone on every billed Claude call
 
+        _mark("gait, stand guard, cues")
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
         if voice and tts_mode == "piper":
             _start_speech_prewarm(tts)
@@ -181,6 +195,7 @@ def main() -> None:
         power_log = _start_power_log()
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 
+        _mark("speech output, battery and power watches")
         camera = None
         if voice and features.vision and settings.vision_describe:
             if os.path.exists(settings.vision_serial_port):
@@ -206,6 +221,7 @@ def main() -> None:
             from ..vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
             namer = ExplorationPictureSaver(camera, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
 
+        _mark("camera")
         watcher_c = None
         from ..memory.call_log import MemoryCallGate
         call_gate = MemoryCallGate(lambda: memory.recency()[0]) if memory else None      # at most ONE memory-processing Claude call per session, across the tidy-up and the reflection
