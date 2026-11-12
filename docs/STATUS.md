@@ -72,6 +72,11 @@ Everything below is on the Pi.
 - Exploration: Two tiers: stationary and attentive, and a roam armed by voice or by a yes to G2's question. Roams have turns that end on the gyro, a wall avoider that does not trust a repeated "8 in" reading, a hit sequence from the motion sensor, narration and scheduled survey pictures. The driver reports one phase (look, move or pause) and logs each change.
 - Looks and rests: The claw look is the same in every mode (one arm stepping, a 0.8 s settle, a dropped stale frame), and every session ends in the verified rest position.
 - Sag recovery: While G2 stands idle, a tilt that grows after 5 s without a command re-stands G2. While a roam walks, a tilt that moves 12 degrees from the walk's own reference holds the walker and re-stands G2.
+- Motion-sensor stream: The IMU print stays on through every pose read, stand-up tilt reading and claw look (they used to switch it off, which blinded the fall guard, the sag check and the turn measurement during roams). The stand guard sends the print command again after 8 s without frames.
+- Falls in a roam: A fall sends gyro balance off and rest at once, and ends the exploration session.
+- Claw look: The stand-up after a look waits for the look to finish. A late look skips its side pictures, and so does a look after one missed picture. While the pose is held, the leg angles are sent again every 4 s.
+- Attention pose entry: The move into the pose is an eased skill that is left to finish (up to 7 s), never snapped into place.
+- Roam length: The default is 5 minutes.
 - Wall loop handover: The same wall turned away from three times at the same distance within 20 s hands over to the back-up-and-turn-around sequence.
 - Walk logs: A scripted firmware gait writes a `scripted_walk` log, kept apart from the learned walks and never read by a fit.
 - Robustness: A dead camera reader restarts, a failed behaviour tick is skipped, and every walk log records why the walk ended.
