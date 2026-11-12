@@ -19,7 +19,28 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-import anthropic
+import importlib.util
+import sys
+
+
+def _lazy_anthropic():
+    """`anthropic` as a lazily loaded module, loaded on a background thread from the moment this file is imported. The import costs about 6 s on the Pi (0.5 s on the Mac), and it used to block every start of the
+    voice service, an exploration session and the deploy's import check; now it runs alongside the model loads and the first attribute use waits only for what is left (2026-11-12)."""
+    spec = importlib.util.find_spec("anthropic")
+    if spec is None or spec.loader is None:
+        import anthropic as mod                       # not installed: the plain import raises the usual error
+        return mod
+    if "anthropic" in sys.modules:
+        return sys.modules["anthropic"]
+    spec.loader = importlib.util.LazyLoader(spec.loader)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["anthropic"] = mod
+    spec.loader.exec_module(mod)
+    threading.Thread(target=lambda: getattr(mod, "Anthropic", None), name="anthropic-prefetch", daemon=True).start()
+    return mod
+
+
+anthropic = _lazy_anthropic()
 
 from ..config import Settings
 from ..diag.core import last_failure, summarize_session

@@ -94,14 +94,14 @@ def look_seconds() -> float:
     return moves / CLAW_DEG_S + 3 * SETTLE_S + 1.0
 
 
-def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None) -> str:
+def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False) -> str:
     """The look. `snapshot(kind)` takes one picture (None = no camera: the arm still moves). Throwaway pictures are `look_left` / `look_right`; the centre one is `kind`.
     `discard()` throws away one stale camera frame before each picture (the voice loop passes the camera's `discard_one`; the exploration's picture saver already takes throwaway frames). Returns "ok", "stopped" (stopped() went true between moves) or "error"; the arm always ends lowered. Never raises."""
     from .ball_chase import CLAW_LIFT_DEG, CLAW_PAN_DEG, CLAW_PAN_SIGN
     left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG              # the pan that points the camera to G2's left
     here = (0.0, 0.0)
     state, halted = "ok", False
-    keep, t0 = _KeepAlive(link), time.monotonic()
+    keep, t0, missed = _KeepAlive(link), time.monotonic(), False
     budget = look_seconds() + LATE_S
     was_on = bool(getattr(link, "imu_print_on", False))
     try:
@@ -113,8 +113,8 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
             if stopped():
                 state = "stopped"
                 break
-            if label != kind and time.monotonic() - t0 > budget:                       # over time (a slow camera): the throwaway pictures are skipped, the one that counts is still taken
-                log.warning("the claw look is %.0f s over its plan: skipping the %s picture", time.monotonic() - t0 - look_seconds(), label)
+            if label != kind and (missed or time.monotonic() - t0 > budget):                       # over time (a slow camera): the throwaway pictures are skipped, the one that counts is still taken
+                log.warning("the claw look %s: skipping the %s picture", "had no picture from the camera" if missed else f"is {time.monotonic() - t0 - look_seconds():.0f} s over its plan", label)
                 continue
             _smooth(link, here, (pan, CLAW_LIFT_DEG), sleep, stopped, keep)
             here = (pan, CLAW_LIFT_DEG)
@@ -123,7 +123,9 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
             if discard is not None:
                 discard()                                                             # the module answers with the picture of the PREVIOUS request: ask once and drop it, as the chase's look does (ball_chase._SnapshotCamera.look)
             if snapshot is not None:
-                snapshot(label)
+                got = snapshot(label)
+                if miss_skips and got is None and label != kind:          # the camera did not answer (the picture saver returns None): the other side picture would wait 6 s again, so it is skipped (2026-11-12)
+                    missed = True
                 keep.tick()
     except _Halt:
         state, halted = "stopped", True

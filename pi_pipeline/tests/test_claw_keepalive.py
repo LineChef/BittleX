@@ -42,3 +42,14 @@ def test_throwaway_pictures_are_skipped_when_late_but_the_counting_one_is_taken(
         now[0] += 30.0                       # a camera that takes 30 s per picture
     C.run_claw_look(link, snap, "look", sleep=sleep)
     assert got[0] == "look_left" and got[-1] == "look" and "look_right" not in got
+
+
+def test_a_missed_side_picture_skips_the_other_one(monkeypatch):
+    link, got = Link(), []
+    now = [0.0]
+    monkeypatch.setattr(C.time, "monotonic", lambda: now[0])
+    def snap(label):
+        got.append(label)
+        return None if label == "look_left" else "saved"
+    C.run_claw_look(link, snap, "look", sleep=lambda s: now.__setitem__(0, now[0] + s), miss_skips=True)
+    assert got == ["look_left", "look"]

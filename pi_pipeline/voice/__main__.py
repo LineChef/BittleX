@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import threading
 
 from ..config import settings
 from ..diag import diag
@@ -60,6 +61,14 @@ def main() -> None:
 
     log_summary()
     start_disk_watch(settings.disk_warn_pct)
+    if args.mode == "voice" and os.environ.get("G2_VOSK_PRELOAD", "1") != "0":
+        def _preload_vosk() -> None:                                  # the speech model takes 5.6 s to load on the Pi and used to start only after the serial link, the attachment checks and the memory were done (the service took 47 s to be ready, 2026-11-12); the model cache is shared, so the wake word takes this same object
+            try:
+                from . import vosk_model
+                vosk_model.get_model(settings.vosk_model_path)
+            except Exception:  # noqa: BLE001 -- the wake word loads it itself and reports the failure
+                logging.getLogger("g2.vosk").debug("preload failed", exc_info=True)
+        threading.Thread(target=_preload_vosk, name="vosk-preload", daemon=True).start()
     if settings.clear_captures:
         from ..util.tidy import clear_folder
         clear_folder(settings.capture_dir, min_age_s=settings.capture_keep_s)
@@ -108,7 +117,6 @@ def main() -> None:
         from ..attachments import startup_check
         startup_check(link)                            # attachment none: nothing; otherwise logs it and checks the BiBoard firmware fits
         fan = policy_walker = None
-        import threading
         exploring = threading.Event()                  # set while an exploration runs inside this service (explore_session.run_inprocess): the guard, battery and sleep watches stand aside
         if link is not None:
             from . import fail_sound

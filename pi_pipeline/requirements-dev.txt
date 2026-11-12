@@ -7,3 +7,10 @@ pytest>=8.0
 # ffb60904651c00a1e0b8df594591770018a0f04587f7deeb3838344fe3adabac (ruff-0.8.4-py3-none-macosx_10_12_x86_64.whl, PyPI)
 #   pi_pipeline/.venv/bin/ruff check
 ruff==0.8.4
+
+# Parallel test runs: pytest-xdist 3.6.1 + execnet 2.1.1 (pure-Python wheels, PyPI, dev machine only, never on the Pi). sha256:
+# 9ed4adfb68a016610848639bb7e02c9352d5d9f03d04809919e2dafc3be4cca7 (pytest_xdist-3.6.1-py3-none-any.whl)
+# 26dee51f1b80cebd6d0ca8e74dd8745419761d3bef34163928cbebbdc4749fdc (execnet-2.1.1-py3-none-any.whl)
+#   pi_pipeline/.venv/bin/pytest -n auto
+pytest-xdist==3.6.1
+execnet==2.1.1

@@ -113,6 +113,7 @@ else
   say "restarting g2-voice"
   pissh "$G2_PI" 'sudo -n systemctl restart g2-voice; for i in 1 2 3 4 5 6 7 8 9 10; do systemctl is-active --quiet g2-voice && break; sleep 0.5; done; systemctl is-active g2-voice' 2>&1 | tee -a "$LOG"
 fi
+say "Pi memory after the restart: $(pissh "$G2_PI" "free -m | awk '/Mem:/ {print \$7}'" 2>/dev/null) MB available (a change that costs memory shows here; the lowest seen in an exploration was 40 MB)"
 say "DEPLOYED. API call log on the Pi: ~/.local/share/g2/api_calls.jsonl  (python -m pi_pipeline.voice.api_log --last 40)"
 ( G2_PI="$G2_PI" nohup bash "$(dirname "$0")/g2_sync.sh" run --force goals >> "$LOG" 2>&1 & ) || true      # in the background, the deploy does not wait for it: a Mac copy of his goal data, readable while he is off (user, 2026-11-01); the other copies run on their own schedule
 date > "$LOGDIR/deploy_done"

@@ -366,7 +366,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         rt.bindings.wrap_diag(tally.wrap)
         if saver is not None:
             from .behavior import claw_survey
-            rt.bindings.claw_look = lambda kind: claw_survey.run_claw_look(link, saver, kind)          # a look is the claw look when the arm is fitted (behavior/claw_survey.py)
+            rt.bindings.claw_look = lambda kind: claw_survey.run_claw_look(link, saver, kind, miss_skips=True)          # a look is the claw look when the arm is fitted (behavior/claw_survey.py)
         rt.driver._choreo.hold = rt.bindings.claw_running           # the stand-up after a claw look waits for the look to finish (a slow camera made it overrun)
         hub = getattr(getattr(rt, "_sensors", None), "__self__", None)
         if hub is not None and hasattr(hub, "yaw_deg") and getattr(rt.bindings, "walker", None) is not None:

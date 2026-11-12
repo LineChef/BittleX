@@ -6,6 +6,10 @@ name: docs-bundle
 on:
   push:
     branches: [development]
+    paths-ignore:                  # a push that only touches these cannot change the bundle (a push with any other file still builds)
+      - 'pi_pipeline/tests/**'
+      - 'rl_training/**'
+      - 'models/**'
   workflow_dispatch:
 
 permissions:
