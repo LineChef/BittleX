@@ -489,11 +489,11 @@ class SerialLink:
                 if waited >= kskill.MIN_WAIT_S and kskill.legs_reached(kskill.read_joints(self), goal):
                     reached = True
                     break
-            if not reached:
-                log.warning("eased move into the attention pose: the board did not report it after %.1f s: forcing it", waited)
-                for _ in range(2):
-                    self._write_pose(standup.move_cmd(goal))
-                    time.sleep(0.3)
+            if not reached:                                                # not snapped into it: a jump to the pose with his weight on the legs put the feet in odd places (owner, 2026-11-12); the skill is left to finish and the look's keep-alive holds the angles
+                log.warning("eased move into the attention pose: the board did not report it after %.1f s: left to finish (no forced jump)", waited)
+                time.sleep(1.0)
+            else:
+                log.info("the attention pose was reached after about %.1f s", waited)
             self.last_motion_command, self._last_motion_t = "kcalib", time.monotonic()
             log.info("moved into the attention pose as an eased K skill (%d bytes)", len(data))
             return True

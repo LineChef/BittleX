@@ -28,7 +28,7 @@ STAND_ATT_WAIT_S = 4.0     # the longest the Pi waits for the board to finish (i
 ATT_ENTRY_EASED = 1        # 1 = the Pi plays the move into the attention pose as an eased K skill (and the firmware `kcalib` is not sent); 0 = the firmware `kcalib` as before.
 ATT_ENTRY_STEPS = 6        # stages of the move.
 ATT_ENTRY_SPEED = 10       # speed of each stage (the firmware speed is this / 8: bigger = faster, harder).
-ATT_ENTRY_WAIT_S = 3.0     # the longest the Pi waits for the legs to read as in the attention pose.
+ATT_ENTRY_WAIT_S = 7.0     # the longest the Pi waits for the legs to read as in the attention pose (3 s was too short: the wait ended with the move still playing and the forced pose snapped him down, 2026-11-12).
 
 # ---- THE CLAW RAISE / SWING IN A LOOK (the arm's two servos are sent a new position this many times a second)
 CLAW_DEG_S = 60.0          # how fast the arm moves, in degrees a second. SMALLER = SLOWER.

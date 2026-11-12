@@ -20,6 +20,8 @@ Exploration and walls
 ---------------------
 
 - `G2_EXPLORE_ROAM_S`: Default: 300; What it does: the roam time of a voice-started exploration
+- `G2_ATT_KEEPALIVE_S`: Default: 4; What it does: while the claw look holds the attention pose, the leg angles are sent again this often, seconds (`0` turns it off)
+- `G2_CLAW_LATE_S`: Default: 4; What it does: a claw look this many seconds past its plan skips the side pictures and lowers the claw
 - `G2_EXPLORE_HANDOVER`: Default: on; What it does: `0` stops "explore" from handing over to an exploration session
 - `G2_EXPLORE_REQUEST`: Default: on; What it does: G2 asks "Can I go exploring?" after idling in the voice service and walks only on a yes. `0` turns the asking off
 - `G2_EXPLORE_ASK_AFTER_S`: Default: 180; What it does: seconds of idling before G2 asks. A no or no answer doubles the wait, up to an hour

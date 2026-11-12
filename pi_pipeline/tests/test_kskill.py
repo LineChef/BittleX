@@ -255,15 +255,14 @@ def test_the_move_into_the_attention_pose_is_an_eased_k_skill_and_kcalib_is_not_
     del att_legs, prof
 
 
-def test_the_eased_entry_forces_the_attention_pose_when_the_board_does_not_report_it(monkeypatch):
+def test_the_eased_entry_is_left_to_finish_not_forced_when_the_board_does_not_report_it(monkeypatch):
     wrote = []
     lk = _arm_link(monkeypatch, wrote)
     monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: [30] * 16)                    # still standing
     monkeypatch.delenv("G2_ATT_ENTRY_EASED", raising=False)
     lk.last_motion_command = "kbalance"
     assert lk._attention_entry_eased() is True
-    forced = [w for w in wrote if w.startswith(b"i8 ")]
-    assert len(forced) == 2 and forced[0].strip() == standup.move_cmd([0.0] * 8).encode()       # forced to legs straight, twice
+    assert not [w for w in wrote if w.startswith(b"i8 ")]                                       # no forced jump to legs straight (owner, 2026-11-12: it snapped him down)
 
 
 def _legs_joints(urdf_legs):
