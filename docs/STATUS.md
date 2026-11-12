@@ -15,7 +15,7 @@ At a glance
 - Walking: Works on hardwood floors. Tile and carpet are not solved.
 - Voice conversation: Works. Wake word, spoken commands, Claude replies, speech out.
 - Memory: Works. Facts and past conversations persist between sessions.
-- Exploration: Works in a small room. A roam can repeat the same wall turn or end with the back legs sagging; fixes for both are deployed and untested.
+- Exploration: Works in a small room. A 5-minute roam on hardwood ended with no falls and level stand-ups after the claw-look and motion-sensor fixes. Earlier roams fell on the back-left leg, which sagged. The yes to G2's question starts a roam. A roam can still bump a wall three times in a short roam; the attention pose after a long hold is not yet confirmed level.
 - Ball goal (punting a ball): Works some of the time. Falls during turns are the main problem.
 - Falls: The biggest open problem. G2 sometimes tips over at pose and turn changes.
 
@@ -72,6 +72,7 @@ Everything below is on the Pi.
 - Exploration: Two tiers: stationary and attentive, and a roam armed by voice or by a yes to G2's question. Roams have turns that end on the gyro, a wall avoider that does not trust a repeated "8 in" reading, a hit sequence from the motion sensor, narration and scheduled survey pictures. The driver reports one phase (look, move or pause) and logs each change.
 - Looks and rests: The claw look is the same in every mode (one arm stepping, a 0.8 s settle, a dropped stale frame), and every session ends in the verified rest position.
 - Sag recovery: While G2 stands idle, a tilt that grows after 5 s without a command re-stands G2. While a roam walks, a tilt that moves 12 degrees from the walk's own reference holds the walker and re-stands G2.
+- Start-up: The voice service is ready in about 33 s. The firmware question is skipped for the arm, and the speech model loads in the background. The Piper voice (13 s on the Pi) is now the largest remaining step.
 - Motion-sensor stream: The IMU print stays on through every pose read, stand-up tilt reading and claw look (they used to switch it off, which blinded the fall guard, the sag check and the turn measurement during roams). The stand guard sends the print command again after 8 s without frames.
 - Falls in a roam: A fall sends gyro balance off and rest at once, and ends the exploration session.
 - Claw look: The stand-up after a look waits for the look to finish. A late look skips its side pictures, and so does a look after one missed picture. While the pose is held, the leg angles are sent again every 4 s.
@@ -133,8 +134,8 @@ What happens next
 
 Testing follows a simple rule: collect data from normal runs first, then run a targeted test only where the logs cannot answer the question.
 
-1. Read the stand-up data from the guard-off roam, then run a roam to check the sag check, the wall-loop handover and the yaw reading.
-2. Check that G2 asks to explore and that a yes starts the roam.
+1. Run one more 5-minute hardwood roam to confirm the legs stay level in the attention pose, the claw lifts on every look and the attention-pose entry log lines show its time.
+2. Find out what the BiBoard's own `up` moves before some attention stand-ups are.
 3. Run the ball goal inside the voice service again and read the stand-up and turn logs.
 4. Recalibrate the wall estimator for the claw camera, then improve the bump reflex for thin obstacles.
 5. Check the wake-word log after a few days of use.
