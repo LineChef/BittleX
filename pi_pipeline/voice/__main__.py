@@ -185,14 +185,18 @@ def main() -> None:
 
         _mark("gait, stand guard, cues")
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
+        _mark("make_tts")
         if voice and tts_mode == "piper":
             _start_speech_prewarm(tts)
+        _mark("speech prewarm")
         audible = voice and tts_mode != "print"
         battery_alert["fn"] = make_battery_alert(tts, audible)     # also used for low readings taken while walking
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link, paused=exploring.is_set)
         if watcher is not None:
             actuator.on_before_gait = watcher.read_before          # a reading right before any walk starts (there is no idle timer)
+        _mark("battery watch")
         power_log = _start_power_log()
+        _mark("power log")
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 
         _mark("speech output, battery and power watches")
