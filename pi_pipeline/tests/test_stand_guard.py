@@ -333,3 +333,35 @@ def test_the_walker_ignores_walk_and_turn_commands_while_held_and_sends_its_toke
     w.release()
     w.walk(0.0)
     assert sent == ["kwkF", "kwkF"]
+
+
+# ---- the IMU print stays on (2026-11-12) and a fall is rested at once
+
+def test_the_guard_sends_gp_again_when_no_frames_come_for_a_while_and_not_before():
+    link, clock = FakeLink(), Clock()
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False)
+    link.queue = [imu_line(1.0, -2.0)]
+    clock.t += 0.2
+    g.tick()                                         # frames have come: the print is known to work
+    for _ in range(30):                               # 6 s with no frames: not stale yet
+        clock.t += 0.2
+        g.tick()
+    assert "gP" not in link.sent
+    for _ in range(15):                               # past 8 s
+        clock.t += 0.2
+        g.tick()
+    assert link.sent.count("gP") == 1 and g.resends == 1
+    for _ in range(10):
+        clock.t += 0.2
+        g.tick()
+    assert link.sent.count("gP") == 1                 # at most once per stale period
+
+
+def test_a_fall_sends_gyro_balance_off_and_rest_once_before_the_handler():
+    link, clock, fell = FakeLink(), Clock(), []
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False, on_fall=lambda: fell.append(list(link.sent)), fall_deg=60.0)
+    for _ in range(6):
+        clock.t += 0.2
+        link.queue = [imu_line(80.0, 2.0)]
+        g.tick()
+    assert link.sent.count("d") == 1 and "gb" in link.sent and len(fell) == 1 and fell[0][-2:] == ["gb", "d"]

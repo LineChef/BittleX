@@ -38,6 +38,10 @@ class LockedLink:
         return getattr(self._link, "last_motion_command", "")
 
     @property
+    def imu_print_on(self) -> bool:
+        return bool(getattr(self._link, "imu_print_on", False))
+
+    @property
     def balance_epoch(self):
         return getattr(self._link, "balance_epoch", None)
 

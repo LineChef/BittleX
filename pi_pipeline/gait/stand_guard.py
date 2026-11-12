@@ -90,7 +90,7 @@ class StandGuard:
                  reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = 60.0,
                  clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2,
                  on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0,
-                 is_walking=None, walk_sag_deg: float = 12.0):
+                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 8.0, rest_on_fall: bool = True):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
         self._balance_off_idle, self._guard = balance_off_idle, guard
@@ -126,6 +126,13 @@ class StandGuard:
         self._is_walking, self._walk_sag_deg = is_walking, walk_sag_deg
         self._walk_t0: float | None = None
         self._walk_ref: tuple | None = None
+        # The IMU print is shared and something can switch it off (2026-11-12: a roam ran with it off after the first pose read, so the guards saw nothing): no frames for `resend_stale_s` while the guard is
+        # on means `gP` is sent again, at most that often.
+        self._resend_stale_s = resend_stale_s
+        self._last_frame_t = clock()
+        self._last_resend = -1e9
+        self.resends = 0
+        self._rest_on_fall = rest_on_fall                  # a fall: gyro balance off and rest at once, so the board's own self-right (the fell-down sound and the legs repeating one motion) stops
 
     OFF_RESEND_S = 30.0
     WALK_REF_FROM_S, WALK_REF_TO_S, WALK_CHECK_FROM_S = 2.0, 5.0, 8.0
@@ -285,6 +292,12 @@ class StandGuard:
             if not self._fell and now - self._tilt_since >= 0.3:
                 self._fell = True
                 log.warning("G2 is tipped over (tilt %.0f deg)", tilt)
+                if self._rest_on_fall:
+                    try:
+                        self._link.send("gb", read_reply=False, settle=0.0)
+                        self._link.send("d", read_reply=False, settle=0.0)
+                    except Exception:  # noqa: BLE001
+                        log.debug("resting after a fall failed", exc_info=True)
                 try:
                     self._on_fall()
                 except Exception:  # noqa: BLE001
@@ -305,6 +318,15 @@ class StandGuard:
             if self.frames == 0:
                 log.info("stand guard is receiving the IMU stream")
             self.frames += len(lines)
+            self._last_frame_t = now
+        elif self._guard and now - self._last_frame_t > self._resend_stale_s and now - self._last_resend > self._resend_stale_s and self.frames > 0:
+            self._last_resend = now
+            self.resends += 1
+            log.warning("no IMU frames for %.0f s: sending gP again (the print was switched off)", now - self._last_frame_t)
+            try:
+                self._link.send("gP", read_reply=False, settle=0.0)
+            except Exception:  # noqa: BLE001
+                log.debug("re-sending the IMU print failed", exc_info=True)
         elif self._guard and self.frames == 0 and not self._warned_no_frames and now - self._started_at > 30.0:
             self._warned_no_frames = True
             log.warning("stand guard: no IMU frames after 30 s -- the wobble guard cannot see G2 (re-sending gP)")

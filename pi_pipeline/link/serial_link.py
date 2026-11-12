@@ -231,6 +231,8 @@ class SerialLink:
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
             self._last_sent_t = time.monotonic()
             command_log.sent(command)             # and every command (not the joint streams), with who sent it (link/command_log.py)
+            if command.strip() in ("gP", "gp"):
+                self.imu_print_on = command.strip() == "gP"
             (getattr(self, "_scripted_walks", None) or _NO_WALK_LOG).note(command)    # a scripted gait is one `scripted_walk` auto-log run, ended by the next motion command (telemetry/scripted_walks.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
@@ -368,9 +370,13 @@ class SerialLink:
         finally:
             self._ramping = False
 
+    imu_print_on = False                          # whether the board's IMU print is on, from the last `gP` / `gp` sent (link/imu_print.py puts it back after a read that needs it off)
+
     def _write_pose(self, command: str) -> None:
         self._ser.write((command + "\n").encode("ascii"))
         self._ser.flush()
+        if command.strip() in ("gP", "gp"):
+            self.imu_print_on = command.strip() == "gP"
 
     def _stand_up(self):
         """The eased stand-up from lying or sitting to the balance pose. Returns the balance pose (Petoi leg order) if it ran, else None.
@@ -437,10 +443,12 @@ class SerialLink:
             from ..gait.imu_parse import parse_imu_line
             if not hasattr(self._ser, "in_waiting"):         # not a real port (a test's fake): a failed read would flag the link as disconnected
                 return None
+            was_on = self.imu_print_on
             self._write_pose("gP")
             time.sleep(seconds)
             rows = [parse_imu_line(x) for x in (self.poll_imu() or [])]
-            self._write_pose("gp")
+            if not was_on:                                   # the print goes back to how it was: a guard that reads it must not lose it after every stand-up (2026-11-12: every roam turn ran with it off)
+                self._write_pose("gp")
             rows = [r for r in rows if r is not None]
             if len(rows) < 2:
                 return None

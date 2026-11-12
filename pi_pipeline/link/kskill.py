@@ -123,21 +123,22 @@ def read_joints(link, timeout_s: float = 0.8, sleep=time.sleep, clock=time.monot
     poll, other = getattr(link, "poll_imu", None), getattr(link, "pop_other", None)
     if not callable(poll) or not callable(other):
         return None
+    from . import imu_print
     try:
-        link.send("gp", read_reply=False, settle=0.0)
-        sleep(0.1)
-        poll()
-        other()
-        link.send("j", read_reply=False, settle=0.0)
-        end = clock() + timeout_s
-        while clock() < end:
+        with imu_print.paused(link):                      # the print goes back on after the read if it was on
+            sleep(0.1)
             poll()
-            for ln in other():
-                if ln.count(",") >= 15:
-                    nums = [int(x) for x in re.findall(r"-?\d+", ln)]
-                    if len(nums) >= 16 and nums[:16] != list(range(16)):
-                        return nums[:16]
-            sleep(0.05)
+            other()
+            link.send("j", read_reply=False, settle=0.0)
+            end = clock() + timeout_s
+            while clock() < end:
+                poll()
+                for ln in other():
+                    if ln.count(",") >= 15:
+                        nums = [int(x) for x in re.findall(r"-?\d+", ln)]
+                        if len(nums) >= 16 and nums[:16] != list(range(16)):
+                            return nums[:16]
+                sleep(0.05)
     except Exception:  # noqa: BLE001
         pass
     return None

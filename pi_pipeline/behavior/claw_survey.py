@@ -66,6 +66,7 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
     left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG              # the pan that points the camera to G2's left
     here = (0.0, 0.0)
     state, halted = "ok", False
+    was_on = bool(getattr(link, "imu_print_on", False))
     try:
         link.send("gP", read_reply=False, settle=0.0)
         if RAISE_FIRST:
@@ -93,7 +94,8 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
                 _smooth(link, here, (0.0, 0.0), sleep)                               # arm down and centred whatever happened
                 from .ball_chase import ensure_claw_centered
                 ensure_claw_centered(link, sleep)                                    # confirmed with the board, the same as the chase's claw look
-            link.send("gp", read_reply=False, settle=0.0)
+            if not was_on:                                                            # the print stays on where it was on before the look (a guard reads it)
+                link.send("gp", read_reply=False, settle=0.0)
         except Exception:  # noqa: BLE001
             log.exception("could not lower the claw")
     return state
