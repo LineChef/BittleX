@@ -15,7 +15,7 @@ import time
 
 from . import noise_log  # noqa: E402
 from . import command_log  # noqa: E402
-from . import opencat, transitions  # noqa: E402
+from . import opencat, transitions, motion_events  # noqa: E402
 
 log = logging.getLogger("g2.link")
 
@@ -503,7 +503,6 @@ class SerialLink:
 
     def _stand_up_kskill(self, standup) -> bool:
         """The eased K stand-up, and one line in the motion events log (link/motion_events.py) for it, whatever happens."""
-        from . import motion_events
         ev: dict = {"outcome": "refused"}
         t0 = time.monotonic()
         try:
@@ -562,6 +561,7 @@ class SerialLink:
             if pose in ("rest", "sit", "attention"):
                 last = {"rest": "krest", "sit": "ksit", "attention": "kcalib"}[pose]
             ev["start"] = last
+            motion_events.write("stand_up_start", pose_read=pose, start=last, joints=[int(x) for x in j0[:16]] if j0 else None)      # written BEFORE the rise: a fall in the middle of it still leaves what the board reported (the line above is only written when the stand-up ends)
             lift0, lift1 = None, None
             if last in ("d", "krest", "kzz"):
                 start, lift0, lift1 = standup.rest_pose(), p.get("arm_rest"), p.get("arm_walk")            # the claw is on the floor at rest: its lift eases up with the legs

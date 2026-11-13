@@ -74,7 +74,7 @@ Everything below is on the Pi.
 - Sag recovery: While G2 stands idle, a tilt that grows after 5 s without a command re-stands G2. While a roam walks, a tilt that moves 12 degrees from the walk's own reference holds the walker and re-stands G2.
 - Start-up: The voice service is ready in about 33 s. The firmware question is skipped for the arm, and the speech model loads in the background. The Piper voice (13 s on the Pi) is now the largest remaining step.
 - Motion-sensor stream: The IMU print stays on through every pose read, stand-up tilt reading and claw look (they used to switch it off, which blinded the fall guard, the sag check and the turn measurement during roams). The stand guard sends the print command again after 8 s without frames.
-- Falls in a roam: A fall sends gyro balance off and rest at once, and ends the exploration session.
+- Falls in a roam: A fall sends gyro balance off and rest at once, and ends the exploration session. Each fall also saves a record of the motion-sensor trace around it, and each stand-up logs the joint angles the board reports just before the rise.
 - Claw look: The stand-up after a look waits for the look to finish. A late look skips its side pictures, and so does a look after one missed picture. While the pose is held, the leg angles are sent again every 4 s.
 - Attention pose entry: The move into the pose is an eased skill that is left to finish (up to 7 s), never snapped into place.
 - Roam length: The default is 5 minutes.

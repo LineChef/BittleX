@@ -80,6 +80,11 @@ class WobbleDetector:
         return False
 
 
+def fall_recorder_post_s() -> float:
+    from . import fall_recorder
+    return fall_recorder.POST_S + 1.0
+
+
 class StandGuard:
     """Background thread that keeps firmware balance off while idle and trips the `WobbleDetector`. `link` needs `send`, `poll_imu`
     (a shared, locked link). `is_busy()` says a gait is running (everything pauses); `note_activity()` is called when any command
@@ -132,6 +137,8 @@ class StandGuard:
         self._last_frame_t = clock()
         self._last_resend = -1e9
         self.resends = 0
+        from . import fall_recorder
+        self._rec = fall_recorder.FallRecorder(link, clock=clock) if fall_recorder.enabled() else None       # the IMU trace around every fall, one file each (gait/fall_recorder.py)
         self._rest_on_fall = rest_on_fall                  # a fall: gyro balance off and rest at once, so the board's own self-right (the fell-down sound and the legs repeating one motion) stops
 
     OFF_RESEND_S = 30.0
@@ -272,6 +279,13 @@ class StandGuard:
                 log.debug("restarting the IMU print failed", exc_info=True)
 
     def stop(self) -> None:
+        rec = self._rec
+        if rec is not None and rec._pending is not None and self._thread is not None and self._thread.is_alive():       # a fall is being recorded: the guard's own thread keeps reading for the settle (a few seconds) before the print is switched off
+            end = self._clock() + fall_recorder_post_s()
+            while rec._pending is not None and self._clock() < end and self._thread.is_alive():
+                self._sleep(0.2)
+        if rec is not None:
+            rec.flush()
         self._stop.set()
         if self._guard:
             try:
@@ -292,6 +306,11 @@ class StandGuard:
             if not self._fell and now - self._tilt_since >= 0.3:
                 self._fell = True
                 log.warning("G2 is tipped over (tilt %.0f deg)", tilt)
+                if self._rec is not None:
+                    try:
+                        self._rec.trigger(now, tilt, busy=bool(self._is_busy()), standing=bool(self._is_standing()), roll_deg=round(roll_deg, 1), pitch_deg=round(pitch_deg, 1))
+                    except Exception:  # noqa: BLE001
+                        log.debug("fall record trigger failed", exc_info=True)
                 if self._rest_on_fall:
                     try:
                         self._link.send("gb", read_reply=False, settle=0.0)
@@ -338,6 +357,8 @@ class StandGuard:
             r = parse_imu_line(line)
             if r is not None:
                 self._hist.append((now, math.degrees(r[0]), math.degrees(r[1])))
+                if self._rec is not None:
+                    self._rec.feed(now, line)
         if self._on_fall is not None:
             for line in lines:                        # a fall at any time, walking or not (the walk loops have their own detector); before the busy / quiet checks
                 r = parse_imu_line(line)

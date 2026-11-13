@@ -299,7 +299,7 @@ def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first
     monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: n.append(1) or None)
     lk.last_motion_command = ""
     assert lk._stand_up_kskill(standup) is True and wrote[0].strip() == b"krest" and len(n) >= 3
-    ev = [json.loads(line) for line in open(tmp_path / "ev.jsonl")]
+    ev = [e for e in (json.loads(line) for line in open(tmp_path / "ev.jsonl")) if e["event"] == "stand_up"]          # (a `stand_up_start` line is written before each rise)
     assert [e["event"] for e in ev] == ["stand_up"] * 3
     assert [e["pose_read"] for e in ev] == ["sit", "unknown", "unknown"] and [e["rested_first"] for e in ev] == [False, False, True]
     assert ev[0]["start"] == "ksit" and ev[1]["start"] == "unknown" and ev[1]["eased_from_reported"] is True and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
