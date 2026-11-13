@@ -28,29 +28,38 @@ STAND_ATT_REAR_HOLD = 0        # a pause after the stage in which the back legs 
 STAND_ATT_VIA_REST = 1         # 1 = a stand-up out of the attention pose first lies down in the rest position and then plays the normal stand-up from rest (owner, 2026-11-12: every stand-up out of the attention pose after a claw look fell over backwards; the stand-up from rest was level every time). 0 = the K stand-up straight out of the attention pose.
 STAND_ATT_WAIT_S = 4.0     # the longest the Pi waits for the board to finish (it stops waiting as soon as the legs read as up).
 
-# ---- EASING INTO THE ATTENTION POSE (owner, 2026-11-08: he "sits hard into the attention position"; the firmware `kcalib` moves every joint at once at full speed). UNTESTED on G2 until the next session.
-ATT_ENTRY_EASED = 1        # 1 = the Pi plays the move into the attention pose as an eased K skill (and the firmware `kcalib` is not sent); 0 = the firmware `kcalib` as before.
-ATT_ENTRY_STEPS = 6        # stages of the move.
-ATT_ENTRY_SPEED = 10       # speed of each stage (the firmware speed is this / 8: bigger = faster, harder).
-# ---- THE CLAW LOOK AS ONE SKILL (owner, 2026-11-12: "0 seconds between each move"): the move into the attention pose, the claw raise, the swing left, right and back with a hold for each picture, the lie-down and
-# the stand-up from rest are ONE `K` message the board plays by itself; the Pi only takes the pictures at times it works out from the frames.
-LOOK_ONE_SKILL = 1         # 1 = the claw look is one K skill (the plan has no separate attention-pose or stand-up step); 0 = the separate moves with a wait after each.
-LOOK_STEP_S = 0.024        # the time the board takes for one step of a frame's move (a frame of D degrees at speed S takes D / (S / 8) steps): fitted to a stand-up from rest that reads as done after about 2 s. Used only to time the pictures.
-LOOK_HOLD_S = 2.0          # the hold at each of the three picture poses (the claw camera's frames are about a second old, so the picture is asked for 1 s in).
-LOOK_PIC_AT_S = 1.1        # seconds into the hold when the picture is asked for.
-LOOK_RAISE_STEPS = 4       # frames of the claw raise (the lift servo, 0 to the look's lift).
-LOOK_PAN_STEPS = 2         # frames of a swing from the centre to one side (the swing across takes twice as many).
-LOOK_CLAW_SPEED = 10       # speed of the claw frames (the firmware speed is this / 8).
-LIE_STEPS = 6              # the lie-down at the end of a claw look (attention pose to the rest position, the claw coming down with the legs, one eased K skill): stages of the move.
-LIE_SPEED = 12             # speed of each stage (the firmware speed is this / 8: bigger = faster).
-LIE_WAIT_S = 4.0           # the longest the Pi waits for the legs to read as rest.
-LIE_SILENT_WAIT_S = 2.5    # the wait when the board does not answer pose reads (the move normally takes 2 to 3 s).
-ATT_ENTRY_SILENT_WAIT_S = 3.0  # the wait for the attention pose when the board does not answer pose reads (the move normally takes 2 to 5 s): no waiting out the full ATT_ENTRY_WAIT_S for a reply that never comes.
-ATT_ENTRY_WAIT_S = 7.0     # the longest the Pi waits for the legs to read as in the attention pose (3 s was too short: the wait ended with the move still playing and the forced pose snapped him down, 2026-11-12).
+# ---- THE CLAW LOOK (owner, 2026-11-12). The look is: the move into the attention pose, the claw raised, a swing left, a swing right, back to the centre with a picture at each, then G2 lies down in the rest
+# position (legs and claw together, one eased skill) and stands up from rest (the STAND_* numbers above). By default these are separate moves with the waits they always had (LOOK_ONE_SKILL = 0).
+# LOOK_ONE_SKILL = 1 tries the same look as ONE `K` message the board plays by itself with no pause between the parts; the Pi then takes the pictures at times it works out from the frames. It ran three times in a
+# drill without a fall, then fell 5 s into its first roam look (2026-11-12) and its timing was not right, so it is off. A speed here is the firmware's speed x 8: BIGGER = FASTER (and harder on the servos).
+LOOK_ONE_SKILL = 0         # 0 = the separate moves with their waits (the default). 1 = the look as one skill with no pause between the parts (the LOOK_* numbers below then apply).
 
-# ---- THE CLAW RAISE / SWING IN A LOOK (the arm's two servos are sent a new position this many times a second)
-CLAW_DEG_S = 60.0          # how fast the arm moves, in degrees a second. SMALLER = SLOWER.
-CLAW_STEPS_PER_S = 100     # position commands a second while it moves. More = finer steps (of 60/40, 40/40, 60/100 and 30/60 the owner picked 60 deg/s at 100 a second as smoothest, 2026-11-08).
+# 1 the move into the attention pose
+ATT_ENTRY_EASED = 1        # 1 = the move into the attention pose is an eased K skill. 0 = the firmware `kcalib`, which moves every joint at once at full speed (he "sat hard into the attention position").
+ATT_ENTRY_STEPS = 6        # how many stages the move is cut into. More = smoother but longer.
+ATT_ENTRY_SPEED = 10       # how fast each stage moves. BIGGER = faster. 10 is gentle.
+
+# 2 to 5 the claw raise, the swings and the holds (LOOK_ONE_SKILL = 1 only)
+LOOK_RAISE_STEPS = 4       # stages of the claw raise (the lift servo from its walking value up to the look's lift, 120). More = smoother and slower.
+LOOK_PAN_STEPS = 2         # stages of a swing from the centre to one side (the swing across to the other side uses twice as many). More = smoother and slower.
+LOOK_CLAW_SPEED = 10       # how fast the claw moves in the raise and the swings. BIGGER = faster. The arm is heavy: too fast shakes the body.
+LOOK_HOLD_S = 2.0          # how long the claw holds still at each of the three picture poses, in seconds. The claw camera's pictures are about a second old, so under about 1.5 s the picture shows the claw still moving.
+LOOK_PIC_AT_S = 1.1        # how many seconds into a hold the picture is asked for. About 1 s of delay in the camera plus the time the claw takes to stop: raise it if the pictures show the previous pose, never past LOOK_HOLD_S.
+
+# 6 the lie-down at the end (legs and claw together, so the claw comes down smoothly instead of snapping)
+LIE_STEPS = 6              # stages of the lie-down. More = smoother and slower.
+LIE_SPEED = 12             # how fast each stage moves. BIGGER = faster.
+
+# The pictures are timed from an estimate of how long the board takes; nothing else depends on it (LOOK_ONE_SKILL = 1 only).
+LOOK_STEP_S = 0.024        # seconds the board takes for one step of a move (a frame of D degrees at speed S takes D / (S / 8) steps). Fitted to a stand-up from rest that reads as done after about 2 s. SMALLER if the whole look ends sooner than the Pi waits (G2 stands idle at the end), BIGGER if the pictures come too early.
+
+# Only when LOOK_ONE_SKILL = 0, or the board does not answer pose reads (the Pi then waits only the time a move normally takes, so nothing waits for a reply that never comes):
+ATT_ENTRY_WAIT_S = 7.0     # the longest the Pi waits for the legs to read as in the attention pose (3 s was too short: the wait ended with the move still playing).
+ATT_ENTRY_SILENT_WAIT_S = 3.0  # the wait for the attention pose when the board does not answer reads (the move normally takes 2 to 5 s).
+LIE_WAIT_S = 4.0           # the longest the Pi waits for the legs to read as rest after a lie-down played by the Pi.
+LIE_SILENT_WAIT_S = 2.5    # the wait for the lie-down when the board does not answer reads (the move normally takes 2 to 3 s).
+CLAW_DEG_S = 60.0          # (LOOK_ONE_SKILL = 0 only) how fast the claw moves, in degrees a second. SMALLER = SLOWER.
+CLAW_STEPS_PER_S = 100     # (LOOK_ONE_SKILL = 0 only) position commands a second while the claw moves. More = finer steps (of 60/40, 40/40, 60/100 and 30/60 the owner picked 60 deg/s at 100 a second as smoothest, 2026-11-08).
 
 _OVERRIDE = "~/.local/share/g2/motion_feel.json"
 
