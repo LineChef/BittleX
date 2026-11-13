@@ -57,7 +57,7 @@ memory
 - `g2pimem`: G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
 - `g2embedder`: move the object gallery to the DINOv2 embedder: push-model / bench / switch / revert, each its own step (tools/g2_switch_embedder.sh); the labelled pictures are never touched.
 - `g2places`: feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics.
-- `g2pics`: the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo). Tick the box on several pictures (Shift-click for a range, or Select all in a group header) and set one room for them in the bar at the bottom.
+- `g2pics`: the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo). Tick the box on several pictures (Shift-click for a range, Select all or Select by G2's guess in a group header) and, in the bar at the bottom, set one room, give them one name, or accept G2's suggested label for each.
 - `g2walls`: the wall pictures (the labelled recognition shots and the near-wall pictures kept in roams) as thumbnails on the Walls tab of the review page.
 - `g2wallstats [DAYS]`: statistics from the wall and detection logs on the Pi: looks per state, the nearest wall in inches, the turns, the times he stayed near a wall.
 - `g2wallreplay [DIR]`: what an exploring G2 would do with each saved wall picture (runs on the Pi; default ~/g2_wall_pics); nothing moves.

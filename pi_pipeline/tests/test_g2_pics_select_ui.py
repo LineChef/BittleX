@@ -57,3 +57,27 @@ def test_picking_one_by_one_a_range_with_shift_and_a_whole_group(tmp_path):
     assert out["other_group"] == ["x/b.jpg", "y/z.jpg"]
     assert out["group"] is True and out["none"] == ["y/z.jpg"]                  # dropping the group leaves the picture from the other group picked
     assert out["range_missing"] == ["x/a.jpg"]
+
+
+def test_the_bar_can_name_the_selection_and_accept_g2s_guesses_and_a_group_can_select_by_guess():
+    page = G.PAGE
+    for hook in ("async function applyName", "async function acceptGuesses", "Name them", "Select by G2's guess", 'api("/api/pictures/name"'):
+        assert hook in page, hook
+
+
+@pytest.mark.skipif(not NODE, reason="node is not installed")
+def test_select_by_guess_picks_every_picture_with_that_guess(tmp_path):
+    script = tmp_path / "g.js"
+    script.write_text(
+        "class N{constructor(t,c,x){this.tag=t;this.className=c||'';this.kids=[];this.style={};this.value='';this.textContent=x||''}append(...k){this.kids.push(...k)}}\n"
+        "global.window={};global.el=(t,c,x)=>new N(t,c,x);global.document={createElement:t=>new N(t)};\n"
+        "eval(require('fs').readFileSync(%r,'utf8'));const S=window.picSelect;S.begin(false);\n"
+        "const g=[{path:'a',guess:{label:'mug'}},{path:'b',guess:{label:'mug'}},{path:'c',guess:{label:'door'}},{path:'d'},{path:'e',guess:{label:'mug'},name:'mug'}];\n"
+        "const w=S.groupButtons(g);const sel=w.kids[1];const opts=sel.kids.map(o=>o.textContent);\n"
+        "sel.onclick={stopPropagation(){}};sel.value='mug';sel.onchange({stopPropagation(){}});\n"
+        "console.log(JSON.stringify({opts,picked:S._logic.selection().sort(),menu:w.kids.length}));\n" % str(TOOLS / "g2_pics_select_ui.js"))
+    r = subprocess.run([NODE, str(script)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["opts"] == ["Select by G2's guess...", "mug (2)", "door (1)"]              # an already named picture is not counted
+    assert out["picked"] == ["a", "b"] and out["menu"] == 2

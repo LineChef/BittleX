@@ -277,7 +277,7 @@ g2pimem() {
     *) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.memory $*" ;;
   esac
 }
-# g2pics  -- the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo). Tick the box on several pictures (Shift-click for a range, or Select all in a group header) and set one room for them in the bar at the bottom.
+# g2pics  -- the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo). Tick the box on several pictures (Shift-click for a range, Select all or Select by G2's guess in a group header) and, in the bar at the bottom, set one room, give them one name, or accept G2's suggested label for each.
 # g2pics status = text summary from the Pi; g2pics pull = copy them to ~/Desktop/G2Memory/g2_pictures/explore; g2pics stop = end the page.
 # g2places  -- feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics.
 # g2embedder  -- move the object gallery to the DINOv2 embedder: push-model | bench | switch | revert, each its own step (tools/g2_switch_embedder.sh); the labelled pictures are never touched.
