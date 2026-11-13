@@ -1241,6 +1241,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
 function fold(title,open){const d=document.createElement("details");d.open=!!open;const sm=document.createElement("summary");sm.textContent=title;sm.style.cssText="cursor:pointer;font-weight:600;color:var(--ink2);margin:10px 0 4px";d.append(sm);return d}
+/*GOALS_SERIES*/
 /*GOALS_UI*/
 /*MEMORY_UI*/
 /*EXCHANGES_UI*/
@@ -1304,6 +1305,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
 $("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;$("#syncnow").onclick=syncNow;$("#micon").onclick=micOn;drawTabs();load();showSync();showMic();setInterval(showMic,60000);
 </script></body></html>"""
+PAGE = PAGE.replace("/*GOALS_SERIES*/", (Path(__file__).resolve().parent / "g2_goals_series.js").read_text())          # the success-since-the-start numbers and chart, before the Goals tab code that uses them
 PAGE = PAGE.replace("/*GOALS_UI*/", (Path(__file__).resolve().parent / "g2_goals_ui.js").read_text())          # the Goals tab's drawing code lives in its own file
 PAGE = PAGE.replace("/*CURATE_UI*/", (Path(__file__).resolve().parent / "g2_curate_ui.js").read_text())        # ... the Observations clean-up and the Pictures curate panels
 PAGE = PAGE.replace("/*SELECT_UI*/", (Path(__file__).resolve().parent / "g2_pics_select_ui.js").read_text())        # ... and the Pictures tab's pick-several-and-set-a-room boxes and bar

@@ -118,10 +118,16 @@ function goalCard(parent,g,f,idx){
  const strip=el("div");strip.style.margin="8px 0 2px";
  const tile=(big,small,tip)=>{const t=el("div","gtile");t.append(el("b","",big),el("span","",small));if(tip)t.title=tip;strip.append(t)};
  tile(rate===null?"—":rate+"%","success ("+g.successes+" of "+g.counted+" counted)");
+ const S=window.goalSeries?goalSeries(g.attempts):null;       // success since the start, the last attempts and the trend (tools/g2_goals_series.js)
+ if(S&&S.n){tile(Math.round(100*S.roll)+"%","last "+Math.min(S.win,S.n)+" attempts","the success rate over the most recent "+Math.min(S.win,S.n)+" counted attempts");
+  const tr=S.trend,d=tr?Math.round(100*tr.delta):0;tile(goalTrendText(S),tr?"trend: last "+tr.w+" vs the "+tr.w+" before":"trend",tr?"The last "+tr.w+" counted attempts: "+Math.round(100*tr.last)+"% good. The "+tr.w+" before them: "+Math.round(100*tr.prev)+"% good.":"A trend needs at least 6 counted attempts");
+  if(tr)strip.lastChild.firstChild.style.color=d>0?"var(--ok)":d<0?"var(--x)":"var(--muted)"}
  const last=(g.sessions||[])[0];tile(last?last.successes+" of "+last.attempts:"—","last session"+(last?" · "+last.time:""),last?"ended: "+last.why:"");
  const focus=(g.learned||[]).find(k=>k.focus);tile(focus?focus.setting:"—","working on"+(focus?" (now "+focus.now+")":""));
  if(g.kind!=="standing"){tile((df.min_pack_pct??"?")+"%","pack needed to start");tile((df.attempts??"?")+" · "+(df.minutes??"?")+" min","attempts · time per session")}
  list.append(strip);
+ if(S&&S.n>=2){const [sv,cp]=goalChart(S),wrap=el("div");wrap.append(el("div","meta","Success since the start"),sv,cp);list.append(wrap)}
+ else if(S){list.append(el("div","meta","The success chart needs at least 2 counted attempts."))}
  if(g.trend&&g.trend.length){const W=30,H=40,svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("width",g.trend.length*W);svg.setAttribute("height",H+14);svg.style.cssText="display:block;margin:4px 0 6px";
   g.trend.forEach((t,i)=>{const h=t.rate===null?2:Math.max(2,Math.round(t.rate*H));const r=document.createElementNS(svg.namespaceURI,"rect");r.setAttribute("x",i*W+4);r.setAttribute("y",H-h);r.setAttribute("width",W-8);r.setAttribute("height",h);r.setAttribute("rx",2);r.style.fill=t.rate===null?"var(--muted)":(t.rate>=.5?"var(--ok)":"var(--x)");
    const tt=document.createElementNS(svg.namespaceURI,"title");tt.textContent=t.session+": "+t.successes+" of "+t.attempts+" good";r.append(tt);svg.append(r);

@@ -48,7 +48,7 @@ When the voice service comes back after a session, he says each new suggestion, 
 ```bash
 g2goal report                # copy the journal from the Pi and open the report page (ball_punt by default); G2 off: the report from the Mac's copy
 g2goal pull                  # copy his goal data to the Mac now (also done every 30 min by g2sync, after every deploy and every g2goal run)
-# the review page (g2pics) has a Goals tab: per goal the lessons he saved (flagged when the curation doubts one), what worked for each setting, every attempt, the sessions and turns
+# the review page (g2pics) has a Goals tab: per goal the lessons he saved (flagged when the curation doubts one), what worked for each setting, every attempt, the sessions and turns; a success-since-the-start chart (the rate over every counted attempt, the rate over the last 10, dotted lines where the floor or hardware changed) with a trend tile (the last 10 attempts against the 10 before)
 g2goal history ball_punt     # the last sessions as text
 g2goal show ball_punt        # every setting: who changes it, its range, the value he uses now, yours if different
 g2goal status                # what each goal has learned, per attachment and floor; a change being tried
