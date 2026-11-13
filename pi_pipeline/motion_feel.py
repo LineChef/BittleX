@@ -32,6 +32,15 @@ STAND_ATT_WAIT_S = 4.0     # the longest the Pi waits for the board to finish (i
 ATT_ENTRY_EASED = 1        # 1 = the Pi plays the move into the attention pose as an eased K skill (and the firmware `kcalib` is not sent); 0 = the firmware `kcalib` as before.
 ATT_ENTRY_STEPS = 6        # stages of the move.
 ATT_ENTRY_SPEED = 10       # speed of each stage (the firmware speed is this / 8: bigger = faster, harder).
+# ---- THE CLAW LOOK AS ONE SKILL (owner, 2026-11-12: "0 seconds between each move"): the move into the attention pose, the claw raise, the swing left, right and back with a hold for each picture, the lie-down and
+# the stand-up from rest are ONE `K` message the board plays by itself; the Pi only takes the pictures at times it works out from the frames.
+LOOK_ONE_SKILL = 1         # 1 = the claw look is one K skill (the plan has no separate attention-pose or stand-up step); 0 = the separate moves with a wait after each.
+LOOK_STEP_S = 0.024        # the time the board takes for one step of a frame's move (a frame of D degrees at speed S takes D / (S / 8) steps): fitted to a stand-up from rest that reads as done after about 2 s. Used only to time the pictures.
+LOOK_HOLD_S = 2.0          # the hold at each of the three picture poses (the claw camera's frames are about a second old, so the picture is asked for 1 s in).
+LOOK_PIC_AT_S = 1.1        # seconds into the hold when the picture is asked for.
+LOOK_RAISE_STEPS = 4       # frames of the claw raise (the lift servo, 0 to the look's lift).
+LOOK_PAN_STEPS = 2         # frames of a swing from the centre to one side (the swing across takes twice as many).
+LOOK_CLAW_SPEED = 10       # speed of the claw frames (the firmware speed is this / 8).
 LIE_STEPS = 6              # the lie-down at the end of a claw look (attention pose to the rest position, the claw coming down with the legs, one eased K skill): stages of the move.
 LIE_SPEED = 12             # speed of each stage (the firmware speed is this / 8: bigger = faster).
 LIE_WAIT_S = 4.0           # the longest the Pi waits for the legs to read as rest.

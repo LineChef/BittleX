@@ -288,11 +288,14 @@ class VoiceLoop:
         try:
             if self._claw_look_wanted():                                  # the claw look (user, 2026-11-06): the centre picture is the one he describes
                 from ..behavior import claw_survey
-                self._pose_token("kcalib")
-                time.sleep(2.0)
-                claw_survey.run_claw_look(self._claw_link, lambda label: setattr(self, "_claw_jpeg", self._camera.snapshot()) if label == "look" else None, "look", discard=getattr(self._camera, "discard_one", None))
-                self._pose_token("kup")
-                time.sleep(SurveyConfig().stand_settle_s)
+                one = claw_survey.one_skill()                                    # the whole look is one skill (attention pose, look, rest, stand-up): no separate moves around it
+                if not one:
+                    self._pose_token("kcalib")
+                    time.sleep(2.0)
+                claw_survey.run_claw_look(self._claw_link, lambda label: setattr(self, "_claw_jpeg", self._camera.snapshot()) if label == "look" else None, "look", discard=getattr(self._camera, "discard_one", None), full=one)
+                if not one:
+                    self._pose_token("kup")
+                    time.sleep(SurveyConfig().stand_settle_s)
                 return
             for delay, skill in picture_pose_steps(SurveyConfig()):
                 wait = delay - (time.monotonic() - t0)

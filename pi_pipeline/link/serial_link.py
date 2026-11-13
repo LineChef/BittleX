@@ -484,6 +484,16 @@ class SerialLink:
         except Exception:  # noqa: BLE001
             return None
 
+    def play_k(self, data: bytes, *, ends: str = "kbalance") -> None:
+        """Send a whole `K` message (the claw look is one) with the gyro balance off, and note where it ends: the Pi's idea of the pose becomes `ends` at once, because nothing is asked of the board until the
+        skill is over. Returns when the message is on the wire (about a quarter of a second for the look), not when the skill ends."""
+        self._write_pose("gb")
+        from . import kskill
+        kskill.write_chunked(self._ser.write, data, time.sleep)
+        self._ser.flush()
+        self.last_motion_command, self._last_motion_t = ends, time.monotonic()
+        command_log.sent("K(skill)", source="play_k")
+
     def lie_down_eased(self, lift_from: float | None = None) -> bool:
         """From the attention pose to the rest position as one eased `K` skill: the legs and the claw's lift servo move together, so the claw comes down smoothly with the legs (the firmware `krest` snapped it down at
         the end, 2026-11-12). `lift_from` is the claw's lift angle now (None = the walking value). True if it played (the pose is rest afterwards); False means nothing was sent and the caller sends `krest`."""

@@ -116,14 +116,125 @@ def _lie_down(link, sleep) -> bool:
     return False
 
 
+def one_skill() -> bool:
+    """Whether the claw look is ONE skill the board plays by itself (kskill.look_skill): the arm is fitted and motion_feel.LOOK_ONE_SKILL is 1."""
+    try:
+        from .. import motion_feel
+        return wanted() and motion_feel.get("LOOK_ONE_SKILL") >= 1
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _skill_for(last: str, kind: str):
+    """(K message, picks [(label, seconds into the skill)], total seconds) for a look that starts from the pose the Pi last sent (`last`), or None when that pose is not one the skill starts from or the
+    attachment has no stand-up poses."""
+    from .. import motion_feel as mf
+    from ..gait import standup
+    from ..link import kskill
+    from .ball_chase import CLAW_LIFT_DEG, CLAW_PAN_DEG, CLAW_PAN_SIGN
+    p = standup._poses()
+    if not p or p.get("arm_rest") is None or not standup.use_kskill(p):
+        return None
+    arm_rest, arm_walk = float(p["arm_rest"]), float(p.get("arm_walk") or 0)
+    if last in ("kbalance", "kup"):
+        legs, lift = standup.balance_pose(), arm_walk
+    elif last == "kcalib":
+        legs, lift = list(standup.ATTENTION_URDF_DEG), arm_walk
+    elif last in ("krest", "d", "kzz"):
+        legs, lift = standup.rest_pose(), arm_rest
+    else:
+        return None
+    pan = float(CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG)
+    sk = kskill.look_skill(legs, lift, attention=list(standup.ATTENTION_URDF_DEG), rest=standup.rest_pose(), balance=standup.balance_pose(), arm_rest=arm_rest, arm_walk=arm_walk,
+                           lift_up=float(CLAW_LIFT_DEG), pan=pan, entry_steps=int(mf.get("ATT_ENTRY_STEPS")), entry_speed=int(mf.get("ATT_ENTRY_SPEED")), raise_steps=int(mf.get("LOOK_RAISE_STEPS")),
+                           pan_steps=int(mf.get("LOOK_PAN_STEPS")), claw_speed=int(mf.get("LOOK_CLAW_SPEED")), hold_raw=int(round(mf.get("LOOK_HOLD_S") / 0.05)), lie_steps=int(mf.get("LIE_STEPS")),
+                           lie_speed=int(mf.get("LIE_SPEED")), stand=kskill.tuning(), kind_label=kind)
+    ends = kskill.frame_end_times(sk["frames"], sk["speeds"], sk["delays"], kskill._vec(legs, lift), mf.get("LOOK_STEP_S"))
+    picks = [(label, ends[idx] + mf.get("LOOK_PIC_AT_S")) for label, idx in sk["picks"]]
+    total = ends[-1] + sk["delays"][-1] * 0.05
+    return kskill.message(kskill.behavior_payload(sk["frames"], sk["speeds"], sk["delays"])), picks, total
+
+
+def _run_skill(link, snapshot, kind: str, *, sleep, stopped, discard, miss_skips: bool, plan) -> str:
+    """Play the look as one skill and take the pictures at the times worked out for it. Never raises."""
+    data, picks, total = plan
+    t0, state, missed = time.monotonic(), "ok", False
+    was_on = bool(getattr(link, "imu_print_on", False))
+    try:
+        link.send("gP", read_reply=False, settle=0.0)
+        link.play_k(data)
+        t0 = time.monotonic()
+        log.info("the claw look plays as one skill (%d bytes, about %.0f s); pictures at %s", len(data), total, ", ".join(f"{lb} {t:.1f} s" for lb, t in picks))
+        for label, t in picks:
+            while state == "ok" and time.monotonic() - t0 < t:
+                if stopped():
+                    state = "stopped"
+                sleep(0.1)
+            if state != "ok":
+                break
+            late = time.monotonic() - t0 - t
+            if label != kind and (missed or late > LATE_S):
+                log.warning("the claw look %s: skipping the %s picture", "had no picture from the camera" if missed else f"is {late:.0f} s late", label)
+                continue
+            if discard is not None:
+                discard()
+            if snapshot is not None:
+                got = snapshot(label)
+                if miss_skips and got is None and label != kind:
+                    missed = True
+        while state == "ok" and time.monotonic() - t0 < total + 0.2:                  # until the stand-up at the end of the skill is over
+            if stopped():
+                state = "stopped"
+            sleep(0.1)
+    except Exception:  # noqa: BLE001
+        log.exception("the claw look skill failed")
+        state = "error"
+    finally:
+        try:
+            if not was_on:
+                link.send("gp", read_reply=False, settle=0.0)
+        except Exception:  # noqa: BLE001
+            pass
+    return state
+
+
+def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, end_in_rest: bool = True, full: bool | None = None) -> str:
+    """The claw look. With `full` (default: `one_skill()`) it is the WHOLE move from standing: the attention pose, the look, the rest position and the stand-up, as one skill the board plays by itself with
+    no pause between the parts (owner, 2026-11-12), and G2 is standing when it returns; where the link cannot play it the same parts are sent one after another. Without `full` it is only the look
+    (`_run_classic`: the caller has put him in the attention pose and stands him up after). Returns "ok", "stopped" or "error"."""
+    if full is None:
+        full = one_skill()
+    if not full:
+        return _run_classic(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, end_in_rest=end_in_rest)
+    plan = None
+    try:
+        if callable(getattr(link, "play_k", None)):
+            plan = _skill_for((getattr(link, "last_motion_command", "") or "").strip(), kind)
+    except Exception:  # noqa: BLE001
+        log.debug("could not plan the look skill", exc_info=True)
+    if plan is not None:
+        return _run_skill(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, plan=plan)
+    link.send("kcalib", read_reply=False, settle=0.0)                                # the parts one after another
+    state = _run_classic(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, end_in_rest=end_in_rest)
+    link.send("kup", read_reply=False, settle=0.0)
+    return state
+
+
 def look_seconds() -> float:
-    """About how long `run_claw_look` takes (the survey plan waits this long before standing up): the arm moves plus three settles."""
+    """About how long `run_claw_look` takes (the survey plan waits this long): as one skill, the whole look and the stand-up; otherwise the arm moves plus three settles."""
+    if one_skill():
+        try:
+            sk = _skill_for("kbalance", "look")
+            if sk is not None:
+                return sk[2]
+        except Exception:  # noqa: BLE001
+            pass
     from .ball_chase import CLAW_DEG_S, CLAW_LIFT_DEG, CLAW_PAN_DEG
     moves = CLAW_LIFT_DEG + CLAW_PAN_DEG + 2 * CLAW_PAN_DEG + CLAW_PAN_DEG + CLAW_LIFT_DEG       # degrees swept: up, left, right, centre, down
     return moves / CLAW_DEG_S + 3 * SETTLE_S + 1.0
 
 
-def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, end_in_rest: bool = True) -> str:
+def _run_classic(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, end_in_rest: bool = True) -> str:
     """The look. `snapshot(kind)` takes one picture (None = no camera: the arm still moves). Throwaway pictures are `look_left` / `look_right`; the centre one is `kind`.
     `discard()` throws away one stale camera frame before each picture (the voice loop passes the camera's `discard_one`; the exploration's picture saver already takes throwaway frames). Returns "ok", "stopped" (stopped() went true between moves) or "error". A look that ran to the end (`end_in_rest`) finishes by lying him down in the rest position, which lowers the claw with the legs; one that
     stopped or failed lowers the claw and stays in the attention pose. The caller stands him up after. Never raises."""

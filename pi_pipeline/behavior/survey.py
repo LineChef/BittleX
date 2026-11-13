@@ -123,6 +123,10 @@ def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]
     t = 0.0
     from . import claw_survey
     if (claw_survey.wanted() if cfg.claw is None else cfg.claw):
+        if claw_survey.one_skill():                                              # the whole look is ONE skill the board plays (attention pose, look, rest, stand-up): no step between the parts (owner, 2026-11-12)
+            plan = [(t, "claw", kind if kind != "look" else "look", f"{why}: the claw look as one skill (attention pose, left, right and centre pictures, rest, stand-up)")]
+            t += claw_survey.look_seconds() + cfg.stand_settle_s
+            return plan, t
         plan = [(t, "skill", "kcalib", f"{why}: the attention pose for the claw look")]
         t += 2.0                                                                  # to settle into it (ball_chase.CLAW_POSE_S)
         plan.append((t, "claw", kind if kind != "look" else "look", f"{why}: claw look, left, right and centre pictures"))

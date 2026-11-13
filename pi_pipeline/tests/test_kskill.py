@@ -358,3 +358,55 @@ def test_the_lie_down_is_one_eased_k_skill_with_the_claw_coming_down_with_the_le
     from pi_pipeline.behavior import claw_survey
     wrote.clear()
     assert claw_survey._lie_down(lk, lambda s: None) is True and not any(w.strip() == b"krest" for w in wrote)          # the look uses it where the link can
+
+
+def test_the_claw_look_is_one_skill_with_a_hold_at_each_picture_and_the_stand_up_at_the_end(monkeypatch):
+    """Owner, 2026-11-12: no pause between the parts. One K message: attention pose, claw up, left (hold), right (hold), centre (hold), lie down, stand up; the pictures are timed from the frames."""
+    from pi_pipeline.behavior import claw_survey
+    from pi_pipeline.behavior.ball_chase import CLAW_LIFT_DEG
+    lk = _arm_link(monkeypatch, [])
+    prof = standup._poses()
+    t = kskill.tuning()
+    sk = kskill.look_skill(standup.balance_pose(), 0.0, attention=standup.ATTENTION_URDF_DEG, rest=standup.rest_pose(), balance=standup.balance_pose(), arm_rest=float(prof['arm_rest']), arm_walk=0.0, lift_up=120.0, pan=35.0,
+                           entry_steps=6, entry_speed=10, raise_steps=4, pan_steps=2, claw_speed=10, hold_raw=40, lie_steps=6, lie_speed=12, stand=t, kind_label="look")
+    fr, dl = sk["frames"], sk["delays"]
+    assert len(fr) == 6 + 4 + 2 + 4 + 2 + 6 + t["steps"] and [p[0] for p in sk["picks"]] == ["look_left", "look_right", "look"]
+    assert [dl[i] for _, i in sk["picks"]] == [40, 40, 40] and sum(1 for d in dl if d) == 3                     # only the three picture holds pause
+    assert [fr[i][0] for _, i in sk["picks"]] == [35.0, -35.0, 0.0] and all(fr[i][1] == 120.0 for _, i in sk["picks"])      # left, right, centre, claw up
+    last = fr[-1]
+    assert all(abs(last[kskill.URDF_TO_SERVO[k]] - standup.balance_pose()[k]) < 0.01 for k in range(8)) and abs(last[1]) < 0.01      # it ends standing, the claw at its walking value
+    assert max(abs(a) for f in fr for a in f) <= 125                                                           # every angle fits a byte
+    kskill.message(kskill.behavior_payload(fr, sk["speeds"], dl))                                              # fits the board's buffer, no terminator byte inside
+    ends = kskill.frame_end_times(fr, sk["speeds"], dl, kskill._vec(standup.balance_pose(), 0.0), 0.024)
+    assert ends == sorted(ends) and ends[-1] > 8.0                                                           # three 2 s holds and the moves between
+    monkeypatch.setattr(claw_survey, "one_skill", lambda: True)
+    data, picks, total = claw_survey._skill_for("kbalance", "look")
+    assert data[:1] == b"K" and [p[0] for p in picks] == ["look_left", "look_right", "look"] and picks[0][1] < picks[1][1] < picks[2][1] < total
+    assert claw_survey._skill_for("kwkF", "look") is None                                                      # a pose it does not start from: the parts one after another
+    assert CLAW_LIFT_DEG == 120.0 and prof["arm_walk"] == 0
+
+
+def test_run_claw_look_plays_the_skill_takes_the_pictures_when_planned_and_falls_back_to_the_parts(monkeypatch):
+    from pi_pipeline.behavior import claw_survey as C
+    _arm_link(monkeypatch, [])
+    now = [0.0]
+    monkeypatch.setattr(C.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(C, "one_skill", lambda: True)
+
+    def sleep(s):
+        now[0] += s
+
+    class Link:
+        def __init__(self, last="kbalance"): self.sent, self.played, self.last_motion_command, self.imu_print_on = [], [], last, False
+        def send(self, c, **kw): self.sent.append(c); return ""
+        def play_k(self, data): self.played.append(data)
+    lk, shots = Link(), []
+    state = C.run_claw_look(lk, lambda label: shots.append((label, round(now[0], 1))), "look", sleep=sleep)
+    assert state == "ok" and len(lk.played) == 1 and [s[0] for s in shots] == ["look_left", "look_right", "look"]
+    assert "kcalib" not in lk.sent and "kup" not in lk.sent and lk.sent[0] == "gP" and lk.sent[-1] == "gp"           # no separate attention-pose or stand-up command
+    assert shots[0][1] < shots[1][1] < shots[2][1] <= now[0]
+    class NoPlay(Link):
+        play_k = None
+    nk = NoPlay()
+    C.run_claw_look(nk, None, "look", sleep=sleep)
+    assert nk.sent[0] == "kcalib" and nk.sent[-1] == "kup" and "krest" in nk.sent                                  # the parts, one after another
