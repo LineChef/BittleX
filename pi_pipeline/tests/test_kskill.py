@@ -382,7 +382,7 @@ def test_the_claw_look_is_one_skill_with_a_hold_at_each_picture_and_the_stand_up
     monkeypatch.setattr(claw_survey, "one_skill", lambda: True)
     data, picks, total = claw_survey._skill_for("kbalance", "look")
     assert data[:1] == b"K" and [p[0] for p in picks] == ["look_left", "look_right", "look"] and picks[0][1] < picks[1][1] < picks[2][1] < total
-    assert claw_survey._skill_for("kwkF", "look") is None                                                      # a pose it does not start from: the parts one after another
+    assert claw_survey._skill_for("khi", "look") is None                                                       # a pose it does not start from: the parts one after another
     assert CLAW_LIFT_DEG == 120.0 and prof["arm_walk"] == 0
 
 
@@ -410,3 +410,22 @@ def test_run_claw_look_plays_the_skill_takes_the_pictures_when_planned_and_falls
     nk = NoPlay()
     C.run_claw_look(nk, None, "look", sleep=sleep)
     assert nk.sent[0] == "kcalib" and nk.sent[-1] == "kup" and "krest" in nk.sent                                  # the parts, one after another
+
+
+def test_a_look_starts_as_one_skill_from_where_a_walk_or_turn_stopped_and_the_parts_wait_for_the_attention_pose(monkeypatch):
+    """2026-11-12 roam: the look fell back to separate parts because the last command was a walk token, and the claw commands went out while the board was still moving into the attention pose (the arm never panned)."""
+    from pi_pipeline.behavior import claw_survey as C
+    _arm_link(monkeypatch, [])
+    for last in ("kwkF", "kwkL", "kwkR", "kbkF", "kbalance", "kup", "kcalib", "krest"):
+        assert C._skill_for(last, "look") is not None, last
+    assert C._skill_for("", "look") is None and C._skill_for("khi", "look") is None
+    monkeypatch.setattr(C, "one_skill", lambda: True)
+    slept = []
+
+    class Link:
+        def __init__(self): self.sent, self.last_motion_command, self.imu_print_on = [], "", False
+        def send(self, c, **kw): self.sent.append((c, len(slept))); return ""
+    lk = Link()
+    C.run_claw_look(lk, None, "look", sleep=lambda s: slept.append(s))
+    first = next(n for c, n in lk.sent if c.startswith("i"))                      # the first arm command comes after the wait that follows `kcalib`
+    assert lk.sent[0][0] == "kcalib" and slept[0] >= 2.0 and first >= 1 and lk.sent[-1][0] == "kup"

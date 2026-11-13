@@ -36,6 +36,7 @@ def wanted() -> bool:
 
 
 KEEPALIVE_S = float(os.environ.get("G2_ATT_KEEPALIVE_S", "4"))     # while he holds the attention pose the leg angles are sent again this often (0 = never): the servos' own overload cutoff lets a leg go after a while at the same target, and a 30 s hold with the angles re-sent did not sag (2026-11-02)
+POSE_SETTLE_S = 2.0       # the wait after the attention-pose command when the look is sent as separate parts (ball_chase.CLAW_POSE_S)
 REST_WAIT_S = 3.5         # after the look the rest command is sent and the board is given this long to report the rest pose before the stand-up reads it
 LATE_S = float(os.environ.get("G2_CLAW_LATE_S", "4"))              # a look still running this long past its planned time skips what is left (a slow camera) and lowers the claw: less time in the attention pose
 
@@ -136,7 +137,8 @@ def _skill_for(last: str, kind: str):
     if not p or p.get("arm_rest") is None or not standup.use_kskill(p):
         return None
     arm_rest, arm_walk = float(p["arm_rest"]), float(p.get("arm_walk") or 0)
-    if last in ("kbalance", "kup"):
+    from ..link import transitions
+    if last in ("kbalance", "kup") or transitions.kind(last) == "gait":                  # standing, or stopped out of a walk or a turn (a roam looks from where its last walk stopped)
         legs, lift = standup.balance_pose(), arm_walk
     elif last == "kcalib":
         legs, lift = list(standup.ATTENTION_URDF_DEG), arm_walk
@@ -215,6 +217,7 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
     if plan is not None:
         return _run_skill(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, plan=plan)
     link.send("kcalib", read_reply=False, settle=0.0)                                # the parts one after another
+    sleep(POSE_SETTLE_S)                                                              # the plan used to give the attention pose this long before the look; arm commands sent while the board is still moving into it are dropped (2026-11-12: the arm never panned)
     state = _run_classic(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, end_in_rest=end_in_rest)
     link.send("kup", read_reply=False, settle=0.0)
     return state
