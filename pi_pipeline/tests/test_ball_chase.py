@@ -1258,3 +1258,24 @@ def test_a_stand_only_round_rests_stands_and_stops_at_the_first_fall(monkeypatch
     sent.clear()
     bad = td.run_stand_only(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
     assert bad["fell"] and bad["cycles"] == 1 and sent.count("kbalance") == 2                  # it stopped at the second stand-up: nothing more was sent
+
+
+def test_attention_stand_drill_stands_from_the_attention_pose_each_cycle_and_stops_at_a_fall(monkeypatch):
+    from pi_pipeline.behavior import ball_chase as bc, transition_drill as td
+    monkeypatch.setattr(bc, "read_joints", lambda link, timeout_s=1.0, **kw: [0] * 16)
+    sent = []
+
+    class Link:
+        last_motion_command = "kcalib"
+        def send(self, c, read_reply=False, settle=0.0): sent.append(c); return ""
+
+    class R:
+        def __init__(self, swings): self._lk, self.swings, self._pitch, self._roll, self.t = Link(), list(swings), [], [], 0.0
+        def _clock(self): self.t += 0.5; return self.t
+        def _fell(self): return False
+        def swing_deg(self): return self.swings.pop(0)
+    ok = td.run_attention_stands(R([3.0, 4.0, 5.0]), 3, say=lambda *a: None, sleep=lambda s: None)
+    assert ok["cycles"] == 3 and not ok["fell"] and sent.count("kcalib") == 3 and sent.count("kbalance") == 3 and ok["swings"] == [3.0, 4.0, 5.0]
+    sent.clear()
+    bad = td.run_attention_stands(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
+    assert bad["fell"] and bad["cycles"] == 1 and sent.count("kbalance") == 2

@@ -169,6 +169,55 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
     return {"cycles": done, "fell": fell, "fell_at": "stand-up from rest" if fell else "", "worst_swing_deg": round(worst, 1), "near_falls": near, "swings": swings, "min_volts": vmins, "poses": poses}
 
 
+def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hold_s: float = 6.0, watch_s: float = 4.0) -> dict:
+    """The stand-up out of the attention pose, `cycles` times (owner, 2026-11-12: the back legs fell over backwards right after it). Each cycle: from standing, the eased move into the attention pose (`kcalib`),
+    a hold of `hold_s` seconds with the leg angles re-sent as in a claw look, the pose and joints the board reports, then the eased stand-up (`kbalance`, which plays the K stand-up from the attention pose) and
+    the tilt for `watch_s` seconds. Stops at the first fall or a swing of STANDUP_FELL_SWING_DEG. Returns {"cycles", "fell", "worst_swing_deg", "swings", "end_tilts", "poses"}."""
+    from . import ball_chase as _bc
+    from . import claw_survey
+    lk = robot._lk
+    worst, swings, ends, poses, done, fell = 0.0, [], [], [], 0, False
+    for i in range(cycles):
+        lk.send("kcalib", read_reply=False, settle=0.0)                       # the eased move into the attention pose (the link plays it as a K skill)
+        keep = claw_survey._KeepAlive(lk)
+        t_end = robot._clock() + hold_s
+        while robot._clock() < t_end:
+            keep.tick()
+            sleep(0.2)
+        lk.send("gP", read_reply=False, settle=0.0)
+        sleep(0.3)
+        pose, before = "?", None
+        try:
+            j = _bc.read_joints(lk, timeout_s=1.0)
+            pose = _bc.classify_pose(j) if j else "?"
+            before = [int(x) for x in j[:16]] if j else None
+        except Exception:  # noqa: BLE001
+            pass
+        robot._pitch, robot._roll = [], []
+        lk.send("kbalance", read_reply=False, settle=0.0)                     # the stand-up under test, from the attention pose
+        t_end = robot._clock() + watch_s
+        while robot._clock() < t_end and not fell:
+            fell = robot._fell()
+            sleep(0.05)
+        sw = robot.swing_deg()
+        swings.append(round(sw, 1))
+        worst = max(worst, sw)
+        tp, tr = list(robot._pitch), list(robot._roll)
+        ends.append({"roll": round(tr[-1], 1), "pitch": round(tp[-1], 1)} if tp and tr else None)
+        lk.send("gp", read_reply=False, settle=0.0)
+        lk.send("gb", read_reply=False, settle=0.0)
+        poses.append(pose)
+        say(f"stand-up from the attention pose {i + 1}/{cycles}: the board read '{pose}' before it; swing {sw:.0f} deg" + (" FELL" if fell else "") + (f"; ended roll {ends[-1]['roll']:+.1f}, pitch {ends[-1]['pitch']:+.1f}" if ends[-1] else ""))
+        if tp and tr:
+            say(f"   tilt during the rise: pitch {min(tp):+.0f}..{max(tp):+.0f}, roll {min(tr):+.0f}..{max(tr):+.0f}; legs before the rise {before[8:16] if before else 'unreadable'}")
+        if sw >= STANDUP_FELL_SWING_DEG:
+            fell = True
+        if fell:
+            break
+        done += 1
+    return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "swings": swings, "end_tilts": ends, "poses": poses}
+
+
 MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF")
 MEASURE_S = 4.0
 
@@ -208,6 +257,7 @@ def main() -> None:
     ap.add_argument("--cycles", type=int, default=10)
     ap.add_argument("--turns-only", action="store_true", help="stand once, then only turn and turn back (no attention pose, claw look or stand-up from it): tests the turn and stop levers where they act")
     ap.add_argument("--stand-only", action="store_true", help="only stand up from rest, --cycles times (the stand-up on its own; G2_STAND_VIA and G2_GYRO_BALANCE choose what is under test)")
+    ap.add_argument("--attention-stand", action="store_true", help="stand up out of the attention pose, --cycles times (attention pose, a short hold, the eased stand-up, the tilt)")
     ap.add_argument("--turn-s", type=float, default=TURN_S, help=f"each turn's length in seconds (default {TURN_S})")
     args = ap.parse_args()
     if not args.measure and not args.variant:
@@ -247,6 +297,12 @@ def main() -> None:
             res = run_stand_only(robot, args.cycles)
             fell = bool(res.get("fell"))
             print("RESULT", args.variant + "+stand_only", res)
+            return
+        if args.attention_stand:
+            chase._stand_if_lying(link, "kbalance")
+            res = run_attention_stands(robot, args.cycles)
+            fell = bool(res.get("fell"))
+            print("RESULT attention_stand", res)
             return
         chase._stand_if_lying(link, "kbalance")
         if args.measure:
