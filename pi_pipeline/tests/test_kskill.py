@@ -302,7 +302,7 @@ def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first
     ev = [e for e in (json.loads(line) for line in open(tmp_path / "ev.jsonl")) if e["event"] == "stand_up"]          # (a `stand_up_start` line is written before each rise)
     assert [e["event"] for e in ev] == ["stand_up"] * 3
     assert [e["pose_read"] for e in ev] == ["sit", "unknown", "unknown"] and [e["rested_first"] for e in ev] == [False, False, True]
-    assert ev[0]["start"] == "ksit" and ev[1]["start"] == "unknown" and ev[1]["eased_from_reported"] is True and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
+    assert ev[0]["start"] == "ksit" and ev[1]["start"] == "unknown" and ev[1]["eased_from_reported"] is True and all("seconds" in e and e["outcome"] in ("reached", "forced", "unread") for e in ev)
 
 
 def test_the_attention_stand_up_timing_knobs_default_to_the_rest_stand_up_and_can_stagger_the_legs(monkeypatch):
@@ -340,3 +340,21 @@ def test_a_stand_up_out_of_the_attention_pose_lies_down_in_rest_first_and_stands
     monkeypatch.setenv("G2_STAND_ATT_VIA_REST", "0")
     lk.last_motion_command = "kcalib"
     assert lk._stand_up_kskill(standup) is True and b"krest" not in [w.strip() for w in wrote]
+
+
+def test_the_lie_down_is_one_eased_k_skill_with_the_claw_coming_down_with_the_legs(monkeypatch):
+    """Owner, 2026-11-12: the claw snapped down at the end of the move from the attention pose to rest. The lie-down plays as one K skill: all four legs and the lift servo on the same curve."""
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    prof = standup._poses()
+    fr = kskill.stand_frames(list(standup.ATTENTION_URDF_DEG), standup.rest_pose(), 120.0, float(prof["arm_rest"]), 6, 0.0, 1.0)
+    lifts = [f[1] for f in fr]
+    assert lifts == sorted(lifts, reverse=True) and lifts[0] < 120.0 and abs(lifts[-1] - prof["arm_rest"]) < 0.01      # eased down, no jump at the end
+    legs0 = [fr[0][kskill.URDF_TO_SERVO[k]] for k in range(8)]
+    assert all(abs(a) < abs(b) + 1e-6 for a, b in zip(legs0, standup.rest_pose())) and all(0 < abs(a) for a in legs0[:4]) and all(0 < abs(a) for a in legs0[4:])      # all legs start moving in the first stage
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: _legs_joints(standup.rest_pose()))
+    assert lk.lie_down_eased(120.0) is True
+    assert _k_message(wrote)[:1] == b"K" and not any(w.strip() == b"krest" for w in wrote) and lk.last_motion_command == "krest"
+    from pi_pipeline.behavior import claw_survey
+    wrote.clear()
+    assert claw_survey._lie_down(lk, lambda s: None) is True and not any(w.strip() == b"krest" for w in wrote)          # the look uses it where the link can

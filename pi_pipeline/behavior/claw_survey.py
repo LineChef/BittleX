@@ -90,17 +90,29 @@ def _smooth(link, a: tuple[float, float], b: tuple[float, float], sleep, stopped
 
 
 def _lie_down(link, sleep) -> bool:
-    """The look's last move: the rest position, claw and legs together (the claw is lowered by the rest pose itself, not first). Waits until the board reports the rest pose, at most REST_WAIT_S. True when it did."""
-    from .ball_chase import classify_pose, read_joints
-    link.send("krest", read_reply=False, settle=0.0)
-    for _ in range(max(1, int(REST_WAIT_S / 0.5))):
-        sleep(0.5)
+    """The look's last move: the rest position, the claw coming down WITH the legs in one eased K skill (the firmware `krest` snapped the claw down at the end, 2026-11-12). Where the link cannot play that
+    skill the firmware `krest` is sent and the board is given a moment to report rest. True when the move ran."""
+    from .ball_chase import CLAW_LIFT_DEG, classify_pose, read_joints
+    fn = getattr(link, "lie_down_eased", None)
+    if callable(fn):
         try:
-            j = read_joints(link, timeout_s=0.6)
-            if j and classify_pose(j) == "rest":
+            if fn(CLAW_LIFT_DEG):
                 return True
         except Exception:  # noqa: BLE001
-            pass
+            log.debug("eased lie-down raised", exc_info=True)
+    link.send("krest", read_reply=False, settle=0.0)
+    sleep(0.8)
+    for _ in range(max(1, int(REST_WAIT_S / 0.4))):
+        try:
+            j = read_joints(link, timeout_s=0.5)
+            if j and classify_pose(j) == "rest":
+                return True
+            if not j:                                                                # the board does not answer: no polling, the stand-up trusts the rest command that was just sent
+                sleep(1.0)
+                return False
+        except Exception:  # noqa: BLE001
+            return False
+        sleep(0.2)
     return False
 
 

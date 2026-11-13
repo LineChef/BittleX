@@ -16,6 +16,10 @@ class LockedLink:
         with self._lock:
             return self._link.send(command, **kw)
 
+    def lie_down_eased(self, *a, **kw) -> bool:
+        with self._lock:
+            return self._link.lie_down_eased(*a, **kw)
+
     def read_line(self) -> str:
         with self._lock:
             return self._link.read_line()

@@ -98,6 +98,13 @@ def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int =
     return behavior_payload(frames, sp, delays)
 
 
+def lie_down_payload(start_urdf, goal_urdf, lift0, lift1, *, steps: int = 6, speed_raw: int = 12) -> bytes:
+    """The lie-down as one eased K skill: all four legs together from `start_urdf` to `goal_urdf` and the lift servo (joint 1: the claw) from `lift0` to `lift1` along the same smooth curve, so the claw
+    comes down with the legs instead of snapping to the rest pose (owner, 2026-11-12)."""
+    frames = stand_frames(start_urdf, goal_urdf, lift0, lift1, steps, 0.0, 1.0)
+    return behavior_payload(frames, [speed_raw] * len(frames), [0] * len(frames))
+
+
 def message(payload: bytes) -> bytes:
     """What goes on the wire: 'K', the payload, '~'."""
     if TERMINATOR in payload:
