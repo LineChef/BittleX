@@ -72,7 +72,7 @@ def test_the_timing_comes_from_the_motion_feel_file_the_override_and_the_environ
     monkeypatch.setenv("G2_MOTION_FEEL", str(ov))
     for k in ("G2_STAND_STEPS", "G2_STAND_SPEED", "G2_STAND_PAUSE", "G2_STAND_WAIT_S"):
         monkeypatch.delenv(k, raising=False)
-    assert kskill.tuning() == {"steps": 8, "speed": 12, "speeds": _speeds(motion_feel.STAND_SPEED, motion_feel.STAND_SPEED_MID), "delay": 0, "wait_s": 3.4}      # the numbers in the file (slow at the ends, fast in the middle)
+    assert kskill.tuning() == {"steps": 8, "speed": 12, "speeds": _speeds(motion_feel.STAND_SPEED, motion_feel.STAND_SPEED_MID), "delay": 0, "wait_s": 3.4, "front_start": 0.2, "rear_end": 0.7}      # the numbers in the file (slow at the ends, fast in the middle)
     ov.write_text('{"STAND_SPEED": 16, "STAND_WAIT_S": 3.0}')
     t = kskill.tuning()
     assert t["speed"] == 16 and t["wait_s"] == 3.0 and t["steps"] == 8                           # the override file wins, only for what it names
@@ -303,3 +303,18 @@ def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first
     assert [e["event"] for e in ev] == ["stand_up"] * 3
     assert [e["pose_read"] for e in ev] == ["sit", "unknown", "unknown"] and [e["rested_first"] for e in ev] == [False, False, True]
     assert ev[0]["start"] == "ksit" and ev[1]["start"] == "unknown" and ev[1]["eased_from_reported"] is True and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
+
+
+def test_the_attention_stand_up_has_the_back_legs_finish_before_the_front_legs_get_going():
+    """Owner, 2026-11-12: the back legs stand first. From the attention pose the back legs are at their stand angles by the fifth of eight stages while the front legs are still near the start;
+    the stand-up from rest keeps its own timing."""
+    from pi_pipeline.gait import standup
+    goal = standup.balance_pose()
+    t, r = kskill.tuning(from_attention=True), kskill.tuning()
+    assert (t["front_start"], t["rear_end"]) == (0.45, 0.65) and (r["front_start"], r["rear_end"]) == (0.2, 0.7)
+    fr = kskill.stand_frames([0.0] * 8, goal, None, None, t["steps"], t["front_start"], t["rear_end"])
+
+    def done(frame, idx):
+        return sum(frame[kskill.URDF_TO_SERVO[k]] / goal[k] for k in idx) / len(idx)
+    assert done(fr[4], (4, 5, 6, 7)) > 0.98 and done(fr[4], (0, 1, 2, 3)) < 0.3
+    assert all(done(fr[i], (0, 1, 2, 3)) < 0.05 for i in range(3))            # the front legs have not moved in the first three stages

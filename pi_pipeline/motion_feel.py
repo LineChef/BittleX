@@ -22,6 +22,8 @@ STAND_WAIT_S = 3.4         # how long the Pi waits for the rise to finish before
 # ---- THE STAND-UP OUT OF THE ATTENTION POSE: its own, slightly slower numbers (owner, 2026-11-08: "standups out of the attention position were getting close to falling"); the rest stand-up above is unchanged.
 STAND_ATT_SPEED = 10       # slow speed at the first and last stages (the same idea as STAND_SPEED; the rest stand-up uses 12).
 STAND_ATT_SPEED_MID = 22   # the faster middle stages (the rest stand-up uses STAND_SPEED_MID).
+STAND_ATT_FRONT_START = 0.45   # when the front legs start to rise, as a fraction of the stand-up's time (the rest stand-up uses 0.2). Bigger = the front legs wait longer for the back legs (owner, 2026-11-12: the back legs have to stand first; both falls this evening went over backwards right after this stand-up).
+STAND_ATT_REAR_END = 0.65      # when the back legs are done rising, as a fraction of the time (the rest stand-up uses 0.7). With these two the back legs are at their stand angles by the fifth of eight stages and the front legs have barely started.
 STAND_ATT_WAIT_S = 4.0     # the longest the Pi waits for the board to finish (it stops waiting as soon as the legs read as up).
 
 # ---- EASING INTO THE ATTENTION POSE (owner, 2026-11-08: he "sits hard into the attention position"; the firmware `kcalib` moves every joint at once at full speed). UNTESTED on G2 until the next session.
