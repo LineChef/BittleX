@@ -173,7 +173,6 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
     """The stand-up out of the attention pose, `cycles` times (owner, 2026-11-12: the back legs fell over backwards right after it). Each cycle: from standing, the eased move into the attention pose (`kcalib`),
     the claw look the roams make (arm up, left, right, centre, down; no pictures) or, with `look=False`, a hold of `hold_s` seconds, the pose and joints the board reports, then the eased stand-up (`kup`, as the
     survey sends it, which plays the K stand-up from the attention pose) and the tilt for `watch_s` seconds. Stops at the first fall or a swing of STANDUP_FELL_SWING_DEG. Returns {"cycles", "fell", "worst_swing_deg", "swings", "end_tilts", "poses"}."""
-    from . import ball_chase as _bc
     from . import claw_survey
     lk = robot._lk
     worst, swings, ends, poses, done, fell = 0.0, [], [], [], 0, False
@@ -188,15 +187,8 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
             while robot._clock() < t_end:
                 keep.tick()
                 sleep(0.2)
-        lk.send("gP", read_reply=False, settle=0.0)
-        sleep(0.3)
-        pose, before = "?", None
-        try:
-            j = _bc.read_joints(lk, timeout_s=1.0)
-            pose = _bc.classify_pose(j) if j else "?"
-            before = [int(x) for x in j[:16]] if j else None
-        except Exception:  # noqa: BLE001
-            pass
+        lk.send("gP", read_reply=False, settle=0.0)                           # the tilt is read from here (no pause: the look's last move is lying down, and the stand-up follows at once)
+        pose, before = "rest" if look else "attention", None
         robot._pitch, robot._roll = [], []
         lk.send("kup", read_reply=False, settle=0.0)                          # the stand-up under test, from the attention pose (the survey's own command)
         t_end = robot._clock() + watch_s
@@ -211,9 +203,9 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
         lk.send("gp", read_reply=False, settle=0.0)
         lk.send("gb", read_reply=False, settle=0.0)
         poses.append(pose)
-        say(f"stand-up from the attention pose {i + 1}/{cycles}: the board read '{pose}' before it; swing {sw:.0f} deg" + (" FELL" if fell else "") + (f"; ended roll {ends[-1]['roll']:+.1f}, pitch {ends[-1]['pitch']:+.1f}" if ends[-1] else ""))
+        say(f"claw look and stand-up {i + 1}/{cycles}: swing {sw:.0f} deg" + (" FELL" if fell else "") + (f"; ended roll {ends[-1]['roll']:+.1f}, pitch {ends[-1]['pitch']:+.1f}" if ends[-1] else ""))
         if tp and tr:
-            say(f"   tilt during the rise: pitch {min(tp):+.0f}..{max(tp):+.0f}, roll {min(tr):+.0f}..{max(tr):+.0f}; legs before the rise {before[8:16] if before else 'unreadable'}")
+            say(f"   tilt during the rise: pitch {min(tp):+.0f}..{max(tp):+.0f}, roll {min(tr):+.0f}..{max(tr):+.0f}")
         if sw >= STANDUP_FELL_SWING_DEG:
             fell = True
         if fell:

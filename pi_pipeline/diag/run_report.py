@@ -166,6 +166,12 @@ def report(args):
                 for r in rs:
                     if r.get("outcome") in ("forced", "refused"):
                         print(f"     {r.get('t')}: {k} {r.get('outcome')} from {r.get('from')} after {r.get('seconds')} s")
+        off = [r for r in ev if (r.get("max_leg_dev_deg") or 0) >= 8]
+        checked = [r for r in ev if r.get("max_leg_dev_deg") is not None]
+        if checked:
+            print(f"   leg joints against their target after a move: {len(checked)} read, {len(off)} with a joint 8 deg or more off" + ("; firmware gyro balance then: " + str(dict(collections.Counter(r.get("gyro_state") for r in off))) if off else ""))
+            for r in off:
+                print(f"     {r.get('t')}: {r.get('event')} (from {r.get('from') or r.get('start')}): deviations {r.get('leg_dev_deg')}, gyro balance {r.get('gyro_state')} (before: {r.get('gyro_state_before')})")
     else:
         print("\n-- motion events: none logged (this build does not write them yet: the stand-up outcomes are only on the console)")
 

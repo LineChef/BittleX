@@ -22,7 +22,7 @@ def _run(link, mp, snap=None):
 def test_leg_angles_are_resent_during_a_look_in_the_attention_pose(monkeypatch):
     link = Link()
     _run(link, monkeypatch)
-    assert sum(1 for c in link.sent if c.count(" ") >= 15) >= 2
+    assert sum(1 for c in link.sent if c.count(" ") >= 15) >= 1                  # (the look no longer lowers the claw at the end: the rest pose does, so it is a few seconds shorter)
 
 
 def test_nothing_is_resent_when_not_in_the_attention_pose(monkeypatch):

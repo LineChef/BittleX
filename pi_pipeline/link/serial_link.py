@@ -43,6 +43,7 @@ def feedback_row(line: str):
 
 # What the legs were last told to do, as far as the stand-up ramp is concerned. "" is a fresh process (assumed lying).
 POSE_READ_TRIES = 3             # reads of the board's pose before a stand-up (the first one after the service stops is often garbled)
+LEG_OFF_DEG = 8.0               # a leg joint this far from the pose it was sent to is logged as a warning (and in the motion events log)
 REST_FIRST_S = 3.0              # after the rest command that comes first when the pose is unknown: the time the board takes to lie down
 LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit", "kcalib")      # kcalib: the attention pose (legs straight); a move out of it stands him up back legs first (user, 2026-11-02)
 # Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
@@ -233,6 +234,10 @@ class SerialLink:
             command_log.sent(command)             # and every command (not the joint streams), with who sent it (link/command_log.py)
             if command.strip() in ("gP", "gp"):
                 self.imu_print_on = command.strip() == "gP"
+            elif command.strip() in ("gB", "gb"):
+                self.gyro_state = "on" if command.strip() == "gB" else "off"
+            elif command[:1] == "k":
+                self.gyro_state = "maybe_on"                 # a skill can switch it on; the `gb` that follows (the arm) sets it back to off
             (getattr(self, "_scripted_walks", None) or _NO_WALK_LOG).note(command)    # a scripted gait is one `scripted_walk` auto-log run, ended by the next motion command (telemetry/scripted_walks.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
@@ -370,6 +375,7 @@ class SerialLink:
         finally:
             self._ramping = False
 
+    gyro_state = "unknown"                        # the firmware gyro balance as far as the Pi knows: "on" after `gB`, "off" after `gb`, "maybe_on" after a firmware skill (a skill can switch it on: the arm's `gb` follows) (owner, 2026-11-12: leg angles that end up wrong may be the balance loop correcting for a slipping foot mid-move)
     imu_print_on = False                          # whether the board's IMU print is on, from the last `gP` / `gp` sent (link/imu_print.py puts it back after a read that needs it off)
 
     def _write_pose(self, command: str) -> None:
@@ -377,6 +383,26 @@ class SerialLink:
         self._ser.flush()
         if command.strip() in ("gP", "gp"):
             self.imu_print_on = command.strip() == "gP"
+        elif command.strip() in ("gB", "gb"):
+            self.gyro_state = "on" if command.strip() == "gB" else "off"
+
+    def _note_leg_position(self, event: str, goal, joints, ev: dict) -> None:
+        """How far each leg joint is from the pose it was sent to, with the gyro balance state, into `ev` (the motion events log) and a warning when one is off by LEG_OFF_DEG or more. Passive: nothing is sent.
+        2026-11-12: odd leg positions after a move are suspected to be the firmware gyro balance correcting for a slipping foot in the middle of the move; this shows when it happens and what the balance was doing."""
+        try:
+            from . import kskill
+            ev["gyro_state"] = self.gyro_state
+            if not joints or len(joints) < 16:
+                ev["legs_read"] = None
+                return
+            dev = [int(round(joints[kskill.URDF_TO_SERVO[k]] - goal[k])) for k in range(8)]
+            ev["legs_read"] = [int(joints[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
+            ev["leg_dev_deg"], ev["max_leg_dev_deg"] = dev, max(abs(d) for d in dev)
+            if ev["max_leg_dev_deg"] >= LEG_OFF_DEG:
+                worst = max(range(8), key=lambda k: abs(dev[k]))
+                log.warning("after the %s a leg joint is %d deg off its target (leg joint %d, all eight: %s); firmware gyro balance: %s", event.replace("_", " "), dev[worst], worst, dev, self.gyro_state)
+        except Exception:  # noqa: BLE001
+            log.debug("leg position note failed", exc_info=True)
 
     def _stand_up(self):
         """The eased stand-up from lying or sitting to the balance pose. Returns the balance pose (Petoi leg order) if it ran, else None.
@@ -482,13 +508,16 @@ class SerialLink:
             data = kskill.message(kskill.entry_payload(start, goal, steps=int(motion_feel.get("ATT_ENTRY_STEPS")), speed_raw=int(motion_feel.get("ATT_ENTRY_SPEED"))))
             kskill.write_chunked(self._ser.write, data, time.sleep)
             self._ser.flush()
-            waited, reached = 0.0, False
+            waited, reached, jr = 0.0, False, None
+            gyro_before = self.gyro_state
             while waited < motion_feel.get("ATT_ENTRY_WAIT_S"):
                 time.sleep(kskill.POLL_S)
                 waited += kskill.POLL_S + 0.25
-                if waited >= kskill.MIN_WAIT_S and kskill.legs_reached(kskill.read_joints(self), goal):
-                    reached = True
-                    break
+                if waited >= kskill.MIN_WAIT_S:
+                    jr = kskill.read_joints(self)
+                    if kskill.legs_reached(jr, goal):
+                        reached = True
+                        break
             if not reached:                                                # not snapped into it: a jump to the pose with his weight on the legs put the feet in odd places (owner, 2026-11-12); the skill is left to finish and the look's keep-alive holds the angles
                 log.warning("eased move into the attention pose: the board did not report it after %.1f s: left to finish (no forced jump)", waited)
                 time.sleep(1.0)
@@ -496,6 +525,9 @@ class SerialLink:
                 log.info("the attention pose was reached after about %.1f s", waited)
             self.last_motion_command, self._last_motion_t = "kcalib", time.monotonic()
             log.info("moved into the attention pose as an eased K skill (%d bytes)", len(data))
+            ev = {"outcome": "reached" if reached else "left_to_finish", "from": last, "waited_s": round(waited, 1), "gyro_state_before": gyro_before}
+            self._note_leg_position("attention_entry", goal, jr, ev)
+            motion_events.write("attention_entry", **ev)
             return True
         except Exception as e:  # noqa: BLE001  -- fall back to the firmware kcalib
             log.warning("eased move into the attention pose failed (%s): the firmware kcalib follows", e)
@@ -594,15 +626,18 @@ class SerialLink:
             kskill.write_chunked(self._ser.write, data, time.sleep)          # in short pieces: a long burst can overflow the board's input while it is busy
             self._ser.flush()
             goal = standup.balance_pose()
-            waited, reached = 0.0, False
+            waited, reached, jr = 0.0, False, None
+            ev["gyro_state_before"] = self.gyro_state
             while waited < max(t["wait_s"] * 2.0, 6.0):                      # until the board reports the stand pose (not a fixed time: the Pi once moved on while the board was still rising, 2026-11-08)
                 time.sleep(kskill.POLL_S)
                 waited += kskill.POLL_S + 0.25
                 if waited < kskill.MIN_WAIT_S:
                     continue
-                if kskill.legs_reached(kskill.read_joints(self), goal):
+                jr = kskill.read_joints(self)
+                if kskill.legs_reached(jr, goal):
                     reached = True
                     break
+            self._note_leg_position("stand_up", goal, jr, ev)                # the legs as the board reports them at the end of the rise, against the stand angles, with the balance state (before any forcing)
             ev["outcome"], ev["waited_s"] = ("reached" if reached else "forced"), round(waited, 1)
             ev["speeds"], ev["wait_s"], ev["gyro"] = t["speeds"], t["wait_s"], bool(gyro)
             if not reached:                                                  # did not get there: force the legs to the stand angles before anything else moves

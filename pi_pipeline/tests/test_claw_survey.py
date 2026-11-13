@@ -34,17 +34,22 @@ def test_naming_uses_the_claw_look_too():
     assert ("claw", "name:mug") in [(k, p) for _, k, p, _ in plan]
 
 
-def test_the_look_takes_left_right_centre_and_ends_with_the_arm_down():
+def test_the_look_takes_left_right_centre_and_ends_by_lying_down_in_rest():
+    """Owner, 2026-11-12: attention pose, claw up, left, right, centre, then the rest position (the claw goes down with the legs, not first), then the stand-up from rest."""
+    from pi_pipeline.behavior.ball_chase import CLAW_LIFT_DEG
     link, shots = _Link(), []
     state = claw_survey.run_claw_look(link, shots.append, "after_bow", sleep=lambda s: None)
     assert state == "ok" and shots == ["look_left", "look_right", "after_bow"]
-    assert link.sent[0] == "gP" and link.sent[-1] == "gp"
+    assert link.sent[0] == "gP" and link.sent[-1] == "gp" and link.sent.count("krest") == 1 and link.sent.index("krest") > max(i for i, c in enumerate(link.sent) if c.startswith("i"))
     arm = {}
     for c in link.sent:
         if c.startswith("i"):
             nums = [int(x) for x in c[1:].split()]
             arm.update(dict(zip(nums[0::2], nums[1::2])))
-    assert arm == {0: 0, 1: 0}                                                      # arm centred and lowered (each command names only the joint that changed)
+    assert arm == {0: 0, 1: CLAW_LIFT_DEG}                                         # the claw is centred and still up when the rest command goes out: the rest pose lowers it
+    link3 = _Link()
+    claw_survey.run_claw_look(link3, [].append, "x", sleep=lambda s: None, end_in_rest=False)
+    assert "krest" not in link3.sent and link3.sent[-1] == "gp"                     # the old ending (claw lowered by the arm moves) is still there when asked for
 
 
 def test_a_stop_during_the_look_halts_the_arm_at_once_and_a_stop_between_moves_lowers_it():
