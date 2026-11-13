@@ -200,31 +200,39 @@ def _run_skill(link, snapshot, kind: str, *, sleep, stopped, discard, miss_skips
     return state
 
 
-def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, end_in_rest: bool = True, full: bool | None = None) -> str:
-    """The claw look. With `full` (default: `one_skill()`) it is the WHOLE move from standing: the attention pose, the look, the rest position and the stand-up, as one skill the board plays by itself with
-    no pause between the parts (owner, 2026-11-12), and G2 is standing when it returns; where the link cannot play it the same parts are sent one after another. Without `full` it is only the look
-    (`_run_classic`: the caller has put him in the attention pose and stands him up after). Returns "ok", "stopped" or "error"."""
-    if full is None:
-        full = one_skill()
+def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, end_in_rest: bool = True, full: bool = True) -> str:
+    """THE claw look, one standard move for every mode (owner, 2026-11-12: "when we modify it, it should change everywhere because we are just calling the skill"). Called from standing it is the WHOLE
+    move: the eased move into the attention pose, the claw raised, the swing left, right and back with a picture at each, the lie-down in the rest position (the claw comes down with the legs) and the
+    stand-up from rest; G2 is standing when it returns. How the parts are played is decided here and nowhere else: as one skill the board plays by itself (`LOOK_ONE_SKILL = 1`) or as separate moves
+    with their waits (the default). A caller does not put him in the attention pose or stand him up: it calls this. `full=False` is only the arm part (`_run_classic`), for a caller that has done the
+    rest itself. Returns "ok", "stopped" or "error"."""
     if not full:
         return _run_classic(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, end_in_rest=end_in_rest)
     plan = None
     try:
-        if callable(getattr(link, "play_k", None)):
+        if one_skill() and callable(getattr(link, "play_k", None)):
             plan = _skill_for((getattr(link, "last_motion_command", "") or "").strip(), kind)
     except Exception:  # noqa: BLE001
         log.debug("could not plan the look skill", exc_info=True)
     if plan is not None:
         return _run_skill(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, plan=plan)
-    link.send("kcalib", read_reply=False, settle=0.0)                                # the parts one after another
-    sleep(POSE_SETTLE_S)                                                              # the plan used to give the attention pose this long before the look; arm commands sent while the board is still moving into it are dropped (2026-11-12: the arm never panned)
+    link.send("kcalib", read_reply=False, settle=0.0)                                # the separate moves, one after another
+    sleep(POSE_SETTLE_S)                                                              # arm commands sent while the board is still moving into the attention pose are dropped (2026-11-12: the arm never panned)
     state = _run_classic(link, snapshot, kind, sleep=sleep, stopped=stopped, discard=discard, miss_skips=miss_skips, end_in_rest=end_in_rest)
-    link.send("kup", read_reply=False, settle=0.0)
+    link.send("kup", read_reply=False, settle=0.0)                                   # from the rest position the look ended in: the normal stand-up from rest
     return state
 
 
+def classic_look_seconds() -> float:
+    """About how long the arm part of the look takes as separate moves: the arm moves plus three settles."""
+    from .ball_chase import CLAW_DEG_S, CLAW_LIFT_DEG, CLAW_PAN_DEG
+    moves = CLAW_LIFT_DEG + CLAW_PAN_DEG + 2 * CLAW_PAN_DEG + CLAW_PAN_DEG + CLAW_LIFT_DEG       # degrees swept: up, left, right, centre, down
+    return moves / CLAW_DEG_S + 3 * SETTLE_S + 1.0
+
+
 def look_seconds() -> float:
-    """About how long `run_claw_look` takes (the survey plan waits this long): as one skill, the whole look and the stand-up; otherwise the arm moves plus three settles."""
+    """About how long `run_claw_look` takes in all (the survey plan schedules by it): as one skill, the whole skill; as separate moves, the wait for the attention pose, the arm part, the lie-down and
+    the stand-up."""
     if one_skill():
         try:
             sk = _skill_for("kbalance", "look")
@@ -232,9 +240,7 @@ def look_seconds() -> float:
                 return sk[2]
         except Exception:  # noqa: BLE001
             pass
-    from .ball_chase import CLAW_DEG_S, CLAW_LIFT_DEG, CLAW_PAN_DEG
-    moves = CLAW_LIFT_DEG + CLAW_PAN_DEG + 2 * CLAW_PAN_DEG + CLAW_PAN_DEG + CLAW_LIFT_DEG       # degrees swept: up, left, right, centre, down
-    return moves / CLAW_DEG_S + 3 * SETTLE_S + 1.0
+    return POSE_SETTLE_S + classic_look_seconds() + 3.0 + 3.0
 
 
 def _run_classic(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, end_in_rest: bool = True) -> str:

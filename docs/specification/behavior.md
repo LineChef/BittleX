@@ -38,7 +38,7 @@ See [Exploration mode](../guides/exploration-mode.md) for the full list.
 Constraints
 -----------
 
-- Consistency: A behavior (stand-up, claw look, rest, sag handling, turns, camera use) is the same in every mode.
+- Consistency: A behavior (stand-up, claw look, rest, sag handling, turns, camera use) is the same in every mode. The claw look is one standard move: the roam, the voice loop and the test drill call it and add no steps around it, so a change to it applies everywhere. The ball chase's own claw scan is not yet routed through it.
 - Emergency stop outranks everything.
 
 Failure handling

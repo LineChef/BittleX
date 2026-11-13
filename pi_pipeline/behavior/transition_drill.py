@@ -177,27 +177,26 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
     lk = robot._lk
     worst, swings, ends, poses, done, fell = 0.0, [], [], [], 0, False
     for i in range(cycles):
-        one = look and claw_survey.one_skill()                               # the whole look is one skill: attention pose, look, rest, stand-up, no pause between
-        if not one:
-            lk.send("kcalib", read_reply=False, settle=0.0)                   # the eased move into the attention pose (the link plays it as a K skill)
-        else:
-            robot._pitch, robot._roll = [], []                                # the tilt is recorded through the whole skill, the stand-up at its end included
         if look:
+            robot._pitch, robot._roll = [], []                                # the tilt is recorded through the whole move, the stand-up at its end included
             t_look = robot._clock()
-            state = claw_survey.run_claw_look(lk, None, "drill", stopped=robot.fallen, full=one)      # the same look the roam makes (behavior/claw_survey.py)
-            say(f"   claw look{' and stand-up' if one else ''}: {state}, {robot._clock() - t_look:.1f} s")
+            state = claw_survey.run_claw_look(lk, None, "drill", stopped=robot.fallen)      # THE claw look, the same call every mode makes: attention pose, look, rest, stand-up (behavior/claw_survey.py)
+            say(f"   claw look and stand-up: {state}, {robot._clock() - t_look:.1f} s")
+            lk.send("gP", read_reply=False, settle=0.0)
+            pose = "rest"
         else:
+            lk.send("kcalib", read_reply=False, settle=0.0)                   # the eased move into the attention pose (the link plays it as a K skill)
             keep = claw_survey._KeepAlive(lk)
             t_end = robot._clock() + hold_s
             while robot._clock() < t_end:
                 keep.tick()
                 sleep(0.2)
-        lk.send("gP", read_reply=False, settle=0.0)                           # the tilt is read from here (no pause: the look's last move is lying down, and the stand-up follows at once)
-        pose, before = "rest" if look else "attention", None
-        if not one:
+            lk.send("gP", read_reply=False, settle=0.0)
+            pose = "attention"
             robot._pitch, robot._roll = [], []
-            lk.send("kup", read_reply=False, settle=0.0)                      # the stand-up under test, from the attention pose (the survey's own command)
-        t_end = robot._clock() + (2.0 if one else watch_s)
+            lk.send("kup", read_reply=False, settle=0.0)                      # the stand-up under test, from the attention pose
+        before = None
+        t_end = robot._clock() + (2.0 if look else watch_s)
         while robot._clock() < t_end and not fell:
             fell = robot._fell()
             sleep(0.05)

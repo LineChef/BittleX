@@ -1037,7 +1037,7 @@ def test_a_fall_in_the_middle_of_the_claw_look_stops_the_arm_moves():
     sent = []
     class L:
         def send(self, c, **k): sent.append(c)
-    state = claw_survey.run_claw_look(L(), None, "x", sleep=lambda s: None, stopped=lambda: True)
+    state = claw_survey.run_claw_look(L(), None, "x", sleep=lambda s: None, stopped=lambda: True, full=False)
     assert state == "stopped" and len([c for c in sent if c.startswith("i0")]) <= 10 and sent[-1] == "gp"
 
 
@@ -1279,7 +1279,7 @@ def test_attention_stand_drill_stands_from_the_attention_pose_each_cycle_and_sto
         def fallen(self): return False
         def swing_deg(self): return self.swings.pop(0)
     ok = td.run_attention_stands(R([3.0, 4.0, 5.0]), 3, say=lambda *a: None, sleep=lambda s: None)
-    assert ok["cycles"] == 3 and not ok["fell"] and sent.count("kcalib") == 3 and sent.count("kup") == 3 and len(looks) == 3 and ok["swings"] == [3.0, 4.0, 5.0]
+    assert ok["cycles"] == 3 and not ok["fell"] and len(looks) == 3 and sent.count("kcalib") == 0 and sent.count("kup") == 0 and ok["swings"] == [3.0, 4.0, 5.0]
     sent.clear()
     bad = td.run_attention_stands(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
-    assert bad["fell"] and bad["cycles"] == 1 and sent.count("kup") == 2
+    assert bad["fell"] and bad["cycles"] == 1 and len(looks) == 3 + 2                    # the second round stopped at its second look (3 from the first round, 2 here)
