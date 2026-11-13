@@ -26,7 +26,7 @@ SPEC = {
     "nudges_before_punt": ("NUDGES_BEFORE_PUNT", int, 0, 10, "small steps closer before punching anyway from out of range"),
     "nudge_step_s": ("NUDGE_S", float, 0.3, 2.5, "length of one small step closer, seconds"),
     "nudge_gait": ("NUDGE_GAIT", str, ("scripted", "policy"), None, "how the small steps closer are walked: Petoi's scripted walk (steadier, the default) or the learned policy"),
-    "walk_aim_in": ("WALK_AIM_IN", float, 1.5, 8.0, "the long walk steps are timed to leave the ball about this far from the camera"),
+    "walk_aim_in": ("WALK_AIM_IN", float, 1.5, 8.0, "the long walk steps are timed to leave the ball about this far from the camera (never closer than punt_max_in + 1 in: the walk has no feedback)"),
     "punt_align_deg": ("PUNT_ALIGN_DEG", float, 2.0, 30.0, "the ball must be within this many degrees of straight ahead before the punch"),
     "punch_lunge_s": ("PUNCH_LUNGE_S", float, 0.05, 0.6, "seconds for the lunge itself (smaller = harder and faster)"),
     "punch_hold_s": ("PUNCH_HOLD_S", float, 0.0, 1.0, "seconds the lunge is held before he comes back"),

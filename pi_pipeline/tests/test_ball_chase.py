@@ -1283,3 +1283,22 @@ def test_attention_stand_drill_stands_from_the_attention_pose_each_cycle_and_sto
     sent.clear()
     bad = td.run_attention_stands(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
     assert bad["fell"] and bad["cycles"] == 1 and len(looks) == 3 + 2                    # the second round stopped at its second look (3 from the first round, 2 here)
+
+
+def test_the_long_walk_is_never_aimed_into_the_balls_touch_zone(monkeypatch):
+    """Owner, 2026-11-13: the walk is timed with no feedback and lands within about 1.6 in of its aim; at an aim of 3.5 in about half of the walks pushed the ball. Whatever the setting, it plans to end at least
+    PUNT_MAX_IN + APPROACH_MARGIN_IN from the ball, and the nudges do the last inches."""
+    monkeypatch.setattr(bc, "WALK_AIM_IN", 3.5)
+    monkeypatch.setattr(bc, "PUNT_MAX_IN", 4.0)
+    monkeypatch.setattr(bc, "APPROACH_MARGIN_IN", 1.0)
+    p = bc.ChasePlanner()
+    pace, start = p._walk_pace(), __import__("pi_pipeline.behavior.chase_pace", fromlist=["WALK_START_S"]).WALK_START_S
+    a = p.decide(reading(11.0, 0))
+    assert a.kind == "walk" and abs(a.seconds - (start + (11.0 - 5.0) / pace)) < 0.02                  # aimed at 5.0 in (4.0 + 1.0), not at the setting's 3.5
+    monkeypatch.setattr(bc, "WALK_AIM_IN", 5.5)
+    b = bc.ChasePlanner().decide(reading(11.0, 0))
+    assert abs(b.seconds - (start + (11.0 - 5.5) / pace)) < 0.02 and b.seconds < a.seconds             # a setting farther out than the floor is kept
+    monkeypatch.setattr(bc, "PUNT_MAX_IN", 3.0)
+    monkeypatch.setattr(bc, "WALK_AIM_IN", 3.5)
+    c = bc.ChasePlanner().decide(reading(11.0, 0))
+    assert abs(c.seconds - (start + (11.0 - 4.0) / pace)) < 0.02                                       # the floor follows the punt reach

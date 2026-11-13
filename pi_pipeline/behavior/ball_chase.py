@@ -44,6 +44,7 @@ NUDGE_MAX_IN = 7.0             # between PUNT_MAX_IN and this: small steps close
 NUDGE_S = 0.9
 NUDGE_GAIT = "scripted"      # how the small steps closer are walked (user, 2026-11-04): "scripted" = Petoi's own forward walk (kwkF) for NUDGE_S, which is steadier than the learned policy for dialing in the distance; "policy" = the learned gait
 WALK_AIM_IN = 4.0              # a walk step is timed to leave the ball about this far from the camera (the ball is touched at about 3 in)
+APPROACH_MARGIN_IN = 1.0       # the long walk never plans to end closer than PUNT_MAX_IN + this, whatever WALK_AIM_IN says (owner, 2026-11-13): it is timed with no feedback and lands within about 1.6 in of its aim, the punt window is only about 1 in wide, so a walk aimed at 3.5 in pushed the ball about half the time; the small nudges (looked at after each) do the last inches
 NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
@@ -524,7 +525,8 @@ class ChasePlanner:
         self.after_punt = False
         self.nudges = 0
         from .chase_pace import WALK_START_S as start
-        secs = min(WALK_MAX_S, max(MIN_MOVE_S, start + (ball.distance_in - WALK_AIM_IN) / self._walk_pace()))      # aim for WALK_AIM_IN: a gait needs a moment just to get moving, and the ball is touched at about 3 in
+        aim = max(WALK_AIM_IN, PUNT_MAX_IN + APPROACH_MARGIN_IN)                      # never aimed into the ball's touch zone: outside the punt reach plus a margin, then nudges
+        secs = min(WALK_MAX_S, max(MIN_MOVE_S, start + (ball.distance_in - aim) / self._walk_pace()))      # aim for WALK_AIM_IN: a gait needs a moment just to get moving, and the ball is touched at about 3 in
         self.walk_log.append((round(ball.distance_in, 1), round(secs, 1)))
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
