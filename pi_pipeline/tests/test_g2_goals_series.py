@@ -81,3 +81,13 @@ def test_the_chart_draws_a_dot_and_a_strip_entry_per_attempt_with_a_minimal_page
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out == {"circles": 30, "rects": 30, "paths": 2, "dashed": 1, "cap": True}          # a dot and a strip entry per attempt, the two lines, one dotted change line
+
+
+def test_every_goals_tab_section_starts_collapsed_and_every_goal_card_starts_open():
+    """Owner, 2026-11-12: the sections start collapsed; each goal's summary (its card: numbers and charts) is the one thing open."""
+    import re
+    js = (TOOLS / "g2_goals_ui.js").read_text()
+    assert len(re.findall(r"(?<![A-Za-z_])fold\(", js)) == 1                                  # only the helper itself calls the page's fold(); every section goes through it
+    assert "const gfold=(title)=>fold(title,false)" in js
+    assert re.search(r"function goalOpen\(id,i\)\{.*return true\}", js, re.S)                  # no saved choice: open
+    assert 'g2GoalOpenV' in js                                                                  # the choices saved under the old rule are dropped once

@@ -16,6 +16,7 @@ const st=document.createElement("style");st.textContent=`
 .gmodal label{display:block;margin:8px 0 2px;font-size:.84rem;color:var(--ink2)}.gmodal input,.gmodal select,.gmodal textarea{width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .gmodal .hint{color:var(--muted);font-size:.76rem}
 `;document.head.append(st);
+const gfold=(title)=>fold(title,false);        // every section of the Goals tab starts collapsed (owner, 2026-11-12); only each goal's summary (its card) is open
 
 const G={}; // per-goal view state: {result, cond}
 const COND_LABEL=c=>[c.attachment,c.floor,c.hw].filter(Boolean).join(" · ");
@@ -62,7 +63,7 @@ function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div",
  sum.append(el("b","","Goal data copied from the Pi: "),document.createTextNode(d.pulled||"never"));
  if(d.pulled_age_h===null||d.pulled_age_h>24){const w=el("div","gwarn",d.pulled_age_h===null?"This copy has no date, so it may be old.":"This copy is "+Math.round(d.pulled_age_h)+" hours old; what you see may not match G2. It refreshes when the Pi is reachable (g2goal pull).");sum.append(w)}
  if(m.lowest_mb!==undefined)sum.append(el("div","sub","Pi memory: lowest available "+Math.round(m.lowest_mb)+" MB ("+m.when+"), swap up to "+Math.round(m.swap_mb)+" MB"+(m.oom_kills?", OOM KILLS: "+m.oom_kills:"")));
- const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=fold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}
+ const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=gfold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}
  list.append(sum);
 
  // (the edits waiting for the Pi are on the Waiting to sync tab; the goal rows below carry a "pending" chip)
@@ -77,7 +78,7 @@ function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div",
  list.append(bar);
 
  // suggestions
- if((d.suggestions||[]).length){const sf=fold("G2 suggests a change ("+d.suggestions.length+")",true);
+ if((d.suggestions||[]).length){const sf=gfold("G2 suggests a change ("+d.suggestions.length+")",true);
   const open=d.suggestions.filter(s=>!pend(s.goal,p=>(p.op==="confirm"||p.op==="cancel")&&p.knob===s.knob).length);
   if(open.length){const ab=btn("Accept all "+open.length+" suggestions",()=>confirmThen("Confirm all "+open.length+" suggested changes? Each one is queued for the Pi and can be taken back from Waiting to sync.",()=>queueMany(open.map(s=>({op:"confirm",goal:s.goal,knob:s.knob})),"confirmations")),"on");ab.style.marginBottom="6px";sf.append(ab)}
   for(const s of d.suggestions){const r=el("div","row"),mn=el("div","main");mn.append(el("div","",s.text),el("div","meta",s.goal+" · "+s.status));
@@ -88,21 +89,22 @@ function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div",
  {const rv=d.lesson_review||[];
   const queued=c=>pend(undefined,p=>p.op==="lesson_delete"&&Number(p.id)===Number(c.id)).length;
   const del=rv.filter(r=>r.verdict==="delete"&&!queued(r)),keep=rv.filter(r=>r.verdict==="keep"),unsure=rv.filter(r=>r.verdict==="unsure");
-  if(rv.length){const lf=fold("Lesson review ("+rv.length+" lessons: "+del.length+" to delete, "+keep.length+" supported, "+unsure.length+" unsure)",del.length>0);
+  if(rv.length){const lf=gfold("Lesson review ("+rv.length+" lessons: "+del.length+" to delete, "+keep.length+" supported, "+unsure.length+" unsure)",del.length>0);
    lf.append(el("div","meta","Each lesson was written after only a few attempts. Here it is re-judged on every attempt on record now, for the same setting, floor and hardware: its record with a 95% range, and how likely it still beats the best alternative that was tried. Delete = nothing backs it any more, a newer lesson says it again, or the alternatives now clearly do better. Deleted lessons move to the review Trash on the Pi."));
    if(del.length){const ab=btn("Delete the "+del.length+" lessons the data does not support",()=>confirmThen("Queue the deletion of "+del.length+" lessons? They move to the Trash on the Pi at the next sync.",()=>queueMany(del.map(c=>({op:"lesson_delete",id:c.id})),"lesson deletions")),"danger");ab.style.margin="6px 0";lf.append(ab)}
-   const show=(title,rows,open)=>{if(!rows.length)return;const sf=fold(title+" ("+rows.length+")",open);for(const c of rows)sf.append(el("div","meta","#"+c.id+" \u00b7 "+c.goal+": "+c.text.slice(0,110)+" \u2014 "+c.why));lf.append(sf)};
+   const show=(title,rows,open)=>{if(!rows.length)return;const sf=gfold(title+" ("+rows.length+")",open);for(const c of rows)sf.append(el("div","meta","#"+c.id+" \u00b7 "+c.goal+": "+c.text.slice(0,110)+" \u2014 "+c.why));lf.append(sf)};
    show("Delete: not supported by the data",del,true);show("Keep: supported by the data",keep,false);show("Unsure: more attempts needed",unsure,false);
    list.append(lf)}}
 
  d.goals.forEach((g,i)=>goalCard(list,g,f,i));
 
- const t=d.turns||{};const tf=fold("Turns in the last "+t.days+" days ("+(t.count||0)+")",false);for(const c of (t.causes||[]))tf.append(el("div","meta",c.n+" × "+c.cause));for(const r of (t.recent||[]))tf.append(el("div","meta",r.time+" · "+r.kind+" "+(r.direction||"")+" "+(r.degrees||"")+"° · "+r.why+(r.ball?" · ball "+Math.round(r.ball)+" in at "+Math.round(r.ball_deg)+"°":"")+(r.wall_in?" · wall reading "+r.wall_in+" in":"")));list.append(tf);
- if((d.other_lessons||[]).length){const of=fold("Other lessons ("+d.other_lessons.length+")",false);for(const l of d.other_lessons)of.append(el("div","meta","#"+l.id+" · "+l.time+": "+l.text));list.append(of)}
- if((d.edit_history||[]).length){const hf=fold("Edits sent to G2 ("+d.edit_history.length+")",false);for(const h of d.edit_history)hf.append(el("div","meta",h.time+" · "+(h.ok?"done":"FAILED")+" · "+h.text+(h.ok?"":" — "+h.answer)));list.append(hf)}
+ const t=d.turns||{};const tf=gfold("Turns in the last "+t.days+" days ("+(t.count||0)+")",false);for(const c of (t.causes||[]))tf.append(el("div","meta",c.n+" × "+c.cause));for(const r of (t.recent||[]))tf.append(el("div","meta",r.time+" · "+r.kind+" "+(r.direction||"")+" "+(r.degrees||"")+"° · "+r.why+(r.ball?" · ball "+Math.round(r.ball)+" in at "+Math.round(r.ball_deg)+"°":"")+(r.wall_in?" · wall reading "+r.wall_in+" in":"")));list.append(tf);
+ if((d.other_lessons||[]).length){const of=gfold("Other lessons ("+d.other_lessons.length+")",false);for(const l of d.other_lessons)of.append(el("div","meta","#"+l.id+" · "+l.time+": "+l.text));list.append(of)}
+ if((d.edit_history||[]).length){const hf=gfold("Edits sent to G2 ("+d.edit_history.length+")",false);for(const h of d.edit_history)hf.append(el("div","meta",h.time+" · "+(h.ok?"done":"FAILED")+" · "+h.text+(h.ok?"":" — "+h.answer)));list.append(hf)}
 }
 
-function goalOpen(id,i){try{const m=JSON.parse(localStorage.getItem("g2GoalOpen")||"{}");if(id in m)return !!m[id]}catch(e){}return i===0}
+function goalOpen(id,i){try{if(localStorage.getItem("g2GoalOpenV")!=="2"){localStorage.removeItem("g2GoalOpen");localStorage.setItem("g2GoalOpenV","2")}      // the choices saved under the old rule (only the first goal open) are dropped once
+ const m=JSON.parse(localStorage.getItem("g2GoalOpen")||"{}");if(id in m)return !!m[id]}catch(e){}return true}       // every goal's card (its summary: the numbers, the charts) starts open; the sections inside it start collapsed
 function setGoalOpen(id,v){try{const m=JSON.parse(localStorage.getItem("g2GoalOpen")||"{}");m[id]=!!v;localStorage.setItem("g2GoalOpen",JSON.stringify(m))}catch(e){}}
 function goalCard(parent,g,f,idx){
  const list=el("div"),df=g.definition||{},rate=g.counted?Math.round(100*g.successes/g.counted):null;
@@ -138,7 +140,7 @@ function goalCard(parent,g,f,idx){
  const pr=pend(g.id,p=>p.op==="set"||p.op==="reset");if(pr.length)acts.append(pendChip(pr.map(p=>p.text).join("; ")));list.append(acts);
 
  // definition
- const dfd=fold("How this goal is set up",false);const rows=[["Attempts per session",df.attempts],["Time limit",(df.minutes??"?")+" min"],["Starts only above",(df.min_pack_pct??"?")+"% pack"],["Ends early after",df.target_successes?df.target_successes+" successes":"never (uses every attempt)"],["Rest between attempts",(df.rest_between_s??"?")+" s"],["Start phrases",(df.start_words||[]).map(w=>"G2, "+w).join(" · ")||"(none)"]];
+ const dfd=gfold("How this goal is set up",false);const rows=[["Attempts per session",df.attempts],["Time limit",(df.minutes??"?")+" min"],["Starts only above",(df.min_pack_pct??"?")+"% pack"],["Ends early after",df.target_successes?df.target_successes+" successes":"never (uses every attempt)"],["Rest between attempts",(df.rest_between_s??"?")+" s"],["Start phrases",(df.start_words||[]).map(w=>"G2, "+w).join(" · ")||"(none)"]];
  if(g.kind==="standing")dfd.append(el("div","meta","A standing goal has no start or end: every encounter in any activity counts as an attempt."));
  const dt=el("table","gtbl");for(const [a,b] of rows){const tr=el("tr");tr.append(el("td","",a),el("td","",String(b)));dt.append(tr)}dfd.append(dt);list.append(dfd);
 
@@ -146,7 +148,7 @@ function goalCard(parent,g,f,idx){
  overridesList(list,g);
  lessonsList(list,g,f);
  attemptsTable(list,g,f);
- const sess=fold("Sessions ("+g.sessions.length+")",false);for(const s of g.sessions){sess.append(el("div","meta",s.time+" · "+s.successes+" of "+s.attempts+" good · "+(s.minutes||0).toFixed(1)+" min · ended: "+s.why))}list.append(sess);
+ const sess=gfold("Sessions ("+g.sessions.length+")",false);for(const s of g.sessions){sess.append(el("div","meta",s.time+" · "+s.successes+" of "+s.attempts+" good · "+(s.minutes||0).toFixed(1)+" min · ended: "+s.why))}list.append(sess);
 }
 
 function settingsTable(list,g){
@@ -156,7 +158,7 @@ function settingsTable(list,g){
  const isInPlay=k=>ovr.some(o=>o.knob===k.name&&o.kind!=="banned")||!!learned[k.name]||pend(g.id,p=>p.knob===k.name).length>0;
  const inPlay=knobs.filter(isInPlay),rest=knobs.filter(k=>!isInPlay(k));
  inPlay.sort((a,b)=>((learned[b.name]||{}).focus?1:0)-((learned[a.name]||{}).focus?1:0)||a.name.localeCompare(b.name));
- const mk=(arr,title,open)=>{const sf=fold(title+" ("+arr.length+")",open);if(!arr.length){sf.append(el("div","empty","None."));return sf}
+ const mk=(arr,title,open)=>{const sf=gfold(title+" ("+arr.length+")",open);if(!arr.length){sf.append(el("div","empty","None."));return sf}
   const t=el("table","gtbl"),h=el("tr");for(const x of ["Setting","In use","Who changes it","What G2 tried (good of tries)",""])h.append(el("th","",x));t.append(h);
   for(const k of arr){const tr=el("tr"),L=learned[k.name];const c1=el("td");c1.append(el("div","",(L&&L.focus?"★ ":"")+k.label),el("div","meta",k.name));
    const pin=ovr.find(o=>o.kind==="pin"&&o.knob===k.name),lim=ovr.find(o=>o.kind==="limit"&&o.knob===k.name);
@@ -176,7 +178,7 @@ function settingsTable(list,g){
 }
 
 function overridesList(list,g){
- const ovr=g.override_rows||[];if(!ovr.length)return;const of=fold("Your overrides ("+ovr.length+")",true);
+ const ovr=g.override_rows||[];if(!ovr.length)return;const of=gfold("Your overrides ("+ovr.length+")",true);
  for(const o of ovr){const r=el("div","row"),mn=el("div","main");
   const text=o.kind==="pin"?"Pinned "+o.knob+" = "+o.value:o.kind==="limit"?"Limit "+o.knob+": "+o.lo+" to "+o.hi:"Undone value of "+o.knob+": "+o.value+" (G2 will not use it)";
   mn.append(el("div","",text),el("div","meta","Applies to: "+(o.scope==="all"?"everywhere":o.scope)));
@@ -185,7 +187,7 @@ function overridesList(list,g){
   r.prepend(mn);of.append(r)}list.append(of)}
 
 function lessonsList(list,g,f){
- const les=g.lessons.filter(l=>!f||l.text.toLowerCase().includes(f));const lf=fold("What G2 learned ("+les.length+")",true);
+ const les=g.lessons.filter(l=>!f||l.text.toLowerCase().includes(f));const lf=gfold("What G2 learned ("+les.length+")",true);
  lf.append(btn("Add a lesson",async()=>{const v=await ask("Add a lesson for "+g.title,[{key:"text",label:"What G2 should remember",type:"textarea",hint:"Write it the way the saved ones read. A note naming a date or time is refused."}],"Queue lesson");if(v&&v.text)queue({op:"lesson_add",text:g.title+": "+v.text.trim()},"a new lesson")}));
  if(!les.length)lf.append(el("div","empty","No lessons saved yet."));
  for(const l of les){const r=el("div","row"),mn=el("div","main");mn.append(el("div","",l.text),el("div","meta","#"+l.id+" · "+l.time));
@@ -200,7 +202,7 @@ function attemptsTable(list,g,f){
  let att=g.attempts.filter(a=>!f||JSON.stringify(a).toLowerCase().includes(f));
  att=att.filter(a=>s.result==="all"||(s.result==="good"&&a.success&&a.counted)||(s.result==="bad"&&!a.success&&a.counted)||(s.result==="uncounted"&&!a.counted));
  att=att.filter(a=>s.cond==="all"||JSON.stringify(a.conditions,Object.keys(a.conditions).sort())===s.cond);
- const af=fold("Attempts ("+att.length+" of "+g.attempts.length+")",false);
+ const af=gfold("Attempts ("+att.length+" of "+g.attempts.length+")",false);
  const fb=el("div");fb.style.margin="4px 0";
  for(const [k,t] of [["all","All"],["good","Good"],["bad","Not good"],["uncounted","Not counted"]])fb.append(btn(t,()=>{s.result=k;render()},s.result===k?"on":""));
  const cs=el("select");cs.append(Object.assign(el("option","","All floors and hardware"),{value:"all"}));for(const c of g.conditions_seen||[]){const o=el("option","",COND_LABEL(JSON.parse(c)));o.value=c;cs.append(o)}cs.value=s.cond;cs.onchange=()=>{s.cond=cs.value;render()};cs.style.marginLeft="8px";fb.append(cs);af.append(fb);
