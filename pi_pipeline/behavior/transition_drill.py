@@ -169,7 +169,7 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
     return {"cycles": done, "fell": fell, "fell_at": "stand-up from rest" if fell else "", "worst_swing_deg": round(worst, 1), "near_falls": near, "swings": swings, "min_volts": vmins, "poses": poses}
 
 
-def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hold_s: float = 6.0, watch_s: float = 4.0, look: bool = True) -> dict:
+def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hold_s: float = 6.0, watch_s: float = 10.0, look: bool = True) -> dict:
     """The stand-up out of the attention pose, `cycles` times (owner, 2026-11-12: the back legs fell over backwards right after it). Each cycle: from standing, the eased move into the attention pose (`kcalib`),
     the claw look the roams make (arm up, left, right, centre, down; no pictures) or, with `look=False`, a hold of `hold_s` seconds, the pose and joints the board reports, then the eased stand-up (`kup`, as the
     survey sends it, which plays the K stand-up from the attention pose) and the tilt for `watch_s` seconds. Stops at the first fall or a swing of STANDUP_FELL_SWING_DEG. Returns {"cycles", "fell", "worst_swing_deg", "swings", "end_tilts", "poses"}."""

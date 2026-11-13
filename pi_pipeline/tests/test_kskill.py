@@ -305,19 +305,38 @@ def test_the_pose_is_read_before_every_stand_up_an_unknown_one_gets_a_rest_first
     assert ev[0]["start"] == "ksit" and ev[1]["start"] == "unknown" and ev[1]["eased_from_reported"] is True and all("seconds" in e and e["outcome"] in ("reached", "forced") for e in ev)
 
 
-def test_the_attention_stand_up_has_the_back_legs_fully_up_before_the_front_legs_start(monkeypatch):
-    """Owner, 2026-11-12: the back legs stand first and the front legs start only after the back legs have fully stood up (a short pause between). The stand-up from rest keeps its own timing."""
+def test_the_attention_stand_up_timing_knobs_default_to_the_rest_stand_up_and_can_stagger_the_legs(monkeypatch):
+    """The back legs leading more tipped him further back (2026-11-12), so the defaults are the rest stand-up's numbers; the knobs stay for trying another stagger."""
     from pi_pipeline.gait import standup
     goal = standup.balance_pose()
     t, r = kskill.tuning(from_attention=True), kskill.tuning()
-    assert (t["front_start"], t["rear_end"], t["rear_hold"]) == (0.5, 0.5, 4) and (r["front_start"], r["rear_end"], r["rear_hold"]) == (0.2, 0.7, 0)
-    fr = kskill.stand_frames([0.0] * 8, goal, None, None, t["steps"], t["front_start"], t["rear_end"])
-
-    def done(frame, idx):
-        return sum(frame[kskill.URDF_TO_SERVO[k]] / goal[k] for k in idx) / len(idx)
-    assert done(fr[3], (4, 5, 6, 7)) > 0.999 and all(done(fr[i], (0, 1, 2, 3)) < 0.001 for i in range(4))      # the fourth stage: back legs all the way up, front legs not moved yet
-    assert done(fr[7], (0, 1, 2, 3)) > 0.999
+    assert (t["front_start"], t["rear_end"], t["rear_hold"]) == (0.2, 0.7, 0) == (r["front_start"], r["rear_end"], r["rear_hold"])
+    monkeypatch.setenv("G2_STAND_ATT_FRONT_START", "0.5")
+    monkeypatch.setenv("G2_STAND_ATT_REAR_END", "0.5")
+    monkeypatch.setenv("G2_STAND_ATT_REAR_HOLD", "4")
+    t = kskill.tuning(from_attention=True)
+    assert (t["front_start"], t["rear_end"], t["rear_hold"]) == (0.5, 0.5, 4)
     seen = {}
     monkeypatch.setattr(kskill, "behavior_payload", lambda frames, speeds, delays: seen.update(delays=list(delays)) or b"x")
     kskill.stand_payload([0.0] * 8, goal, None, None, steps=8, speeds=t["speeds"], front_start=t["front_start"], rear_end=t["rear_end"], rear_hold=t["rear_hold"])
-    assert seen["delays"] == [0, 0, 0, 4, 0, 0, 0, 0]                                              # the pause is after the stage in which the back legs arrive
+    assert seen["delays"] == [0, 0, 0, 4, 0, 0, 0, 0]
+
+
+def test_a_stand_up_out_of_the_attention_pose_lies_down_in_rest_first_and_stands_up_from_rest(monkeypatch):
+    """Owner, 2026-11-12: the stand-up straight out of the attention pose tipped him over backwards after a claw look; the one from rest never did. The pose is read as the attention pose, `krest`
+    goes first, then the normal stand-up from rest (the lift servo easing up with the legs). G2_STAND_ATT_VIA_REST=0 plays the K stand-up straight out of the attention pose as before."""
+    import json
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: [0] * 16)                 # every joint at 0: the attention pose
+    monkeypatch.setenv("G2_MOTION_EVENTS", "off")
+    lk.last_motion_command = "kcalib"
+    assert lk._stand_up_kskill(standup) is True
+    cmds = [w.strip() for w in wrote]
+    assert b"krest" in cmds and cmds.index(b"krest") < next(i for i, w in enumerate(wrote) if w[:1] == b"K")
+    first = [b - 256 if b > 127 else b for b in _k_message(wrote)[8:8 + 20]]
+    assert first[1] > 0                                                                       # a stand-up from rest: the lift servo eases up with the legs
+    wrote.clear()
+    monkeypatch.setenv("G2_STAND_ATT_VIA_REST", "0")
+    lk.last_motion_command = "kcalib"
+    assert lk._stand_up_kskill(standup) is True and b"krest" not in [w.strip() for w in wrote]

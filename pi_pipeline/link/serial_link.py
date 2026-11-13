@@ -541,6 +541,14 @@ class SerialLink:
             if j0:
                 ev["legs"] = [int(j0[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
             ev["rested_first"] = False
+            if pose == "attention" and motion_feel.get("STAND_ATT_VIA_REST") >= 1:
+                # from the attention pose he lies down first and then stands up from rest (owner, 2026-11-12: the stand-up straight out of the attention pose after a claw look tipped him over backwards, the one from rest never did)
+                log.info("stand-up out of the attention pose: lying down in rest first, then the stand-up from rest")
+                self._write_pose("krest")
+                time.sleep(REST_FIRST_S)
+                self._write_pose("gb")
+                self.last_motion_command, self._last_motion_t = "krest", time.monotonic()
+                ev["via_rest"], pose = True, "rest"
             if pose == "unknown" and j0 is not None:
                 # a readable pose that is not one of the four (the survey bow, the check lean): eased from the angles the board reports, never a `krest` first (owner, 2026-11-10: "ease the bow to rest";
                 # the rest-first rule of 2026-11-09 stays for an UNREADABLE pose)

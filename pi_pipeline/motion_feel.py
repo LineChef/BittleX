@@ -22,9 +22,10 @@ STAND_WAIT_S = 3.4         # how long the Pi waits for the rise to finish before
 # ---- THE STAND-UP OUT OF THE ATTENTION POSE: its own, slightly slower numbers (owner, 2026-11-08: "standups out of the attention position were getting close to falling"); the rest stand-up above is unchanged.
 STAND_ATT_SPEED = 10       # slow speed at the first and last stages (the same idea as STAND_SPEED; the rest stand-up uses 12).
 STAND_ATT_SPEED_MID = 22   # the faster middle stages (the rest stand-up uses STAND_SPEED_MID).
-STAND_ATT_FRONT_START = 0.5    # when the front legs start to rise, as a fraction of the stand-up's time (the rest stand-up uses 0.2). Owner, 2026-11-12: the front legs start only after the back legs have fully stood up, so this is not below STAND_ATT_REAR_END.
-STAND_ATT_REAR_END = 0.5       # when the back legs are done rising, as a fraction of the time (the rest stand-up uses 0.7). With 8 stages the back legs take the first four and the front legs the last four.
-STAND_ATT_REAR_HOLD = 4        # a pause after the stage in which the back legs arrive, in 50 ms units (4 = 0.2 s): the front legs wait until the back legs have settled. 0 = no pause.
+STAND_ATT_FRONT_START = 0.2    # when the front legs start to rise, as a fraction of the stand-up's time, for a stand-up out of the attention pose when STAND_ATT_VIA_REST is 0 (the same as the stand-up from rest). Making the back legs lead more tipped him further back on 2026-11-12 (45/65: pitch -34 to -38; 50/50 with a pause: -71).
+STAND_ATT_REAR_END = 0.7       # when the back legs are done rising, as a fraction of the time (the same as the stand-up from rest).
+STAND_ATT_REAR_HOLD = 0        # a pause after the stage in which the back legs arrive, in 50 ms units. 0 = none.
+STAND_ATT_VIA_REST = 1         # 1 = a stand-up out of the attention pose first lies down in the rest position and then plays the normal stand-up from rest (owner, 2026-11-12: every stand-up out of the attention pose after a claw look fell over backwards; the stand-up from rest was level every time). 0 = the K stand-up straight out of the attention pose.
 STAND_ATT_WAIT_S = 4.0     # the longest the Pi waits for the board to finish (it stops waiting as soon as the legs read as up).
 
 # ---- EASING INTO THE ATTENTION POSE (owner, 2026-11-08: he "sits hard into the attention position"; the firmware `kcalib` moves every joint at once at full speed). UNTESTED on G2 until the next session.
