@@ -76,7 +76,7 @@ def _sharpness(jpeg: bytes) -> float:
 
 class ExplorationPictureSaver:
     def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
-                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0, wait_still=None, on_failure=None, on_survey_stop=None):
+                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0, wait_still=None, on_failure=None, on_survey_stop=None, on_survey=None):
         self._source = source
         self._prep_every_s = prep_every_s           # the camera prep (the throwaway frames that let auto-exposure settle) is done for the first picture and again after this long (0 = every picture)
         self._last_prep: float | None = None
@@ -85,6 +85,7 @@ class ExplorationPictureSaver:
         self._root = Path(os.path.expanduser(root))
         self._clock = clock
         self._warn_mb = warn_mb
+        self._on_survey = on_survey                # called with the path of each saved SURVEY picture (not a look, not a named one): the suggested label (vision/guess_labels.py)
         self._on_saved = on_saved                  # called with the saved path (a shutter tick, a counter)
         self._on_survey_stop = on_survey_stop      # called as (path or None, sidecar dict, jpeg bytes) for every survey-stop picture (kind 'after_bow'), also a near-duplicate that was not kept: the place log (behavior/place_log.py)
         self._survey_distance, self._named_distance = survey_distance, named_distance
@@ -215,6 +216,11 @@ class ExplorationPictureSaver:
         if kind.startswith("look_"):
             self._trim_looks(folder.parent)
             return str(path)                                             # look-only pictures are never offered to the object gallery
+        if self._on_survey and not kind.startswith("name:"):
+            try:
+                self._on_survey(str(path))                                 # a suggested label for review: it never touches the gallery
+            except Exception:  # noqa: BLE001
+                log.debug("on_survey hook failed", exc_info=True)
         if self._on_saved and kind.startswith("name:"):                 # only a picture named by voice feeds the object gallery; survey pictures wait for the filter, your label and a promotion (user, 2026-10-10)
             try:
                 self._on_saved(str(path))
@@ -344,7 +350,7 @@ def list_pictures(root: str = DEFAULT_ROOT) -> list[dict]:
         out.append({"path": rel, "group": rel.split("/")[0], "folder": f.parent.name, "pose": meta.get("pose"), "name": meta.get("name"),
                     "time": meta.get("time") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(f.stat().st_mtime)),
                     "brightness": (meta.get("exposure") or {}).get("mean"), "detector": sorted({d["label"] for d in meta.get("detections", [])} - set(meta.get("dismissed_labels", []))),
-                    "dismissed": sorted(set(meta.get("dismissed_labels", []))),
+                    "dismissed": sorted(set(meta.get("dismissed_labels", []))), "guess": meta.get("guess"),
                     "bytes": f.stat().st_size})
     return out
 

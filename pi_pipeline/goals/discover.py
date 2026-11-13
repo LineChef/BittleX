@@ -5,12 +5,16 @@ asks the interest scorer whether an unknown object is in view (not a person, not
 candidate (`behavior/interest_watch.py`, `vision/object_gallery.py`). This goal adds the measuring and the learning: what an attempt produced is read back from the gallery file and the new
 pictures' sidecars, scored, and the judge tunes how often he looks and when he gives up being picky, per floor and hardware, like the ball goal.
 
-  new_object     a candidate that was not in the gallery before, with MIN_PICTURES or more usable pictures taken during the roam        success
-  few_pictures   a new candidate, but fewer usable pictures than that                                                                   partial
-  nothing_new    pictures were taken, but everything in them was already known (no new candidate)                                         miss
+  pictures_captured  MIN_PICTURES or more usable survey pictures taken during the roam                                                success
+  few_pictures   some usable pictures, but fewer than that                                                                              partial
+  none_usable    pictures were taken, but none was usable (a person in view, or a bad exposure)                                          miss
   never_found    no picture stop at all                                                                                                 miss
   fell           he fell                                                                                                                failed
   stopped        the user stopped it                                                                                                    not counted
+
+Success is capturing usable survey pictures (owner, 2026-11-12, confirmed). It is NOT a new gallery candidate: survey pictures never feed the gallery by themselves (2026-10-10: they wait for the
+filter, your label and a promotion), so the old rule (`new_object`: a new candidate in the gallery) could never be met and every roam was scored `nothing_new`. Each picture gets a suggested label
+(vision/guess_labels.py: the closest named object, or the camera detector's label) that you review and change in the Pictures tab of g2pics.
 
 A usable picture: a survey picture (not a throwaway look), no person detected in it, sensibly exposed. The pictures are filed under the room he was told he is in (memory/places.py) and
 appear in the Pictures tab of g2pics unnamed: you name them there, or he asks "what am I looking at?". Nothing here calls the API.
@@ -37,8 +41,9 @@ SPEC = {
 }
 DIAGNOSIS = {
     "never_found": [("peek_every_s", -1), ("relax_s", -1), ("fallback_s", -1), ("roam_s", +1)],
-    "nothing_new": [("roam_s", +1), ("peek_every_s", -1)],
-    "few_pictures": [("relax_s", -1), ("fallback_s", -1)],
+    "few_pictures": [("relax_s", -1), ("fallback_s", -1), ("roam_s", +1)],
+    "none_usable": [("roam_s", +1)],
+    "nothing_new": [("roam_s", +1), ("peek_every_s", -1)],              # (scored before 2026-11-12: kept so the old attempts in the journal still diagnose)
 }
 STAGE_OF = {k: "find" for k in SPEC}
 ENV = {"peek_every_s": "G2_INTEREST_EVERY_S", "fallback_s": "G2_INTEREST_FALLBACK_S", "relax_s": "G2_SURVEY_RELAX_S"}
@@ -201,7 +206,7 @@ class DiscoverObjects:
                 self._shared.exploring.set()                       # the goal session keeps the service's guards aside between attempts
         extra = judge_roam(str(ended), before, gallery_state(), pictures_since(t_wall - 1.0))
         extra["roam_s"] = roam_s
-        ctx.say(f"roam over ({ended}): {extra['pictures']} pictures, {extra['usable']} usable, {extra['new_candidates']} new candidate(s)")
+        ctx.say(f"roam over ({ended}): {extra['pictures']} pictures, {extra['usable']} usable")
         return AttemptResult(str(ended), round(time.monotonic() - t0, 1), [], extra)
 
     def score(self, result: AttemptResult, settings: dict) -> Outcome:
@@ -212,13 +217,13 @@ class DiscoverObjects:
             return Outcome("fell", 0.0, False, "I fell while looking for new objects", n, stages={"find": 0.0})
         if any(w in ended for w in ("voice command", "stopped", "stop")):
             return Outcome("stopped", None, False, "I was stopped while looking for new objects", n)
-        if x.get("new_candidates", 0) >= 1 and x.get("usable", 0) >= MIN_PICTURES:
-            return Outcome("new_object", 1.0, True, f"I found something new and took {x['usable']} usable pictures of it", n, stages={"find": 1.0})
-        if x.get("new_candidates", 0) >= 1:
-            return Outcome("few_pictures", 0.5, False, f"I found something new but only {x.get('usable', 0)} of its pictures were usable (I need {MIN_PICTURES})", n, stages={"find": 0.5})
+        if x.get("usable", 0) >= MIN_PICTURES:
+            return Outcome("pictures_captured", 1.0, True, f"I took {x['usable']} usable pictures of things to identify", n, stages={"find": 1.0})
+        if x.get("usable", 0) >= 1:
+            return Outcome("few_pictures", 0.5, False, f"I took only {x['usable']} usable picture(s) (I need {MIN_PICTURES})", n, stages={"find": 0.5})
         if x.get("pictures", 0) > 0:
-            return Outcome("nothing_new", 0.2, False, f"I took {x['pictures']} pictures but everything in them was already known", n, stages={"find": 0.2})
-        return Outcome("never_found", 0.0, False, "I did not find anything worth a picture", n, stages={"find": 0.0})
+            return Outcome("none_usable", 0.2, False, f"I took {x['pictures']} pictures but none was usable (a person in view or a bad exposure)", n, stages={"find": 0.2})
+        return Outcome("never_found", 0.0, False, "I did not take any picture", n, stages={"find": 0.0})
 
 
 def restore_env() -> None:

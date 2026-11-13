@@ -43,11 +43,15 @@ def _score(extra, ended="time limit"):
     return make("discover_objects").score(AttemptResult(ended, 100.0, [], extra), {})
 
 
-def test_a_roam_is_scored_from_what_it_left_in_the_gallery_and_the_pictures():
-    ok = _score({"new_candidates": 1, "usable": 4, "pictures": 5})
-    assert ok.code == "new_object" and ok.success and ok.score == 1.0 and ok.stages == {"find": 1.0}
-    assert _score({"new_candidates": 1, "usable": 2, "pictures": 3}).code == "few_pictures"
-    assert _score({"new_candidates": 0, "usable": 3, "pictures": 3}).code == "nothing_new"
+def test_a_roam_is_scored_by_the_usable_survey_pictures_it_took():
+    """Owner, 2026-11-12: capturing usable survey pictures is success. A new gallery candidate is not needed (survey pictures never feed the gallery by themselves)."""
+    ok = _score({"new_candidates": 0, "usable": 4, "pictures": 5})
+    assert ok.code == "pictures_captured" and ok.success and ok.score == 1.0 and ok.stages == {"find": 1.0}
+    assert _score({"new_candidates": 0, "usable": discover.MIN_PICTURES, "pictures": 3}).code == "pictures_captured"
+    few = _score({"new_candidates": 0, "usable": 2, "pictures": 3})
+    assert few.code == "few_pictures" and not few.success and few.score == 0.5
+    none = _score({"new_candidates": 0, "usable": 0, "pictures": 3})
+    assert none.code == "none_usable" and not none.success
     assert _score({"new_candidates": 0, "usable": 0, "pictures": 0}).code == "never_found"
     assert _score({}, ended="fell").code == "fell"
     stopped = _score({}, ended="voice command")
@@ -77,7 +81,7 @@ def test_an_attempt_runs_the_roam_with_the_knobs_as_settings_and_puts_them_back(
     res = ap.run_attempt({"roam_s": 120, "peek_every_s": 6.0, "relax_s": 40}, AttemptContext(say=lambda m: None))
     assert seen["env"] == ("6.0", "40") and os.environ.get("G2_INTEREST_EVERY_S") is None            # applied during the roam, restored after
     out = ap.score(res, {})
-    assert out.code == "new_object" and res.extra["usable"] == 3 and res.extra["roam_s"] == 120
+    assert out.code == "pictures_captured" and res.extra["usable"] == 3 and res.extra["roam_s"] == 120
 
 
 def test_a_goal_that_explores_needs_the_service_ready_for_an_exploration(monkeypatch):
@@ -102,7 +106,7 @@ def test_an_exploration_is_judged_like_a_roam_and_the_goals_own_roam_is_left_to_
         _pic(tmp_path, "survey/20261106", f"p{i}")
     gal.write_text(json.dumps({"entries": {"a": {"name": "mug", "sample_count": 3}, "b": {"sample_count": 3}}}))        # a new unnamed candidate
     o = discover.outcome_of_exploration("roam time limit", before, started - 1, 200.0)
-    assert o is not None and o.code == "new_object" and o.success
+    assert o is not None and o.code == "pictures_captured" and o.success
     assert discover.outcome_of_exploration("roam time limit", before, started - 1, 20.0) is None                        # too short to say anything
     monkeypatch.setenv(discover.GOAL_ROAM_ENV, "1")
     assert discover.outcome_of_exploration("roam time limit", before, started - 1, 200.0) is None                       # the goal's own roam
