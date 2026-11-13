@@ -576,7 +576,7 @@ class SerialLink:
                 start = [float(j[kskill.URDF_TO_SERVO[k]]) for k in range(8)]
                 lift0, lift1 = float(j[1]), p.get("arm_walk")
             t = kskill.tuning(from_attention=(last == "kcalib"))
-            data = kskill.message(kskill.stand_payload(start, standup.balance_pose(), lift0, lift1, steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"], front_start=t["front_start"], rear_end=t["rear_end"]))
+            data = kskill.message(kskill.stand_payload(start, standup.balance_pose(), lift0, lift1, steps=t["steps"], speed_raw=t["speed"], delay_raw=t["delay"], speeds=t["speeds"], front_start=t["front_start"], rear_end=t["rear_end"], rear_hold=t["rear_hold"]))
             from pi_pipeline.attachments import flag_explicit_on
             keep_on = flag_explicit_on("gyro_balance")             # the gyro balance is on for the whole run (G2_GYRO_BALANCE=1): leave it
             gyro = keep_on or motion_feel.get("STAND_GYRO") >= 1     # on while the board plays the rise (the gyro-on stand-up was 10 of 10)

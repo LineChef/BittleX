@@ -80,17 +80,22 @@ def tuning(from_attention: bool = False) -> dict:
     if mid > 0:                                           # slow at the start and the end, fast through the middle (owner, 2026-11-08: the half-up pose is where he tips)
         for k in range(slow_n, steps - slow_n):
             speeds[k] = max(1, mid)
-    out = {"steps": steps, "speed": speed, "speeds": speeds, "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, wait), "front_start": 0.2, "rear_end": 0.7}
+    out = {"steps": steps, "speed": speed, "speeds": speeds, "delay": max(0, int(mf.get("STAND_PAUSE"))), "wait_s": max(0.5, wait), "front_start": 0.2, "rear_end": 0.7, "rear_hold": 0}
     if from_attention:                                    # the back legs finish rising before the front legs get going (owner, 2026-11-12)
-        out["front_start"], out["rear_end"] = float(mf.get("STAND_ATT_FRONT_START")), float(mf.get("STAND_ATT_REAR_END"))
+        out["front_start"], out["rear_end"], out["rear_hold"] = float(mf.get("STAND_ATT_FRONT_START")), float(mf.get("STAND_ATT_REAR_END")), max(0, int(mf.get("STAND_ATT_REAR_HOLD")))
     return out
 
 
-def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0, speeds: list | None = None, front_start: float = 0.2, rear_end: float = 0.7) -> bytes:
+def stand_payload(start_urdf, goal_urdf, lift0=None, lift1=None, *, steps: int = 8, speed_raw: int = 24, delay_raw: int = 0, speeds: list | None = None, front_start: float = 0.2, rear_end: float = 0.7, rear_hold: int = 0) -> bytes:
     """The stand-up skill: `steps` frames, each a move at `speed_raw` / 8 (or its own entry of `speeds`) followed by a pause of `delay_raw` x 50 ms."""
     frames = stand_frames(start_urdf, goal_urdf, lift0, lift1, steps, front_start, rear_end)
     sp = list(speeds) if speeds is not None and len(speeds) == len(frames) else [speed_raw] * len(frames)
-    return behavior_payload(frames, sp, [delay_raw] * len(frames))
+    delays = [delay_raw] * len(frames)
+    if rear_hold > 0:                                     # a pause after the stage in which the back legs arrive: the front legs wait until they have settled
+        import math as _m
+        k = min(len(frames), max(1, _m.ceil(rear_end * len(frames) - 1e-9))) - 1
+        delays[k] = max(delays[k], int(rear_hold))
+    return behavior_payload(frames, sp, delays)
 
 
 def message(payload: bytes) -> bytes:
