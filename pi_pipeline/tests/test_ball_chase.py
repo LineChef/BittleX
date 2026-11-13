@@ -1262,7 +1262,10 @@ def test_a_stand_only_round_rests_stands_and_stops_at_the_first_fall(monkeypatch
 
 def test_attention_stand_drill_stands_from_the_attention_pose_each_cycle_and_stops_at_a_fall(monkeypatch):
     from pi_pipeline.behavior import ball_chase as bc, transition_drill as td
+    from pi_pipeline.behavior import claw_survey
     monkeypatch.setattr(bc, "read_joints", lambda link, timeout_s=1.0, **kw: [0] * 16)
+    looks = []
+    monkeypatch.setattr(claw_survey, "run_claw_look", lambda *a, **kw: looks.append(1) or "ok")
     sent = []
 
     class Link:
@@ -1273,9 +1276,10 @@ def test_attention_stand_drill_stands_from_the_attention_pose_each_cycle_and_sto
         def __init__(self, swings): self._lk, self.swings, self._pitch, self._roll, self.t = Link(), list(swings), [], [], 0.0
         def _clock(self): self.t += 0.5; return self.t
         def _fell(self): return False
+        def fallen(self): return False
         def swing_deg(self): return self.swings.pop(0)
     ok = td.run_attention_stands(R([3.0, 4.0, 5.0]), 3, say=lambda *a: None, sleep=lambda s: None)
-    assert ok["cycles"] == 3 and not ok["fell"] and sent.count("kcalib") == 3 and sent.count("kbalance") == 3 and ok["swings"] == [3.0, 4.0, 5.0]
+    assert ok["cycles"] == 3 and not ok["fell"] and sent.count("kcalib") == 3 and sent.count("kup") == 3 and len(looks) == 3 and ok["swings"] == [3.0, 4.0, 5.0]
     sent.clear()
     bad = td.run_attention_stands(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
-    assert bad["fell"] and bad["cycles"] == 1 and sent.count("kbalance") == 2
+    assert bad["fell"] and bad["cycles"] == 1 and sent.count("kup") == 2
