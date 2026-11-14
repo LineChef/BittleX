@@ -52,6 +52,7 @@ TX and RX cross: each board's transmit line goes to the other's receive line. Pi
 2. No BiBoard wire is on the Pi's pin 2. Pin 2 does carry the amp's 5 V in Part 2, and that is a separate wire.
 3. BiBoard TX2 goes to Pi pin 10, not pin 8. They are easy to swap.
 4. All three wires are seated at both ends.
+5. The plug is the right way round on the BiBoard's 5-pin header, with the TX2 wire on the square-pad pin. A reversed plug leaves the port open but silent: the Pi gets no motion data and the voice service reports "the board is not answering" after 20 s.
 
 Part 2: Everything wired into the Pi
 ------------------------------------
