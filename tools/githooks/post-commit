@@ -14,4 +14,16 @@ if [ -f "$src" ]; then
   mkdir -p "$backup_dir"
   cp "$src" "$backup_dir/CLAUDE.md.backup"
 fi
+
+# Also keep the other local, gitignored Claude Code files backed up (skills, path-scoped rules, settings), copied beside
+# the CLAUDE.md backup into one folder; same reason: outside the repo, never tracked.
+root="$(git rev-parse --show-toplevel)"
+cfg="$backup_dir/claude-config-backup"
+if [ -d "$root/.claude" ]; then
+  mkdir -p "$cfg"
+  [ -f "$src" ] && cp "$src" "$cfg/CLAUDE.md"
+  [ -f "$root/.claude/settings.json" ] && cp "$root/.claude/settings.json" "$cfg/settings.json"
+  [ -d "$root/.claude/skills" ] && rsync -a --delete "$root/.claude/skills/" "$cfg/skills/"
+  [ -d "$root/.claude/rules" ] && rsync -a --delete "$root/.claude/rules/" "$cfg/rules/"
+fi
 exit 0

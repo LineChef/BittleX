@@ -118,6 +118,19 @@ fi
 left="$(python3 "$(git rev-parse --show-toplevel)/tools/g2_cleanup.py" --check 2>/dev/null || true)"
 [ -n "$left" ] && echo "pre-commit: $left"
 
+# --- 8. secrets: BLOCK a commit whose staged additions contain a credential-shaped string (plain regex, no downloads). -----------
+# Covers Anthropic/OpenAI-style keys, AWS access key ids, GitHub tokens, Slack tokens, PEM private keys and a KEY= assignment with a long value.
+# Skips tools/githooks/* (this pattern list would match itself) and .env.example. Bypass a genuine false positive:  git commit --no-verify
+secret_pattern='sk-ant-[A-Za-z0-9_-]{20,}|(^|[^A-Za-z0-9])sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN ([A-Z]+ )?PRIVATE KEY-----|[A-Z_]*(API_KEY|SECRET|TOKEN|PASSWORD)[A-Z_]*=[^[:space:]]{20,}'
+secret_hits="$(git diff --cached --unified=0 --no-color -- . ':(exclude)tools/githooks/*' ':(exclude).env.example' \
+  | grep -E '^\+' | grep -vE '^\+\+\+' | grep -En -e "$secret_pattern" | cut -c1-12 || true)"
+if [ -n "$secret_hits" ]; then
+  echo "pre-commit: a credential-shaped string appears in the staged changes (only the first characters are shown):"
+  printf '%s\n' "$secret_hits" | sed 's/^/  /'
+  echo "Remove it and keep secrets in the gitignored .env, or --no-verify if it is truly a false positive."
+  exit 1
+fi
+
 repo_root="$(git rev-parse --show-toplevel)"
 terms_file="$repo_root/.gitprivacy-terms"
 [ -f "$terms_file" ] || exit 0   # no term list -> nothing to enforce
