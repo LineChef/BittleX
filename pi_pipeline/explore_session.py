@@ -397,19 +397,27 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         tts = None
         narrator = None
         say = lambda text: None  # noqa: E731
+        speech_closed = threading.Event()                 # set when the session ends: nothing new is spoken, so no thread is inside the speech engine when the process exits
+        speech_lock = [None]
         if not args.no_narrate and not args.light:
             raw = tts_future.result()                                            # started at the top of main()
             log.info("speech engine ready %.1f s after the session started", time.monotonic() - boot_t0)
             lock = threading.Lock()
 
+            speech_lock[0] = lock
+
             class _Locked:                                                    # narration and replies never talk over each other
                 def speak(self, text):
+                    if speech_closed.is_set():
+                        return
                     with lock:
                         raw.speak(text)
 
             if hasattr(raw, "prepare") and hasattr(raw, "play"):
                 _Locked.prepare = lambda self, text: raw.prepare(text)             # synthesis (or the cached audio) happens outside the lock
                 def _play(self, item):
+                    if speech_closed.is_set():
+                        return
                     with lock:
                         raw.play(item)
                 _Locked.play = _play
@@ -628,6 +636,13 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
             t.join(timeout=2.0)
             guard.stop()
             watcher.stop()
+            speech_closed.set()                                               # the end of speaking: a line in the middle of being spoken finishes, nothing new starts, the narrator thread ends (the exit aborted inside the speech engine, 2026-11-13)
+            if narrator is not None:
+                narrator.close(timeout=6.0)
+            for _th in announce_threads:
+                _th.join(timeout=3.0)
+            if speech_lock[0] is not None and speech_lock[0].acquire(timeout=8.0):
+                speech_lock[0].release()
             try:                                                              # reflection level 1: keep a recap of this session (never disturbs the shutdown)
                 from .behavior.place_log import read_stops
                 from .reflection.recap import ExperienceLog, build_recap

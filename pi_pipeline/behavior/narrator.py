@@ -82,12 +82,33 @@ class Narrator:
         self.stale_s = 6.0                       # a line queued longer than this is old news (2026-10-08: lines were spoken 4-120 s late): dropped
         self.said: list[str] = []
         self._threaded = threaded
+        self._thread = None
         if threaded:
-            threading.Thread(target=self._run, name="narrator", daemon=True).start()
+            self._thread = threading.Thread(target=self._run, name="narrator", daemon=True)
+            self._thread.start()
+
+    def close(self, timeout: float = 6.0) -> None:
+        """Stop narrating and let the speaking thread finish the line it is in the middle of, so the process can exit without a daemon thread inside the speech engine (2026-11-13: the exit aborted with "terminate
+        called without an active exception"). Nothing queued is spoken after this."""
+        self.enabled = False
+        try:
+            while True:
+                self._q.get_nowait()                    # drop a queued line ...
+        except queue.Empty:
+            pass
+        try:
+            self._q.put_nowait(None)                    # ... and tell the thread to end
+        except queue.Full:
+            pass
+        if self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout)
 
     def _run(self) -> None:
         while True:
-            queued_at, text = self._q.get()
+            item = self._q.get()
+            if item is None:
+                return
+            queued_at, text = item
             if not self.enabled or self._clock() - queued_at > self.stale_s:
                 log.info("narration dropped (%s): %s", "muted" if not self.enabled else "stale", text)
                 continue

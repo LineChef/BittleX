@@ -71,3 +71,24 @@ def test_walls_and_bumps_are_narrated_with_what_he_sees_and_which_way_he_goes():
     assert line_for("wall blocked (0 in, 5 groups): turn left") == ("wall", "I'm right up against a wall. Turning left.")
     assert line_for("hit: back up")[1].startswith("Oof!") and line_for("hit: turn around")[1] == "Turning around."
     assert line_for("straight first")[1] == "Patrolling."
+
+
+def test_close_lets_the_line_being_spoken_finish_drops_the_queued_one_and_ends_the_thread():
+    """2026-11-13: the exploration process aborted at exit because a daemon narrator thread was still inside the speech engine. close() waits for the line in progress, drops the queued one and ends the thread."""
+    import threading
+    import time as _t
+    started, release, said = threading.Event(), threading.Event(), []
+
+    def speak(text):
+        started.set()
+        release.wait(5.0)
+        said.append(text)
+    n = Narrator(speak, min_gap_s=0.0, repeat_s=0.0)
+    n.narrate([Effect(EffectKind.HEAD, "pan_sweep", "look-around")])               # "Looking around.": being spoken
+    assert started.wait(2.0)
+    n.narrate([Effect(EffectKind.HEAD, 0.4, "toward a sound")])                    # queued behind it
+    threading.Timer(0.3, release.set).start()                                       # the first line ends 0.3 s into the close
+    t0 = _t.monotonic()
+    n.close(timeout=3.0)
+    assert said == ["Looking around."] and _t.monotonic() - t0 >= 0.25 and not n._thread.is_alive()
+    assert n.enabled is False
