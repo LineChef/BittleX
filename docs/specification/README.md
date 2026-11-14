@@ -19,4 +19,4 @@ Subsystems
 - [Behavior](behavior.md): The tick that composes idle, conversation, exploration and approach
 - [Goals](goals.md): Sessions of attempts that are scored and judged on the Pi
 - [Power](power.md): Packs, battery warnings, sleep and shutdown
-- [Mode exceptions](mode-exceptions.md): The register of behaviors that differ in one mode because the owner asked for it (empty by default)
+- [Mode exceptions](mode-exceptions.md): The register of behaviors that differ in one mode because that was explicitly requested (empty by default)
