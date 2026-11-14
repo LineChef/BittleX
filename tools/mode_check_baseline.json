@@ -1,11 +1,4 @@
 {
  "_help": "Known mode-consistency gaps (tools/check_modes.py). Fix one and run --update-baseline: the list only shrinks.",
- "known": [
-  "R4|behavior/three_point.py|link.send(\"kbalance\", read_reply=False, settle=0.0)",
-  "R4|behavior/transition_drill.py|lk.send(\"kbalance\", read_reply=False, settle=0.0)            # the stand-up under test",
-  "R4|behavior/transition_drill.py|lk.send(\"kcalib\", read_reply=False, settle=0.0)                   # the eased move into th",
-  "R4|behavior/transition_drill.py|lk.send(\"kup\", read_reply=False, settle=0.0)                      # the stand-up under tes",
-  "R4|explore_session.py|link.send(\"kbalance\", read_reply=False, settle=0.0)           # resting straight out of a ",
-  "R5|voice/__main__.py|guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(ac"
- ]
+ "known": []
 }

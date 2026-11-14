@@ -125,7 +125,8 @@ def run_stand_only(robot, cycles: int, *, say=print, sleep=time.sleep, rest_s: f
         lk.send("gP", read_reply=False, settle=0.0)
         sleep(0.3)
         robot._pitch, robot._roll = [], []
-        lk.send("kbalance", read_reply=False, settle=0.0)            # the stand-up under test
+        if robot.stand_up_from_rest() == "fell":                      # the stand-up under test: the standard one every mode uses
+            fell = True
         t_end = robot._clock() + watch_s
         volts, next_v = [], robot._clock()
         while robot._clock() < t_end and not fell:
@@ -185,14 +186,15 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
             lk.send("gP", read_reply=False, settle=0.0)
             pose = "rest"
         else:
-            lk.send("kcalib", read_reply=False, settle=0.0)                   # the eased move into the attention pose (the link plays it as a K skill)
+            robot.relax()                                                     # the standard move into the attention pose
             t_end = robot._clock() + hold_s
             while robot._clock() < t_end:
                 sleep(0.2)
             lk.send("gP", read_reply=False, settle=0.0)
             pose = "attention"
             robot._pitch, robot._roll = [], []
-            lk.send("kup", read_reply=False, settle=0.0)                      # the stand-up under test, from the attention pose
+            if robot.stand_up_from_attention() == "fell":                     # the stand-up under test, from the attention pose: the standard one every mode uses
+                fell = True
         before = None
         t_end = robot._clock() + (2.0 if look else watch_s)
         while robot._clock() < t_end and not fell:

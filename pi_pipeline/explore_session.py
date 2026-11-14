@@ -448,52 +448,33 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 link.send("gb", read_reply=False, settle=0.0)         # balance off: lying (or held) upside down, the gyro balance loop fights the servos and G2 twitches
             except Exception:  # noqa: BLE001
                 log.debug("could not switch balance off after the fall", exc_info=True)
-            def _announce():
-                from .voice import prompt_tones
-                prompt_tones.play_horn_if_enabled("G2_FALL_HORN", wait=True)              # the losing horn (user, 2026-10-10), then the words
-                say("I fell down. I have stopped.")
-            th = threading.Thread(target=_announce, daemon=True)
-            announce_threads.append(th)
-            th.start()   # this runs on the walker thread: never wait for the speaker here (the main loop waits for it before the process exits)
+            from .gait import body_guards
+            from .voice import prompt_tones
+            announce_threads.append(body_guards.announce_fall(say, horn=lambda: prompt_tones.play_horn_if_enabled("G2_FALL_HORN", wait=True)))    # the same horn and words in every mode; this runs on the walker thread: never wait for the speaker here (the main loop waits for it before the process exits)
         fall["fn"] = _on_fall
         silent = threading.Event()                        # the board stopped answering (no motion data for 20 s): the session ends, he is laid down, and he says why
 
         def _on_silent(seconds):
             log.error("the board is not answering (no motion data for %.0f s): ending the exploration session", seconds)
             silent.set()
-            rt.halt()
-            for c in ("gb", "krest"):
-                try:
-                    link.send(c, read_reply=False, settle=0.0)           # rest at once; nothing is waited for, a deaf board cannot confirm it
-                except Exception:  # noqa: BLE001
-                    log.debug("could not send %s to a silent board", c, exc_info=True)
-            th = threading.Thread(target=lambda: say("My motion sensor stopped answering. I have stopped. Please check the plug to the board."), daemon=True)
-            announce_threads.append(th)
-            th.start()
+            from .gait import body_guards
+            announce_threads.append(body_guards.lay_down_deaf_board(link, say, halt=rt.halt))             # the same response in every mode (gait/body_guards.py), then this session ends
 
-        from .gait.stand_guard import StandGuard
+        from .gait import body_guards
 
-        def _sag_recover(roll, pitch):
-            """Standing legs sagged: the same recovery as in the voice service (attention pose, then up again, back legs first; ball_chase.SerialRobot.recover_sag) on this session's own IMU copy. One behavior in every mode (owner, 2026-11-10)."""
-            from .behavior.ball_chase import SerialRobot
+        def _hold():
             walker = getattr(rt.bindings, "walker", None)
             if hasattr(walker, "hold"):
                 walker.hold()                         # a sag while WALKING: nothing walks or turns until he is up again
-            c = consumer()
-            try:
-                SerialRobot(c).recover_sag((pitch, roll))
-            finally:
-                if hasattr(walker, "release"):
-                    walker.release()
-                try:
-                    fan.release(c)
-                except Exception:  # noqa: BLE001
-                    pass
 
-        guard = StandGuard(consumer(), on_sag=_sag_recover, is_standing=lambda: getattr(link, "last_motion_command", "") not in ("", "d", "krest", "ksit", "kcalib"), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
-                           is_walking=lambda: str(getattr(link, "last_motion_command", "") or "")[:3] in ("kwk", "kbk"),
-                           balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None,
-                           on_fall=on_fall, on_silent=_on_silent).start()   # tipped over at any time: the same handler as the walker's own fall (horn, words, the roam halted and the session ended; 2026-11-12: the guard alone only played the horn and the roam stood him up again 5 s after a fall)
+        def _release():
+            walker = getattr(rt.bindings, "walker", None)
+            if hasattr(walker, "release"):
+                walker.release()
+
+        guard = body_guards.install(link, settings=settings, new_consumer=consumer, release_consumer=fan.release,
+                                    is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy),
+                                    on_fall=on_fall, on_silent=_on_silent, hold=_hold, release=_release)     # the guard every mode builds the same way (gait/body_guards.py): this session only says how it pauses its walking and how it ends
 
         # this session has stopped the voice service, so it must watch G2's battery itself (reads pause while a walk is running;
         # the walk loop checks the voltage under load)
@@ -629,8 +610,8 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 time.sleep(1.0)
                 if policy_walker is not None:
                     policy_walker.stop(rest=False)                            # stop walking first, then settle into a balanced stand, and only then lie down:
-                link.send("kbalance", read_reply=False, settle=0.0)           # resting straight out of a stride or a turn dropped G2 on his side (2026-10-09)
-                time.sleep(1.5)
+                from .behavior.ball_chase import settle_to_stand
+                settle_to_stand(link)                                          # the standard settle (a balanced stand, then a moment): resting straight out of a stride or a turn dropped G2 on his side (2026-10-09)
                 say("Exploration complete.")                                   # said first (user, 2026-10-07; wording 2026-10-10), then the "da naaaa", then G2 lies down
                 if os.environ.get("G2_COMPLETE_SOUND", "1") != "0" and not args.light:          # a goal's roam (--light) is one attempt: the goal session plays it once at its end
                     from .voice import prompt_tones

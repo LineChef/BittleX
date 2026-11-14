@@ -7,12 +7,11 @@ only call it. This script fails when a mode builds its own.
 
   BLOCKING (always an error)
     R1  a second claw look: a function named run_claw_look / claw_scan / claw_look_sequence defined outside behavior/claw_survey.py and behavior/ball_chase.py
-    R2  a StandGuard built anywhere but the two mode entry points (voice/__main__.py, explore_session.py), or built without `on_fall=`
+    R2  a StandGuard built anywhere but gait/body_guards.py, or a body_guards.install(...) call without `on_fall=` and `on_silent=` (every mode ends the same way on a fall and on a deaf board)
     R3  a fall threshold written as a number other than pi_pipeline/body.py's FALL_DEG (`fall_deg=` / `fall_abort_deg=`)
     R7  a `MODE-SPECIFIC(...)` exception in the code that docs/specification/mode-exceptions.md does not list (the owner's explicit request, with the date)
   RATCHET (known today, listed in tools/mode_check_baseline.json; a NEW one is an error, fixing one means removing it from the baseline)
     R4  a mode file sends a stand / rest / attention command itself (send("kup" | "kbalance" | "kcalib" | "krest" | "d")) instead of calling the standard move
-    R5  a StandGuard built without `on_silent=` (a deaf board must end every mode the same way)
 
 Run: python tools/check_modes.py [--list] [--update-baseline]   (also run by the pre-commit hook and by tests/test_mode_parity.py)
 """
@@ -29,7 +28,7 @@ BASELINE = Path(__file__).resolve().parent / "mode_check_baseline.json"
 EXCEPTIONS = ROOT / "docs" / "specification" / "mode-exceptions.md"
 
 LOOK_HOME = {"behavior/claw_survey.py", "behavior/ball_chase.py"}
-GUARD_ENTRY = {"voice/__main__.py", "explore_session.py"}
+GUARD_HOME = "gait/body_guards.py"                                             # the only place a StandGuard is built; modes call body_guards.install(...)
 MODE_DIRS = ("behavior/", "voice/", "goals/", "app/")
 MODE_FILES = {"explore_session.py", "punt_launch.py", "goal_launch.py"}
 STANDARD_HOMES = {"behavior/ball_chase.py", "behavior/claw_survey.py"}            # the standard moves live here (SerialRobot: stand_up, sit_down, stand_from_sit, rest)
@@ -97,15 +96,15 @@ def violations() -> list[dict]:
                 add("R4", n, "a mode sends a stand / rest / attention command itself instead of calling the standard move", False)
         for m in re.finditer(r"\bStandGuard\(", text):
             n = text.count("\n", 0, m.start()) + 1
-            if lines[n - 1].lstrip().startswith(("class ", "def ")) or rel == "gait/stand_guard.py":
+            if lines[n - 1].lstrip().startswith(("class ", "def ")) or rel in ("gait/stand_guard.py", GUARD_HOME):
                 continue
+            add("R2", n, "a StandGuard built outside gait/body_guards.py: call body_guards.install(...)", True)
+        for m in re.finditer(r"\bbody_guards\.install\(", text):
+            n = text.count("\n", 0, m.start()) + 1
             call = call_text(text, m.start())
-            if rel not in GUARD_ENTRY:
-                add("R2", n, "a StandGuard built outside the mode entry points (voice/__main__.py, explore_session.py)", True)
-            elif "on_fall=" not in call:
-                add("R2", n, "a StandGuard built without on_fall=", True)
-            if "on_silent=" not in call:
-                add("R5", n, "a StandGuard built without on_silent= (a deaf board must end every mode the same way)", False)
+            for arg in ("on_fall=", "on_silent="):
+                if arg not in call:
+                    add("R2", n, f"body_guards.install(...) without {arg} (every mode ends the same way on a fall and on a deaf board)", True)
     return out
 
 

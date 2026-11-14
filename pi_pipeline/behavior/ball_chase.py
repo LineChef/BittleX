@@ -1155,6 +1155,10 @@ class SerialRobot:
             log.exception("leg check failed")
             return []
 
+    def stand_up_from_rest(self) -> str:
+        """The normal stand-up from the rest position (the firmware `kbalance` as the link plays it). "ok" or "fell"."""
+        return self._stand_up_from("rest")
+
     def stand_up_from_attention(self) -> str:
         """The attention pose to the stand, back legs first (what a goal session does when a move follows a claw look). "ok" or "fell"."""
         return self._stand_up_from("attention")
@@ -1455,6 +1459,13 @@ def confirm_ball(camera, ball: BallReading | None, sleep=time.sleep, trace: list
     if trace is not None:
         trace.append({"kind": "dim_confirm", "ok": ok, "first": _ball_dict(ball), "second": _ball_dict(again)})
     return again if ok else None
+
+
+def settle_to_stand(link, sleep=time.sleep) -> None:
+    """THE end-of-motion settle every mode uses (owner, 2026-11-13): after a stride or a turn is stopped, a balanced stand (`kbalance`) and a moment, before anything else (resting straight out of a stride or a turn
+    dropped G2 on his side, 2026-10-09). The caller stops its own walking first."""
+    link.send("kbalance", read_reply=False, settle=0.0)
+    sleep(1.5)
 
 
 def claw_look_sequence(robot, per_pan, *, pans, from_sit: bool = True, raise_first: bool = True, sleep=time.sleep, lap=lambda name: None, stopped=lambda: False) -> str:

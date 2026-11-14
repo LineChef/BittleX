@@ -135,6 +135,18 @@ def main() -> None:
             from . import fail_sound
             link.on_failure = fail_sound.command_failed         # a motion command that cannot be sent plays the wrong-answer horn
         battery_alert = {"fn": None}                      # filled in once the speaker exists (below)
+        speak_ref = {"fn": None}                          # filled in once the speaker exists (below): the words after a fall and for a deaf board
+
+        def _say(text):
+            fn = speak_ref["fn"]
+            if fn is not None:
+                fn(text)
+
+        def _on_fall():                                   # the response to a fall that every mode shares (gait/body_guards.py): note it, the losing horn, then the words
+            _note_fall()
+            from ..gait import body_guards
+            from . import prompt_tones
+            body_guards.announce_fall(_say, horn=lambda: prompt_tones.play_horn_if_enabled("G2_FALL_HORN", wait=True))
         if link is not None and args.actuator == "serial":
             from ..link.fanout import ImuFanout
             fan = ImuFanout(link)                          # the stand guard and the learned walk each get their own copy of the IMU stream
@@ -142,29 +154,23 @@ def main() -> None:
                 from ..gait.policy_walker import PolicyWalker
                 from . import prompt_tones
                 policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: battery_alert["fn"] and battery_alert["fn"](lvl, v),
-                                             on_fall=lambda: (_note_fall(), prompt_tones.play_horn_if_enabled("G2_FALL_HORN")))     # the losing horn when he falls (user, 2026-10-10); it does not wait, the walker thread must rest him at once
+                                             on_fall=_on_fall)     # the same fall response as the guard's (the losing horn, user 2026-10-10, then the words); it does not wait, the walker thread must rest at once
         actuator = make_actuator(
             args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
             max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle, policy_walker=policy_walker,
         )
-        def _sag_recover(roll, pitch):
-            """Standing legs sagged (gait/stand_guard.py): the attention pose, then up again, back legs first. Runs on its own IMU copy; the actuator's walks are never running (the guard is busy then)."""
-            from ..behavior.ball_chase import SerialRobot
-            c = fan.consumer() if fan is not None else link
-            try:
-                SerialRobot(c).recover_sag((pitch, roll))
-            finally:
-                if fan is not None:
-                    fan.release(c)
-
         guard = None
         if link is not None and (settings.stand_guard or settings.balance_off_idle):
-            from ..gait.stand_guard import StandGuard
-            guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), guard=settings.stand_guard,
-                               balance_off_idle=settings.balance_off_idle, reassert_s=settings.stand_reassert_s,
-                               reenable_after_s=None if settings.balance_off_idle else 300.0,
-                               on_sag=_sag_recover, is_standing=lambda: getattr(link, "last_motion_command", "") not in ("", "d", "krest", "ksit", "kcalib"),
-                               on_fall=lambda: (_note_fall(), __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN"))).start()   # tipped over at any time: the losing horn
+            from ..gait import body_guards
+
+            def _on_silent(seconds):
+                if exploring.is_set():
+                    return                                # an exploration inside this service has its own guard and ends itself
+                logging.getLogger("g2.voice").error("the board is not answering (no motion data for %.0f s): laying G2 down", seconds)
+                body_guards.lay_down_deaf_board(link, _say, halt=actuator.stop)
+            guard = body_guards.install(link, settings=settings, new_consumer=(fan.consumer if fan is not None else (lambda: link)), release_consumer=(fan.release if fan is not None else (lambda c: None)),
+                                        is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), on_fall=_on_fall, on_silent=_on_silent,
+                                        hold=actuator.stop)     # the guard every mode builds the same way (gait/body_guards.py): this service only says how it pauses a walk (stop it) and how it ends
             actuator.on_command = guard.note_activity
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot
@@ -190,6 +196,7 @@ def main() -> None:
             _start_speech_prewarm(tts)
         _mark("speech prewarm")
         audible = voice and tts_mode != "print"
+        speak_ref["fn"] = tts.speak                                  # the words after a fall and for a deaf board (gait/body_guards.py)
         battery_alert["fn"] = make_battery_alert(tts, audible)     # also used for low readings taken while walking
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link, paused=exploring.is_set)
         if watcher is not None:

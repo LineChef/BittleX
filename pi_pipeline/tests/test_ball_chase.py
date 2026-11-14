@@ -1244,11 +1244,13 @@ def test_a_stand_only_round_rests_stands_and_stops_at_the_first_fall(monkeypatch
         def _clock(self): self.t += 0.5; return self.t
         def _fell(self): return False
         def swing_deg(self): return self.swings.pop(0)
+        def stand_up_from_rest(self): stands.append(1); return "ok"                      # the standard stand-up every mode uses
+    stands = []
     ok = td.run_stand_only(R([3.0, 4.0, 5.0]), 3, say=lambda *a: None, sleep=lambda s: None)
-    assert ok["cycles"] == 3 and not ok["fell"] and sent.count("kbalance") == 3 and sent.count("krest") == 3 and ok["swings"] == [3.0, 4.0, 5.0]
-    sent.clear()
+    assert ok["cycles"] == 3 and not ok["fell"] and len(stands) == 3 and sent.count("krest") == 3 and ok["swings"] == [3.0, 4.0, 5.0]
+    sent.clear(); stands.clear()
     bad = td.run_stand_only(R([3.0, 40.0, 3.0]), 5, say=lambda *a: None, sleep=lambda s: None)
-    assert bad["fell"] and bad["cycles"] == 1 and sent.count("kbalance") == 2                  # it stopped at the second stand-up: nothing more was sent
+    assert bad["fell"] and bad["cycles"] == 1 and len(stands) == 2                          # it stopped at the second stand-up: nothing more was sent
 
 
 def test_attention_stand_drill_stands_from_the_attention_pose_each_cycle_and_stops_at_a_fall(monkeypatch):

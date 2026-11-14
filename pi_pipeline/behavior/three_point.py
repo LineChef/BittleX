@@ -77,7 +77,7 @@ def main() -> None:
     except KeyboardInterrupt:
         print("ended")
     finally:
-        link.send("kbalance", read_reply=False, settle=0.0)
+        chase.settle_to_stand(link)
         print("no rest command sent: left as he is")
 
 
