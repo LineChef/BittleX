@@ -38,7 +38,7 @@ See [Exploration mode](../guides/exploration-mode.md) for the full list.
 Constraints
 -----------
 
-- Consistency: A behavior (stand-up, claw look, rest, sag handling, turns, camera use) is the same in every mode. The claw look is one standard move: the roam, the voice loop and the test drill call it and add no steps around it, so a change to it applies everywhere. The ball chase's own claw scan is not yet routed through it.
+- Consistency: A behavior (stand-up, claw look, rest, sag handling, turns, camera use, what a fall is, what a deaf board is) is the same in every mode. It is defined once and the modes only call it: the claw look is the ball chase's sequence (`run_claw_look`), the body limits are in `pi_pipeline/body.py` (a fall is a tilt past 60 degrees for 0.3 s; a board with no motion data for 20 s is deaf), and the guards are built the same way everywhere. `tools/check_modes.py` fails a commit that builds a second copy, and `docs/specification/mode-exceptions.md` lists the only differences allowed: the ones the owner asked for.
 - Emergency stop outranks everything.
 
 Failure handling

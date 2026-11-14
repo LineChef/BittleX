@@ -186,10 +186,8 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
             pose = "rest"
         else:
             lk.send("kcalib", read_reply=False, settle=0.0)                   # the eased move into the attention pose (the link plays it as a K skill)
-            keep = claw_survey._KeepAlive(lk)
             t_end = robot._clock() + hold_s
             while robot._clock() < t_end:
-                keep.tick()
                 sleep(0.2)
             lk.send("gP", read_reply=False, settle=0.0)
             pose = "attention"
@@ -292,7 +290,7 @@ def main() -> None:
                 board_moves.append(msg[-60:])
     logging.getLogger("g2.command_log").addHandler(_Watch())
     logging.getLogger().addHandler(_Watch())
-    robot = chase.SerialRobot(link, fall_deg=30.0)          # 30 deg off level is not standing (the stand-ups that fell on 2026-11-07 stayed under the old 45 deg limit)
+    robot = chase.SerialRobot(link)          # the fall limit is the body's (pi_pipeline/body.py: 60 deg in every mode); a half-fall shows as a swing of STANDUP_FELL_SWING_DEG below
     fell = False
     try:
         if args.stand_only:

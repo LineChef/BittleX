@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from . import gait_cycle
+from ..body import FALL_DEG
 from ..vision.ball_finder import BallReading, find_ball
 
 log = logging.getLogger("g2.ball_chase")
@@ -694,7 +695,7 @@ def wait_for_pose(link, target: str, timeout_s: float | None = None, sleep=time.
 class SerialRobot:
     """The firmware skills over the serial link. Every move ends in a balanced stand (`kbalance`); the link sends `gb` after each skill. Each returns "ok" or "fell"."""
 
-    def __init__(self, link, poll_imu=None, fall_deg: float = 45.0, sleep=time.sleep, clock=time.monotonic, use_pick: bool = False):
+    def __init__(self, link, poll_imu=None, fall_deg: float = FALL_DEG, sleep=time.sleep, clock=time.monotonic, use_pick: bool = False):
         self._lk, self._sleep, self._clock = link, sleep, clock
         self.use_pick = use_pick                          # True: `kpickF`, the pick skill (it opens and closes the claw); the default is the punch
         self._fall_rad = math.radians(fall_deg)
@@ -1456,6 +1457,56 @@ def confirm_ball(camera, ball: BallReading | None, sleep=time.sleep, trace: list
     return again if ok else None
 
 
+def claw_look_sequence(robot, per_pan, *, pans, from_sit: bool = True, raise_first: bool = True, sleep=time.sleep, lap=lambda name: None, stopped=lambda: False) -> str:
+    """THE claw look, one standard move for every mode (owner, 2026-11-13: "use the claw look from the ball chase, that is the one that doesn't fall"; every mode calls this and nothing builds its own).
+    From a sit-down (`robot.sit_down()`: stand first, then the attention pose, settled), the claw is raised straight up first, then taken to each pan in `pans` (the camera to one side, the other, the centre)
+    with a settle at each, and `per_pan(pan)` takes the picture (it returns True to stop early); then the claw goes back to the centre raised, is lowered and centred, and `robot.stand_from_sit()` stands him
+    up (a normal stand-up: out of the attention pose it lies him down in rest first, `STAND_ATT_VIA_REST`). Returns "ok", "fell" or "stopped". `lap(name)` times the phases for the chase's trace."""
+    state = "ok"
+    was_on = bool(getattr(getattr(robot, "_lk", None), "imu_print_on", False))              # the motion-sensor print stays on where it was on before the look: the guards read it (2026-11-12: a roam ran with it off)
+    try:
+        return _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, stopped)
+    finally:
+        if was_on:
+            try:
+                robot._tx("gP")
+            except Exception:  # noqa: BLE001
+                log.debug("could not put the motion-sensor print back after the look", exc_info=True)
+
+
+def _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, stopped) -> str:
+    state = "ok"
+    if from_sit and robot.sit_down() == "fell":
+        return "fell"
+    lap("sit")
+    if raise_first:
+        state = robot.claw_pose(0.0, CLAW_LIFT_DEG if CLAW_RAISE_DEG is None else CLAW_RAISE_DEG)                              # up first, straight ahead and well clear of the legs before any pan
+    lap("raise")
+    for pan in (pans if state != "fell" else []):
+        if stopped():
+            state = "stopped"
+            break
+        state = robot.claw_pose(pan, CLAW_LIFT_DEG)
+        lap("pan")
+        if state == "fell":
+            break
+        sleep(CLAW_SETTLE_S)
+        lap("settle")
+        if per_pan(pan):
+            break
+    if state not in ("fell", "stopped") and raise_first and (not pans or pans[-1] != 0.0):
+        state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                    # back to the centre still raised (a look that ends on the centre picture is there already) ...
+    if state != "fell":
+        down = robot.claw_pose(0.0, 0.0)                                               # ... then lowered
+        state = "fell" if down == "fell" else state
+    lap("lower")
+    if from_sit and state != "fell":
+        up = robot.stand_from_sit()
+        state = "fell" if up == "fell" else state
+    lap("stand")
+    return state
+
+
 def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None,
               stamp: Callable[[], float] | None = None, after_punt: bool = False) -> tuple[str, BallReading | None]:
     """One look around with the arm: the camera to one side, then the other, then the centre, a picture at each (user, 2026-11-03: left, right, centre; from a sit all three are always taken); stops at the first sight of the ball. The arm goes back
@@ -1479,25 +1530,14 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     if from_sit:
         left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG            # the pan that points the camera to G2's left
         pans = [left, -left, 0.0]                                                     # always left first, then right (user, 2026-11-01), then the centre, claw still raised (user, 2026-11-03)
-        if robot.sit_down() == "fell":
-            return "fell", None
-        lap("sit")
     else:
         side = planner.claw_side or planner.last_side or 1
         pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
-    found, state = None, "ok"
+    found = None
     seen = []                                                                         # [(pan, reading)]
-    raise_first = CLAW_RAISE_FIRST and (BETWEEN_MOVES == "attention" or (from_sit and not CLAW_LOOK_STANDING))      # only from the attention pose, where the claw sits between the legs (user, 2026-11-03: attention pose, raise the claw, pan left, picture, pan right, picture, centre, lower, stand up)
-    if raise_first:
-        state = robot.claw_pose(0.0, CLAW_LIFT_DEG if CLAW_RAISE_DEG is None else CLAW_RAISE_DEG)                                 # up first, straight ahead and well clear of the legs before any pan (the pictures come down to CLAW_LIFT_DEG)
-    lap("raise")
-    for pan in (pans if state != "fell" else []):
-        state = robot.claw_pose(pan, CLAW_LIFT_DEG)
-        lap("pan")
-        if state == "fell":
-            break
-        sleep(CLAW_SETTLE_S)
-        lap("settle")
+    raise_first = CLAW_RAISE_FIRST and (BETWEEN_MOVES == "attention" or (from_sit and not CLAW_LOOK_STANDING))      # only from the attention pose, where the claw sits between the legs (user, 2026-11-03: attention pose, raise the claw, pan left, right, centre)
+
+    def per_pan(pan):
         jpeg = camera.look()
         lap("camera")
         ball = confirm_ball(camera, find_ball(jpeg) if jpeg else None, sleep, trace)
@@ -1506,8 +1546,9 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
             if saver is not None:
                 saver.maybe_save(jpeg, ball, tag="claw")
             seen.append((pan, ball))
-            if not from_sit:
-                break                                                                  # from a sit both pictures are always taken (the arm goes back to centre and he stands up next)
+            return not from_sit                                                       # from a sit both pictures are always taken (the arm goes back to centre and he stands up next)
+        return False
+    state = claw_look_sequence(robot, per_pan, pans=pans, from_sit=from_sit, raise_first=raise_first, sleep=sleep, lap=lap)
     if seen:
         pan, ball = seen[0]
         kept = [seen[0]]
@@ -1525,14 +1566,6 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
             trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
                           **({"t": stamp()} if stamp else {}), **extra})
         say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
-    if state != "fell" and raise_first and (not pans or pans[-1] != 0.0):
-        state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # back to the centre still raised (a look that ends on the centre picture is there already) ...
-    if state != "fell":
-        state = robot.claw_pose(0.0, 0.0)                                            # ... then lowered
-    lap("lower")
-    if from_sit and state != "fell":
-        state = robot.stand_from_sit()
-    lap("stand")
     if trace is not None:
         trace.append({"kind": "claw_look", "found": found is not None, "state": state, "phases_s": dict(phases), **({"t": stamp()} if stamp else {}), **extra})
     say("   claw look time: " + ", ".join(f"{k} {v:.1f} s" for k, v in phases.items()))

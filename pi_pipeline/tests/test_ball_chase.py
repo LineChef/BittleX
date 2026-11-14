@@ -511,14 +511,14 @@ def test_close_to_the_ball_he_stays_standing_between_the_small_steps(monkeypatch
 def test_a_fall_records_which_way_he_went(monkeypatch):
     import math
     from pi_pipeline.gait import imu_parse
-    monkeypatch.setattr(imu_parse, "parse_imu_line", lambda line: (math.radians(-5.0), math.radians(-60.0)))
+    monkeypatch.setattr(imu_parse, "parse_imu_line", lambda line: (math.radians(-5.0), math.radians(-70.0)))      # past the body's 60 degrees
     class FakeLink:
         def send(self, c, read_reply=False, settle=0.0): return ""
         def poll_imu(self): return ["x"]
     r = bc.SerialRobot(FakeLink(), sleep=lambda s: None)
     r.posture = "attention"
     assert r._fell() is True
-    assert r.last_fall == {"pitch": -60.0, "roll": -5.0, "way": "nose up", "posture": "attention"}
+    assert r.last_fall == {"pitch": -70.0, "roll": -5.0, "way": "nose up", "posture": "attention"}
 
 
 class _PoseLink:
@@ -1030,15 +1030,6 @@ def test_the_drill_stops_at_once_when_he_is_found_fallen_after_the_attention_pos
         def swing_deg(self): return 0.0
     res = td.run_variant(R(), 5, look=lambda r: calls.append("look"), say=lambda *a: None, sleep=lambda s: None)
     assert res["fell"] and res["cycles"] == 0 and calls == []                       # no claw look, no stand-up, no turn on a fallen G2
-
-
-def test_a_fall_in_the_middle_of_the_claw_look_stops_the_arm_moves():
-    from pi_pipeline.behavior import claw_survey
-    sent = []
-    class L:
-        def send(self, c, **k): sent.append(c)
-    state = claw_survey.run_claw_look(L(), None, "x", sleep=lambda s: None, stopped=lambda: True, full=False)
-    assert state == "stopped" and len([c for c in sent if c.startswith("i0")]) <= 10 and sent[-1] == "gp"
 
 
 def test_the_leg_check_names_a_joint_that_holds_the_wrong_angle_after_a_stand_up(monkeypatch, tmp_path):

@@ -86,7 +86,7 @@ def main() -> None:
     print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
     if not ok:
         return
-    robot = chase.SerialRobot(link, fall_deg=30.0)
+    robot = chase.SerialRobot(link)
     try:
         if not robot.imu_alive():
             print("NO IMU FRAMES: the board is silent, a fall would not be seen. Check the Pi-to-BiBoard plug. Not run.")

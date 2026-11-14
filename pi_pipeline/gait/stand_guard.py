@@ -24,8 +24,10 @@ import logging
 import math
 import threading
 import time
+
 from collections import deque
 
+from ..body import FALL_DEG, FALL_HOLD_S, FALL_REARM_DEG, SILENT_END_S
 from .imu_parse import parse_imu_line
 
 log = logging.getLogger("g2.stand_guard")
@@ -92,10 +94,10 @@ class StandGuard:
 
     def __init__(self, link, *, is_busy=lambda: False, detector: WobbleDetector | None = None, balance_off_idle: bool = True,
                  guard: bool = True, reassert_s: float = 60.0, quiet_after_activity_s: float = 8.0, on_trip=None,
-                 reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = 60.0,
+                 reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = FALL_DEG,
                  clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2,
                  on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0,
-                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 8.0, rest_on_fall: bool = True, on_silent=None, silent_end_s: float = 20.0):
+                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 8.0, rest_on_fall: bool = True, on_silent=None, silent_end_s: float = SILENT_END_S):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
         self._balance_off_idle, self._guard = balance_off_idle, guard
@@ -304,7 +306,7 @@ class StandGuard:
         tilt = max(abs(roll_deg), abs(pitch_deg))
         if tilt > self._fall_deg:
             self._tilt_since = self._tilt_since if self._tilt_since is not None else now
-            if not self._fell and now - self._tilt_since >= 0.3:
+            if not self._fell and now - self._tilt_since >= FALL_HOLD_S:
                 self._fell = True
                 log.warning("G2 is tipped over (tilt %.0f deg)", tilt)
                 if self._rec is not None:
@@ -322,7 +324,7 @@ class StandGuard:
                     self._on_fall()
                 except Exception:  # noqa: BLE001
                     log.debug("on_fall handler raised", exc_info=True)
-        elif tilt < 40.0:
+        elif tilt < FALL_REARM_DEG:
             self._tilt_since, self._fell = None, False
 
     def tick(self) -> bool:

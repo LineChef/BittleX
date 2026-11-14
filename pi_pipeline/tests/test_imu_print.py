@@ -41,11 +41,13 @@ def test_the_pose_read_leaves_the_print_on_when_it_was_on():
 
 
 def test_the_claw_look_leaves_the_print_as_it_found_it(monkeypatch):
-    from pi_pipeline.behavior import claw_survey
     import pi_pipeline.behavior.ball_chase as bc
-    monkeypatch.setattr(claw_survey, "_smooth", lambda *a, **k: None)
+    from pi_pipeline.behavior import claw_survey
     monkeypatch.setattr(bc, "ensure_claw_centered", lambda *a, **k: None)
     for was_on in (True, False):
         lk = FakeLink(was_on)
-        claw_survey.run_claw_look(lk, None, "look_centre", sleep=lambda s: None)
+        robot = bc.SerialRobot(lk, sleep=lambda s: None, clock=lambda: 0.0)
+        monkeypatch.setattr(robot, "sit_down", lambda: "ok")
+        monkeypatch.setattr(robot, "stand_from_sit", lambda: (robot._tx("gp"), "ok")[1])        # the chase's stand-up ends with the print off
+        claw_survey.run_claw_look(lk, None, "look_centre", sleep=lambda s: None, robot=robot)
         assert lk.imu_print_on is was_on, was_on

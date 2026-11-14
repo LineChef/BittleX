@@ -46,7 +46,7 @@ def main() -> None:
     from ..link.serial_link import SerialLink
     link = SerialLink("/dev/serial0")
     link.connect()
-    robot = chase.SerialRobot(link, fall_deg=30.0)
+    robot = chase.SerialRobot(link)
     fell = False
     try:
         link.send("i0 0", read_reply=False, settle=0.0)              # the claw centered first, at rest: nothing in this test pans it (owner, 2026-11-08: "don't pan the claw right before you start the raise test"). The attention pose

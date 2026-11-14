@@ -484,51 +484,6 @@ class SerialLink:
         except Exception:  # noqa: BLE001
             return None
 
-    def play_k(self, data: bytes, *, ends: str = "kbalance") -> None:
-        """Send a whole `K` message (the claw look is one) with the gyro balance off, and note where it ends: the Pi's idea of the pose becomes `ends` at once, because nothing is asked of the board until the
-        skill is over. Returns when the message is on the wire (about a quarter of a second for the look), not when the skill ends."""
-        self._write_pose("gb")
-        from . import kskill
-        kskill.write_chunked(self._ser.write, data, time.sleep)
-        self._ser.flush()
-        self.last_motion_command, self._last_motion_t = ends, time.monotonic()
-        command_log.sent("K(skill)", source="play_k")
-
-    def lie_down_eased(self, lift_from: float | None = None) -> bool:
-        """From the attention pose to the rest position as one eased `K` skill: the legs and the claw's lift servo move together, so the claw comes down smoothly with the legs (the firmware `krest` snapped it down at
-        the end, 2026-11-12). `lift_from` is the claw's lift angle now (None = the walking value). True if it played (the pose is rest afterwards); False means nothing was sent and the caller sends `krest`."""
-        try:
-            from pi_pipeline.gait import standup
-            from .. import motion_feel
-            from . import kskill
-            p = standup._poses()
-            if not p or p.get("arm_rest") is None or not standup.use_kskill(p):
-                return False
-            goal = list(standup.rest_pose())
-            lift0 = float(p.get("arm_walk") or 0) if lift_from is None else float(lift_from)
-            data = kskill.message(kskill.lie_down_payload(list(standup.ATTENTION_URDF_DEG), goal, lift0, float(p["arm_rest"]), steps=int(motion_feel.get("LIE_STEPS")), speed_raw=int(motion_feel.get("LIE_SPEED"))))
-            kskill.write_chunked(self._ser.write, data, time.sleep)
-            self._ser.flush()
-            waited, reached, silent, limit = 0.0, False, 0, motion_feel.get("LIE_WAIT_S")
-            while waited < limit:
-                time.sleep(kskill.POLL_S)
-                waited += kskill.POLL_S + 0.25
-                if waited < kskill.MIN_WAIT_S:
-                    continue
-                jr = kskill.read_joints(self)
-                if kskill.legs_reached(jr, goal):
-                    reached = True
-                    break
-                silent = silent + 1 if jr is None else 0
-                if silent >= 2:
-                    limit = min(limit, motion_feel.get("LIE_SILENT_WAIT_S"))
-            self.last_motion_command, self._last_motion_t = "krest", time.monotonic()
-            log.info("lay down in the rest position as an eased K skill (%d bytes, %s after about %.1f s)", len(data), "reached" if reached else "no readback", waited)
-            return True
-        except Exception as e:  # noqa: BLE001
-            log.warning("eased lie-down failed (%s): the firmware krest follows", e)
-            return False
-
     def _attention_entry_eased(self) -> bool:
         """Move into the attention pose (legs straight) as an eased `K` skill instead of the firmware `kcalib` (which drives every joint at once at full speed). UNTESTED on G2 until the next session
         (motion_feel.ATT_ENTRY_EASED turns it off). True if it handled the command (including "already there"); False means the caller sends `kcalib` as before."""

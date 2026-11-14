@@ -21,6 +21,15 @@
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
 
+# --- 7. mode consistency (tools/check_modes.py): a second claw look, a guard built by hand, a fall threshold other than the body's, an unregistered MODE-SPECIFIC exception, or a NEW mode that sends
+#        stand / rest / attention commands itself. Runs only when python or the checker is staged.
+if git diff --cached --name-only --diff-filter=ACM | grep -qE '^(pi_pipeline/.*\.py|tools/check_modes\.py|tools/mode_check_baseline\.json)$'; then
+  if ! python3 tools/check_modes.py; then
+    echo "pre-commit: tools/check_modes.py failed: every mode must behave the same (CLAUDE.md, docs/specification/mode-exceptions.md). Fix it, or ask the owner for an explicit exception."
+    exit 1
+  fi
+fi
+
 # --- 2. strip attribution from staged file content ---------------------
 # Excludes tools/githooks/* -- this pattern definition necessarily contains
 # the words it's matching against, so scanning the hooks themselves would
