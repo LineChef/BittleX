@@ -18,6 +18,14 @@ Procedure used
    lined up with the ruler's openings.
 4. Saved calibration in the app once all 8 leg joints were aligned.
 
+![The BiBoard seated in the frame, seen from above, with servo cables routed to its sockets](../docs/assets/biboard-in-frame.jpg "The BiBoard seated in the frame, seen from above, with the servo cables routed to its sockets.")
+
+![The frame on the Nybble Calibrator stand with leg servos laid out on the table](../docs/assets/frame-on-calibrator-parts.jpg "The frame on the Nybble Calibrator stand, with the leg servos still to be fitted.")
+
+![G2 on the Nybble Calibrator with the legs fitted, side view](../docs/assets/legs-on-calibrator.jpg "G2 on the Nybble Calibrator with the legs fitted, side view.")
+
+![G2 on the Nybble Calibrator seen from above with the BiBoard powered](../docs/assets/biboard-top-on-calibrator.jpg "G2 on the Nybble Calibrator seen from above, with the BiBoard powered.")
+
 Finding: the bracket step doesn't put all four feet on the ground, and that's correct
 ------------------------------------------------------------
 

@@ -24,6 +24,8 @@ The PiSugar powers the Pi through its pogo pins, so the BiBoard's +5V pins and t
 - Correct orientation: The PiSugar's micro-USB port, switch and battery end up under the Pi's mini-HDMI and USB edge, and its pogo pins land under the 40-pin header.
 - Check: The pogo pins sit on the header's solder joints before the screws are tightened. The screws fit either way.
 
+![Side view of the PiSugar S under the Pi Zero 2 W, with the battery below and the gold pogo pins between the boards](../docs/assets/pisugar-stack-side.jpg "The PiSugar S under the Pi Zero 2 W, side view: the battery sits below and the pogo pins meet the header's solder joints.")
+
 The pogo pins contact these Pi pins (inferred):
 - 5V: Pi pin 2
 - 5V: Pi pin 4

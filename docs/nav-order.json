@@ -154,6 +154,7 @@
    [
     "specification/locomotion",
     "specification/safety",
+    "specification/mode-exceptions",
     "specification/link"
    ]
   ],

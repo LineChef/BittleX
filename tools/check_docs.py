@@ -11,7 +11,7 @@ ERRORS (exit 1, block the commit):
   * the currently deployed policy's name (read from DEFAULT_POLICY in the code) in a page that must not name it
   * docs/backlog.md out of date with the item headings it is generated from (tools/gen_backlog.py)
   * a `##` section heading in a published page (owner, 2026-11-11: sections are a title line over `---`; tools/md_headings.py converts)
-  * an image with no alt text, a raster image over 300 KB, an unsafe SVG, or images over the 5 MB budget (docs/maintaining-docs.md, "Images")
+  * an image with no alt text, a raster image over 300 KB, or an unsafe SVG (docs/maintaining-docs.md, "Images")
   * a markdown pipe table (owner, 2026-11-11: no tables in the docs; write a bulleted list, one bullet per row; tools/md_lists.py converts)
 WARNINGS (printed, never fail):
   * readability of a page published on the docs site: a line over 700 characters, an attribution tag such as
@@ -173,11 +173,11 @@ def deployed_policy_stem(root):
 
 IMG_MD = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)")
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".svg")
-RASTER_MAX, IMAGE_BUDGET = 300 * 1024, 5 * 1024 * 1024
+RASTER_MAX = 300 * 1024
 
 
 def image_errors(root, files):
-    """Images in the published docs: every `![alt](file)` has alt text, a raster image is at most 300 KB, an SVG has nothing unsafe in it, and all the images together stay under 5 MB (owner, 2026-11-11)."""
+    """Images in the published docs: every `![alt](file)` has alt text, a raster image is at most 300 KB, and an SVG has nothing unsafe in it (the 5 MB total budget was removed by the owner, 2026-11-14)."""
     out = []
     for f in files:
         full = os.path.join(root, f)
@@ -185,7 +185,6 @@ def image_errors(root, files):
             for m in IMG_MD.finditer(line):
                 if not m.group(1).strip():
                     out.append(f"{f}:{i}: image {m.group(2)} has no alt text")
-    total = 0
     for base in ("docs", "blueprints"):
         for d, dirs, names in os.walk(os.path.join(root, base)):
             dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
@@ -197,15 +196,12 @@ def image_errors(root, files):
                     continue
                 p = os.path.join(d, n)
                 size = os.path.getsize(p)
-                total += size
                 rel = os.path.relpath(p, root)
                 if n.lower().endswith(".svg"):
                     for why in img_info.svg_problems(open(p, encoding="utf-8", errors="replace").read()):
                         out.append(f"{rel}: the SVG {why}")
                 elif size > RASTER_MAX:
                     out.append(f"{rel}: {size // 1024} KB; a raster image is at most {RASTER_MAX // 1024} KB (resize or recompress it)")
-    if total > IMAGE_BUDGET:
-        out.append(f"images under docs/ and blueprints/ total {total // 1024} KB; the budget is {IMAGE_BUDGET // 1024} KB")
     return out
 
 

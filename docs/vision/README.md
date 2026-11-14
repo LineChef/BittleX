@@ -3,6 +3,10 @@
 Everything about G2's camera, the on-device detection model, and building /
 capturing data for it.
 
+![Front view of G2 on the calibrator stand with the Petoi camera module at the head](../assets/camera-head-front.jpg "The Petoi camera module at G2's head, front view.")
+
+![Side view of G2 on the calibrator stand with the Petoi camera module at the head](../assets/camera-head-side.jpg "The Petoi camera module at G2's head, side view.")
+
 - [`picture-library.md`](picture-library.md): What happens to a picture G2 takes while exploring, which folder holds what, and which parts can be rebuilt. The pictures are local only: trainingdata/ is gitignored, nothing is uploaded, and the repository holds none of
 - [`detection-layer.md`](detection-layer.md): Architecture: one model slot, three roles (safety / interaction / objects), a model-manager that swaps by mode, and the measured on-device detector behaviour.
 - [`person-recognition.md`](person-recognition.md): B15 — individual recognition + the "G2, meet X" enrollment flow.

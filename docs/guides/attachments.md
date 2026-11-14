@@ -2,6 +2,8 @@
 
 G2 wears one attachment on the neck at a time: the Petoi AI head, the Petoi robot arm, or nothing beyond the stock head. One setting says which is fitted. Switching it also switches the gait policy saved for that attachment, checks that the BiBoard firmware fits, and adds or removes the attachment's skills. Swaps are expected to be rare, but every one should work with one command. Code: [`pi_pipeline/attachments/`](../../pi_pipeline/attachments/__init__.py).
 
+![Side view of G2 with the pod on the back and the arm holding the camera module in its claw](../assets/g2-side-arm-camera.jpg "The arm attachment fitted, side view: the pod on the back and the arm holding the camera module in its claw.")
+
 Switch
 ------
 

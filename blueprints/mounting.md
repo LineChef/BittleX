@@ -13,6 +13,8 @@ What is on G2 now
 
 Front is the head end; left and right are G2's left and right.
 
+![Front view of G2 with the pod on the back and the arm holding the camera module in its claw](../docs/assets/g2-front-arm-camera.jpg "G2 from the front: the pod on the back, and the arm folded forward holding the camera module in its claw.")
+
 - Platform cover: The stock Petoi back cover, replaced by the platform cover (`cover_pegs_foot.stl`, the Petoi cover with four teardrop pegs on top). The Pi slot and the BiBoard header are at the front left
 - Pod (body + top panel): Clicks onto the four pegs: set it 7 mm behind its place with the grille to the rear, slide it 7 mm (see below)
 - Pi Zero 2 W + PiSugar S: In the pod, held in the grooves of the two end posts: ports up, 40-pin header down and toward the left wall, SD card at the rear
@@ -55,6 +57,13 @@ Renders of the add-on
 ![A cross-section through the pod](images/addon-section.png "A section through the pod, showing how the stack sits between the platform cover and the panel. Image: Jeremy Collins, CC BY 4.0.")
 
 ![The pod parts pulled apart](images/addon-exploded.png "The pod exploded: panel, body, door, the stack and the platform cover. Image: Jeremy Collins, CC BY 4.0.")
+
+As printed
+----------
+
+![Two printed shells, a back cover and a PiSugar case shell](../docs/assets/printed-shells.jpg "Two printed shells: a back cover (top) and a PiSugar case shell (bottom).")
+
+![A printed pod with ventilation grilles resting on a printed cover](../docs/assets/printed-pod-on-cover.jpg "A printed pod with ventilation grilles, resting on a printed cover.")
 
 Wiring in the pod
 -----------------
@@ -135,5 +144,8 @@ Per the project: code MIT; designs and documents CC BY 4.0 (Jeremy Collins); the
 
 History
 -------
+
+
+![The Pi Zero 2 W and PiSugar stack sitting on top of the BiBoard, linked by wires](../docs/assets/pi-stack-interim.jpg "An early layout, before the pod: the Pi Zero 2 W and PiSugar stack on top of the BiBoard, linked by wires.")
 
 The first design, a corner clip, was abandoned. The interim mount used PiSugar's own case shell (75 × 31 × 36 mm, nearly twice the stock cover's 18.6 mm internal depth) velcroed on top of a modified Petoi cover (`Bittle_Cover_with_hole_for_Pi.stl`, with the PiSugar switch exposed and the SD port widened), with the camera at the front of the case, the speaker at the very back and the microphone on top of the lid (all confirmed; payload about 168 g, roughly 100 × 40 × 38 mm).
