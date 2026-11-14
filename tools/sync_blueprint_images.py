@@ -14,6 +14,9 @@ import sys
 
 from PIL import Image
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gitutil  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "blueprints", "images")
@@ -63,7 +66,7 @@ def shrink(src, dst):
 
 
 def main():
-    commit = subprocess.run(["git", "-C", SRC, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    commit = gitutil.git("-C", SRC, "rev-parse", "HEAD").strip()
     os.makedirs(OUT, exist_ok=True)
     rows = []
     for name, rel in FILES.items():

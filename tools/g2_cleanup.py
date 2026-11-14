@@ -20,6 +20,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gitutil  # noqa: E402
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 TRAINED = "rl_training/opencat-gym/trained"
 
@@ -42,7 +45,7 @@ PI_TRAINED = "bittleX/rl_training/opencat-gym/trained"
 
 
 def git(*args):
-    return subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True).stdout
+    return gitutil.git("-C", ROOT, *args)      # raises when git cannot run: an empty answer would read as "nothing to clean"
 
 
 def matches(path, patterns):
@@ -117,6 +120,14 @@ def rm(path):
 
 
 def main():
+    try:
+        return _main()
+    except RuntimeError as e:
+        print(f"g2_cleanup: could not run git ({e})", file=sys.stderr)
+        return 2
+
+
+def _main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--check", action="store_true")

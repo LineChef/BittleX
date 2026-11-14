@@ -33,6 +33,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import img_info  # noqa: E402
 import md_headings  # noqa: E402
+import gitutil  # noqa: E402
 
 SKIP_DIRS = {".git", ".venv", "node_modules", ".pytest_cache", "__pycache__", "trained", "build"}  # build/ = local docs-bundle output
 # pages that must not carry hard-coded counts / the current policy name (everything else is a log, a record, or generated)
@@ -112,8 +113,7 @@ def readability_warnings(path, text):
 
 def md_files(root, staged=False):
     if staged:
-        out = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"], cwd=root,
-                             capture_output=True, text=True).stdout.split()
+        out = gitutil.git("diff", "--cached", "--name-only", "--diff-filter=ACM", cwd=root).split()
         return sorted(f for f in out if f.endswith(".md") and os.path.exists(os.path.join(root, f)))
     found = []
     for d, dirs, files in os.walk(root):
@@ -336,7 +336,7 @@ def main():
     ap.add_argument("--quiet-warnings", action="store_true")
     ap.add_argument("--notes", action="store_true", help="list the note-style wording in published pages, line by line")
     args = ap.parse_args()
-    root = args.root or subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip() \
+    root = args.root or gitutil.git("rev-parse", "--show-toplevel", check=False).strip() \
         or os.getcwd()
     files = md_files(root, staged=args.staged)
     if args.notes:
