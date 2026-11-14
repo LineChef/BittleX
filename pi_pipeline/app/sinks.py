@@ -118,6 +118,15 @@ class WalkerSink:
             self._link.send(token, read_reply=False)
             self._last = token
 
+    @staticmethod
+    def _learned() -> bool:
+        """Whether straight walking is the learned policy right now: the one rule every mode uses (gait/gait_mode.walk_choice: the high step, a tile floor, or the learned default gait)."""
+        try:
+            from ..gait import gait_mode
+            return gait_mode.walk_choice()[0] == "policy"
+        except Exception:  # noqa: BLE001
+            return True                                    # unreadable: what a walker given a policy always did
+
     def _firmware(self) -> None:
         if self._policy is not None and self._policy.busy:
             self._policy.stop(rest=False)       # hand over to a firmware gait without lying down in between
@@ -143,7 +152,7 @@ class WalkerSink:
             return                              # a timed turn is running: let it finish before walking on
         if self._turn_until:                    # it just ended: the next command (re)starts cleanly
             self._turn_until, self._last = 0.0, ""
-        if self._policy is not None and -self._thr < bias < self._thr:
+        if self._policy is not None and -self._thr < bias < self._thr and self._learned():
             if not self._policy.busy:
                 self._last = ""
                 self._policy.walk(None)

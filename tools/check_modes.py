@@ -9,6 +9,7 @@ only call it. This script fails when a mode builds its own.
     R1  a second claw look: a function named run_claw_look / claw_scan / claw_look_sequence defined outside behavior/claw_survey.py and behavior/ball_chase.py
     R2  a StandGuard built anywhere but gait/body_guards.py, or a body_guards.install(...) call without `on_fall=` and `on_silent=` (every mode ends the same way on a fall and on a deaf board)
     R3  a fall threshold written as a number other than pi_pipeline/body.py's FALL_DEG (`fall_deg=` / `fall_abort_deg=`)
+    R6  a mode reading `settings.default_gait` to choose the walk instead of asking gait_mode.walk_choice()
     R7  a `MODE-SPECIFIC(...)` exception in the code that docs/specification/mode-exceptions.md does not list (the owner's explicit request, with the date)
   RATCHET (known today, listed in tools/mode_check_baseline.json; a NEW one is an error, fixing one means removing it from the baseline)
     R4  a mode file sends a stand / rest / attention command itself (send("kup" | "kbalance" | "kcalib" | "krest" | "d")) instead of calling the standard move
@@ -92,6 +93,8 @@ def violations() -> list[dict]:
             for m in FALL_NUM.finditer(line):
                 if rel != "body.py" and float(m.group(2)) != fall:
                     add("R3", n, f"a fall threshold of {m.group(2)}: the body's is {fall:g} (pi_pipeline/body.py)", True)
+            if rel not in ("config.py", "gait/gait_mode.py") and "settings.default_gait" in line:
+                add("R6", n, "the walk (learned or scripted) is chosen by gait_mode.walk_choice(), the one rule every mode uses; do not read settings.default_gait", True)
             if is_mode(rel) and rel not in STANDARD_HOMES and SEND_BODY.search(line):
                 add("R4", n, "a mode sends a stand / rest / attention command itself instead of calling the standard move", False)
         for m in re.finditer(r"\bStandGuard\(", text):

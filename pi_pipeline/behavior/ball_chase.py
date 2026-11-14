@@ -556,13 +556,11 @@ POSE_WAIT_S = {"stand": 6.0, "attention": 3.0}      # the longest wait for a pos
 
 
 def default_gait() -> str:
-    """The default gait: "firmware" (Petoi's scripted arm gait, `kwkF`) or "policy" (the learned walk). `G2_DEFAULT_GAIT` decides, read now (user, 2026-11-08: the firmware gait is the default)."""
-    v = os.environ.get("G2_DEFAULT_GAIT", "").strip().lower()
-    if v:
-        return v
+    """The walk in use: "policy" (the learned walk) or "firmware" (Petoi's scripted arm gait, `kwkF`). Decided by the one rule every mode uses, `gait/gait_mode.walk_choice` (owner, 2026-11-13: tile or the
+    high step plays the learned V7 policy, hardwood the scripted walk); `G2_DEFAULT_GAIT` still sets the default for a floor with no rule."""
     try:
-        from ..config import settings
-        return settings.default_gait
+        from ..gait import gait_mode
+        return gait_mode.walk_choice()[0]
     except Exception:  # noqa: BLE001
         return "firmware"
 

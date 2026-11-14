@@ -124,6 +124,15 @@ class SerialActuator:
         if self._balance_off_idle:
             self._send("gB" if on else "gb", read_reply=False)
 
+    @staticmethod
+    def _learned_walk() -> bool:
+        """Whether a walk_forward is the learned policy right now: the one rule every mode uses (gait/gait_mode.walk_choice)."""
+        try:
+            from ..gait import gait_mode
+            return gait_mode.walk_choice()[0] == "policy"
+        except Exception:  # noqa: BLE001
+            return True
+
     def perform(self, skill_name: str, seconds: float | None = None) -> None:
         if not skills.is_valid(skill_name):
             log.warning("unknown skill %r -- ignoring", skill_name)
@@ -141,7 +150,7 @@ class SerialActuator:
                 self.on_before_gait()
             except Exception:  # noqa: BLE001 -- a battery check must never stop a walk
                 log.debug("before-gait callback raised", exc_info=True)
-        if skill_name == "walk_forward" and self._policy_walker is not None:
+        if skill_name == "walk_forward" and self._policy_walker is not None and self._learned_walk():
             duration = skills.clamp_seconds(seconds)
             if self._max_continuous_s > 0:
                 duration = min(duration, self._max_continuous_s) if duration else self._max_continuous_s

@@ -329,7 +329,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
             saved = {k: getattr(policy_walker, k) for k in ("_on_battery", "_on_fall", "_hold", "_on_stall", "_on_contact")}
             policy_walker._on_battery, policy_walker._on_fall, policy_walker._hold = on_battery, on_fall, True
             restore.append(lambda: [setattr(policy_walker, k, v) for k, v in saved.items()])
-        elif features.gait != "off" and settings.default_gait == "policy":
+        elif features.gait != "off":                       # the walker is always there; which walk is played (learned or scripted) is decided per walk by gait_mode.walk_choice()
             from .gait.policy_walker import PolicyWalker
             policy_walker = PolicyWalker(consumer(), on_battery=on_battery, on_fall=on_fall, hold_between_legs=True)    # no rest between legs: hold a balanced stand, rest at the end of the session
         saver = None

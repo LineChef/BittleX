@@ -104,6 +104,81 @@ def _read(path: str) -> dict:
         return {}
 
 
+def _profile() -> dict:
+    """The fitted attachment's profile in gait_profiles.json ({} when unreadable)."""
+    try:
+        from pi_pipeline.attachments import current as _att, load_profiles
+        return load_profiles().get(_att()) or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def allowed_gaits() -> list:
+    """The gaits this attachment may switch to: the profile's own `gaits` list (the arm: normal and hi_step), else every gait when `gait_switching` is on, else only the normal one."""
+    g = _profile().get("gaits")
+    if isinstance(g, list) and g:
+        return [x for x in g if x in GAITS]
+    return list(GAITS) if switching_allowed() else [DEFAULT]
+
+
+def mode_policy(mode: str) -> str | None:
+    """The learned policy a gait plays AS IT IS (no scripted base): the profile's `hi_step_policy` for the high step ("G2, switch to high step": the trained V7 policy for the arm, owner 2026-11-13;
+    `G2_HIGHSTEP_POLICY` overrides), else None (the gait is played the way it always was)."""
+    if mode != "hi_step":
+        return None
+    return os.environ.get("G2_HIGHSTEP_POLICY", "").strip() or _profile().get("hi_step_policy") or None
+
+
+def floor_policy(floor: str | None) -> str | None:
+    """The learned policy the profile names for a floor (the arm: tile -> V7), else None (the default walk). `G2_FLOOR_POLICIES` (`tile=Release_CandidateV7_ppo.onnx,...`) overrides."""
+    fl = (floor or "").strip().lower()
+    if not fl:
+        return None
+    env = os.environ.get("G2_FLOOR_POLICIES", "").strip()
+    table = dict(kv.split("=", 1) for kv in env.split(",") if "=" in kv) if env else (_profile().get("floor_policies") or {})
+    return table.get(fl) or None
+
+
+def walk_choice(floor: str = "auto") -> tuple:
+    """THE walking gait, decided in one place for every mode (owner, 2026-11-13): (kind, policy name or None, why). kind "policy" is the learned walk (through PolicyWalker; the name picks the policy file,
+    None the attachment's own), "firmware" is Petoi's scripted walk (the arm's `wkArmF`). In order: a spoken gait ("high step" plays its policy; carpet and a scripted high step go through PolicyWalker as
+    before); else the floor label (the arm on tile walks the V7 policy); else the default gait (scripted for the arm unless `G2_DEFAULT_GAIT=policy`)."""
+    mode = current()
+    pol = mode_policy(mode)
+    if pol:
+        return "policy", pol, f"{mode} gait: the {pol} policy"
+    if mode != DEFAULT:
+        return "policy", None, f"{mode} gait"
+    if floor == "auto":
+        try:
+            from .heading_hold import current_floor
+            floor = current_floor()
+        except Exception:  # noqa: BLE001
+            floor = None
+    fp = floor_policy(floor)
+    if fp:
+        return "policy", fp, f"on {floor}: the {fp} policy"
+    v = os.environ.get("G2_DEFAULT_GAIT", "").strip().lower()
+    if not v:
+        try:
+            from ..config import settings
+            v = settings.default_gait
+        except Exception:  # noqa: BLE001
+            v = "firmware"
+    return ("policy", None, "the default gait is the learned walk") if v == "policy" else ("firmware", None, "the default gait is Petoi's scripted walk")
+
+
+def policy_file(name: str | None) -> str | None:
+    """The file of a learned policy by name: pi_pipeline/gait/ on the Pi, else trained/ on the dev machine (the same places the attachment profile looks). None when it is not there."""
+    if not name:
+        return None
+    try:
+        from pi_pipeline.attachments import _policy_file
+        return _policy_file(name)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def switching_allowed() -> bool:
     """False while the fitted attachment has `gait_switching` off (the arm's first tests, user 2026-10-24): the gait is held at normal whatever the state file says."""
     try:
@@ -123,15 +198,14 @@ def _held_message() -> str:
 
 
 def current(path: str | None = None) -> str:
-    if not switching_allowed():
-        return DEFAULT
-    return _read(path or STATE_PATH).get("mode", DEFAULT)
+    mode = _read(path or STATE_PATH).get("mode", DEFAULT)
+    return mode if mode in allowed_gaits() else DEFAULT
 
 
 def blend(path: str | None = None, now: float | None = None) -> tuple[str, str, float]:
     """(from_gait, to_gait, alpha): alpha runs 0 -> 1 over BLEND_S after a switch, so the base is a mix of the old and new gait until then."""
     d = _read(path or STATE_PATH)
-    if not d or not switching_allowed():
+    if not d or d.get("mode") not in allowed_gaits():
         return DEFAULT, DEFAULT, 1.0
     now = time.time() if now is None else now
     a = min(1.0, max(0.0, (now - float(d.get("since", 0.0))) / BLEND_S))
@@ -161,9 +235,14 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
     gait = parse_gait_command(text)
     if gait is None:
         return None, ""
-    if not switching_allowed():                           # held at normal: "walk normally" is fine, any other gait is refused (None) with the reason
-        return (DEFAULT, GAITS[DEFAULT].echo_on) if gait == DEFAULT else (None, _held_message())
+    if gait == DEFAULT:
+        set_mode(DEFAULT, path)                           # "walk normally" always works (from the high step too)
+        return DEFAULT, GAITS[DEFAULT].echo_on
+    if gait not in allowed_gaits():                       # a gait this attachment is held away from: refused (None) with the reason
+        return None, _held_message()
     set_mode(gait, path)
+    if mode_policy(gait):                                 # the high step with a learned policy of its own (the arm: V7): played as that policy, no scripted base
+        return gait, f"{GAITS[gait].echo_on} I am using my trained walking policy."
     if not supports(policy_onnx, gait):
         if not GAITS[gait].scripted_fallback:             # carpet on a policy that never learned it: its normal walk, said out loud
             return gait, f"{GAITS[gait].echo_on} My walk has not learned carpet yet, so I will use my normal walk for now."
@@ -179,8 +258,8 @@ def uses_scripted(policy_onnx: str | None, gait: str) -> bool:
 def follow_floor(label: str | None, path: str | None = None) -> str:
     """The floor label decides carpet mode (carpet plan, 2026-10-20): a carpet floor switches to it, any other floor switches out of it (another gait the person chose stays)."""
     cur = current(path)
-    if not switching_allowed():
-        return DEFAULT
+    if "carpet" not in allowed_gaits():
+        return cur                                         # this attachment has no carpet mode: the floor does not switch the gait (a gait the person chose stays)
     if (label or "").strip().lower() == "carpet":
         return set_mode("carpet", path) if cur != "carpet" else cur
     return set_mode(DEFAULT, path) if cur == "carpet" else cur
@@ -190,9 +269,14 @@ def floor_note(label: str | None, path: str | None = None) -> str:
     """follow_floor, plus what G2 adds after "Okay, the floor is ...": the gait change it made, if any."""
     before = current(path)
     after = follow_floor(label, path)
-    if after == before:
-        return ""
-    return " " + GAITS["carpet"].echo_on if after == "carpet" else " Back to my default gait."
+    if after != before:
+        return " " + GAITS["carpet"].echo_on if after == "carpet" else " Back to my default gait."
+    fp = floor_policy(label)
+    if fp and after == DEFAULT:
+        return " I will walk with my trained walking policy on this floor."          # the floor rule (the arm on tile: V7); a spoken gait still wins
+    if (label or "").strip().lower() and (_profile().get("floor_policies") and after == DEFAULT):
+        return " I will use my scripted walk on this floor."
+    return ""
 
 
 def split_compound(text: str):
@@ -207,11 +291,14 @@ def split_compound(text: str):
 def claude_hint() -> str:
     """One system-prompt line for Claude: G2's current walking gait, so a conversational walk uses it and never swaps in another skill."""
     mode = current()
-    if not switching_allowed():
+    if allowed_gaits() == [DEFAULT]:
         return "Your walking gait is NORMAL and fixed while your attachment is fitted: the other gaits (hi step, carpet mode) are switched off for now."
     if mode == "carpet":
         return ("Your walking gait is set to CARPET MODE (for soft carpet). When asked to walk or go forward, use perform_skill walk_forward and it walks in carpet mode. "
                 "The person switches back with 'switch to default gait'.")
+    if mode == "hi_step" and mode_policy(mode):
+        return ("Your walking gait is set to HI STEP, which for you is your trained walking policy. It is real: when asked to walk or go forward, use perform_skill walk_forward and it walks with that policy. "
+                "Never substitute another skill for it. The person switches back with 'walk normally'.")
     if mode == "hi_step":
         return ("Your walking gait is set to HI STEP (a slow scripted high-stepping walk, lifted feet for snags and rubble). It is real: when asked to walk "
                 "or go forward, use perform_skill walk_forward and it walks in hi step. Never substitute trot or another skill for it, and never say you do not have it. "

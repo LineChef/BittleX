@@ -269,19 +269,52 @@ def test_startup_turns_the_gyro_off_for_the_arm(monkeypatch):
     assert sent[-1] == "gb"
 
 
-def test_the_arm_holds_the_normal_gait(monkeypatch, tmp_path):
+def test_the_arm_may_switch_to_the_high_step_which_plays_v7_and_nothing_else(monkeypatch, tmp_path):
+    """Owner, 2026-11-13: "G2, switch to high step" plays the trained V7 policy with the arm fitted; carpet mode stays off for the arm."""
     from pi_pipeline.gait import gait_mode as G
     p = str(tmp_path / "gait_mode.json")
-    G.set_mode("hi_step", p)
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    assert G.current(p) == "normal" and G.blend(p)[:2] == ("normal", "normal")
+    monkeypatch.delenv("G2_HIGHSTEP_POLICY", raising=False)
+    assert G.allowed_gaits() == ["normal", "hi_step"]
     gait, said = G.request("high step", path=p)
-    assert gait is None and "arm" in said                 # refused (the losing horn), with the reason
-    assert G.request("walk normally", path=p)[0] == "normal"
-    assert G.follow_floor("carpet", p) == "normal"
-    assert "fixed" in G.claude_hint()
+    assert gait == "hi_step" and "trained walking policy" in said and G.current(p) == "hi_step"
+    assert G.mode_policy("hi_step") == "Release_CandidateV7_ppo.onnx"
+    gait, said = G.request("carpet mode", path=p)
+    assert gait is None and "arm" in said                    # no carpet mode for the arm
+    assert G.follow_floor("carpet", p) == "hi_step"          # a carpet floor does not switch the gait; the person's choice stays
+    assert G.request("walk normally", path=p)[0] == "normal" and G.current(p) == "normal"
     monkeypatch.delenv("G2_ATTACHMENT")
-    assert G.current(p) == "hi_step"                       # the head and no attachment are unchanged
+    G.set_mode("hi_step", p)
+    assert G.current(p) == "hi_step"                         # the head and no attachment are unchanged
+
+
+def test_the_arm_walks_v7_on_tile_and_the_scripted_walk_on_hardwood_and_a_spoken_gait_wins(monkeypatch, tmp_path):
+    """Owner, 2026-11-13: tile -> the V7 RL policy; hardwood -> the scripted arm walk; "high step" -> V7 on any floor. One rule for every mode (gait_mode.walk_choice)."""
+    from pi_pipeline.gait import gait_mode as G
+    p = str(tmp_path / "gait_mode.json")
+    monkeypatch.setattr(G, "STATE_PATH", p)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.delenv("G2_DEFAULT_GAIT", raising=False)
+    for k in ("G2_HIGHSTEP_POLICY", "G2_FLOOR_POLICIES"):
+        monkeypatch.delenv(k, raising=False)
+    kind, name, why = G.walk_choice("tile")
+    assert (kind, name) == ("policy", "Release_CandidateV7_ppo.onnx") and "tile" in why
+    assert G.walk_choice("hardwood")[:2] == ("firmware", None)
+    assert G.walk_choice(None)[:2] == ("firmware", None)                 # no floor label: the scripted walk
+    import pi_pipeline.gait.heading_hold as HH
+    monkeypatch.setattr(HH, "current_floor", lambda: "tile")
+    assert G.walk_choice()[:2] == ("policy", "Release_CandidateV7_ppo.onnx")       # the live floor label decides ("auto")
+    monkeypatch.setattr(HH, "current_floor", lambda: "hardwood")
+    assert G.walk_choice()[0] == "firmware"
+    G.request("high step", path=p)
+    assert G.walk_choice()[:2] == ("policy", "Release_CandidateV7_ppo.onnx")       # a spoken high step wins on hardwood too
+    G.request("walk normally", path=p)
+    assert G.walk_choice()[0] == "firmware"                                          # and "walk normally" goes back to the floor's rule
+    monkeypatch.setenv("G2_FLOOR_POLICIES", "hardwood=Release_CandidateARMW_ppo.onnx")
+    assert G.walk_choice()[:2] == ("policy", "Release_CandidateARMW_ppo.onnx")       # the table can be changed without a deploy
+    monkeypatch.setenv("G2_ATTACHMENT", "none")
+    monkeypatch.delenv("G2_FLOOR_POLICIES")
+    assert G.walk_choice("tile")[0] == "firmware"                                    # no rule for other attachments: their default gait stands
 
 
 def test_the_cli(capsys):

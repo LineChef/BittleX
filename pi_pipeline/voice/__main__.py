@@ -150,7 +150,7 @@ def main() -> None:
         if link is not None and args.actuator == "serial":
             from ..link.fanout import ImuFanout
             fan = ImuFanout(link)                          # the stand guard and the learned walk each get their own copy of the IMU stream
-            if features.gait != "off" and settings.default_gait == "policy":
+            if features.gait != "off":                     # the walker is always there; which walk is played (learned or scripted) is decided per walk by gait_mode.walk_choice()
                 from ..gait.policy_walker import PolicyWalker
                 from . import prompt_tones
                 policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: battery_alert["fn"] and battery_alert["fn"](lvl, v),

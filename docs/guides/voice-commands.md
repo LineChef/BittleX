@@ -189,7 +189,7 @@ The robot's name is spoken as "gee two" (soft g, like the wake word). A hard-g s
 Switching gait
 --------------
 
-- "hi step" / "high step" / "highstep" / "switch to high step" / "switch to hi step" / "switch to highstep" / "step mode": switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction.
+- "hi step" / "high step" / "highstep" / "switch to high step" / "switch to hi step" / "switch to highstep" / "step mode": switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction. With the arm fitted it plays the trained V7 walking policy (no scripted base), on any floor, until "walk normally".
 - "carpet mode" / "switch to carpet mode" / "carpet walk" / "carpet gait": switches to carpet mode
 - "switch to default gait" / "default gait" / "walk normally" / "switch to normal" / "switch to walk mode" / "walk mode" / "normal mode" / "normal walk" / "carpet mode off": back to the normal walk (the deployed policy).
 

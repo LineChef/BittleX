@@ -24,6 +24,8 @@ Exploration and walls
 - `G2_FIRMWARE_CHECK`: Default: per attachment profile (arm: off); What it does: `1` asks the BiBoard its firmware at start even when the profile skips it, `0` never asks
 - `G2_ATT_KEEPALIVE_S`: Default: 4; What it does: while the claw look holds the attention pose, the leg angles are sent again this often, seconds (`0` turns it off)
 - `G2_FALL_RECORD`: Default: on; What it does: every fall saves one file with the IMU trace from 20 s before to 8 s after, a summary (peak tilt, how long the tip took, the side he rests on) and the commands sent in the last 40 s, in `~/.local/share/g2/falls/` (`off` turns it off; `G2_FALL_DIR` moves the folder)
+- `G2_FLOOR_POLICIES`: Default: the attachment profile's `floor_policies` (the arm: tile plays the V7 policy, see [STATUS](../STATUS.md)); What it does: a floor label to a learned policy file, `tile=<policy file>,hardwood=<policy file>`; a floor with no entry walks the default gait (the arm: Petoi's scripted walk)
+- `G2_HIGHSTEP_POLICY`: Default: the attachment profile's `hi_step_policy` (the arm: the V7 policy, see [STATUS](../STATUS.md)); What it does: the learned policy that "G2, switch to high step" plays
 - `G2_CLAW_LATE_S`: Default: 4; What it does: a claw look this many seconds past its plan skips the side pictures and lowers the claw
 - `G2_EXPLORE_HANDOVER`: Default: on; What it does: `0` stops "explore" from handing over to an exploration session
 - `G2_EXPLORE_REQUEST`: Default: on; What it does: G2 asks "Can I go exploring?" after idling in the voice service and walks only on a yes. `0` turns the asking off

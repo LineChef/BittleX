@@ -48,6 +48,15 @@ class FakeWalker:
         self.busy = False
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _learned_default(monkeypatch):
+    monkeypatch.setenv("G2_DEFAULT_GAIT", "policy")            # these tests are about the learned walk: which walk plays is decided by gait_mode.walk_choice (the default gait here)
+    monkeypatch.delenv("G2_ATTACHMENT", raising=False)
+
+
 def test_walk_forward_uses_the_learned_policy_not_the_firmware_gait():
     link, w = Link(), FakeWalker()
     act = SerialActuator("x", 1, link=link, policy_walker=w)

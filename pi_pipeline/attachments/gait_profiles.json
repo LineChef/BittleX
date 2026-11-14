@@ -82,6 +82,14 @@
       "arm_rest": 60,
       "arm_walk": 0
     },
-    "blending": true
+    "blending": true,
+    "gaits": [
+      "normal",
+      "hi_step"
+    ],
+    "hi_step_policy": "Release_CandidateV7_ppo.onnx",
+    "floor_policies": {
+      "tile": "Release_CandidateV7_ppo.onnx"
+    }
   }
 }
