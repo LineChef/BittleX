@@ -95,7 +95,7 @@ class StandGuard:
                  reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = 60.0,
                  clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2,
                  on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0,
-                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 8.0, rest_on_fall: bool = True):
+                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 8.0, rest_on_fall: bool = True, on_silent=None, silent_end_s: float = 20.0):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
         self._balance_off_idle, self._guard = balance_off_idle, guard
@@ -135,6 +135,7 @@ class StandGuard:
         # on means `gP` is sent again, at most that often.
         self._resend_stale_s = resend_stale_s
         self._last_frame_t = clock()
+        self._on_silent, self._silent_end_s, self._silent_fired = on_silent, silent_end_s, False      # no IMU frame at all for this long (the resends of `gP` did not bring it back): the board is not answering, `on_silent(seconds)` is called once (2026-11-13: a roam walked on for minutes with the board deaf)
         self._last_resend = -1e9
         self.resends = 0
         from . import fall_recorder
@@ -328,6 +329,7 @@ class StandGuard:
         """One pass: drain the IMU lines, re-assert balance off, run the detector. True if the detector tripped."""
         now = self._clock()
         if getattr(self, "_paused", False):
+            self._last_frame_t = max(self._last_frame_t, now)                    # a pause (a pose read has the print off) is not silence
             return False
         try:
             lines = self._link.poll_imu() if self._guard else []
@@ -353,6 +355,15 @@ class StandGuard:
                 self._link.send("gP", read_reply=False, settle=0.0)
             except Exception:  # noqa: BLE001
                 pass
+        if lines:
+            self._silent_fired = False
+        elif self._on_silent is not None and self._guard and not self._silent_fired and now - self._last_frame_t >= self._silent_end_s:
+            self._silent_fired = True
+            log.error("the board has sent no IMU frames for %.0f s: it is not answering", now - self._last_frame_t)
+            try:
+                self._on_silent(now - self._last_frame_t)
+            except Exception:  # noqa: BLE001
+                log.debug("on_silent handler raised", exc_info=True)
         for line in lines:
             r = parse_imu_line(line)
             if r is not None:

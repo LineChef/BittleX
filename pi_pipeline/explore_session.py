@@ -455,6 +455,20 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
             announce_threads.append(th)
             th.start()   # this runs on the walker thread: never wait for the speaker here (the main loop waits for it before the process exits)
         fall["fn"] = _on_fall
+        silent = threading.Event()                        # the board stopped answering (no motion data for 20 s): the session ends, he is laid down, and he says why
+
+        def _on_silent(seconds):
+            log.error("the board is not answering (no motion data for %.0f s): ending the exploration session", seconds)
+            silent.set()
+            rt.halt()
+            for c in ("gb", "krest"):
+                try:
+                    link.send(c, read_reply=False, settle=0.0)           # rest at once; nothing is waited for, a deaf board cannot confirm it
+                except Exception:  # noqa: BLE001
+                    log.debug("could not send %s to a silent board", c, exc_info=True)
+            th = threading.Thread(target=lambda: say("My motion sensor stopped answering. I have stopped. Please check the plug to the board."), daemon=True)
+            announce_threads.append(th)
+            th.start()
 
         from .gait.stand_guard import StandGuard
 
@@ -478,7 +492,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         guard = StandGuard(consumer(), on_sag=_sag_recover, is_standing=lambda: getattr(link, "last_motion_command", "") not in ("", "d", "krest", "ksit", "kcalib"), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
                            is_walking=lambda: str(getattr(link, "last_motion_command", "") or "")[:3] in ("kwk", "kbk"),
                            balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None,
-                           on_fall=on_fall).start()   # tipped over at any time: the same handler as the walker's own fall (horn, words, the roam halted and the session ended; 2026-11-12: the guard alone only played the horn and the roam stood him up again 5 s after a fall)
+                           on_fall=on_fall, on_silent=_on_silent).start()   # tipped over at any time: the same handler as the walker's own fall (horn, words, the roam halted and the session ended; 2026-11-12: the guard alone only played the horn and the roam stood him up again 5 s after a fall)
 
         # this session has stopped the voice service, so it must watch G2's battery itself (reads pause while a walk is running;
         # the walk loop checks the voltage under load)
@@ -548,6 +562,9 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 if fell.is_set():
                     ended_by = "fell"
                     break
+                if silent.is_set():
+                    ended_by = "board_silent"
+                    break
                 while memory is not None and not notes.empty():
                     try:
                         memory.store.add_fact(notes.get_nowait())
@@ -600,8 +617,8 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 listener.stop()
             log.info("ending the exploration session")
             try:
-                if fell.is_set() or ended_by == "fell":
-                    ended_by = "fell"                                         # he is on his side or back: no stand-up, no "complete" jingle, no second rest (the fall already stopped and rested him); only let the "I fell" announcement finish
+                if fell.is_set() or ended_by in ("fell", "board_silent"):
+                    ended_by = "board_silent" if ended_by == "board_silent" else "fell"                                         # he is on his side or back: no stand-up, no "complete" jingle, no second rest (the fall already stopped and rested him); only let the "I fell" announcement finish
                     for th in announce_threads:
                         th.join(timeout=12.0)
                     raise _FellExit()
@@ -623,7 +640,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 pass
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")
-            if policy_walker is not None and not fell.is_set():
+            if policy_walker is not None and not fell.is_set() and not silent.is_set():
                 policy_walker.stop(rest=True)
             rt.stop()
             t.join(timeout=2.0)

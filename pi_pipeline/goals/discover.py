@@ -215,6 +215,8 @@ class DiscoverObjects:
         ended = (result.ended or "").lower()
         if "fell" in ended:
             return Outcome("fell", 0.0, False, "I fell while looking for new objects", n, stages={"find": 0.0})
+        if "board_silent" in ended:
+            return Outcome("stopped", None, False, "The board stopped answering (no motion data), so the attempt was not counted", n)
         if any(w in ended for w in ("voice command", "stopped", "stop")):
             return Outcome("stopped", None, False, "I was stopped while looking for new objects", n)
         if x.get("usable", 0) >= MIN_PICTURES:

@@ -365,3 +365,41 @@ def test_a_fall_sends_gyro_balance_off_and_rest_once_before_the_handler():
         link.queue = [imu_line(80.0, 2.0)]
         g.tick()
     assert link.sent.count("d") == 1 and "gb" in link.sent and len(fell) == 1 and fell[0][-2:] == ["gb", "d"]
+
+
+def test_a_board_that_sends_no_imu_frames_for_20_s_is_reported_once_and_frames_re_arm_it():
+    """2026-11-13: a roam walked on for minutes with the board deaf (no motion data, commands not obeyed). The guard says so after 20 s of nothing, once; frames coming back re-arm it."""
+    link, clock, silent = FakeLink(), Clock(), []
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False, on_silent=lambda s: silent.append(round(s)), silent_end_s=20.0)
+    for _ in range(int(19 / 0.5)):                              # 19 s of nothing: not yet
+        clock.t += 0.5; g.tick()
+    assert silent == []
+    for _ in range(6):
+        clock.t += 0.5; g.tick()
+    assert len(silent) == 1 and silent[0] >= 20                  # reported
+    for _ in range(40):
+        clock.t += 0.5; g.tick()
+    assert len(silent) == 1                                      # and only once while it stays silent
+    link.queue = [imu_line(0, 0)]
+    clock.t += 0.5; g.tick()                                     # frames are back
+    for _ in range(int(21 / 0.5)):
+        clock.t += 0.5; g.tick()
+    assert len(silent) == 2                                      # silent again: reported again
+
+
+def test_frames_arriving_or_a_pause_are_not_silence():
+    link, clock, silent = FakeLink(), Clock(), []
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False, on_silent=lambda s: silent.append(s), silent_end_s=20.0)
+    for i in range(200):                                         # 100 s with a frame every 5 s
+        clock.t += 0.5
+        if i % 10 == 0:
+            link.queue = [imu_line(0, 0)]
+        g.tick()
+    assert silent == []
+    g.pause() if hasattr(g, "pause") else setattr(g, "_paused", True)
+    for _ in range(200):                                         # 100 s paused (a pose read has the print off)
+        clock.t += 0.5; g.tick()
+    assert silent == []
+    g.resume() if hasattr(g, "resume") else setattr(g, "_paused", False)
+    clock.t += 0.5; g.tick()
+    assert silent == []                                          # the first tick after the pause is not judged on the pause
