@@ -195,6 +195,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="One supervised attentive bout (claw gaze-follow from the attention pose). Needs the owner's go; the voice service stopped.")
     ap.add_argument("--minutes", type=float, default=2.0)
     ap.add_argument("--labels", default=None, help="comma-separated labels to follow (default: any detection; or G2_ATTENTIVE_LABELS)")
+    ap.add_argument("--live", action="store_true", help="follow continuously (pictures back to back, claw steered from where it pointed when each was taken); needs --target (behavior/live_follow.py)")
     ap.add_argument("--target", default=None, help="also find this named object with the object gallery (a name or part of one, for example the name of a toy): the camera's own detector knows only three classes")
     args = ap.parse_args()
     try:
@@ -250,6 +251,20 @@ def main() -> None:
         return dets
     try:
         chase._stand_if_lying(link, "kbalance")
+        if args.live:
+            from . import live_follow as lf
+            if targets is None:
+                print("refused: --live needs --target (for example ball)")
+                return
+            n = {"i": 0}
+
+            def save(i, jpeg):
+                with open(os.path.join(outdir, f"pic_{i:03d}.jpg"), "wb") as f:
+                    f.write(jpeg)
+            res = lf.run_live(robot, cam.snapshot, targets.detections, lf.LiveConfig(seconds=args.minutes * 60.0), pan_sign=chase.CLAW_PAN_SIGN, save=save)
+            lf.write_log(res, outdir)
+            print(f"PICTURES: {outdir} ({res['summary'].get('pictures', 0)} pictures, {res['summary'].get('with_target', 0)} with the target)")
+            return
         run_bout(robot, look, cfg, pan_sign=chase.CLAW_PAN_SIGN)
         print(f"PICTURES: {outdir} ({seen['n']} pictures, {seen['with_det']} with a detection, best score {seen['best']:.2f})")
     except KeyboardInterrupt:
