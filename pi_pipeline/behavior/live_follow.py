@@ -205,6 +205,65 @@ def summarize(rows: list[dict], moves: list[dict], reversals: int, seconds: floa
             "use_age_s_mean": round(statistics.mean([m["age_s"] for m in moves]), 2) if moves else None}
 
 
+def follow_loop(robot, grab, follower: "LiveFollower", pan_log: PanLog, cfg: LiveConfig, *, base, pan: float, seconds: float, say=print, sleep=time.sleep, clock=time.monotonic,
+                stopped=lambda: False, on_picture=None) -> dict:
+    """The control loop of a live follow, for a claw that is already up and a grabber that is already running: new pictures steer the claw until `seconds` pass, a stop, a fall, a sag, or `on_picture`
+    says done. `on_picture(pic, pan, now)` is called once for each new picture (pic = (capture time, detections, index)) before it steers, and returns True to end the loop. Returns
+    {"ended": "time"|"stopped"|"fell"|"sag"|"done", "pan", "moves", "reversals"}. The caller owns the grabber and the claw's end-of-run moves."""
+    ended = "time"
+    last_dir, reversals = 0, 0
+    moves: list[dict] = []
+    seen_idx = -1
+    t_start = clock()
+    end_at = t_start + seconds
+    next_keep, next_tilt = t_start + cfg.keepalive_s, t_start + cfg.tilt_check_s
+    while clock() < end_at:
+        if stopped():
+            ended = "stopped"
+            break
+        if robot._fell():
+            ended = "fell"
+            break
+        now = clock()
+        if now >= next_keep:
+            next_keep = now + cfg.keepalive_s
+            robot._tx("i8 0 9 0 10 0 11 0 12 0 13 0 14 0 15 0")
+        if now >= next_tilt:
+            next_tilt = now + cfg.tilt_check_s
+            if base is not None and robot._roll and robot._pitch:
+                r = statistics.median(robot._roll[-5:])
+                p = statistics.median(robot._pitch[-5:])
+                if max(abs(p - base[0]), abs(r - base[1])) > cfg.max_tilt_change_deg:
+                    say(f"live follow: the body tilted pitch {p:+.0f} roll {r:+.0f}: ending")
+                    ended = "sag"
+                    break
+        pic = grab.take()
+        if pic is not None:
+            t_cap, dets, idx = pic
+            if on_picture is not None and idx != seen_idx:
+                seen_idx = idx
+                if on_picture(pic, pan, now):
+                    ended = "done"
+                    break
+            want = follower.decide(t_cap, dets, now, pan)
+            if want is not None:
+                ts = clock()
+                state = robot.claw_pose(want, cfg.lift_deg)
+                te = clock()
+                pan_log.move(ts, te, pan, want)
+                d = 1 if want > pan else -1
+                if last_dir and d != last_dir:
+                    reversals += 1
+                last_dir = d
+                moves.append({"picture": idx, "t": round(ts - t_start, 2), "age_s": round(ts - t_cap, 2), "from": round(pan, 1), "to": round(want, 1), "why": follower.reason})
+                pan = want
+                if state == "fell":
+                    ended = "fell"
+                    break
+        sleep(cfg.tick_s)
+    return {"ended": ended, "pan": pan, "moves": moves, "reversals": reversals}
+
+
 def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign: str = "left", say=print, sleep=time.sleep, clock=time.monotonic,
              stopped=lambda: False, save=None, make_grabber=None) -> dict:
     """One live follow run. Returns {"ended", "seconds", "summary", "moves", "rows"}. Never raises; the claw is lowered and G2 stands up the standard way however it ends (a fall leaves him in rest)."""
@@ -233,51 +292,10 @@ def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign
             follower = LiveFollower(cfg, pan_sign, pan_log)
             grab = make_grabber(find_fn, cfg, clock, save) if make_grabber is not None else Grabber(snap_fn, find_fn, cfg, clock=clock, save=save)
             grab.start()
-            pan, last_dir = 0.0, 0
-            t_start = clock()
-            end_at = t_start + cfg.seconds
-            next_keep, next_tilt = t_start + cfg.keepalive_s, t_start + cfg.tilt_check_s
             res["ended"] = "time"
             say(f"live follow: {cfg.seconds:.0f} s, claw up")
-            while clock() < end_at:
-                if stopped():
-                    res["ended"] = "stopped"
-                    break
-                if robot._fell():
-                    res["ended"] = "fell"
-                    break
-                now = clock()
-                if now >= next_keep:
-                    next_keep = now + cfg.keepalive_s
-                    robot._tx("i8 0 9 0 10 0 11 0 12 0 13 0 14 0 15 0")
-                if now >= next_tilt:
-                    next_tilt = now + cfg.tilt_check_s
-                    if base is not None and robot._roll and robot._pitch:
-                        r = statistics.median(robot._roll[-5:])
-                        p = statistics.median(robot._pitch[-5:])
-                        if max(abs(p - base[0]), abs(r - base[1])) > cfg.max_tilt_change_deg:
-                            say(f"live follow: the body tilted pitch {p:+.0f} roll {r:+.0f}: ending")
-                            res["ended"] = "sag"
-                            break
-                pic = grab.take()
-                if pic is not None:
-                    t_cap, dets, idx = pic
-                    want = follower.decide(t_cap, dets, now, pan)
-                    if want is not None:
-                        ts = clock()
-                        state = robot.claw_pose(want, cfg.lift_deg)
-                        te = clock()
-                        pan_log.move(ts, te, pan, want)
-                        d = 1 if want > pan else -1
-                        if last_dir and d != last_dir:
-                            reversals += 1
-                        last_dir = d
-                        moves.append({"picture": idx, "t": round(ts - t_start, 2), "age_s": round(ts - t_cap, 2), "from": round(pan, 1), "to": round(want, 1), "why": follower.reason})
-                        pan = want
-                        if state == "fell":
-                            res["ended"] = "fell"
-                            break
-                sleep(cfg.tick_s)
+            out = follow_loop(robot, grab, follower, pan_log, cfg, base=base, pan=0.0, seconds=cfg.seconds, say=say, sleep=sleep, clock=clock, stopped=stopped)
+            res["ended"], moves, reversals = out["ended"], out["moves"], out["reversals"]
     except Exception:  # noqa: BLE001
         log.exception("the live follow failed")
         res["ended"] = "error"

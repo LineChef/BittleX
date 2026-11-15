@@ -1754,9 +1754,9 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], **kw) -> s
 
 def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
               settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print,
-              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None, battery_checked: bool = False) -> str:
+              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None, battery_checked: bool = False, first_reading: BallReading | None = None) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
-    Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went.
+    Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went. `first_reading`: a reading in G2's own direction to start from (the post-punt watch found the ball).
     `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one. `wall_check(jpeg, ball) -> WallSeen | None`: the wall
     reading for each straight-ahead picture (goals/walls.py makes one only with a wall calibration from the current hardware); with it he keeps CHASE_WALL_IN from walls."""
     planner = planner or ChasePlanner()
@@ -1768,7 +1768,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
     steps = 0
     punts = 0
     seen = False
-    pending: BallReading | None = None                    # the ball a claw look just found (the camera is back at straight ahead, so it would not see it now)
+    pending: BallReading | None = first_reading           # the ball a claw look just found (the camera is back at straight ahead, so it would not see it now); or the ball the post-punt watch acquired (behavior/punt_watch.py)
     t_start = clock()
 
     def note(**kw):

@@ -12,5 +12,5 @@ Registered exceptions:
 
 - The attentive look (the attentive bout, the live follow, the camera-only checks and the lift calibration):
   - The request (2026-11-15): "when we do this kind of look, no sound from the camera when we take a picture. turn that sound off for pictures when we do this kind of look."
-  - The code: `behavior/attentive_bout.py`, `behavior/gallery_target.py`, `behavior/lift_cal.py` and `vision/stream_probe.py` build their camera with `click=False`.
+  - The code: `behavior/attentive_bout.py`, `behavior/gallery_target.py`, `behavior/lift_cal.py`, `behavior/punt_watch_test.py` and `vision/stream_probe.py` build their camera with `click=False`.
   - The scope: in these looks the camera takes its pictures without the shutter click. Every other mode keeps the double click on every picture.

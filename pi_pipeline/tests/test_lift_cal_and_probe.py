@@ -113,5 +113,5 @@ def test_the_attentive_looks_take_pictures_without_the_shutter_click_and_other_m
         assert cam.snapshot() is not None and len(clicks) == want
     import pathlib
     root = pathlib.Path(__file__).resolve().parents[1]
-    for f in ("behavior/attentive_bout.py", "behavior/gallery_target.py", "behavior/lift_cal.py", "vision/stream_probe.py"):
+    for f in ("behavior/attentive_bout.py", "behavior/gallery_target.py", "behavior/lift_cal.py", "behavior/punt_watch_test.py", "vision/stream_probe.py"):
         assert "click=False" in (root / f).read_text() and f in (root.parent / "docs/specification/mode-exceptions.md").read_text()

@@ -443,6 +443,20 @@ g2liftcal() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
+# g2punttest [dry]  -- the post-punt watch: stands G2 up from rest, punts the ball (it must be in punt range), follows it rolling with the claw until it stops, takes a picture, says "target acquired" and goes on with the chase (turn, walk, dial in, one more punt), or, when the ball is lost, turns toward the side it was last seen on and does the normal claw look. `dry` = no punt and no chase: you roll the ball by hand and he only watches. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2puntstop ends it.
+g2punttest() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2stop voice || return 1
+  local out
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.punt_watch_test ${1:+--no-punt} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  printf '%s\n' "$out"
+  local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
+  if [ -n "$dir" ]; then
+    local dest="$HOME/Desktop/G2Memory/g2_pictures/watch/$(basename "$dir")"; mkdir -p "$dest"
+    scp -q "$G2_PI:$dir/*.jpg" "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null || scp -q "$G2_PI:$dir/*.jpg" "$dest/"; echo "watch pictures copied to $dest"
+  fi
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
 g2attendstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/attentive_stop" && echo "stop sent: the bout ends within a second"; }
 # g2armskill SKILL  -- play ONE arm skill (launch, toss, tossF, tossL, tossR, hunt, showOff; clap needs `g2armskill clap --allow-clap`) with the body watched: stands him up, sends it, watches the IMU 6 s, sends gb, rests him, and prints ok / lean / tipped / fell (log: ~/g2_runs/arm_skills/). Runs ONLY on your go, G2 on the floor on his feet, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. Test order and why: docs/hardware/arm-skills.md.
 g2armskill() {
