@@ -14,6 +14,7 @@ Behaviour
 - Connection: The link opens the port, reconnects after the cable is unplugged without crashing the caller, and builds command strings.
 - Eased transitions: Before a firmware skill, the link eases the legs from the known pose to the skill's first frame, capped at 80 degrees per second.
 - IMU demultiplexing: With the IMU print on, the board interleaves IMU frames with command replies. Every read path routes IMU lines to a queue instead of handing them back as a reply.
+- IMU print stays on: A move of the ball chase (turn, back-up, walk step, claw move, punch) does not switch the print off when it ends, so the stand guard, the stillness wait before a picture and the turn measurement always see frames. A read that needs the board quiet pauses it and puts it back.
 - Logging: Every command and every board line is written to the command log (`g2cmds`) with who sent it, and a tracing wrapper writes a replayable JSONL file.
 
 Interfaces

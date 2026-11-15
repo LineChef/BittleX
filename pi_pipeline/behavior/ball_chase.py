@@ -222,7 +222,9 @@ ALIGN_MIN_DEG = 3.0            # the smallest line-up turn asked for (gyro-stopp
 ALIGN_MIN_RUN_S = 0.25         # a gyro-stopped turn is never ended on the yaw sooner than this after the start (2026-11-10: "asked 6.0 deg, got 11.3 deg in 0.03 s": a first reading that was already off by a few degrees ended the turn before he moved)
 ALIGN_STOP_LEAD_DEG = 1.5      # the least the gyro stop sends `kbalance` early (see align_stop_lead)
 ALIGN_COAST_DEG = 6.5          # (2026-11-15 goal log: asked 6, got 10 to 14; asked 20, got 22 to 28) the body keeps turning about this far after `kbalance`: the gyro stop sends it this much early
+ALIGN_COAST_MIN_WANT_DEG = 10.0  # the coast-aware lead applies to turns of at least this many degrees; a smaller one keeps ALIGN_STOP_LEAD_DEG until the next goal run (IMU print on) says more
 ALIGN_LEAD_FRAC = 0.6          # ... but never earlier than this share of a small turn, or a 6 degree ask would stop before it began
+IMU_PRINT_STAYS_ON = True       # (2026-11-15) a move no longer sends `gp` when it ends: the IMU print stays on, so the stand guard, the stillness wait and the turn measurement always see frames (the 2026-11-15 goal run: 62 pictures taken with "no IMU frames" and 33 guard resends, because every move switched the print off)
 YAW_STALE_S = 0.5              # the yaw has not changed for this long during a gyro-stopped turn: the IMU print went quiet (a long timed run then turns far past the ask: 1 s is 20 to 28 degrees), so the timed length applies
 ALIGN_PULSE_FLOOR_DEG = 9.0    # the timed fallback of a line-up pulse is never shorter than the time this many degrees take at that side's measured pace (right 28 deg/s, left 20 deg/s: not one floor for both)
 ALIGN_PULSE_FLOOR_MIN_S = 0.3  # ... and never under this
@@ -612,7 +614,9 @@ def classify_pose(joints) -> str:
 
 def align_stop_lead(want_deg: float) -> float:
     """How many degrees before the wanted turn the gyro stop sends `kbalance`: the coast of the body (ALIGN_COAST_DEG), at most ALIGN_LEAD_FRAC of a small turn, at least ALIGN_STOP_LEAD_DEG. The one number every gyro-stopped turn uses (the chase's line-up and the voice service's turns)."""
-    return max(ALIGN_STOP_LEAD_DEG, min(ALIGN_COAST_DEG, ALIGN_LEAD_FRAC * max(0.0, want_deg)))
+    if want_deg < ALIGN_COAST_MIN_WANT_DEG:
+        return ALIGN_STOP_LEAD_DEG                    # a small turn keeps the old lead for now: asked 6.0 got 0.2 and asked 5.2 got 1.3 on 2026-11-15 (taken with the IMU print cycling off), too little to tune on
+    return max(ALIGN_STOP_LEAD_DEG, min(ALIGN_COAST_DEG, ALIGN_LEAD_FRAC * want_deg))
 
 
 def align_stop_at(want_deg: float) -> float:
@@ -926,6 +930,11 @@ class SerialRobot:
         log.info("stop on a calm moment: waited %.2f s%s", waited, "" if waited < CALM_MAX_S else " (gave up waiting)")
         return "ok"
 
+    def _imu_release(self) -> None:
+        """What a move did at its end with the IMU print (`gp`). The print is shared (link/imu_print.py): it stays on unless IMU_PRINT_STAYS_ON is False."""
+        if not IMU_PRINT_STAYS_ON:
+            self._tx("gp")
+
     def _skill(self, token: str, seconds: float, stop_yaw_deg: float | None = None) -> str:
         if self._gate() == "fell":
             return "fell"
@@ -994,7 +1003,7 @@ class SerialRobot:
                 self.last_turn_deg, self.last_turn_s = abs(_yaw_diff(self._yaw, yaw0)), ran
                 log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s (ended by %s)", stop_yaw_deg, self.last_turn_deg, ran, ended_by)
         self.last_turn_end = ended_by if stop_yaw_deg is not None else None
-        self._tx("gp")
+        self._imu_release()
         self._moved_at = self._clock()
         return state
 
@@ -1039,7 +1048,7 @@ class SerialRobot:
                     roll.append(math.degrees(r[0]))
                     pitch.append(math.degrees(r[1]))
             self._sleep(0.05)
-        self._tx("gp")
+        self._imu_release()
         return (statistics.median(pitch), statistics.median(roll)) if pitch else None
 
     def note_picture_tilt(self, reading) -> None:
@@ -1134,7 +1143,7 @@ class SerialRobot:
         while self._clock() - t0 < seconds:
             self._fell()
             self._sleep(0.05)
-        self._tx("gp")
+        self._imu_release()
         return len(self._roll) > before
 
     def fallen(self) -> bool:
@@ -1220,7 +1229,7 @@ class SerialRobot:
                 state = "fell"
                 break
             self._sleep(0.05)
-        self._tx("gp")
+        self._imu_release()
         self.posture = "stand"
         if state != "fell":
             got = wait_for_pose(self._lk, "stand", sleep=self._sleep, clock=self._clock, fallback_s=0.0)
@@ -1276,7 +1285,7 @@ class SerialRobot:
                 state = "fell"
                 break
             self._sleep(0.05)
-        self._tx("gp")
+        self._imu_release()
         self.posture = "stand"
         self._moved_at = self._clock()
         return state
@@ -1348,7 +1357,7 @@ class SerialRobot:
                 state = "fell"
                 break
         self._claw = (pan, lift)
-        self._tx("gp")
+        self._imu_release()
         if state != "fell" and pan == 0.0 and lift == 0.0:
             ensure_claw_centered(self._lk, self._sleep)           # the arm down and centred is confirmed with the board, not assumed
         return state
@@ -1403,12 +1412,12 @@ class SerialRobot:
                 self._sleep(1.0 / PUNCH_STEPS_PER_S)
                 n += 1
                 if n % 5 == 0 and self._fell():
-                    self._tx("gp")
+                    self._imu_release()
                     return "fell"
             cur = (lift, sh, kn)
         self._sleep(0.3)
         self._fell()
-        self._tx("gp")
+        self._imu_release()
         self._moved_at = self._clock()
         return "ok"
 

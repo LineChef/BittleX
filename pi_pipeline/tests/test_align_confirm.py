@@ -8,7 +8,7 @@ from pi_pipeline.tests.test_ball_chase import reading
 
 def test_the_gyro_stop_leaves_early_by_the_coast_but_never_ends_a_small_turn_before_it_begins():
     assert bc.align_stop_lead(20.0) == bc.ALIGN_COAST_DEG                              # a big turn: the whole coast
-    assert bc.ALIGN_STOP_LEAD_DEG <= bc.align_stop_lead(6.0) < bc.ALIGN_COAST_DEG       # a small one: less, so it still starts
+    assert bc.align_stop_lead(6.0) == bc.ALIGN_STOP_LEAD_DEG                           # a small one keeps the old lead until the next run says more (2026-11-15)
     assert 0.0 < bc.align_stop_at(6.0) < 6.0 and bc.align_stop_at(1.0) >= 0.0
 
 
@@ -70,3 +70,16 @@ def test_a_gyro_stopped_turn_says_what_ended_it():
     r, lk = _gyro_robot(28.0)
     r.turn(30.0, 1.0, stop_deg=5.0)
     assert r.last_turn_end == "gyro"
+
+
+def test_a_move_leaves_the_imu_print_on(monkeypatch):
+    """2026-11-15 goal run: every move ended with `gp`, so G2 stood waiting for each picture with the IMU print off (62 pictures with no frames, 33 guard resends)."""
+    from pi_pipeline.tests.test_ball_chase import _gyro_robot
+    r, lk = _gyro_robot(28.0)
+    r.turn(30.0, 1.0, stop_deg=5.0)
+    sent = [c for c, _ in lk.sent]
+    assert "gP" in sent and "gp" not in sent
+    monkeypatch.setattr(bc, "IMU_PRINT_STAYS_ON", False)
+    r2, lk2 = _gyro_robot(28.0)
+    r2.turn(30.0, 1.0, stop_deg=5.0)
+    assert "gp" in [c for c, _ in lk2.sent]                                            # the old behavior is one switch

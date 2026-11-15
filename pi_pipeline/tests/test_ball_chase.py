@@ -628,17 +628,17 @@ def test_a_walk_that_cannot_start_because_the_board_sends_nothing_ends_the_attem
 
 def test_the_standing_flow_sends_nothing_extra_before_a_move_or_at_session_start(monkeypatch):
     """2026-11-02: the pose read, the tilt check and the stand-up polling put extra serial traffic in front of every walk, and the walks after them showed no board echoes. In the
-    default flow a move sends exactly what it sent before: no `j`, no `gp` / `gP` pair, nothing."""
+    default flow a move sends exactly what it sent before: no `j`, no `gp`, nothing (a move's `gP` stays: the IMU print is left on, 2026-11-15)."""
     assert bc.BETWEEN_MOVES == "stand"
     lk = _PoseLink("stand")
     t = iter(np.arange(0, 100000, 0.2))
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
     r._moved_at = r._clock() - 60.0                                                    # long still: the attention flow would read the pose and the tilt now
-    assert r.stand_up() == "ok" and lk.sent == ["gP", "gp"]                           # (user, 2026-11-05) standing 5 s or more: only the tilt read for the sag check, no pose read
+    assert r.stand_up() == "ok" and lk.sent == ["gP"]                               # (user, 2026-11-05) standing 5 s or more: only the tilt read for the sag check, no pose read
     for move in (lambda: r.turn(20, 0.3), lambda: r.back(0.3)):
         lk.sent.clear()
         assert move() == "ok"
-        assert lk.sent[0] == "gP" and "j" not in lk.sent and lk.sent.count("gP") == 1 and lk.sent.count("gp") == 1       # the skill wrapper's own gP ... gp, as before
+        assert lk.sent[0] == "gP" and "j" not in lk.sent and lk.sent.count("gP") == 1 and lk.sent.count("gp") == 0       # the skill wrapper's own gP; the print stays on after the move (2026-11-15)
 
 
 def test_the_session_start_reads_the_pose_once_and_waits_a_fixed_time(monkeypatch):
