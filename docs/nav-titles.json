@@ -33,6 +33,7 @@
  "hardware/self-righting": "Self-righting",
  "hardware/petoi-firmware-reference": "Firmware reference",
  "hardware/disabled-moves": "Disabled moves",
+ "hardware/arm-skills": "Arm skills",
  "vision": "Vision",
  "vision/picture-library": "Picture library",
  "vision/detection-layer": "Detection layer",

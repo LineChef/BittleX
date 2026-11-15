@@ -12,6 +12,7 @@ Specs, reference and research for the hardware that is installed. The physical a
 - [`servo-thermal.md`](servo-thermal.md): Servo overheat risk + the layered mitigation (Layer 1+2 built).
 - [`diagnostics.md`](diagnostics.md): Black-box logging + watchdog design (Phase 1 + non-HW Phase 2 built).
 - [`self-righting.md`](self-righting.md): Bittle's built-in self-right — limited; no BiBoard-V1 IR trigger.
+- [`arm-skills.md`](arm-skills.md): What the arm firmware's throw and launch skills do, how left and right resolve, and the order they are tested in.
 
 ### Reference
 

@@ -96,7 +96,8 @@
     "hardware/servo-thermal",
     "hardware/diagnostics",
     "hardware/self-righting",
-    "hardware/disabled-moves"
+    "hardware/disabled-moves",
+    "hardware/arm-skills"
    ]
   ],
   [

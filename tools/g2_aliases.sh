@@ -395,6 +395,14 @@ g2attend() {
 }
 # g2attendstop  -- end an attentive bout now (the claw goes down and he stands up the standard way).
 g2attendstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/attentive_stop" && echo "stop sent: the bout ends within a second"; }
+# g2armskill SKILL  -- play ONE arm skill (launch, toss, tossF, tossL, tossR, hunt, showOff; clap needs `g2armskill clap --allow-clap`) with the body watched: stands him up, sends it, watches the IMU 6 s, sends gb, rests him, and prints ok / lean / tipped / fell (log: ~/g2_runs/arm_skills/). Runs ONLY on your go, G2 on the floor on his feet, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. Test order and why: docs/hardware/arm-skills.md.
+g2armskill() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2armskill launch|toss|tossF|tossL|tossR|hunt|showOff"; return 2; }
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_skill_test --skill $1 ${2:-} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac
