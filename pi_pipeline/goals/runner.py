@@ -57,8 +57,9 @@ class GoalSession:
 
     def run(self) -> dict:
         """The session, inside a task scope: every setting an attempt changed is put back when it ends, however it ends (util/task_scope.py)."""
+        from .. import focus
         from ..util.task_scope import task_scope
-        with task_scope(f"goal session {self.goal.id}") as scope:
+        with focus.holding(f"goal:{self.goal.id}", "goal session"), task_scope(f"goal session {self.goal.id}") as scope:      # G2's own initiative stands aside for the whole session (focus lock)
             def _clear_stop_files():
                 for f in ("~/.local/share/g2/goal_stop", "~/.local/share/g2/ball_chase_stop"):
                     try:

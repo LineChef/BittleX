@@ -17,6 +17,7 @@ Most used
 - `g2stop voice`: stop the voice service safely
 - `g2reset`: restart the voice loop
 - `g2floor hardwood`: set the floor before any walk
+- `g2focus on 30`: hold back G2's own initiative (explore ask, rest, sleep) for 30 min
 - `g2ball`: start the ball goal
 - `g2ballstop`: stop the ball goal
 - `g2explore start`: start exploring
@@ -333,6 +334,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2explore`: [Most used](#most-used), [Stop and safety](#stop-and-safety), [Explore](#explore)
 - `g2feat`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2floor`: [Most used](#most-used), [Walk tests](#walk-tests)
+- `g2focus`: [Most used](#most-used)
 - `g2goal`: [Ball goal and punts](#ball-goal-and-punts)
 - `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)

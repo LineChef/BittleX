@@ -238,8 +238,9 @@ def run_inprocess(shared: SharedParts, roam_s: float) -> str:
 
 def run_session(args, shared: SharedParts | None = None) -> str:
     """The exploration, inside a task scope: every setting it changed (the walls goal's values, the chase's) is put back when it ends, however it ends (util/task_scope.py)."""
+    from . import focus
     from .util.task_scope import task_scope
-    with task_scope("exploration"):
+    with focus.holding("exploration", "exploration session"), task_scope("exploration"):      # G2's own initiative stands aside for the whole session (focus lock)
         return _run_session(args, shared)
 
 

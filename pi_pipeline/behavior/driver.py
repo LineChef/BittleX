@@ -129,6 +129,9 @@ class DriverInputs:
     chirps_on: bool = False                  # "turn on your chirps" -> re-enable, live
     chirps_off: bool = False                 # "turn off your chirps" -> disable, live
 
+    # --- the focus lock (pi_pipeline/focus.py): a held lock stands G2's own initiative aside (no sleep entry, no idle descent, no fidgets, no attentive bouts) ---
+    focus_held: bool = False
+
     # --- continuous sensor / perception state ---
     imu_level: bool = True
     imu_stable: bool = True
@@ -861,11 +864,14 @@ class BehaviorDriver:
         if i.shutdown:
             self._choreo.clear()
             self.sleep.on_command_shutdown()
-        _, s_act = self.sleep.update(
-            now, resting=self.idle.posture is Posture.RESTING,
-            person_present=i.person_present, loud_sound=i.loud_sound,
-            imu_tap=i.imu_tap or i.picked_up,                  # lifted == a wake
-            wake_word=i.wake_word or i.told_stop or i.come_here)  # spoken to == a wake
+        if i.focus_held and not self.sleep.asleep:
+            s_act = SleepAction.NONE                                  # focused (a goal, a test, `g2focus on`): he does not settle into sleep on his own
+        else:
+            _, s_act = self.sleep.update(
+                now, resting=self.idle.posture is Posture.RESTING,
+                person_present=i.person_present, loud_sound=i.loud_sound,
+                imu_tap=i.imu_tap or i.picked_up,                  # lifted == a wake
+                wake_word=i.wake_word or i.told_stop or i.come_here)  # spoken to == a wake
         if s_act is SleepAction.LIE_DOWN:             # shutdown: lie flat first
             return self._finish(self.mode.update(now),
                                 effects + [Effect(EffectKind.SKILL, "d", "shutdown: lie down")],
@@ -1005,7 +1011,9 @@ class BehaviorDriver:
             self._roam_chirp_at = None       # not roaming -> reset the entry chirp
             self._roam_began_at = None
 
-        # 5. IDLE -- staged descent + idle fidgets + the Tier 0 attentive layer
+        # 5. IDLE -- staged descent + idle fidgets + the Tier 0 attentive layer. A held focus lock (pi_pipeline/focus.py) stands all of it aside: he stays as he is.
+        if i.focus_held:
+            return self._finish(mode, effects, now, reason="idle: held by the focus lock")
         safe_to_rest = (i.imu_level and i.imu_stable and not i.held
                         and not i.recovering)
         _, pa = self.idle.update(

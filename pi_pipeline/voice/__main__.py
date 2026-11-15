@@ -313,6 +313,7 @@ def main() -> None:
         sleep_watch_ref = None
         if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)
             from ..power import power as _power
+            from .. import focus as _focus
             from ..power.sleep_watch import SleepWatch, WakeHook
             from . import prompt_tones
             _sleep_steps = [lambda: prompt_tones.play_sigh(wait=True), lambda: _power.set_wifi_power_save(True)]
@@ -321,7 +322,7 @@ def main() -> None:
                 _sleep_steps.append(guard.pause)
                 _wake_steps.append(guard.resume)
             sleep_watch = SleepWatch(is_resting=lambda: getattr(link, "last_motion_command", "") in ("", "d"),
-                                     is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), after_s=settings.sleep_after_s,
+                                     is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set() or not _focus.allow("sleep"), after_s=settings.sleep_after_s,
                                      on_sleep=_sleep_steps, on_wake=_wake_steps,
                                      on_event=(power_log.event if power_log else None)).start()
             sleep_watch_ref = sleep_watch
@@ -341,6 +342,9 @@ def main() -> None:
 
                 def _may_ask() -> bool:
                     if sleep_watch_ref.asleep or getattr(actuator, "busy", False) or exploring.is_set():
+                        return False
+                    from .. import focus
+                    if not focus.allow("explore_ask"):                  # a focused session (a goal, a test, `g2focus on`): no asking to go exploring
                         return False
                     ok, _pct, _v = _battery.motion_gate(link, min_percent=40)
                     return bool(ok)

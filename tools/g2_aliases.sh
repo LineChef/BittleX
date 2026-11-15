@@ -458,6 +458,11 @@ g2attach() {
 }
 
 # g2floor [LABEL]  -- show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs.
+# g2focus [on [MINUTES] [REASON...] | off | status]  -- hold G2's own initiative back (no "Can I go exploring?" ask, no settling to rest or sleep, no look-around bouts) while you test; `on` lasts 30 min unless you say MINUTES (the most is 4 h) and frees itself; a goal or an exploration holds it by itself for its whole length. Voice commands, stop and the safety guards always work.
+g2focus() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.focus ${*:-status}"
+}
 g2floor() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   case "${1:-show}" in

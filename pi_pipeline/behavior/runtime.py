@@ -29,6 +29,8 @@ import logging
 import time
 from dataclasses import dataclass, field
 
+from .. import focus as _focus
+
 from .bindings import DriverBindings
 from .driver import BehaviorDriver, DriverInputs, DriverTick
 
@@ -103,6 +105,7 @@ class _Pending:
         return out
 
 
+
 class BehaviorRuntime:
     def __init__(self, driver: BehaviorDriver, bindings: DriverBindings, *,
                  frame_source=None, sensors=None, recency=None, roster=None,
@@ -170,7 +173,7 @@ class BehaviorRuntime:
         return DriverInputs(
             now=now, frame=list(self._frame_source() or []),
             last_interaction_s=age, exchanges_recent=n_recent, body_idle_mult=self._body.idle_mult(),
-            known_person_labels=frozenset(self._roster() or ()),
+            known_person_labels=frozenset(self._roster() or ()), focus_held=_focus.held(),
             **sensors, **evt,
         )
 
