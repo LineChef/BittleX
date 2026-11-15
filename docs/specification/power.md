@@ -20,6 +20,8 @@ Interfaces
 ----------
 
 - Battery reads use the `P` command through the serial link, on demand (at start and before a walk) with a 30 minute backstop (`G2_BATTERY_POLL_S`).
+- Low-battery alarm: A reading taken at rest at or below the low voltage is read again 5 s later and, if the better of the two is still low, sounds the alarm at once. A reading taken under load still needs three in a row. While the last reading is under `G2_BATTERY_POLL_LOW_V` the timed reading comes every `G2_BATTERY_POLL_LOW_S` instead of every 30 minutes.
+- Refused runs: A goal, roam or exploration refused because the pack is below the 30% gate sounds the low (or critical) battery alarm once, at most once a minute, so a refusal is never silent. The gate itself is unchanged.
 - Sleep and battery watches stand aside while an exploration or goal session runs.
 
 Constraints

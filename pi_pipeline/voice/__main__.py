@@ -565,7 +565,11 @@ def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, li
 
     monitor = BatteryMonitor(settings.battery_low_v, settings.battery_critical_v)
     from ..power.battery import make_voltage_log
-    return BatteryWatcher(reader, make_battery_alert(tts, audible), monitor=monitor, poll_s=settings.battery_poll_s,
+    from ..power.battery import set_refusal_alert
+    alert = make_battery_alert(tts, audible)
+    set_refusal_alert(alert)                                       # a goal or roam refused for a low pack sounds the same alert (power/battery.py)
+    return BatteryWatcher(reader, alert, monitor=monitor, poll_s=settings.battery_poll_s,
+                          poll_low_s=settings.battery_poll_low_s, poll_low_v=settings.battery_poll_low_v,
                           record=make_voltage_log(settings.battery_log), record_every_s=settings.battery_log_every_s).start()
 
 

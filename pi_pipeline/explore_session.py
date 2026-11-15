@@ -428,6 +428,8 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 saver.on_camera_slow = lambda: threading.Thread(target=say, args=("My camera isn't answering.",), daemon=True).start()
             from .voice.__main__ import make_battery_alert
             alert["fn"] = make_battery_alert(tts, True)
+            from .power.battery import set_refusal_alert
+            set_refusal_alert(alert["fn"])               # a run refused for a low pack sounds the same alert
             from .personality.bonds import Bonds
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
             narrator = Narrator(tts.speak, prepare=getattr(tts, "prepare", None), play=getattr(tts, "play", None), private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
@@ -491,6 +493,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         watcher = BatteryWatcher(lambda: None if (policy_walker is not None and policy_walker.busy) else read_voltage(link),
                                  lambda lvl, v: alert["fn"] and alert["fn"](lvl, v),
                                  monitor=BatteryMonitor(settings.battery_low_v, settings.battery_critical_v), poll_s=settings.battery_poll_s,
+                                 poll_low_s=settings.battery_poll_low_s, poll_low_v=settings.battery_poll_low_v,
                                  record=make_voltage_log(settings.battery_log), record_every_s=settings.battery_log_every_s).start()
         stop_flag = threading.Event()
         listener = None

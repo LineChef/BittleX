@@ -181,6 +181,8 @@ class Settings:
     # "go ahead and look around" by voice hands over to an exploration session (explore_launch.py); it ends and the voice service returns
     explore_handover: bool = field(default_factory=lambda: _env("G2_EXPLORE_HANDOVER", "1") not in ("0", "false", "no"))
     explore_roam_s: float = field(default_factory=lambda: _env_float("G2_EXPLORE_ROAM_S", 300.0))
+    battery_poll_low_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_LOW_S", 300.0))   # below battery_poll_low_v the idle reading comes this often (0 = never faster)
+    battery_poll_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_LOW_V", 7.7))   # about 55% left of a 2S Li-ion pack at rest
     battery_poll_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_S", 1800.0))   # the idle backstop: a reading every 30 min (was 60 s; every `P` makes the BiBoard tick, measured 2026-10-08). Readings are also taken at start, at the wake word and before a walk, and the walk loop reads the pack every 5 s itself; 0 = no idle timer
     # G2's pack voltage history, one line per `battery_log_every_s` (empty path = off)
     battery_log: str = field(default_factory=lambda: _env("G2_BATTERY_LOG", "~/.local/share/g2/battery_voltage.csv"))

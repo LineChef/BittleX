@@ -51,6 +51,7 @@ Power and battery
 - `G2_SLEEP_AFTER_S`: Default: 300; What it does: seconds at rest before power-saving sleep (0 = off); the wake word wakes him with a yawn
 - `G2_FOCUS_FILE`: Default: `~/.local/share/g2/focus.json`; What it does: the focus lock's state file (holders with an expiry); see `g2focus`
 - `G2_BATTERY_LOW_V`, `G2_BATTERY_CRITICAL_V`: Default: 7.54, 7.46; What it does: G2 pack alarms at rest (about 30% and 20%); `G2_BATTERY_LOAD_LOW_V` 7.3 and `G2_BATTERY_LOAD_CRITICAL_V` 7.2 under load
+- `G2_BATTERY_POLL_LOW_S`, `G2_BATTERY_POLL_LOW_V`: Default: 300, 7.7; What it does: while the last pack reading is under the voltage (about 55%), the timed reading comes every this many seconds instead of every `G2_BATTERY_POLL_S` (0 turns the faster poll off); each reading ticks the board
 - `G2_PI_WARN_FRACTION`, `G2_PI_CRITICAL_FRACTION`: Default: 0.70, 0.80; What it does: Pi battery alarms as a share of the measured runtime (3.28 h); critical backs off to every 15 min
 - `G2_POWER_LOG`: Default: `~/.local/share/g2/power_log.jsonl`; What it does: the power diary
 

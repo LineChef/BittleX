@@ -117,7 +117,37 @@ def settled_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, rest_reads: int
             log.info("battery read low (%s%%), then %s%% after resting: sag, going on", pct, pct2)
             return True, pct2, v2
     log.warning("battery still low after %d re-reads (best %s%%, %.2f V)", rest_reads, best[0], best[1])
+    _refusal_alert(best[1])
     return False, best[0], best[1]
+
+
+
+_REFUSAL_ALERT = None            # set by the service or the session that can speak: fn(level, volts)
+_REFUSAL_GAP_S = 60.0
+_last_refusal = -1e9
+
+
+def set_refusal_alert(fn) -> None:
+    """Register what sounds when a run is refused for a low pack (the same alert the battery watch plays)."""
+    global _REFUSAL_ALERT
+    _REFUSAL_ALERT = fn
+
+
+def _refusal_alert(volts: float | None) -> None:
+    """A goal, roam or exploration was refused because the pack is below the gate: sound the low (or critical) battery alert once (at most once a minute), so it is never silent."""
+    global _last_refusal
+    if _REFUSAL_ALERT is None or volts is None:
+        return
+    now = time.monotonic()
+    if now - _last_refusal < _REFUSAL_GAP_S:
+        return
+    _last_refusal = now
+    try:
+        from ..config import settings
+        level = BatteryLevel.CRITICAL if volts <= settings.battery_critical_v else BatteryLevel.LOW
+        _REFUSAL_ALERT(level, volts)
+    except Exception:  # noqa: BLE001 -- an alert failing must not change the refusal
+        log.debug("battery refusal alert raised", exc_info=True)
 
 
 class BatteryLevel(IntEnum):
@@ -153,12 +183,17 @@ class BatteryMonitor:
         self.level = BatteryLevel.OK
         self._last_alert: float | None = None
 
-    def update(self, volts: float, now: float | None = None) -> BatteryLevel | None:
+    def update(self, volts: float, now: float | None = None, *, immediate: bool = False) -> BatteryLevel | None:
+        """`immediate`: this reading was taken at rest (and confirmed by a re-read): one reading at or below the low voltage counts at once, without waiting for `confirm` of them (2026-11-15: three
+        readings 30 minutes apart, cleared by every service restart, meant the alarm never sounded at 30%)."""
         now = time.monotonic() if now is None else now
         self._recent.append(volts)
-        if len(self._recent) < self._recent.maxlen:
+        if immediate and volts <= self.low_v:
+            worst = volts
+        elif len(self._recent) < self._recent.maxlen:
             return None
-        worst = max(self._recent)          # the least-low of the confirmed readings
+        else:
+            worst = max(self._recent)          # the least-low of the confirmed readings
         if worst <= self.critical_v:
             seen = BatteryLevel.CRITICAL
         elif worst <= self.low_v:
@@ -183,8 +218,11 @@ class BatteryWatcher:
     `read_voltage` returns volts or None (e.g. a gait is running, or no link): None readings are skipped."""
 
     def __init__(self, read_voltage, on_alert, *, monitor: BatteryMonitor | None = None, poll_s: float = 60.0,
-                 record=None, record_every_s: float = 300.0, clock=time.monotonic):
+                 record=None, record_every_s: float = 300.0, clock=time.monotonic,
+                 poll_low_s: float = 0.0, poll_low_v: float = 7.7, rest_confirm_s: float = 5.0, sleep=time.sleep):
         self._record, self._record_every_s, self._clock = record, record_every_s, clock
+        self._poll_low_s, self._poll_low_v = poll_low_s, poll_low_v      # below `poll_low_v` the timer reads every `poll_low_s` instead of `poll_s` (0 = no faster poll)
+        self._rest_confirm_s, self._sleep = rest_confirm_s, sleep         # a low reading at rest is read again this much later before it alerts
         self._last_recorded: float | None = None
         self._read = read_voltage
         self._on_alert = on_alert
@@ -197,9 +235,16 @@ class BatteryWatcher:
         self._thread: threading.Thread | None = None
         self.last_volts: float | None = None
 
-    def poll_once(self, now: float | None = None) -> BatteryLevel | None:
+    def poll_once(self, now: float | None = None, *, rest: bool = False) -> BatteryLevel | None:
+        """One reading. `rest`: it was taken while G2 stands idle (the reader gives None while a gait runs), so a reading at or below the low voltage is read again after `rest_confirm_s` (a pack
+        recovers within seconds of a load) and, if the better of the two is still low, alerts at once."""
         try:
             v = self._read()
+            if rest and v is not None and v <= self.monitor.low_v and self._rest_confirm_s > 0:
+                self._sleep(self._rest_confirm_s)
+                v2 = self._read()
+                if v2 is not None and v2 > v:
+                    v = v2
         except Exception:  # noqa: BLE001
             log.debug("battery read raised", exc_info=True)
             return None
@@ -207,7 +252,7 @@ class BatteryWatcher:
             return None
         self.last_volts = v
         self._maybe_record(v)
-        level = self.monitor.update(v, now)
+        level = self.monitor.update(v, now, immediate=rest)
         if level is not None:
             log.warning("battery %s: %.2f V", level.name.lower(), v)
             try:
@@ -215,6 +260,11 @@ class BatteryWatcher:
             except Exception:  # noqa: BLE001 -- an alert failing must not stop the watch
                 log.debug("battery alert handler raised", exc_info=True)
         return level
+
+    def next_gap_s(self) -> float:
+        """Seconds to the next timed reading: the idle backstop, or `poll_low_s` while the last reading is under `poll_low_v` (each read ticks the board, so a low pack only)."""
+        low = self._poll_low_s > 0 and self.last_volts is not None and self.last_volts < self._poll_low_v
+        return self._poll_low_s if low else self._poll_s
 
     def _maybe_record(self, v: float) -> None:
         """Hand the reading to `record` at most once per `record_every_s` (the history of the discharge curve)."""
@@ -254,8 +304,9 @@ class BatteryWatcher:
                 if first or due or asked:
                     first = False
                     self._last_read = now
-                    self.poll_once()
-                    next_due = now + self._poll_s if self._poll_s > 0 else 0.0
+                    self.poll_once(rest=True)
+                    gap = self.next_gap_s()
+                    next_due = now + gap if gap > 0 else 0.0
         self._thread = threading.Thread(target=_run, name="battery-watch", daemon=True)
         self._thread.start()
         return self
