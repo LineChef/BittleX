@@ -48,7 +48,8 @@ def test_a_silent_board_and_a_lost_ball_stop_the_calibration():
     r = Robot([None])
     assert lc.run_lift_cal(r, lambda: None, say=lambda *_: None, sleep=lambda s: None)["ended"] == "no_board" and r.calls == []
     r2 = Robot([(0.0, 0.0)])
-    assert lc.run_lift_cal(r2, lambda: None, lifts=(120.0, 105.0, 90.0), say=lambda *_: None, sleep=lambda s: None)["ended"] == "lost"
+    res2 = lc.run_lift_cal(r2, lambda: None, lifts=(120.0, 105.0, 90.0), say=lambda *_: None, sleep=lambda s: None)
+    assert res2["ended"] == "done" and len(res2["rows"]) == 3                           # a ball out of the frame does not stop the steps
 
 
 def test_the_probe_counts_pictures_gaps_and_other_lines():

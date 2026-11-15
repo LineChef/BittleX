@@ -3,7 +3,7 @@
 The live follow turns the claw left and right only. To follow a target up and down the lift joint (index 1) would tilt the camera, but nobody has measured which way and how much, and the claw look raises
 the lift to 120 first because from a low lift the claw sits between the front legs. This test holds the pan at 0 with a ball fixed in view and steps the lift down from 120 in small steps. At each step it
 takes two pictures (the first is dropped: the module answers with the previous request's picture), finds the ball with the colour finder, and reads the body's tilt. It stops at the first step that tilts
-the body `MAX_TILT_DEG` from where it stood, that loses the ball twice, or that falls, then puts the claw down and stands him up the standard way.
+the body `MAX_TILT_DEG` from where it stood, or that falls (a ball that leaves the frame does not stop it: the whole scene is measured on the saved pictures), then puts the claw down and stands him up the standard way.
 
 The table it prints: lift, the ball's centre (x, y) and diameter in frame fractions, the tilt from the starting stand, and the camera's vertical shift per degree of lift (the vertical field of view is
 taken as the horizontal one, 89 deg over the square frame). Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped (`g2liftcal`).
@@ -15,7 +15,8 @@ from __future__ import annotations
 import os
 import time
 
-LIFTS = (120.0, 105.0, 90.0, 75.0, 60.0)
+LIFTS = (120.0, 105.0, 90.0, 75.0, 60.0, 45.0, 30.0)
+MAX_LOST = 99                       # the ball may leave the frame as the view tilts: keep stepping, the pictures are measured on the whole scene afterwards
 MAX_TILT_DEG = 6.0
 FOV_DEG = 89.0                  # the measured full field of view (pan fit, 2026-11-15); the vertical one is assumed equal for the square frame
 
@@ -74,7 +75,7 @@ def run_lift_cal(robot, look, lifts=LIFTS, *, say=print, sleep=time.sleep, stopp
                     say(f"lift calibration: the body tilted {dev} deg at lift {lift:.0f}: stopping here")
                     res["ended"] = "tilt"
                     break
-                if lost >= 2:
+                if lost >= MAX_LOST:
                     say("lift calibration: the ball is out of view: stopping here")
                     res["ended"] = "lost"
                     break
