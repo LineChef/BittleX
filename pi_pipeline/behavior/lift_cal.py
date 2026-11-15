@@ -16,6 +16,7 @@ import os
 import time
 
 LIFTS = (120.0, 105.0, 90.0, 75.0, 60.0, 45.0, 30.0)
+LIFTS_UP = (0.0, 15.0, 30.0, 45.0, 60.0, 75.0, 90.0, 105.0, 120.0)      # from the home position up: the range below 30 the downward sweep never measured
 MAX_LOST = 99                       # the ball may leave the frame as the view tilts: keep stepping, the pictures are measured on the whole scene afterwards
 MAX_TILT_DEG = 6.0
 FOV_DEG = 89.0                  # the measured full field of view (pan fit, 2026-11-15); the vertical one is assumed equal for the square frame
@@ -97,6 +98,10 @@ def run_lift_cal(robot, look, lifts=LIFTS, *, say=print, sleep=time.sleep, stopp
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser(description="Lift calibration: step the claw lift with a ball in view and measure the picture and the body tilt.")
+    ap.add_argument("--up", action="store_true", help="sweep from the home position (0) UP to 120 in 15 deg steps instead of down from 120")
+    args = ap.parse_args()
     from ..config import settings
     from ..link import imu_print
     from ..link.serial_link import SerialLink
@@ -133,7 +138,7 @@ def main() -> None:
         return None if b is None else (b.x / 240.0, b.y / 240.0, b.width / 240.0, b.height / 240.0)
     try:
         chase._stand_if_lying(link, "kbalance")
-        res = run_lift_cal(robot, look)
+        res = run_lift_cal(robot, look, lifts=LIFTS_UP if args.up else LIFTS)
         print(f"RESULT: {res['ended']}")
     except KeyboardInterrupt:
         print("ended")
