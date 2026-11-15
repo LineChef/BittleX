@@ -120,3 +120,49 @@ def test_the_step_report_finds_when_a_fixed_target_settled_and_counts_reversals(
     assert r["first_offset_deg"] == pytest.approx(0.4 * 2 * 44.0, abs=0.1) and r["settled_after_s"] == 1.5 and r["reversals"] == 1
     assert r["final_offset_deg"] == 0.0 and r["worst_offset_after_settling_deg"] <= 4.0
     assert lf.step_report([{"t_capture": 0.0, "det": []}], [])["pictures_with_target"] == 0
+
+
+def test_the_stream_grabber_reads_pictures_as_they_arrive_and_always_breaks_at_the_end():
+    from pi_pipeline.vision import stream_probe as sp
+
+    class S:
+        jpeg = b"jpg"
+        detections = []
+
+    class Ser:
+        def __init__(self, n):
+            self.lines, self.written = [b"p\n"] * n, []
+
+        def reset_input_buffer(self):
+            pass
+
+        def write(self, b):
+            self.written.append(b)
+
+        def readline(self):
+            if self.lines:
+                return self.lines.pop(0)
+            time.sleep(0.005)
+            return b""
+    ser = Ser(5)
+    g = lf.StreamGrabber(ser, lambda jpeg: [ball(0.7)], lf.LiveConfig(), parse=lambda line, labels: S(), latency_s=0.25, sleep=lambda s: None)
+    g.start()
+    deadline = time.time() + 2.0
+    while len(g.rows) < 5 and time.time() < deadline:
+        time.sleep(0.01)
+    g.stop_flag.set()
+    g.join(timeout=2.0)
+    assert len(g.rows) == 5 and g.rows[0]["t_call"] - g.rows[0]["t_capture"] == pytest.approx(0.25, abs=0.01) and g.take()[2] == 5
+    assert ser.written[0] == sp.BREAK and sp.LOOP_WITH_PICTURE in ser.written and ser.written[-1] == sp.BREAK
+
+
+def test_run_live_can_use_another_grabber():
+    made = []
+
+    class Fake(lf.Grabber):
+        def run(self):
+            made.append(1)
+            self.stop_flag.wait(0.3)
+    r = FakeRobot()
+    res = lf.run_live(r, lambda: None, lambda j: [], lf.LiveConfig(seconds=0.2, tick_s=0.02), say=lambda *_: None, make_grabber=lambda find, cfg, clock, save: Fake(lambda: None, find, cfg, clock=clock))
+    assert made == [1] and res["ended"] == "time"

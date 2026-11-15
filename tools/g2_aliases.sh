@@ -386,12 +386,12 @@ print('voltage', b.read_voltage(l))
 PYEOF
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2attend [MINUTES [TARGET [live]]]  -- one supervised attentive bout (default 2 min): G2 holds the attention pose with the claw up and turns the camera toward what the camera model detects (largest first; with TARGET, a named object from the object gallery as well), looks around now and then, then puts the claw down and stands up the standard way. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2attendstop ends a bout at once.
+# g2attend [MINUTES [TARGET [live [stream]]]]  -- one supervised attentive bout (default 2 min): G2 holds the attention pose with the claw up and turns the camera toward what the camera model detects (largest first; with TARGET, a named object from the object gallery as well), looks around now and then, then puts the claw down and stands up the standard way. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2attendstop ends a bout at once.
 g2attend() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
   local out
-  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.attentive_bout --minutes ${1:-2} ${2:+--target $2} ${3:+--live} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.attentive_bout --minutes ${1:-2} ${2:+--target $2} ${3:+--live} ${4:+--stream} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
   printf '%s\n' "$out"
   local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \([^ ]*\).*/\1/p' | tail -1)"
   if [ -n "$dir" ]; then
@@ -429,12 +429,12 @@ g2stream() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2liftcal  -- lift calibration: with a ball fixed in view and the pan at 0, steps the claw lift down from 120 (120, 105, 90, 75, 60), takes pictures and reads the body tilt at each, stops at the first 6 deg of tilt or a lost ball, then puts the claw down and stands him up. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after.
+# g2liftcal [up]  -- lift calibration (`up`: from the home position up to 120 in 15 deg steps): with a ball fixed in view and the pan at 0, steps the claw lift down from 120 (120, 105, 90, 75, 60), takes pictures and reads the body tilt at each, stops at the first 6 deg of tilt or a lost ball, then puts the claw down and stands him up. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after.
 g2liftcal() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
   local out
-  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lift_cal 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lift_cal ${1:+--up} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
   printf '%s\n' "$out"
   local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
   if [ -n "$dir" ]; then

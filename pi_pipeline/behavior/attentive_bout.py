@@ -195,6 +195,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="One supervised attentive bout (claw gaze-follow from the attention pose). Needs the owner's go; the voice service stopped.")
     ap.add_argument("--minutes", type=float, default=2.0)
     ap.add_argument("--labels", default=None, help="comma-separated labels to follow (default: any detection; or G2_ATTENTIVE_LABELS)")
+    ap.add_argument("--stream", action="store_true", help="with --live: use the module's continuous picture stream instead of one request per picture (about 4 pictures a second)")
     ap.add_argument("--live", action="store_true", help="follow continuously (pictures back to back, claw steered from where it pointed when each was taken); needs --target (behavior/live_follow.py)")
     ap.add_argument("--target", default=None, help="also find this named object with the object gallery (a name or part of one, for example the name of a toy): the camera's own detector knows only three classes")
     args = ap.parse_args()
@@ -261,7 +262,11 @@ def main() -> None:
             def save(i, jpeg):
                 with open(os.path.join(outdir, f"pic_{i:03d}.jpg"), "wb") as f:
                     f.write(jpeg)
-            res = lf.run_live(robot, cam.snapshot, targets.detections, lf.LiveConfig(seconds=args.minutes * 60.0), pan_sign=chase.CLAW_PAN_SIGN, save=save)
+            make = None
+            if args.stream:
+                cam._open()                                                # the snapshotter's start-up (reset wait, sensor option, exposure), then the stream takes the port
+                make = lambda find, cfg, clock, sv: lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=sv)      # noqa: E731
+            res = lf.run_live(robot, cam.snapshot, targets.detections, lf.LiveConfig(seconds=args.minutes * 60.0), pan_sign=chase.CLAW_PAN_SIGN, save=save, make_grabber=make)
             lf.write_log(res, outdir)
             print("STEP:", lf.step_report(res["rows"], res["moves"]))
             print(f"PICTURES: {outdir} ({res['summary'].get('pictures', 0)} pictures, {res['summary'].get('with_target', 0)} with the target)")

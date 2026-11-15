@@ -147,6 +147,56 @@ class Grabber(threading.Thread):
                 self.rows.append(row)
 
 
+class StreamGrabber(Grabber):
+    """The module's continuous picture stream (`AT+INVOKE=-1,0,0`, measured 2026-11-15: about 4.3 pictures a second, a steady 0.22 s gap) instead of one request per picture. The module sends pictures on its own, so
+    a picture's capture time is its arrival minus `latency_s` (the encode and the serial transfer; an estimate until measured from a run's log)."""
+
+    def __init__(self, ser, find_fn, cfg: LiveConfig, *, clock=time.monotonic, save=None, parse=None, latency_s: float = 0.25, sleep=time.sleep):
+        super().__init__(lambda: None, find_fn, cfg, clock=clock, save=save)
+        self.ser, self.parse, self.latency_s, self._sleep = ser, parse, latency_s, sleep
+
+    def run(self) -> None:
+        from ..vision.snapshot import parse_invoke_line
+        from ..vision.stream_probe import BREAK, LOOP_WITH_PICTURE
+        parse = self.parse or parse_invoke_line
+        n, prev = 0, None
+        try:
+            self.ser.reset_input_buffer()
+            self.ser.write(BREAK)
+            self._sleep(0.2)
+            self.ser.reset_input_buffer()
+            self.ser.write(LOOP_WITH_PICTURE)
+            while not self.stop_flag.is_set():
+                raw = self.ser.readline()
+                if not raw:
+                    continue
+                t = self.clock()
+                snap = parse(raw.decode("utf-8", "replace"), [])
+                if snap is None:
+                    continue
+                try:
+                    dets = list(self.find_fn(snap.jpeg))
+                except Exception:  # noqa: BLE001
+                    dets = []
+                n += 1
+                if self.save is not None:
+                    try:
+                        self.save(n, snap.jpeg)
+                    except Exception:  # noqa: BLE001
+                        pass
+                row = {"n": n, "t_call": round(t, 3), "t_done": round(t, 3), "t_capture": round(t - self.latency_s, 3), "grab_s": round(t - prev, 3) if prev is not None else 0.0,
+                       "det": [(d[0], round(d[2], 3)) for d in dets]}
+                prev = t
+                with self._lock:
+                    self.latest = (t - self.latency_s, dets, n)
+                    self.rows.append(row)
+        finally:
+            try:
+                self.ser.write(BREAK)
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def summarize(rows: list[dict], moves: list[dict], reversals: int, seconds: float) -> dict:
     grabs = [r["grab_s"] for r in rows] or [0.0]
     seen = [r for r in rows if r["det"]]
@@ -156,7 +206,7 @@ def summarize(rows: list[dict], moves: list[dict], reversals: int, seconds: floa
 
 
 def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign: str = "left", say=print, sleep=time.sleep, clock=time.monotonic,
-             stopped=lambda: False, save=None) -> dict:
+             stopped=lambda: False, save=None, make_grabber=None) -> dict:
     """One live follow run. Returns {"ended", "seconds", "summary", "moves", "rows"}. Never raises; the claw is lowered and G2 stands up the standard way however it ends (a fall leaves him in rest)."""
     from .. import focus
     cfg = cfg or LiveConfig()
@@ -181,7 +231,7 @@ def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign
             base = robot._tilt()
             pan_log = PanLog(0.0, clock())
             follower = LiveFollower(cfg, pan_sign, pan_log)
-            grab = Grabber(snap_fn, find_fn, cfg, clock=clock, save=save)
+            grab = make_grabber(find_fn, cfg, clock, save) if make_grabber is not None else Grabber(snap_fn, find_fn, cfg, clock=clock, save=save)
             grab.start()
             pan, last_dir = 0.0, 0
             t_start = clock()
