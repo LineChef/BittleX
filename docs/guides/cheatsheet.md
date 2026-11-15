@@ -20,6 +20,8 @@ Most used
 - `g2focus on 30`: hold back G2's own initiative (explore ask, rest, sleep) for 30 min
 - `g2attend 2 NAME`: one supervised 2 min look-around bout (NAME: a gallery object)
 - `g2seen NAME`: camera only: what the detector and the gallery see (no move)
+- `g2stream`: camera only: can the module stream pictures, and how fast?
+- `g2liftcal`: step the claw lift with a ball in view (hands near)
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
 - `g2ball`: start the ball goal
 - `g2ballstop`: stop the ball goal
@@ -344,6 +346,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)
 - `g2libstatus`: [Camera model](#camera-model)
+- `g2liftcal`: [Most used](#most-used)
 - `g2look`: [Claw and camera](#claw-and-camera)
 - `g2mem`: [Data and review](#data-and-review)
 - `g2membackup`: [Data and review](#data-and-review)
@@ -372,6 +375,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2ssh`: [Most used](#most-used), [Setup](#setup)
 - `g2standup`: [Most used](#most-used)
 - `g2stop`: [Most used](#most-used), [Stop and safety](#stop-and-safety)
+- `g2stream`: [Most used](#most-used)
 - `g2sync`: [Most used](#most-used), [Data and review](#data-and-review)
 - `g2tb`: [Training and policies](#training-and-policies)
 - `g2test`: [Training and policies](#training-and-policies), [Docs and repo](#docs-and-repo)

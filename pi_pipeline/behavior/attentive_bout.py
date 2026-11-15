@@ -263,6 +263,7 @@ def main() -> None:
                     f.write(jpeg)
             res = lf.run_live(robot, cam.snapshot, targets.detections, lf.LiveConfig(seconds=args.minutes * 60.0), pan_sign=chase.CLAW_PAN_SIGN, save=save)
             lf.write_log(res, outdir)
+            print("STEP:", lf.step_report(res["rows"], res["moves"]))
             print(f"PICTURES: {outdir} ({res['summary'].get('pictures', 0)} pictures, {res['summary'].get('with_target', 0)} with the target)")
             return
         run_bout(robot, look, cfg, pan_sign=chase.CLAW_PAN_SIGN)

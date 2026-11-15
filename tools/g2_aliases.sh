@@ -415,6 +415,34 @@ g2seen() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
+# g2stream [SECONDS]  -- camera only, G2 does not move: asks the camera module for a continuous stream of pictures (AT+INVOKE=-1,0,0) and prints how many pictures a second arrive and how far apart (default 6 s). Rests G2 and stops the voice service first (g2stop voice) and starts it again after; the first frames are copied to the Mac.
+g2stream() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2stop voice || return 1
+  local out
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.vision.stream_probe --seconds ${1:-6} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  printf '%s\n' "$out"
+  local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
+  if [ -n "$dir" ]; then
+    local dest="$HOME/Desktop/G2Memory/g2_pictures/stream/$(basename "$dir")"; mkdir -p "$dest"
+    scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null && echo "frames copied to $dest"
+  fi
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
+# g2liftcal  -- lift calibration: with a ball fixed in view and the pan at 0, steps the claw lift down from 120 (120, 105, 90, 75, 60), takes pictures and reads the body tilt at each, stops at the first 6 deg of tilt or a lost ball, then puts the claw down and stands him up. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after.
+g2liftcal() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2stop voice || return 1
+  local out
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lift_cal 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  printf '%s\n' "$out"
+  local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
+  if [ -n "$dir" ]; then
+    local dest="$HOME/Desktop/G2Memory/g2_pictures/liftcal/$(basename "$dir")"; mkdir -p "$dest"
+    scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null && echo "pictures copied to $dest"
+  fi
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
 g2attendstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/attentive_stop" && echo "stop sent: the bout ends within a second"; }
 # g2armskill SKILL  -- play ONE arm skill (launch, toss, tossF, tossL, tossR, hunt, showOff; clap needs `g2armskill clap --allow-clap`) with the body watched: stands him up, sends it, watches the IMU 6 s, sends gb, rests him, and prints ok / lean / tipped / fell (log: ~/g2_runs/arm_skills/). Runs ONLY on your go, G2 on the floor on his feet, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. Test order and why: docs/hardware/arm-skills.md.
 g2armskill() {

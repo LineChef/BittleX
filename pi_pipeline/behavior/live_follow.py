@@ -249,6 +249,26 @@ def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign
     return res
 
 
+def step_report(rows: list[dict], moves: list[dict], fov_half_deg: float = 31.5, settle_deg: float = 6.0, settle_n: int = 3) -> dict:
+    """The step response of a run with a FIXED target: the first offset, the time until the target stays within `settle_deg` of the middle for `settle_n` pictures in a row, the biggest offset after that,
+    the steady offset at the end and the number of direction reversals (an oscillation shows as many)."""
+    pts = [(r["t_capture"], (r["det"][0][1] - 0.5) * 2.0 * fov_half_deg) for r in rows if r["det"]]
+    if not pts:
+        return {"pictures_with_target": 0}
+    t0 = pts[0][0]
+    settled_at = None
+    for i in range(len(pts) - settle_n + 1):
+        if all(abs(p[1]) <= settle_deg for p in pts[i:i + settle_n]):
+            settled_at = pts[i][0] - t0
+            break
+    after = [abs(p[1]) for p in pts if settled_at is not None and p[0] - t0 >= settled_at]
+    tail = [abs(p[1]) for p in pts[-5:]]
+    dirs = [1 if m["to"] > m["from"] else -1 for m in moves]
+    return {"first_offset_deg": round(pts[0][1], 1), "settled_after_s": None if settled_at is None else round(settled_at, 1),
+            "worst_offset_after_settling_deg": round(max(after), 1) if after else None, "final_offset_deg": round(statistics.median(tail), 1),
+            "reversals": sum(1 for a, b in zip(dirs, dirs[1:]) if a != b), "moves": len(moves), "pictures_with_target": len(pts)}
+
+
 def write_log(res: dict, outdir: str) -> str | None:
     try:
         path = os.path.join(os.path.expanduser(outdir), "live_log.json")
