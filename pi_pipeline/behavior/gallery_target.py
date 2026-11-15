@@ -6,6 +6,7 @@ now: the localizer proposes object-like regions, each region's crop is embedded,
 (label, score, cx, cy, w, h), all in frame fractions. The gallery is only read.
 
     python -m pi_pipeline.behavior.gallery_target --pictures 5 --target toy        # camera only: G2 does not move; the voice service is stopped (`g2seen`)
+    python -m pi_pipeline.behavior.gallery_target --pictures 1 --target ball       # the green ball, by the colour finder
 """
 from __future__ import annotations
 
@@ -49,7 +50,31 @@ class GalleryTargets:
             return []
 
 
-def open_targets(*, target: str | None = None, min_sim: float = MIN_SIM) -> GalleryTargets:
+class BallTarget:
+    """The green ball, found the way the ball chase finds it: the colour finder (`vision/ball_finder.py`, plain numpy, no model). Same (label, score, cx, cy, w, h) form as the gallery's matches."""
+
+    FRAME_PX = 240.0
+
+    def detections(self, jpeg: bytes) -> list:
+        try:
+            from ..vision.ball_finder import find_ball
+            b = find_ball(jpeg)
+            if b is None:
+                return []
+            f = self.FRAME_PX
+            return [("ball", 1.0, float(b.x) / f, float(b.y) / f, float(b.width) / f, float(b.height) / f)]
+        except Exception:  # noqa: BLE001
+            return []
+
+
+def open_targets(*, target: str | None = None, min_sim: float = MIN_SIM):
+    """`ball` is the colour finder; any other name is looked for in the object gallery."""
+    if target and target.strip().lower() == "ball":
+        return BallTarget()
+    return _open_gallery_targets(target=target, min_sim=min_sim)
+
+
+def _open_gallery_targets(*, target: str | None = None, min_sim: float = MIN_SIM) -> GalleryTargets:
     """The recognizer exploration uses, read-only: the gallery file, the localizer and the embedder the gallery was built with."""
     from ..config import settings
     from ..vision.embedder import embedder_for

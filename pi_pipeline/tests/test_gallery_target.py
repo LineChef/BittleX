@@ -61,3 +61,14 @@ def test_without_a_target_any_named_object_counts_and_a_bad_picture_gives_nothin
     t = GalleryTargets(Scorer([(0.1, 0.1, 0.5, 0.5)]), Gallery([(Entry("couch"), 0.7)]))
     assert [x[0] for x in t.detections(jpeg())] == ["couch"]
     assert GalleryTargets(Scorer([(0.1, 0.1, 0.5, 0.5)]), Gallery([])).detections(b"not a jpeg") == []
+
+
+def test_the_green_ball_target_is_the_colour_finders_blob_in_frame_fractions(monkeypatch):
+    from pi_pipeline.behavior import gallery_target as g
+    from pi_pipeline.vision import ball_finder as bf
+    monkeypatch.setattr(bf, "find_ball", lambda jpeg: bf.BallReading(180.0, 150.0, 900, 30, 30, 30.0, 8.0, 12.0, False))
+    d = g.BallTarget().detections(b"x")
+    assert d == [("ball", 1.0, 0.75, 0.625, 0.125, 0.125)]
+    monkeypatch.setattr(bf, "find_ball", lambda jpeg: None)
+    assert g.BallTarget().detections(b"x") == []
+    assert isinstance(g.open_targets(target="Ball"), g.BallTarget)                      # the name "ball" picks the colour finder, nothing is loaded
