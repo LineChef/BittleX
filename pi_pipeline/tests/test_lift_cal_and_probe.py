@@ -8,7 +8,7 @@ from pi_pipeline.vision import stream_probe as sp
 def test_the_shift_per_degree_comes_from_consecutive_steps_with_the_ball_in_both():
     rows = [{"lift": 120, "cy": 0.40}, {"lift": 105, "cy": 0.48}, {"lift": 90, "cy": None}, {"lift": 75, "cy": 0.70}]
     s = lc.shift_per_degree(rows)
-    assert len(s) == 1 and s[0]["from"] == 120 and s[0]["to"] == 105 and s[0]["view_deg_per_lift_deg"] == pytest.approx(0.08 * 63 / 15, abs=0.01)
+    assert len(s) == 1 and s[0]["from"] == 120 and s[0]["to"] == 105 and s[0]["view_deg_per_lift_deg"] == pytest.approx(0.08 * lc.FOV_DEG / 15, abs=0.01)
 
 
 class Robot:
@@ -83,3 +83,34 @@ def test_the_probe_starts_the_loop_with_pictures_and_always_breaks_at_the_end(tm
     res = sp.run_probe(ser, 1.5, tmp_path, clock=clock, parse=lambda line, labels: S() if line.startswith("x") else None, sleep=lambda s: None)
     assert ser.written[0] == sp.BREAK and sp.LOOP_WITH_PICTURE in ser.written and ser.written[-1] == sp.BREAK
     assert res["pictures"] == 1 and (tmp_path / "frame_1.jpg").exists()
+
+
+def test_the_attentive_looks_take_pictures_without_the_shutter_click_and_other_modes_keep_it(monkeypatch):
+    """2026-11-15 (registered mode exception): the bout, live follow, camera checks and lift calibration build their camera with click=False; the default stays on."""
+    from pi_pipeline.vision import snapshot as snap
+    from pi_pipeline.voice import shutter
+    clicks = []
+    monkeypatch.setattr(shutter, "click", lambda: clicks.append(1))
+
+    class Ser:
+        def reset_input_buffer(self):
+            pass
+
+        def write(self, b):
+            pass
+
+        def readline(self):
+            return b""
+    for click, want in ((False, 0), (True, 1)):
+        cam = snap.CameraSnapshotter("x", click=click, serial_factory=Ser, sleep=lambda s: None, exposure_check=False)
+        cam._ser = Ser()
+        cam._grab_one = lambda: snap.Snapshot(b"jpg", 240, 240, [])
+        cam._arm_idle_close = lambda: None
+        cam._save = lambda s: None
+        monkeypatch.setattr("pi_pipeline.vision.picture_tilt.estimate", lambda jpeg: None, raising=False)
+        clicks.clear()
+        assert cam.snapshot() is not None and len(clicks) == want
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1]
+    for f in ("behavior/attentive_bout.py", "behavior/gallery_target.py", "behavior/lift_cal.py", "vision/stream_probe.py"):
+        assert "click=False" in (root / f).read_text() and f in (root.parent / "docs/specification/mode-exceptions.md").read_text()

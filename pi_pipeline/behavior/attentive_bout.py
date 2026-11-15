@@ -32,7 +32,7 @@ LEG_KEEPALIVE_CMD = "i8 0 9 0 10 0 11 0 12 0 13 0 14 0 15 0"        # every leg 
 class BoutConfig:
     minutes: float = 2.0
     pan_max_deg: float = 35.0          # the pan he will ask of the claw (its own limit is 45)
-    fov_half_deg: float = 31.5         # the camera's half field of view
+    fov_half_deg: float = 44.0         # the camera's half field of view, measured 2026-11-15 (the picture moves 0.0113 of its width per degree of pan)
     gain: float = 0.7                  # share of the way to the target one move goes (the frame he sees is about 1 s old)
     cooldown_s: float = 1.5            # least gap between two pan moves
     deadband_deg: float = 5.0          # a target this close to the middle needs no move
@@ -212,7 +212,7 @@ def main() -> None:
     print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
     if not ok:
         return
-    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
+    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(behavior/attentive_bout.py, 2026-11-15): no shutter click in this look
     from ..link import imu_print
     if not imu_print.board_answers(link):
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")

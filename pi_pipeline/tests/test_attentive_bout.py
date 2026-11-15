@@ -88,7 +88,7 @@ def test_he_does_not_stare_after_satiate_s_only_glances_until_the_target_moves_f
     t = ab.GazeTracker(cfg, "left")
     moves, pan, now = [], 0.0, 0.0
     while now < 30.0:                                                                    # a target 12 deg off to the side, never centred
-        m = t.update([det(0.69)], pan, now)
+        m = t.update([det(0.64)], pan, now)
         if m is not None:
             moves.append(round(now, 1))
             pan = m

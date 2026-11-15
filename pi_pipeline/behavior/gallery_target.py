@@ -101,7 +101,7 @@ def main() -> None:
     ap.add_argument("--min-sim", type=float, default=MIN_SIM)
     args = ap.parse_args()
     targets = open_targets(target=args.target, min_sim=args.min_sim)
-    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
+    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(behavior/gallery_target.py, 2026-11-15): no shutter click in this look
     outdir = Path(os.path.expanduser(time.strftime("~/g2_claw_pics/seen_%Y%m%d_%H%M%S")))
     outdir.mkdir(parents=True, exist_ok=True)
     hits = 0

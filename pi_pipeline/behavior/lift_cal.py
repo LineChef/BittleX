@@ -6,7 +6,7 @@ takes two pictures (the first is dropped: the module answers with the previous r
 the body `MAX_TILT_DEG` from where it stood, that loses the ball twice, or that falls, then puts the claw down and stands him up the standard way.
 
 The table it prints: lift, the ball's centre (x, y) and diameter in frame fractions, the tilt from the starting stand, and the camera's vertical shift per degree of lift (the vertical field of view is
-taken as the horizontal one, 63 deg over the square frame). Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped (`g2liftcal`).
+taken as the horizontal one, 89 deg over the square frame). Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped (`g2liftcal`).
 
     python -m pi_pipeline.behavior.lift_cal
 """
@@ -17,7 +17,7 @@ import time
 
 LIFTS = (120.0, 105.0, 90.0, 75.0, 60.0)
 MAX_TILT_DEG = 6.0
-FOV_DEG = 63.0
+FOV_DEG = 89.0                  # the measured full field of view (pan fit, 2026-11-15); the vertical one is assumed equal for the square frame
 
 
 def shift_per_degree(rows: list[dict]) -> list[dict]:
@@ -112,7 +112,7 @@ def main() -> None:
     if not imu_print.board_answers(link):
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")
         return
-    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
+    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(behavior/lift_cal.py, 2026-11-15): no shutter click in this look
     robot = chase.SerialRobot(link)
     outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/liftcal_%Y%m%d_%H%M%S"))
     os.makedirs(outdir, exist_ok=True)

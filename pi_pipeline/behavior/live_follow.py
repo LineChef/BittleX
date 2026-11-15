@@ -29,7 +29,7 @@ log = logging.getLogger("g2.live_follow")
 class LiveConfig:
     seconds: float = 60.0
     pan_max_deg: float = 35.0
-    fov_half_deg: float = 31.5
+    fov_half_deg: float = 44.0         # measured 2026-11-15: the picture moves 0.0113 of its width per degree of pan, so half the field of view is about 44 deg (full about 89), not 31.5
     gain: float = 0.5                  # share of the offset seen in a picture that one correction asks for (the picture is old: lower than the bout's 0.7)
     deadband_deg: float = 3.0
     min_move_deg: float = 1.0
@@ -249,7 +249,7 @@ def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign
     return res
 
 
-def step_report(rows: list[dict], moves: list[dict], fov_half_deg: float = 31.5, settle_deg: float = 6.0, settle_n: int = 3) -> dict:
+def step_report(rows: list[dict], moves: list[dict], fov_half_deg: float = 44.0, settle_deg: float = 6.0, settle_n: int = 3) -> dict:
     """The step response of a run with a FIXED target: the first offset, the time until the target stays within `settle_deg` of the middle for `settle_n` pictures in a row, the biggest offset after that,
     the steady offset at the end and the number of direction reversals (an oscillation shows as many)."""
     pts = [(r["t_capture"], (r["det"][0][1] - 0.5) * 2.0 * fov_half_deg) for r in rows if r["det"]]

@@ -154,7 +154,7 @@ def next_bump(bump: int, s: ExposureStats) -> int | None:
 
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
-                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, keep_days: float = 0.0, exposure_check: bool = True,
+                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, click: bool = True, save_dir: str | None = None, keep_days: float = 0.0, exposure_check: bool = True,
                  max_exposure_retries: int = 2, meter_every_s: float = 30.0, wait_still=None, serial_factory=None,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
@@ -165,6 +165,7 @@ class CameraSnapshotter:
         self._lock = threading.Lock()
         self._idle_close_s = idle_close_s
         self._on_capture = on_capture                      # called once per picture taken (the shutter sound)
+        self._click = click                                # False: no shutter click for this camera (a registered mode exception: docs/specification/mode-exceptions.md)
         self._keep_days = keep_days
         self._exposure_check, self._max_exposure_retries = exposure_check, max_exposure_retries
         self._meter_every_s = meter_every_s
@@ -391,8 +392,9 @@ class CameraSnapshotter:
                 if self.last_tilt is not None:
                     log.info("picture tilt %+.1f deg (confidence %.2f)%s", self.last_tilt[0], self.last_tilt[1], " -- a sag hint" if picture_tilt.flagged(self.last_tilt) else "")
                 self._arm_idle_close()
-                from ..voice import shutter
-                shutter.click()                  # every picture taken makes the double click
+                if self._click:
+                    from ..voice import shutter
+                    shutter.click()              # every picture taken makes the double click
                 self._save(snap)
                 if self._on_capture:
                     try:

@@ -114,9 +114,9 @@ def test_a_silent_board_moves_nothing_and_a_stop_ends_the_run():
 
 
 def test_the_step_report_finds_when_a_fixed_target_settled_and_counts_reversals():
-    rows = [{"t_capture": 0.0 + i * 0.5, "det": [("ball", 0.9 if i < 3 else 0.56 if i < 6 else 0.5)]} for i in range(10)]
+    rows = [{"t_capture": 0.0 + i * 0.5, "det": [("ball", 0.9 if i < 3 else 0.54 if i < 6 else 0.5)]} for i in range(10)]
     moves = [{"from": 0, "to": -10}, {"from": -10, "to": -15}, {"from": -15, "to": -13}]
     r = lf.step_report(rows, moves)
-    assert r["first_offset_deg"] == pytest.approx(25.2, abs=0.1) and r["settled_after_s"] == 1.5 and r["reversals"] == 1
+    assert r["first_offset_deg"] == pytest.approx(0.4 * 2 * 44.0, abs=0.1) and r["settled_after_s"] == 1.5 and r["reversals"] == 1
     assert r["final_offset_deg"] == 0.0 and r["worst_offset_after_settling_deg"] <= 4.0
     assert lf.step_report([{"t_capture": 0.0, "det": []}], [])["pictures_with_target"] == 0

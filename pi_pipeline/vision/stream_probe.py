@@ -73,7 +73,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Camera-only probe: does AT+INVOKE=-1,0,0 stream pictures, and how fast? (G2 does not move)")
     ap.add_argument("--seconds", type=float, default=6.0)
     args = ap.parse_args()
-    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
+    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(vision/stream_probe.py, 2026-11-15): no shutter click in this look
     outdir = Path(os.path.expanduser(time.strftime("~/g2_claw_pics/stream_%Y%m%d_%H%M%S")))
     outdir.mkdir(parents=True, exist_ok=True)
     try:
