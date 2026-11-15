@@ -18,7 +18,8 @@ Most used
 - `g2reset`: restart the voice loop
 - `g2floor hardwood`: set the floor before any walk
 - `g2focus on 30`: hold back G2's own initiative (explore ask, rest, sleep) for 30 min
-- `g2attend 2`: one supervised 2 min look-around bout (claw up, follows what it sees)
+- `g2attend 2 NAME`: one supervised 2 min look-around bout (NAME: a gallery object)
+- `g2seen NAME`: camera only: what the detector and the gallery see (no move)
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
 - `g2ball`: start the ball goal
 - `g2ballstop`: stop the ball goal
@@ -365,6 +366,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2rl`: [Setup](#setup)
 - `g2rltest`: [Training and policies](#training-and-policies)
 - `g2see`: [Claw and camera](#claw-and-camera)
+- `g2seen`: [Most used](#most-used)
 - `g2send`: [Claw and camera](#claw-and-camera)
 - `g2serial`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2ssh`: [Most used](#most-used), [Setup](#setup)

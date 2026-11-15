@@ -195,6 +195,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="One supervised attentive bout (claw gaze-follow from the attention pose). Needs the owner's go; the voice service stopped.")
     ap.add_argument("--minutes", type=float, default=2.0)
     ap.add_argument("--labels", default=None, help="comma-separated labels to follow (default: any detection; or G2_ATTENTIVE_LABELS)")
+    ap.add_argument("--target", default=None, help="also find this named object with the object gallery (a name or part of one, for example the name of a toy): the camera's own detector knows only three classes")
     args = ap.parse_args()
     try:
         os.remove(os.path.expanduser(STOP_FILE))
@@ -218,6 +219,11 @@ def main() -> None:
     robot = chase.SerialRobot(link)
     cfg = BoutConfig(minutes=args.minutes, labels=tuple(x.strip().lower() for x in args.labels.split(",")) if args.labels else labels_from_env())
 
+    targets = None
+    if args.target:
+        from .gallery_target import open_targets
+        targets = open_targets(target=args.target)
+        print(f"also looking for '{args.target}' in the object gallery")
     outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/bout_%Y%m%d_%H%M%S"))
     os.makedirs(outdir, exist_ok=True)
     seen = {"n": 0, "with_det": 0, "best": 0.0}
@@ -230,6 +236,8 @@ def main() -> None:
             return None
         seen["n"] += 1
         dets = list(snap.detections)
+        if targets is not None:
+            dets += targets.detections(snap.jpeg)                          # named matches from the object gallery, in the same (label, score, cx, cy, w, h) form
         if dets:
             seen["with_det"] += 1
             seen["best"] = max(seen["best"], max(d[1] for d in dets))
