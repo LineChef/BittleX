@@ -18,6 +18,7 @@ Behaviour
 - Hit sequence: On a wall hit or an IMU contact signal, G2 backs up and turns around toward the open side.
 - Survey stops: G2 stops at times for a claw-look picture, using one shared arm stepping, a 0.8 s settle and a dropped stale frame.
 - Ending: Every session ends in the verified rest position, and the roam stops its behavior loop before resting.
+- Attentive bout: A supervised bout (`g2attend`, run only with someone watching) holds the attention pose with the claw raised and, for a few minutes, turns the camera toward what the camera model detects (largest first), slowly (a move at most every 1.5 s and only part of the way, because the frames are about a second old). After 10 s of following he only glances, and he looks around when nothing is in view. It stops on a fall, a sag, or the stop file, holds the focus lock, and always ends with the claw down and centred and the standard stand-up. It never walks. The camera model has three classes and no human or face class, so it follows detections of those classes.
 
 Interfaces
 ----------

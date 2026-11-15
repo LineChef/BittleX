@@ -386,6 +386,15 @@ print('voltage', b.read_voltage(l))
 PYEOF
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
+# g2attend [MINUTES]  -- one supervised attentive bout (default 2 min): G2 holds the attention pose with the claw up and turns the camera toward what the camera model detects (largest first), looks around now and then, then puts the claw down and stands up the standard way. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2attendstop ends a bout at once.
+g2attend() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.attentive_bout --minutes ${1:-2} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
+# g2attendstop  -- end an attentive bout now (the claw goes down and he stands up the standard way).
+g2attendstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/attentive_stop" && echo "stop sent: the bout ends within a second"; }
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac

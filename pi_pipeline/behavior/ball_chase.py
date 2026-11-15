@@ -120,6 +120,7 @@ BETWEEN_MOVES = "stand"        # the switch (user, 2026-11-02; the punt setting 
                                # pose until a wall calibration is taken in it. The legs went slack after 7 to 10 s of standing still (docs/STATUS.md open problem 14).
 # Close to the ball (within the nudge range, NUDGE_MAX_IN / PUNT_MAX_IN as the goal set them for this attempt, at the look before the move) he is dialing in: nudges, line-up turns,
 # a step closer after a punt. He stays standing between those small steps instead of going into the attention pose at each stop (user, 2026-11-02): `_dialing_in`.
+SAG_RECHECK_S = 3.0            # standing, the sag check before a move is repeated when the last one is this old (it ran once per stand before 2026-11-15)
 SAG_CHECK_AFTER_S = 5.0        # (user, 2026-11-05) standing this long since the last move ended: before the next move the IMU tilt is checked for sagging legs, and if they have sagged he goes
                                # into the attention pose and stands up again (back legs first) before moving. Always on, in every flow (the standing flow included)
 POSE_GATE = os.environ.get("G2_POSE_GATE", "1").strip().lower() not in ("0", "off", "false", "no")      # (user, 2026-11-06; UNPROVEN until the hardware A/B) before a walk or turn that follows a pose change, read the body's real state from the IMU and re-seat the legs if they lag
@@ -222,7 +223,7 @@ ALIGN_MIN_DEG = 3.0            # the smallest line-up turn asked for (gyro-stopp
 ALIGN_MIN_RUN_S = 0.25         # a gyro-stopped turn is never ended on the yaw sooner than this after the start (2026-11-10: "asked 6.0 deg, got 11.3 deg in 0.03 s": a first reading that was already off by a few degrees ended the turn before he moved)
 ALIGN_STOP_LEAD_DEG = 1.5      # the least the gyro stop sends `kbalance` early (see align_stop_lead)
 ALIGN_COAST_DEG = 6.5          # (2026-11-15 goal log: asked 6, got 10 to 14; asked 20, got 22 to 28) the body keeps turning about this far after `kbalance`: the gyro stop sends it this much early
-ALIGN_COAST_MIN_WANT_DEG = 10.0  # the coast-aware lead applies to turns of at least this many degrees; a smaller one keeps ALIGN_STOP_LEAD_DEG until the next goal run (IMU print on) says more
+ALIGN_COAST_MIN_WANT_DEG = 0.0    # the coast-aware lead applies to turns of at least this many degrees; a smaller one keeps ALIGN_STOP_LEAD_DEG until the next goal run (IMU print on) says more
 ALIGN_LEAD_FRAC = 0.6          # ... but never earlier than this share of a small turn, or a 6 degree ask would stop before it began
 IMU_PRINT_STAYS_ON = True       # (2026-11-15) a move no longer sends `gp` when it ends: the IMU print stays on, so the stand guard, the stillness wait and the turn measurement always see frames (the 2026-11-15 goal run: 62 pictures taken with "no IMU frames" and 33 guard resends, because every move switched the print off)
 YAW_STALE_S = 0.5              # the yaw has not changed for this long during a gyro-stopped turn: the IMU print went quiet (a long timed run then turns far past the ask: 1 s is 20 to 28 degrees), so the timed length applies
@@ -233,7 +234,7 @@ ALIGN_FAR_DEG = 6.0
 ALIGN_CONFIRM_IN = 5.0         # at this range or closer a line-up turn is sized from two pictures that agree (the bearing swings 25 to 40 degrees from one picture to the next at 2 to 4 in: the camera is on the claw)
 ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; otherwise look once more and use the newest
 
-ALIGN_CAP_S = 2.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
+ALIGN_CAP_S = 1.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
 ALIGN_YAW_STOP = os.environ.get("G2_ALIGN_YAW_STOP", "1").strip().lower() not in ("0", "off", "false", "no")      # `0`: the line-up turns are timed (from the learned turn pace) instead of stopped on the yaw (owner's idea, 2026-11-08)
 YAW_SPIKE_RATE_DEG_S = 120.0   # a yaw change faster than this (plus the margin) cannot be a real turn (they run at about 30 deg/s): it is a sensor spike and is ignored. 2026-11-08: "asked 6.0 deg, got 22.4 deg in 0.02 s"
 YAW_SPIKE_MARGIN_DEG = 6.0
@@ -495,7 +496,8 @@ class ChasePlanner:
         near = ball.distance_in <= NUDGE_MAX_IN
         in_reach = ball.distance_in <= PUNT_MAX_IN
         align_tol = min(PUNT_ALIGN_DEG, ALIGN_FAR_DEG) if ball.distance_in > max(ALIGN_FAR_IN, PUNT_MAX_IN + 1.0) else PUNT_ALIGN_DEG      # line up farther out, where the bearing is steady, then walk straight in
-        if (self.prev_kind == "turn" and self.turn_before is not None and ball.bearing_deg * self.turn_before < 0           # (user, 2026-11-05) he turned toward the ball and it is now on the OTHER side:
+        edge = bool(getattr(ball, "touches_edge", False))          # a ball at the frame edge reads a clipped bearing (about +-39): it says "at least this far", never "swung over"
+        if (self.prev_kind == "turn" and not edge and self.turn_before is not None and ball.bearing_deg * self.turn_before < 0           # (user, 2026-11-05) he turned toward the ball and it is now on the OTHER side:
                 and abs(ball.bearing_deg) > SEARCH_SIDE_DEADBAND_DEG and abs(self.turn_before) > SEARCH_SIDE_DEADBAND_DEG and self._can_back(BACK_UP_S)):      # he overshot: back up, look again, then line up again
             was, self.turn_before, self.align_before, self.align_turns = self.turn_before, None, None, 0
             return self._back("back", BACK_UP_S, f"overshot the turn: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
@@ -506,7 +508,7 @@ class ChasePlanner:
         if not near:
             self.align_turns = 0
         if near and abs(ball.bearing_deg) > align_tol:
-            if self.prev_kind == "align" and self.align_before is not None and ball.bearing_deg * self.align_before < 0 and self._can_back(BACK_UP_S):
+            if self.prev_kind == "align" and not edge and self.align_before is not None and ball.bearing_deg * self.align_before < 0 and self._can_back(BACK_UP_S):
                 was, self.align_before, self.align_turns = self.align_before, None, 0         # overshot (user, 2026-11-01): back up, look again, then line up again from the start
                 return self._back("back", BACK_UP_S, f"overshot: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
             if self.align_turns < ALIGN_TRIES and ball.distance_in <= ALIGN_CONFIRM_IN:      # close in the bearing swings from picture to picture: turn on two pictures that agree
@@ -612,16 +614,16 @@ def classify_pose(joints) -> str:
 
 
 
-def align_stop_lead(want_deg: float) -> float:
+def align_stop_lead(want_deg: float, coast_deg: float | None = None) -> float:
     """How many degrees before the wanted turn the gyro stop sends `kbalance`: the coast of the body (ALIGN_COAST_DEG), at most ALIGN_LEAD_FRAC of a small turn, at least ALIGN_STOP_LEAD_DEG. The one number every gyro-stopped turn uses (the chase's line-up and the voice service's turns)."""
     if want_deg < ALIGN_COAST_MIN_WANT_DEG:
         return ALIGN_STOP_LEAD_DEG                    # a small turn keeps the old lead for now: asked 6.0 got 0.2 and asked 5.2 got 1.3 on 2026-11-15 (taken with the IMU print cycling off), too little to tune on
-    return max(ALIGN_STOP_LEAD_DEG, min(ALIGN_COAST_DEG, ALIGN_LEAD_FRAC * want_deg))
+    return max(ALIGN_STOP_LEAD_DEG, min(ALIGN_COAST_DEG if coast_deg is None else coast_deg, ALIGN_LEAD_FRAC * want_deg))
 
 
-def align_stop_at(want_deg: float) -> float:
-    """The yaw change at which a gyro-stopped turn is ended."""
-    return max(0.0, want_deg - align_stop_lead(want_deg))
+def align_stop_at(want_deg: float, coast_deg: float | None = None) -> float:
+    """The yaw change at which a gyro-stopped turn is ended; `coast_deg` is the coast learned from this session's turns (None = ALIGN_COAST_DEG)."""
+    return max(0.0, want_deg - align_stop_lead(want_deg, coast_deg))
 
 def _yaw_diff(a: float, b: float) -> float:
     """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
@@ -745,11 +747,13 @@ class SerialRobot:
         self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
         self.last_turn_deg: float | None = None
         self.last_turn_s: float | None = None
+        self._coast_deg: float | None = None             # the learned coast of a gyro-stopped turn (None = ALIGN_COAST_DEG until the first one)
         self.last_turn_end: str | None = None            # what ended the last gyro-stopped turn: "gyro", "stale" (no new yaw), "cap" or "timed"
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
+        self._sag_checked_t: float | None = None          # when the last sag check was made (a standing G2 is checked again every SAG_RECHECK_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
         self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
         self._posed_at: float | None = None               # when the legs last changed pose (attention, stand-up): the next move is checked once against the real tilt (_gate)
@@ -930,6 +934,13 @@ class SerialRobot:
         log.info("stop on a calm moment: waited %.2f s%s", waited, "" if waited < CALM_MAX_S else " (gave up waiting)")
         return "ok"
 
+    def _learn_coast(self, coast: float) -> None:
+        """How far the body kept turning after the stop (got minus the yaw when `kbalance` was sent): a running average over this session's gyro-stopped turns, used by the next one.
+        Limited to 1.5 to 8 deg so a bad reading cannot make him stop at once or never."""
+        c = max(ALIGN_STOP_LEAD_DEG, min(8.0, float(coast)))
+        self._coast_deg = c if self._coast_deg is None else 0.7 * self._coast_deg + 0.3 * c
+        log.info("turn coast: %.1f deg after the stop (running %.1f deg)", coast, self._coast_deg)
+
     def _imu_release(self) -> None:
         """What a move did at its end with the IMU print (`gp`). The print is shared (link/imu_print.py): it stays on unless IMU_PRINT_STAYS_ON is False."""
         if not IMU_PRINT_STAYS_ON:
@@ -954,9 +965,10 @@ class SerialRobot:
         t0, state = self._clock(), "ok"
         limit = seconds
         if yaw0 is not None:
-            limit = max(ALIGN_CAP_S, 2.0 * seconds)
+            limit = max(ALIGN_CAP_S, 1.5 * seconds)
         spikes = 0
         ended_by = "timed" if yaw0 is None else "cap"
+        stopped_at = None
         last_yaw, yaw_moved_t = self._yaw, t0
         while self._clock() - t0 < limit:
             if self._fell():
@@ -974,9 +986,10 @@ class SerialRobot:
                     spikes += 1
                     log.warning("yaw spike: %.1f deg in %.2f s is faster than a turn can be: ignored (counting from here)", dyaw, self._clock() - t0)
                     yaw0 = self._yaw
-                elif dyaw >= align_stop_at(stop_yaw_deg):
+                elif dyaw >= align_stop_at(stop_yaw_deg, self._coast_deg):
                     if self._clock() - t0 >= ALIGN_MIN_RUN_S:
                         ended_by = "gyro"
+                        stopped_at = dyaw
                         break
                     yaw0 = self._yaw                      # too early to be a real turn: count from this reading instead
             self._sleep(0.02 if yaw0 is not None else 0.05)
@@ -1002,6 +1015,8 @@ class SerialRobot:
             if self._yaw is not None:
                 self.last_turn_deg, self.last_turn_s = abs(_yaw_diff(self._yaw, yaw0)), ran
                 log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s (ended by %s)", stop_yaw_deg, self.last_turn_deg, ran, ended_by)
+                if ended_by == "gyro" and stopped_at is not None:
+                    self._learn_coast(self.last_turn_deg - stopped_at)
         self.last_turn_end = ended_by if stop_yaw_deg is not None else None
         self._imu_release()
         self._moved_at = self._clock()
@@ -1086,8 +1101,10 @@ class SerialRobot:
         first stand-up (the link's stand_from_attention); rest or a sit, the normal stand-up (the firmware `kbalance`; from a sit the link's slow back-legs stand-up). An unreadable
         pose falls back to the last one he was told to take (none yet: standing, as the session start left him). Then it waits until the board reads the stand,
         watching for a fall; "fell" if he went over. Standing, and the last move ended under QUICK_MOVE_S ago: nothing to check, he goes at once."""
-        if self.posture in ("stand", "unknown") and self._moved_at is not None and self._sag_checked_at != self._moved_at and self._clock() - self._moved_at >= SAG_CHECK_AFTER_S:
-            self._sag_checked_at = self._moved_at         # one check per stand: a clean one is not repeated until he has moved again
+        recheck = self._sag_checked_t is None or self._clock() - self._sag_checked_t >= SAG_RECHECK_S or self._picture_hint()      # a clean check is repeated every few seconds of standing and at once after a rolled picture:
+        if self.posture in ("stand", "unknown") and self._moved_at is not None and self._clock() - self._moved_at >= SAG_CHECK_AFTER_S and recheck:      # the legs sag AFTER a clean one (2026-11-15: 11.5 s still, roll 22 deg, then a back-up threw him over)
+            self._sag_checked_at = self._moved_at
+            self._sag_checked_t = self._clock()
             tilt = self._tilt()
             if self._sagged(tilt):
                 return self.recover_sag(tilt)
@@ -1734,6 +1751,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
     if pace is not None:
         planner.pace = pace
     last_move = None                                      # (kind, seconds, degrees, the ball before it): measured against the next reading
+    last_turn_got = None                                  # what the gyro counted for that turn (None: no yaw reading), for the "turn check" line
     steps = 0
     punts = 0
     seen = False
@@ -1786,9 +1804,18 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 saver.maybe_save(jpeg, ball)
             if last_move is not None and planner.pace is not None and not dry_run:
                 kind, secs, degs, before = last_move
-                got = planner.pace.record_walk(before, ball, secs) if kind == "walk" else planner.pace.record_turn(before, ball, degs, secs)
+                edged = bool(getattr(before, "touches_edge", False) or getattr(ball, "touches_edge", False))      # a ball at the frame edge reads a clipped bearing: no pace is learned from it
+                got = None if edged else (planner.pace.record_walk(before, ball, secs) if kind == "walk" else planner.pace.record_turn(before, ball, degs, secs))
                 if got is not None:
                     note(kind="measured", what=kind, seconds=round(secs, 2), value=round(got, 2))
+            if last_move is not None and last_move[0] == "turn" and last_turn_got is not None and ball is not None:
+                before, side = last_move[3], (1 if last_move[2] > 0 else -1)
+                expected = before.bearing_deg - side * last_turn_got
+                log.info("turn check: the gyro counted %.1f deg, the ball bearing went %+.0f -> %+.0f (expected %+.0f)%s", last_turn_got, before.bearing_deg, ball.bearing_deg, expected,
+                         " [ball at the frame edge: bearing clipped]" if getattr(ball, "touches_edge", False) else "")
+                note(kind="turn_check", gyro_deg=round(last_turn_got, 1), before=round(before.bearing_deg, 1), after=round(ball.bearing_deg, 1), expected=round(expected, 1),
+                     edge=bool(getattr(ball, "touches_edge", False)), dist_before=round(before.distance_in, 1), dist_after=round(ball.distance_in, 1))
+            last_turn_got = None
             last_move = None
             if wall_check is not None:
                 try:
@@ -1874,6 +1901,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             state = robot.turn(act.degrees, act.seconds)
         elif act.kind in ("turn", "search_turn", "align"):
             state = robot.turn(act.degrees, act.seconds, stop_deg=act.stop_deg) if act.stop_deg > 0 else robot.turn(act.degrees, act.seconds)
+            last_turn_got = getattr(robot, "last_turn_deg", None)
             if ball is not None:
                 last_move = ("turn", getattr(robot, "last_turn_s", None) or act.seconds, act.degrees, ball)      # a gyro-stopped turn ran for its own time, not the timed fallback
         elif act.kind == "sidestep":
