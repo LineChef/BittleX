@@ -390,7 +390,14 @@ PYEOF
 g2attend() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
-  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.attentive_bout --minutes ${1:-2} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  local out
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.attentive_bout --minutes ${1:-2} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  printf '%s\n' "$out"
+  local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \([^ ]*\).*/\1/p' | tail -1)"
+  if [ -n "$dir" ]; then
+    local dest="$HOME/Desktop/G2Memory/g2_pictures/bout/$(basename "$dir")"; mkdir -p "$dest"
+    scp -q "$G2_PI:$dir/*.jpg" "$dest/" && echo "bout pictures copied to $dest"
+  fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
 # g2attendstop  -- end an attentive bout now (the claw goes down and he stands up the standard way).

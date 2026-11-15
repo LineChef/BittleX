@@ -52,7 +52,7 @@ Test plan for the next hardware session
 
 Run after the attentive-bout check, one skill per run, with a person's go before each.
 
-1. Preconditions: the arm fitted and the BiBoard answering "Bittle X+Arm", the claw calibrated, the pack above the 30% gate, G2 on his feet on hardwood, hands near, nothing in the claw, a soft surface in front, a quiet room.
+1. Preconditions: the arm fitted, the BiBoard powered on and answering "Bittle X+Arm" (the test refuses and sends nothing when no IMU frames arrive), the claw calibrated, the pack above the 30% gate, G2 on his feet on hardwood, hands near, nothing in the claw, a soft surface in front, a quiet room.
 2. Order, mildest first: `launch`, `toss`, `tossF`, `hunt`, `showOff`, then `tossL` and `tossR` once each to confirm they play the same motion as `toss`.
 3. Each run: `g2armskill launch` stands him up, reads the tilt, sends the skill, watches the IMU for 6 s, sends `gb`, reads the tilt again and lays him in rest. The result is `ok` (under 30 deg from where he stood), `lean` (30 to 45), `tipped` (45 or more) or `fell`.
 4. Stop the block at the first `tipped` or `fell`. A `lean` is repeated once before going on.

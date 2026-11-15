@@ -115,7 +115,7 @@ def stop_requested() -> bool:
 
 def run_bout(robot, look, cfg: BoutConfig | None = None, *, pan_sign: str = "left", say=print, sleep=time.sleep, clock=time.monotonic, stopped=stop_requested) -> dict:
     """One bout. `robot` is a chase `SerialRobot`; `look()` returns the detections of a fresh picture ((label, score, cx, cy, w, h) tuples, None when there was no picture). Returns what happened:
-    {"ended": "time"|"stopped"|"fell"|"sag"|"error", "seconds", "moves", "scans", "pictures"}. The claw is lowered and centred and G2 is stood up the standard way however it ends (a fall leaves him
+    {"ended": "time"|"stopped"|"fell"|"sag"|"no_board"|"error", "seconds", "moves", "scans", "pictures"}. The claw is lowered and centred and G2 is stood up the standard way however it ends (a fall leaves him
     in rest). Never raises."""
     from .. import focus
     cfg = cfg or BoutConfig()
@@ -125,6 +125,10 @@ def run_bout(robot, look, cfg: BoutConfig | None = None, *, pan_sign: str = "lef
     tracker = GazeTracker(cfg, pan_sign)
     try:
         with focus.holding("attentive_bout", "supervised attentive bout"):
+            if robot._tilt(1.5) is None:
+                say("attentive bout: no IMU frames from the board: is the BiBoard powered on? Nothing was moved.")
+                res["ended"] = "no_board"
+                return res
             say(f"attentive bout: {cfg.minutes:g} min, claw up, watching for {'anything the camera model detects' if not cfg.labels else ', '.join(cfg.labels)}")
             if robot.relax() == "fell" or robot._fell():
                 res["ended"] = "fell"
@@ -207,17 +211,39 @@ def main() -> None:
     if not ok:
         return
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
+    from ..link import imu_print
+    if not imu_print.board_answers(link):
+        print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")
+        return
     robot = chase.SerialRobot(link)
     cfg = BoutConfig(minutes=args.minutes, labels=tuple(x.strip().lower() for x in args.labels.split(",")) if args.labels else labels_from_env())
+
+    outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/bout_%Y%m%d_%H%M%S"))
+    os.makedirs(outdir, exist_ok=True)
+    seen = {"n": 0, "with_det": 0, "best": 0.0}
 
     def look():
         cam.discard_one()                                              # the module answers with the previous request's picture
         time.sleep(1.0)
         snap = cam.snapshot()
-        return None if snap is None else list(snap.detections)
+        if snap is None:
+            return None
+        seen["n"] += 1
+        dets = list(snap.detections)
+        if dets:
+            seen["with_det"] += 1
+            seen["best"] = max(seen["best"], max(d[1] for d in dets))
+        try:
+            with open(os.path.join(outdir, f"pic_{seen['n']:02d}.jpg"), "wb") as f:
+                f.write(snap.jpeg)
+        except OSError:
+            pass
+        print(f"picture {seen['n']}: " + (", ".join(f"{d[0]} {d[1]:.2f} at x={d[2]:.2f} area={d[4] * d[5]:.3f}" for d in dets) if dets else "no detections"))
+        return dets
     try:
         chase._stand_if_lying(link, "kbalance")
         run_bout(robot, look, cfg, pan_sign=chase.CLAW_PAN_SIGN)
+        print(f"PICTURES: {outdir} ({seen['n']} pictures, {seen['with_det']} with a detection, best score {seen['best']:.2f})")
     except KeyboardInterrupt:
         print("ended")
     finally:

@@ -78,3 +78,31 @@ def test_the_log_is_one_json_file_per_run(tmp_path, monkeypatch):
     p = t.write_log({"skill": "launch", "verdict": "ok"}, {"pack_pct": 80})
     d = json.load(open(p))
     assert d["skill"] == "launch" and d["pack_pct"] == 80 and p.endswith("_launch.json")
+
+
+def test_a_silent_board_sends_nothing_and_is_not_called_ok():
+    """2026-11-15: the BiBoard was off; every read got no answer. The skill test must say so, not report a quiet body as ok."""
+    r = FakeRobot()
+    r._tilt = lambda *a, **k: None
+    res = t.run_skill(r, "launch", watch_s=1.0, say=lambda *_: None, sleep=lambda s: None)
+    assert res["verdict"] == "no_board" and r._lk.sent == []
+
+
+def test_board_answers_needs_a_parseable_imu_frame(monkeypatch):
+    from pi_pipeline.link import imu_print
+
+    class L:
+        def __init__(self, lines):
+            self.lines, self.sent = lines, []
+
+        def send(self, c, **kw):
+            self.sent.append(c)
+
+        def poll_imu(self):
+            out, self.lines = self.lines, []
+            return out
+    c = Clock()
+    assert imu_print.board_answers(L([]), 1.0, sleep=c.sleep, clock=c) is False
+    c = Clock()
+    ok = L(["ICM:  0.01  0.02  1.00   10.0   0.0   0.0"])
+    assert imu_print.board_answers(ok, 1.0, sleep=c.sleep, clock=c) is True and ok.sent == ["gP"]

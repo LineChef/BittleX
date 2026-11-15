@@ -148,3 +148,11 @@ def test_labels_come_from_the_environment(monkeypatch):
     assert ab.labels_from_env() == ("cup", "ball")
     monkeypatch.delenv("G2_ATTENTIVE_LABELS")
     assert ab.labels_from_env() is None
+
+
+def test_a_silent_board_moves_nothing_and_ends_no_board():
+    c, r = Clock(), FakeRobot()
+    r._tilt = lambda *a, **k: None
+    res = ab.run_bout(r, lambda: [], ab.BoutConfig(minutes=1), say=lambda *_: None, sleep=c.sleep, clock=c, stopped=lambda: False)
+    assert res["ended"] == "no_board"
+    assert "relax" not in r.calls and not any(isinstance(x, tuple) and x[0] == "claw" and x[2] == 120.0 for x in r.calls)       # nothing was moved

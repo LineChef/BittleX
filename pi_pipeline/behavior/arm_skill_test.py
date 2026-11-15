@@ -39,6 +39,10 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
     """Play `token` (no `k`) from a stand and report what the body did. Never raises."""
     res = {"skill": token, "verdict": "error", "max_roll_dev": None, "max_pitch_dev": None, "fell": False, "tilt_before": None, "tilt_after": None, "seconds": watch_s}
     try:
+        if robot._tilt(1.5) is None:
+            say("no IMU frames from the board: is the BiBoard powered on? Nothing was sent.")
+            res["verdict"] = "no_board"
+            return res
         if robot.stand_up() == "fell":
             res.update(verdict="fell", fell=True)
             return res
@@ -108,6 +112,10 @@ def main() -> None:
     ok, pct, volts = battery.motion_gate(link)
     print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
     if not ok:
+        return
+    from ..link import imu_print
+    if not imu_print.board_answers(link):
+        print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was sent.")
         return
     robot = chase.SerialRobot(link)
     try:
