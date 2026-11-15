@@ -106,3 +106,39 @@ def test_the_motion_sensor_print_is_put_back_after_the_look():
     off = _Robot()
     bc.claw_look_sequence(off, lambda pan: False, pans=[0.0], sleep=lambda s: None)
     assert "gP" not in off._lk.sent
+
+
+class _BusyWalker:
+    """A policy walker whose thread is still running (what `walk_active` sees)."""
+    busy = True
+
+
+def test_the_claw_look_never_starts_while_a_policy_walk_runs(monkeypatch):
+    """2026-11-14: the attention pose and the arm moves went out while the policy walk was still driving the legs, and G2 went onto his back. Every mode's look is this one function."""
+    from pi_pipeline.gait import policy_walker
+    monkeypatch.setattr(policy_walker, "_WALKERS", [_BusyWalker()])
+    robot, slept = _Robot(), []
+    assert claw_survey.run_claw_look(None, None, "look", sleep=slept.append, robot=robot) == "stopped"
+    assert sum(slept) >= claw_survey.WALK_WAIT_S - 0.3                                # it waited for the walk to end first
+    assert robot.moves == []                                                          # and moved nothing
+
+
+def test_the_claw_look_goes_on_once_the_walk_has_ended(monkeypatch):
+    from pi_pipeline.gait import policy_walker
+    w = _BusyWalker()
+    monkeypatch.setattr(policy_walker, "_WALKERS", [w])
+    n = []
+
+    def sleep(s):
+        n.append(s)
+        if len(n) == 3:
+            w.busy = False                                                            # the walker thread ended
+    robot = _Robot()
+    assert claw_survey.run_claw_look(None, None, "look", sleep=sleep, robot=robot) == "ok"
+    assert robot.moves[0] == "sit_down" and len(n) >= 3
+
+
+def test_a_real_walker_registers_itself_for_the_check():
+    from pi_pipeline.gait import policy_walker
+    w = policy_walker.PolicyWalker(_Link())
+    assert w in policy_walker._WALKERS and not policy_walker.walk_active()

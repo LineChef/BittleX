@@ -39,6 +39,7 @@ Constraints
 -----------
 
 - Consistency: A behavior (stand-up, claw look, rest, sag handling, turns, camera use, what a fall is, what a deaf board is) is the same in every mode. It is defined once and the modes only call it: the claw look is the ball chase's sequence (`run_claw_look`), the body limits are in `pi_pipeline/body.py` (a fall is a tilt past 60 degrees for 0.3 s; a board with no motion data for 20 s is deaf), and the guards, the sag recovery and the responses to a fall and to a deaf board are built by `gait/body_guards.py` for every mode. `tools/check_modes.py` fails a commit that builds a second copy, and `docs/specification/mode-exceptions.md` lists the only differences allowed: the ones explicitly requested.
+- Claw look and walking: The claw look never starts while a policy walk is running. It waits up to 8 s for the walk to end and, if the walk is still going, is skipped, so the arm and the attention pose never compete with the walking legs.
 - Emergency stop outranks everything.
 
 Failure handling

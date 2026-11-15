@@ -15,6 +15,8 @@ import time
 
 log = logging.getLogger("g2.claw_survey")
 
+WALK_WAIT_S = 8.0      # the longest the claw look waits for a policy walk to end before it gives up (the walker stops within 5 s)
+
 
 def wanted() -> bool:
     """Whether looks use the claw: the arm is fitted (`G2_SURVEY_CLAW=1` / `0` forces it)."""
@@ -43,6 +45,14 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
     camera missed one (it would wait for the camera again); `stopped()` ends it between moves; `robot` is the chase robot to run it on (default: one on `link`). G2 is standing when it returns.
     Returns "ok", "stopped" (stopped, or he fell: the fall guard handles the fall) or "error". Never raises."""
     from . import ball_chase as bc
+    from ..gait import policy_walker
+    waited = 0.0
+    while policy_walker.walk_active() and waited < WALK_WAIT_S and not stopped():
+        sleep(0.25)                                                                           # a walk is still ending: the arm and the attention pose wait for it (2026-11-14)
+        waited += 0.25
+    if policy_walker.walk_active():
+        log.warning("the claw look was not started: a policy walk is still running after %.1f s", waited)
+        return "stopped"
     left = bc.CLAW_PAN_DEG if bc.CLAW_PAN_SIGN == "left" else -bc.CLAW_PAN_DEG               # the pan that points the camera to G2's left
     labels = {left: "look_left", -left: "look_right", 0.0: kind}
     missed = [False]

@@ -13,6 +13,7 @@ from __future__ import annotations
 import inspect
 import logging
 import threading
+import weakref
 
 from .heading_hold import default_foot_hold   # noqa: E402  -- re-exported: the everyday walks' default steering foot
 
@@ -20,6 +21,14 @@ log = logging.getLogger("g2.policy_walker")
 
 DEFAULT_CMD_FWD = 0.10        # m/s, the speed the policy has been walked at on the robot
 MAX_SECONDS = 120.0           # a walk with no stated length still ends
+
+_WALKERS: "weakref.WeakSet[PolicyWalker]" = weakref.WeakSet()
+
+
+def walk_active() -> bool:
+    """True while ANY policy walk thread is still running in this process (every mode's walker registers itself). The claw look asks this before it moves the arm or sends an attention pose:
+    two controllers driving the board at once threw G2 onto his back (2026-11-14)."""
+    return any(w.busy for w in list(_WALKERS))
 
 
 def _where(t: threading.Thread) -> str:
@@ -52,6 +61,7 @@ class PolicyWalker:
         self._thread: threading.Thread | None = None
         self._stop = _Stop()
         self._lock = threading.Lock()
+        _WALKERS.add(self)
 
     @staticmethod
     def _policy_path():
