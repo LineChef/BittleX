@@ -90,6 +90,7 @@ def test_planner_turns_then_walks_then_punts():
     a = p.decide(reading(30, 3)); assert a.kind == "walk" and bc.MIN_MOVE_S <= a.seconds <= bc.WALK_MAX_S
     a = p.decide(reading(3, 3)); assert a.kind == "punt"
     a = p.decide(reading(3, 16)); assert a.kind == "align"                                         # near and off line: a small turn to line up before the punt
+    p.track.turned(16.0)                                                                             # (the run loop tells the track the turn he made)
     a = p.decide(reading(1.5, 0)); assert a.kind == "punt"                                           # too close to punt
 
 

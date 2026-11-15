@@ -1682,7 +1682,7 @@ def test_an_align_turn_that_overshoots_backs_up_and_lines_up_again():
     first = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, -23.0, False))
     assert first.kind == "align"
     pl.prev_kind = "align"
-    over = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 2.5, 32.0, False))        # the ball swung to the other side
+    over = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 3.5, 32.0, False))        # the ball swung to the other side (3.5 in: inside 3 in the camera bearing is not used, behavior/ball_track.py)
     assert over.kind == "back" and "overshot" in over.why and pl.align_turns == 0
     pl.prev_kind = "back"
     again = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, 14.0, False))

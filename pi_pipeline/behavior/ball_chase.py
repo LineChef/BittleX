@@ -286,6 +286,11 @@ class Action:
     stop_deg: float = 0.0      # a line-up turn: stop on the gyro once he has turned this many degrees (`seconds` is then only the fallback when no IMU frames arrive)
 
 
+
+def _new_track():
+    from .ball_track import BallTrack
+    return BallTrack()
+
 @dataclass
 class ChasePlanner:
     last_side: int = 0         # +1 the ball was last seen to the right, -1 to the left, 0 never
@@ -301,6 +306,7 @@ class ChasePlanner:
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
     claw_ok: bool = True       # the robot can move the arm for a claw look (run_chase sets it from the robot)
+    track: object = field(default_factory=lambda: _new_track())      # the ball's place by dead reckoning (behavior/ball_track.py): answers for a picture too close or at the frame edge to give a bearing
     confirm_bearing: float | None = None   # the first picture's bearing of a close line-up, waiting for a second that agrees (ALIGN_CONFIRM_IN)
     confirm_looks: int = 0
     align_before: float | None = None   # the ball's bearing when the last align turn was chosen: a swing to the other side afterwards is an overshoot
@@ -449,7 +455,9 @@ class ChasePlanner:
                 return Action("punt", 0.0, why="the ball vanished at close range: it is at the claw: punt")
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
+            self.track.clear()                                  # searching: the old place is no use
             return self._search_move()
+        ball = self.track.see(ball)                           # too close for the camera (under 3 in) or at the frame edge: the bearing comes from the last good picture and what he has done since
         self.lost = 0
         self.search_steps = 0
         self.search_i = 0
@@ -748,6 +756,7 @@ class SerialRobot:
         self.last_turn_deg: float | None = None
         self.last_turn_s: float | None = None
         self._coast_deg: float | None = None             # the learned coast of a gyro-stopped turn (None = ALIGN_COAST_DEG until the first one)
+        self.last_drift_deg: float | None = None         # how far the last plain walk or back-up turned him (the firmware yaw's change; the sign is the board's), None when there was no yaw reading
         self.last_turn_end: str | None = None            # what ended the last gyro-stopped turn: "gyro", "stale" (no new yaw), "cap" or "timed"
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
@@ -961,6 +970,7 @@ class SerialRobot:
             yaw0 = self._yaw
         if PREPOSITION and callable(getattr(self._lk, "ease_into", None)):
             self.last_preposition = self._lk.ease_into(token)
+        drift0 = self._yaw if yaw0 is None else None                  # heading before a plain walk or back-up, to say how far it drifted (data first, 2026-11-15)
         self._tx(token)
         t0, state = self._clock(), "ok"
         limit = seconds
@@ -1018,6 +1028,9 @@ class SerialRobot:
                 if ended_by == "gyro" and stopped_at is not None:
                     self._learn_coast(self.last_turn_deg - stopped_at)
         self.last_turn_end = ended_by if stop_yaw_deg is not None else None
+        if yaw0 is None and drift0 is not None and token in ("kwkF", "kbkF", "kbkR", "kbkL") and self._yaw is not None:
+            self.last_drift_deg = _yaw_diff(self._yaw, drift0)
+            log.info("walk drift: %s ran %.2f s, the heading changed %.1f deg", token, ran, abs(self.last_drift_deg))
         self._imu_release()
         self._moved_at = self._clock()
         return state
@@ -1898,13 +1911,19 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             _premeter(camera)                                 # meter the light while he moves, not while he stands waiting for the picture
         if act.kind == "wall_turn":
             note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
+            planner.track.clear()
             state = robot.turn(act.degrees, act.seconds)
         elif act.kind in ("turn", "search_turn", "align"):
             state = robot.turn(act.degrees, act.seconds, stop_deg=act.stop_deg) if act.stop_deg > 0 else robot.turn(act.degrees, act.seconds)
             last_turn_got = getattr(robot, "last_turn_deg", None)
+            if act.kind in ("turn", "align"):
+                planner.track.turned((1 if act.degrees > 0 else -1) * (last_turn_got if last_turn_got is not None else (act.stop_deg if act.stop_deg > 0 else abs(act.degrees))))      # the ball is that far round
+            else:
+                planner.track.clear()                                                    # a search turn: it is not about the ball
             if ball is not None:
                 last_move = ("turn", getattr(robot, "last_turn_s", None) or act.seconds, act.degrees, ball)      # a gyro-stopped turn ran for its own time, not the timed fallback
         elif act.kind == "sidestep":
+            planner.track.clear()
             side = 1 if act.degrees > 0 else -1
             state = robot.turn(act.degrees, abs(act.degrees) / planner._turn_rate(side, False))
             if state not in ("fell", "board_silent"):
@@ -1926,9 +1945,14 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                     state = robot.back(VANISH_BACK_S)
                 last_move = None
                 ball = None                                                       # no pace sample from a walk that ended on a bump
+            if act.kind == "walk":
+                planner.track.walked(act.seconds * planner._walk_pace())           # the ball is that much nearer
+            else:
+                planner.track.clear()
             if ball is not None and act.kind == "walk" and not act.scripted:         # (the pace book measures the learned walk; a scripted step must not pull it)
                 last_move = ("walk", act.seconds, 0.0, ball)
         elif act.kind == "three_point":
+            planner.track.clear()
             if announce is not None:
                 announce("backing up")
             side = 1 if act.degrees > 0 else -1
@@ -1936,6 +1960,10 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
         elif act.kind in ("back", "search_back"):
             if announce is not None:
                 announce("backing up")                    # he says it when he picks the back-up (user, 2026-11-01)
+            if act.kind == "back":
+                planner.track.walked(-act.seconds * planner._walk_pace())          # the ball is that much farther
+            else:
+                planner.track.clear()
             state = robot.back(act.seconds)
         elif act.kind == "punt":
             if announce is not None:
