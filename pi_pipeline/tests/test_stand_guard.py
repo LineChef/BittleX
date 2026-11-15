@@ -161,7 +161,7 @@ def test_guard_warns_and_retries_gP_if_no_imu_frames_ever_arrive():
     g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False)
     for _ in range(int(40 / 0.2)):
         clock.t += 0.2; g.tick()
-    assert g.frames == 0 and link.sent.count("gP") == 1 and g._warned_no_frames
+    assert g.frames == 0 and link.sent.count("gP") >= 10 and g._warned_no_frames      # asked again every few seconds (2026-11-15), warned once at 30 s
 
 
 def test_guard_counts_frames():
@@ -343,18 +343,36 @@ def test_the_guard_sends_gp_again_when_no_frames_come_for_a_while_and_not_before
     link.queue = [imu_line(1.0, -2.0)]
     clock.t += 0.2
     g.tick()                                         # frames have come: the print is known to work
-    for _ in range(30):                               # 6 s with no frames: not stale yet
+    for _ in range(10):                               # 2 s with no frames: not stale yet
         clock.t += 0.2
         g.tick()
     assert "gP" not in link.sent
-    for _ in range(15):                               # past 8 s
+    for _ in range(10):                               # past 3 s (2026-11-15: was 8 s; a look left the stream silent for 8 s each time)
         clock.t += 0.2
         g.tick()
     assert link.sent.count("gP") == 1 and g.resends == 1
-    for _ in range(10):
+    for _ in range(5):
         clock.t += 0.2
         g.tick()
     assert link.sent.count("gP") == 1                 # at most once per stale period
+
+
+def test_before_the_first_frame_the_guard_sends_gp_every_few_seconds_not_once_after_30_s():
+    """2026-11-14: start() sent gP once and resent only at 30 s, after the 20 s deaf-board verdict; a clean start lost its stream for about 30 s."""
+    link, clock = FakeLink(), Clock()
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False)
+    for _ in range(80):                               # 16 s, no frame at all
+        clock.t += 0.2
+        g.tick()
+    assert link.sent.count("gP") >= 4                 # about every 3 s
+    link.queue = [imu_line(1.0, -2.0)]
+    clock.t += 0.2
+    g.tick()
+    sent = link.sent.count("gP")
+    for _ in range(10):
+        clock.t += 0.2
+        g.tick()
+    assert link.sent.count("gP") == sent              # the first frame ends the early resends
 
 
 def test_a_fall_sends_gyro_balance_off_and_rest_once_before_the_handler():

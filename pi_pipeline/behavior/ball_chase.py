@@ -220,7 +220,17 @@ SEARCH_SIDE_DEADBAND_DEG = 6.0 # a ball last seen less than this far off straigh
 ALIGN_MAX_DEG = 6.0            # (user, 2026-11-03: still turning too much) one line-up pulse is sized to turn at most this many degrees, whatever the bearing; more pulses do the rest (ALIGN_TRIES)
 ALIGN_MIN_DEG = 3.0            # the smallest line-up turn asked for (gyro-stopped turns, 2026-11-05)
 ALIGN_MIN_RUN_S = 0.25         # a gyro-stopped turn is never ended on the yaw sooner than this after the start (2026-11-10: "asked 6.0 deg, got 11.3 deg in 0.03 s": a first reading that was already off by a few degrees ended the turn before he moved)
-ALIGN_STOP_LEAD_DEG = 1.5      # the gyro stop sends `kbalance` this many degrees early: the body keeps turning a moment after it
+ALIGN_STOP_LEAD_DEG = 1.5      # the least the gyro stop sends `kbalance` early (see align_stop_lead)
+ALIGN_COAST_DEG = 6.5          # (2026-11-15 goal log: asked 6, got 10 to 14; asked 20, got 22 to 28) the body keeps turning about this far after `kbalance`: the gyro stop sends it this much early
+ALIGN_LEAD_FRAC = 0.6          # ... but never earlier than this share of a small turn, or a 6 degree ask would stop before it began
+YAW_STALE_S = 0.5              # the yaw has not changed for this long during a gyro-stopped turn: the IMU print went quiet (a long timed run then turns far past the ask: 1 s is 20 to 28 degrees), so the timed length applies
+ALIGN_PULSE_FLOOR_DEG = 9.0    # the timed fallback of a line-up pulse is never shorter than the time this many degrees take at that side's measured pace (right 28 deg/s, left 20 deg/s: not one floor for both)
+ALIGN_PULSE_FLOOR_MIN_S = 0.3  # ... and never under this
+ALIGN_FAR_IN = 5.0             # farther than this (inside the nudge range) the ball must be within ALIGN_FAR_DEG before he walks on: line up where the bearing is steady, then walk straight in (2026-11-15)
+ALIGN_FAR_DEG = 6.0
+ALIGN_CONFIRM_IN = 5.0         # at this range or closer a line-up turn is sized from two pictures that agree (the bearing swings 25 to 40 degrees from one picture to the next at 2 to 4 in: the camera is on the claw)
+ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; otherwise look once more and use the newest
+
 ALIGN_CAP_S = 2.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
 ALIGN_YAW_STOP = os.environ.get("G2_ALIGN_YAW_STOP", "1").strip().lower() not in ("0", "off", "false", "no")      # `0`: the line-up turns are timed (from the learned turn pace) instead of stopped on the yaw (owner's idea, 2026-11-08)
 YAW_SPIKE_RATE_DEG_S = 120.0   # a yaw change faster than this (plus the margin) cannot be a real turn (they run at about 30 deg/s): it is a sensor spike and is ignored. 2026-11-08: "asked 6.0 deg, got 22.4 deg in 0.02 s"
@@ -288,6 +298,8 @@ class ChasePlanner:
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
     claw_ok: bool = True       # the robot can move the arm for a claw look (run_chase sets it from the robot)
+    confirm_bearing: float | None = None   # the first picture's bearing of a close line-up, waiting for a second that agrees (ALIGN_CONFIRM_IN)
+    confirm_looks: int = 0
     align_before: float | None = None   # the ball's bearing when the last align turn was chosen: a swing to the other side afterwards is an overshoot
     turn_before: float | None = None   # the ball's bearing when the last approach turn toward it was chosen: a swing to the other side afterwards is an overshoot (user, 2026-11-05)
     prev_kind: str | None = None   # the kind of the last action he carried out (run_chase sets it): a ball gone after a small step forward means he pushed it
@@ -480,27 +492,39 @@ class ChasePlanner:
         self.last_bearing, self.last_edge = float(ball.bearing_deg), bool(getattr(ball, "touches_edge", False))
         near = ball.distance_in <= NUDGE_MAX_IN
         in_reach = ball.distance_in <= PUNT_MAX_IN
+        align_tol = min(PUNT_ALIGN_DEG, ALIGN_FAR_DEG) if ball.distance_in > max(ALIGN_FAR_IN, PUNT_MAX_IN + 1.0) else PUNT_ALIGN_DEG      # line up farther out, where the bearing is steady, then walk straight in
         if (self.prev_kind == "turn" and self.turn_before is not None and ball.bearing_deg * self.turn_before < 0           # (user, 2026-11-05) he turned toward the ball and it is now on the OTHER side:
                 and abs(ball.bearing_deg) > SEARCH_SIDE_DEADBAND_DEG and abs(self.turn_before) > SEARCH_SIDE_DEADBAND_DEG and self._can_back(BACK_UP_S)):      # he overshot: back up, look again, then line up again
             was, self.turn_before, self.align_before, self.align_turns = self.turn_before, None, None, 0
             return self._back("back", BACK_UP_S, f"overshot the turn: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
-        if near and not in_reach and abs(ball.bearing_deg) <= PUNT_ALIGN_DEG and self.nudges < NUDGES_BEFORE_PUNT:
+        if near and not in_reach and abs(ball.bearing_deg) <= align_tol and self.nudges < NUDGES_BEFORE_PUNT:
             self.nudges += 1
             self.after_punt = False
             return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})", scripted=NUDGE_GAIT == "scripted")
         if not near:
             self.align_turns = 0
-        if near and abs(ball.bearing_deg) > PUNT_ALIGN_DEG:
+        if near and abs(ball.bearing_deg) > align_tol:
             if self.prev_kind == "align" and self.align_before is not None and ball.bearing_deg * self.align_before < 0 and self._can_back(BACK_UP_S):
                 was, self.align_before, self.align_turns = self.align_before, None, 0         # overshot (user, 2026-11-01): back up, look again, then line up again from the start
                 return self._back("back", BACK_UP_S, f"overshot: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
+            if self.align_turns < ALIGN_TRIES and ball.distance_in <= ALIGN_CONFIRM_IN:      # close in the bearing swings from picture to picture: turn on two pictures that agree
+                first = self.confirm_bearing
+                if first is None or self.confirm_looks < 1 and abs(ball.bearing_deg - first) > ALIGN_CONFIRM_AGREE_DEG:
+                    self.confirm_looks += 1 if first is not None else 0
+                    self.confirm_bearing = float(ball.bearing_deg)
+                    return Action("look", 1.0, why=f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a second picture before the line-up turn")
+                if abs(ball.bearing_deg - first) <= ALIGN_CONFIRM_AGREE_DEG:
+                    ball = dataclasses.replace(ball, bearing_deg=(ball.bearing_deg + first) / 2.0)       # two agreeing pictures: their mean
+                self.confirm_bearing, self.confirm_looks = None, 0
             if self.align_turns < ALIGN_TRIES:                  # a small turn, then a new picture (the camera checks every pulse)
                 self.align_turns += 1
                 self.align_before = float(ball.bearing_deg)
                 side = 1 if ball.bearing_deg > 0 else -1
                 gain = ALIGN_GAIN * (ALIGN_CLOSE_GAIN if ball.distance_in <= ALIGN_CLOSE_IN else 1.0)
                 want = max(ALIGN_MIN_DEG, min(gain * abs(ball.bearing_deg), ALIGN_MAX_DEG))
-                secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, want / self._turn_rate(side, True)))
+                rate = self._turn_rate(side, True)
+                floor_s = min(ALIGN_PULSE_MIN_S, max(ALIGN_PULSE_FLOOR_MIN_S, ALIGN_PULSE_FLOOR_DEG / rate))      # per side: the same degrees take longer to the slower side
+                secs = max(floor_s, min(ALIGN_PULSE_MAX_S, want / rate))
                 return Action("align", secs, float(ball.bearing_deg), stop_deg=want, why=f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a small turn to line the claw up ({self.align_turns} of {ALIGN_TRIES})")
             if WHEN_MISALIGNED == "back_up" and self._can_back(BACK_UP_S):
                 self.align_turns = 0
@@ -584,6 +608,16 @@ def classify_pose(joints) -> str:
             best, err = name, e
     return best if err <= POSE_TOL_DEG else "unknown"
 
+
+
+def align_stop_lead(want_deg: float) -> float:
+    """How many degrees before the wanted turn the gyro stop sends `kbalance`: the coast of the body (ALIGN_COAST_DEG), at most ALIGN_LEAD_FRAC of a small turn, at least ALIGN_STOP_LEAD_DEG. The one number every gyro-stopped turn uses (the chase's line-up and the voice service's turns)."""
+    return max(ALIGN_STOP_LEAD_DEG, min(ALIGN_COAST_DEG, ALIGN_LEAD_FRAC * max(0.0, want_deg)))
+
+
+def align_stop_at(want_deg: float) -> float:
+    """The yaw change at which a gyro-stopped turn is ended."""
+    return max(0.0, want_deg - align_stop_lead(want_deg))
 
 def _yaw_diff(a: float, b: float) -> float:
     """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
@@ -707,6 +741,7 @@ class SerialRobot:
         self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
         self.last_turn_deg: float | None = None
         self.last_turn_s: float | None = None
+        self.last_turn_end: str | None = None            # what ended the last gyro-stopped turn: "gyro", "stale" (no new yaw), "cap" or "timed"
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
@@ -896,7 +931,7 @@ class SerialRobot:
             return "fell"
         self._pitch, self._roll = [], []
         self._tx("gP")
-        self.last_turn_deg, self.last_turn_s = None, None
+        self.last_turn_deg, self.last_turn_s, self.last_turn_end = None, None, None
         yaw0 = None
         if stop_yaw_deg is not None:
             self._sleep(0.15)                             # a few frames, so there is a yaw to count from
@@ -912,18 +947,27 @@ class SerialRobot:
         if yaw0 is not None:
             limit = max(ALIGN_CAP_S, 2.0 * seconds)
         spikes = 0
+        ended_by = "timed" if yaw0 is None else "cap"
+        last_yaw, yaw_moved_t = self._yaw, t0
         while self._clock() - t0 < limit:
             if self._fell():
                 state = "fell"
                 break
+            if yaw0 is not None:
+                if self._yaw is not None and self._yaw != last_yaw:
+                    last_yaw, yaw_moved_t = self._yaw, self._clock()
+                elif self._clock() - yaw_moved_t > YAW_STALE_S and self._clock() - t0 >= seconds:
+                    ended_by = "stale"                    # no new yaw: the IMU print is quiet, so the gyro cannot end this turn; the timed length does (a full run to the cap turned 50 degrees or more)
+                    break
             if yaw0 is not None and self._yaw is not None:
                 dyaw = abs(_yaw_diff(self._yaw, yaw0))
                 if dyaw > YAW_SPIKE_RATE_DEG_S * (self._clock() - t0) + YAW_SPIKE_MARGIN_DEG:
                     spikes += 1
                     log.warning("yaw spike: %.1f deg in %.2f s is faster than a turn can be: ignored (counting from here)", dyaw, self._clock() - t0)
                     yaw0 = self._yaw
-                elif dyaw >= max(0.0, stop_yaw_deg - ALIGN_STOP_LEAD_DEG):
+                elif dyaw >= align_stop_at(stop_yaw_deg):
                     if self._clock() - t0 >= ALIGN_MIN_RUN_S:
+                        ended_by = "gyro"
                         break
                     yaw0 = self._yaw                      # too early to be a real turn: count from this reading instead
             self._sleep(0.02 if yaw0 is not None else 0.05)
@@ -948,7 +992,8 @@ class SerialRobot:
             self._fell()                                  # the last frames: where the yaw ended once the body had stopped
             if self._yaw is not None:
                 self.last_turn_deg, self.last_turn_s = abs(_yaw_diff(self._yaw, yaw0)), ran
-                log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s", stop_yaw_deg, self.last_turn_deg, ran)
+                log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s (ended by %s)", stop_yaw_deg, self.last_turn_deg, ran, ended_by)
+        self.last_turn_end = ended_by if stop_yaw_deg is not None else None
         self._tx("gp")
         self._moved_at = self._clock()
         return state

@@ -8,6 +8,12 @@ from PIL import Image
 from pi_pipeline.behavior import ball_chase as bc
 from pi_pipeline.vision import ball_finder as bf
 
+
+@pytest.fixture(autouse=True)
+def _no_confirm_look(monkeypatch):
+    """These tests size the line-up turn from ONE picture; the two-picture confirm has its own tests (test_align_confirm.py)."""
+    monkeypatch.setattr(bc, "ALIGN_CONFIRM_IN", 0.0)
+
 BALL = (146, 213, 140)         # the treat ball as the camera sees it
 
 
@@ -756,7 +762,7 @@ def test_a_ball_gone_right_after_a_line_up_turn_means_he_turned_past_it_so_he_ba
 def test_a_line_up_pulse_turns_only_part_of_the_bearing_and_less_when_close():
     p = bc.ChasePlanner()
     far = p.decide(reading(6, 16)); near = bc.ChasePlanner().decide(reading(3, 16))
-    assert far.kind == near.kind == "align" and far.seconds >= near.seconds >= bc.ALIGN_PULSE_MIN_S
+    assert far.kind == near.kind == "align" and far.seconds >= near.seconds >= bc.ALIGN_PULSE_FLOOR_MIN_S
 
 
 def _search_dir(p):

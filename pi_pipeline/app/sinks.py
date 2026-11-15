@@ -201,7 +201,7 @@ class WalkerSink:
         if fn is None:
             return
         try:
-            from ..behavior.ball_chase import ALIGN_MIN_RUN_S, ALIGN_STOP_LEAD_DEG, YAW_SPIKE_MARGIN_DEG, YAW_SPIKE_RATE_DEG_S, _yaw_diff
+            from ..behavior.ball_chase import ALIGN_MIN_RUN_S, YAW_SPIKE_MARGIN_DEG, YAW_SPIKE_RATE_DEG_S, _yaw_diff, align_stop_at
             y0 = fn()
             if y0 is None:
                 return
@@ -225,7 +225,7 @@ class WalkerSink:
                         continue
                     d_prev = d
                     self.last_turn_deg = acc + d        # what the turn really did, by the same counting that ends it on the gyro (the turn result line reports this)
-                    if run >= ALIGN_MIN_RUN_S and d >= max(0.0, want_deg - ALIGN_STOP_LEAD_DEG):
+                    if run >= ALIGN_MIN_RUN_S and d >= align_stop_at(want_deg):
                         if self._turn_until == until:  # still the same turn: end it now; walk() restarts cleanly
                             self._turn_until = self._clock()
                             log.info("turn stopped on the gyro after %.1f s: %.0f of %.0f deg", run, d, want_deg)

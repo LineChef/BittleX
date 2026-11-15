@@ -97,7 +97,7 @@ class StandGuard:
                  reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = FALL_DEG,
                  clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2,
                  on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0,
-                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 8.0, rest_on_fall: bool = True, on_silent=None, silent_end_s: float = SILENT_END_S):
+                 is_walking=None, walk_sag_deg: float = 12.0, resend_stale_s: float = 3.0, rest_on_fall: bool = True, on_silent=None, silent_end_s: float = SILENT_END_S):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
         self._balance_off_idle, self._guard = balance_off_idle, guard
@@ -145,6 +145,7 @@ class StandGuard:
         self._rest_on_fall = rest_on_fall                  # a fall: gyro balance off and rest at once, so the board's own self-right (the fell-down sound and the legs repeating one motion) stops
 
     OFF_RESEND_S = 30.0
+    FIRST_FRAME_RESEND_S = 3.0           # before the first frame: send `gP` again this often (the deaf-board verdict is at 20 s)
     WALK_REF_FROM_S, WALK_REF_TO_S, WALK_CHECK_FROM_S = 2.0, 5.0, 8.0
 
     def _check_walk_sag(self, now: float) -> None:
@@ -350,9 +351,12 @@ class StandGuard:
                 self._link.send("gP", read_reply=False, settle=0.0)
             except Exception:  # noqa: BLE001
                 log.debug("re-sending the IMU print failed", exc_info=True)
-        elif self._guard and self.frames == 0 and not self._warned_no_frames and now - self._started_at > 30.0:
-            self._warned_no_frames = True
-            log.warning("stand guard: no IMU frames after 30 s -- the wobble guard cannot see G2 (re-sending gP)")
+        elif self._guard and self.frames == 0 and now - self._started_at > self.FIRST_FRAME_RESEND_S and now - self._last_resend > self.FIRST_FRAME_RESEND_S:
+            self._last_resend = now                                          # no frame has ever come (2026-11-14: a start with one `gP` and a resend only at 30 s ran past the 20 s deaf-board verdict): ask again every few seconds
+            self.resends += 1
+            if not self._warned_no_frames and now - self._started_at > 30.0:
+                self._warned_no_frames = True
+                log.warning("stand guard: no IMU frames after 30 s -- the wobble guard cannot see G2 (re-sending gP)")
             try:
                 self._link.send("gP", read_reply=False, settle=0.0)
             except Exception:  # noqa: BLE001

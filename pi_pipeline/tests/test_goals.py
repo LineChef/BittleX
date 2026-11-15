@@ -15,6 +15,12 @@ from pi_pipeline.tests.test_ball_chase import FakeCamera, disc, picture
 
 
 @pytest.fixture(autouse=True)
+def _no_confirm_look(monkeypatch):
+    """These tests size the line-up turn from ONE picture; the two-picture confirm has its own tests (test_align_confirm.py)."""
+    monkeypatch.setattr(bc, "ALIGN_CONFIRM_IN", 0.0)
+
+
+@pytest.fixture(autouse=True)
 def _isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("G2_GOALS", str(tmp_path / "goals.json"))
     monkeypatch.setenv("G2_GOAL_JOURNAL", str(tmp_path / "journal.jsonl"))
@@ -348,7 +354,7 @@ def test_close_and_off_line_he_lines_up_with_small_turns_then_punches_or_backs_u
     bc.PUNT_ALIGN_DEG, bc.ALIGN_TRIES = 6.0, 2
     p = bc.ChasePlanner()
     a = p.decide(reading(3.5, 15))
-    assert a.kind == "align" and a.degrees == 15 and bc.ALIGN_PULSE_MIN_S <= a.seconds <= bc.ALIGN_PULSE_MAX_S
+    assert a.kind == "align" and a.degrees == 15 and bc.ALIGN_PULSE_FLOOR_MIN_S <= a.seconds <= bc.ALIGN_PULSE_MAX_S
     assert p.decide(reading(3.5, -9)).kind == "align"
     assert p.decide(reading(3.5, 8)).kind == "punt"                                  # two tries used: punch anyway (the default)
     bc.WHEN_MISALIGNED = "back_up"
