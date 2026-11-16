@@ -498,3 +498,13 @@ def test_the_goal_turns_by_the_last_bearing_only_when_it_was_well_off_to_one_sid
             assert (turned[0] if turned else None) == expect, (last_bearing, turned)
     finally:
         bp._chase = orig
+
+
+def test_the_chase_does_not_say_target_acquired_again_for_the_reading_the_active_look_announced():
+    said = []
+    bc.run_chase(FakeRobot(), FakeCamera([picture([disc(122, 110, 50)])]), lambda: False, max_steps=1, first_reading=reading(14.0, 3.0), announce=said.append,
+                 sleep=lambda s: None, say=lambda m: None, dry_run=True)
+    assert "target acquired" not in said                                                    # (2026-11-16: it was heard twice, once by the watch and once by the chase)
+    again = []
+    bc.run_chase(FakeRobot(), FakeCamera([picture([disc(122, 110, 50)])]), lambda: False, max_steps=1, announce=again.append, sleep=lambda s: None, say=lambda m: None, dry_run=True)
+    assert "target acquired" in again                                                       # without a first reading the chase announces the first sighting as before

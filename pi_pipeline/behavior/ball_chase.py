@@ -1886,6 +1886,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
     steps = 0
     punts = 0
     seen = False
+    first_cue_said = first_reading is not None             # a first reading comes from the active look, which has announced it
     pending: BallReading | None = first_reading           # the ball a claw look just found (the camera is back at straight ahead, so it would not see it now); or the ball the post-punt watch acquired (behavior/punt_watch.py)
     t_start = clock()
 
@@ -1965,7 +1966,10 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
         last_empty = scene if ball is None else None
         if announce is not None:                          # real-time signal of what he sees (user, 2026-10-25): "searching" when a search starts, "target acquired" when the ball is found again
             if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or planner.search_i > 0 or not seen):
-                announce("target acquired")
+                if first_cue_said:                        # the active look already said "target acquired" for this very reading (2026-11-16: it was heard twice): not again
+                    first_cue_said = False
+                else:
+                    announce("target acquired")
             elif ball is None and planner.lost + 1 == LOST_LOOKS:                       # the look that starts a search
                 announce("searching")
         seen = seen or ball is not None
