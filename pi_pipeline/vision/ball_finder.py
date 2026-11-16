@@ -32,6 +32,9 @@ CLOSE_MIN_AREA = 3000         # px: about 62 px across, the ball about 5 in away
 # Dim at a few inches more (2026-11-01, lamp light, the ball about 8 in away: green above red/blue by 13 at the median, green about 112): a third pass for a round blob on the floor
 # (its centre below the horizon), any size from about 20 px across. On 355 saved exploration pictures it added 7 real balls and 7 false finds (a green cup, a green lamp shade, 4 others).
 DIM_DOM_MIN, DIM_G_MIN, DIM_MIN_AREA = 11, 80, 300
+DIM_PALE = (14, 150, 65)      # (owner-approved 2026-11-16, from the pictures where he turned away from a ball right in front of him) a SECOND dim rule, tried after the first: dominance 14, minimum area 150, the blob's centre at least row 65. A pale ball (its brightest green about 139 to 147, dominance 14 to 49) 24 to 30 in away
+                              # is only about 230 px and sits right at the horizon (rows 75 to 77), which the first rule rejects on both counts. Over 1237 real pictures it adds 14 detections and loses none (5 of them the missed ball); a dim sighting is confirmed by a second picture
+CLOSE_PALE_MIN_AREA, CLOSE_PALE_MIN_Y = 900, 90   # a pale ball 5 to 9 in away is 1000 to 3400 px: the close-up rule wants 3000, so it fell through to nothing; this lowers the area but only for a blob whose centre is in the lower half of the frame (big green things high in the frame are walls and plants), and a sighting is confirmed like a dim one
 DIM_MIN_Y = 80                # px from the top: the claw camera's horizon is about here
 
 
@@ -141,9 +144,17 @@ def find_ball_array(rgb: np.ndarray) -> BallReading | None:
         if found is not None:
             found = dataclasses.replace(found, via="close")
     if found is None:
+        low = _find(rgb, CLOSE_DOM_MIN, CLOSE_G_MIN, CLOSE_PALE_MIN_AREA)
+        if low is not None and low.y >= CLOSE_PALE_MIN_Y:
+            found = dataclasses.replace(low, via="dim")
+    if found is None:
         dim = _find(rgb, DIM_DOM_MIN, DIM_G_MIN, DIM_MIN_AREA)
         if dim is not None and dim.y >= DIM_MIN_Y:
             found = dataclasses.replace(dim, via="dim")
+    if found is None:
+        pale = _find(rgb, DIM_PALE[0], DIM_G_MIN, DIM_PALE[1])
+        if pale is not None and pale.y >= DIM_PALE[2]:
+            found = dataclasses.replace(pale, via="dim")
     return found
 
 

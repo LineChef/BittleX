@@ -57,6 +57,10 @@ SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that wa
 POST_PUNT_WATCH = True          # after the last punt of an attempt, follow the ball with the claw until it stops instead of taking one picture (behavior/punt_watch.py; the goal passes the watch in, 2026-11-15)
 SEARCH_WALK = False            # walk on blind after a full circle without the ball (off: only on a big floor, `--search-walk`)
 AFTER_PUNT_SETTLE_S = 1.0      # after the punch, before the picture that says where the ball went
+JUMP_GUARD = True              # (owner-approved 2026-11-16, after he walked 3 s through a ball at 5 in because a reading of 45 in appeared right after a line-up turn) a reading that puts the ball much farther away than the last one, when only a turn or a look has happened since, is a different green thing: it is treated as the ball having vanished at close range
+JUMP_NEAR_IN = 8.0             # the last reading was at most this far ...
+JUMP_IN = 15.0                 # ... and the new one is more than this much farther
+JUMP_AFTER = ("align", "turn", "wall_turn", "look", "claw_look", "search_turn")      # moves that cannot carry the ball (or him) 15 in: a walk, a back-up, a punt or a sidestep can, so they are not checked
 DIRECTED_LOOK = True            # (owner-approved 2026-11-16) at the second empty picture of a chase, when the ball's last bearing is known, ONE claw look aimed at it comes before any blind search
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
@@ -354,6 +358,8 @@ class ChasePlanner:
     circles: int = 0           # whole turns finished without the ball this search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
+    prev_seen_dist: float | None = None  # the distance of the last reading that was accepted (the jump guard compares the next one with it)
+    jump_stops: int = 0                  # readings the jump guard threw out this attempt
     directed_done: bool = False         # the aimed claw look was made since the ball was last seen
     last_bearing: float | None = None   # the ball's bearing when it was last seen (None: not this attempt)
     last_edge: bool = False    # ... and whether it touched the picture's edge (it was leaving the view that way)
@@ -464,6 +470,16 @@ class ChasePlanner:
         return Action("wall_turn", abs(deg) / self._turn_rate(side, False), deg, why)
 
     def decide(self, ball: BallReading | None, wall: "WallSeen | None" = None) -> Action:
+        if (JUMP_GUARD and ball is not None and self.lost == 0 and self.prev_seen_dist is not None and self.prev_seen_dist <= JUMP_NEAR_IN
+                and self.prev_kind in JUMP_AFTER and ball.distance_in - self.prev_seen_dist > JUMP_IN):
+            msg = (f"jump guard: the ball read {self.prev_seen_dist:.0f} in, then {ball.distance_in:.0f} in ({ball.bearing_deg:+.0f} deg, {getattr(ball, 'via', 'normal')} pass, blob {ball.width} x {ball.height} px "
+                   f"at {ball.x:.0f},{ball.y:.0f}) after only a {self.prev_kind}: a different green thing, not the ball; treated as the ball having vanished")
+            log.warning(msg)
+            self.considered.append(msg)
+            self.jump_stops += 1
+            return self.decide(None, wall)
+        if ball is not None:
+            self.prev_seen_dist = ball.distance_in                 # every accepted reading, including the ones a wall check answers with a look
         if ball is None:
             self.lost += 1
             self.punts_in_range = 0
@@ -540,6 +556,7 @@ class ChasePlanner:
         else:
             self.by_wall = 0
         self.last_dist = ball.distance_in
+        self.prev_seen_dist = ball.distance_in
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
         self.last_bearing, self.last_edge = float(ball.bearing_deg), bool(getattr(ball, "touches_edge", False))
         near = ball.distance_in <= NUDGE_MAX_IN

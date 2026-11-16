@@ -1409,3 +1409,33 @@ def test_one_long_walk_covers_at_most_sixty_percent_of_the_distance_then_he_look
     monkeypatch.setattr(bc, "WALK_MAX_FRACTION", 1.0)
     whole = bc.ChasePlanner().decide(reading(20.0, 0))
     assert whole.seconds >= a.seconds                                                    # off: the whole way, as before
+
+
+# ---- 2026-11-16: the jump guard (he walked 3 s through a ball at 5 in after a 45 in reading appeared)
+
+def _seen_then_jump(prev_kind, first=5.0, second=45.0):
+    p = bc.ChasePlanner()
+    p.decide(reading(first, 8))
+    p.prev_kind = prev_kind
+    return p, p.decide(reading(second, -3))
+
+
+def test_a_reading_far_beyond_the_last_one_after_only_a_turn_is_not_walked_toward():
+    for kind in ("align", "turn", "look", "claw_look"):
+        p, act = _seen_then_jump(kind)
+        assert p.jump_stops == 1 and act.kind != "walk" and "45" in " ".join(p.considered)
+    p, act = _seen_then_jump("align")
+    assert act.kind in ("back", "claw_look", "look")                                       # the vanished-after-a-line-up-turn answer: back up and look again, never a walk toward the far blob
+
+
+def test_moves_that_can_carry_the_ball_or_him_are_not_checked_and_the_guard_can_be_switched_off(monkeypatch):
+    for kind in ("walk", "back", "search_back", "punt", "sidestep"):
+        p, act = _seen_then_jump(kind)
+        assert p.jump_stops == 0                                                           # a walk or a punt really can change the distance
+    far, act = _seen_then_jump("align", first=12.0, second=45.0)
+    assert far.jump_stops == 0                                                             # the last reading was beyond JUMP_NEAR_IN: no check
+    small, act = _seen_then_jump("align", first=5.0, second=14.0)
+    assert small.jump_stops == 0                                                           # 9 in farther: within the guard's margin
+    monkeypatch.setattr(bc, "JUMP_GUARD", False)
+    off, act = _seen_then_jump("align")
+    assert off.jump_stops == 0 and act.kind == "walk"
