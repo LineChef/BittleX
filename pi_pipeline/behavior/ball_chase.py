@@ -583,6 +583,7 @@ class Camera(Protocol):
     def look(self) -> bytes | None: ...
 
 
+MOVE_TILT_GATE_DEG = 12.0       # (owner, 2026-11-15, after two falls) BEFORE EVERY move (walk, turn, back, punt) the body's tilt is read; more than this far off level on pitch or roll and the move is NOT sent: he is laid down and stood up again (recover_sag: attention pose, then via rest). 0 turns it off
 SAG_TILT_DEG = 12.0            # standing, the body this far off the tilt measured right after his last good stand-up (or 20 deg off level before there is one): the legs have sagged
 PICTURE_SAG_HINT_S = 30.0       # how long a rolled picture keeps the body-tilt sag check stricter
 PICTURE_SAG_FACTOR = 0.6        # the body-tilt thresholds are this fraction of themselves while the hint is on (12 deg becomes 7)
@@ -1115,6 +1116,7 @@ class SerialRobot:
         first stand-up (the link's stand_from_attention); rest or a sit, the normal stand-up (the firmware `kbalance`; from a sit the link's slow back-legs stand-up). An unreadable
         pose falls back to the last one he was told to take (none yet: standing, as the session start left him). Then it waits until the board reads the stand,
         watching for a fall; "fell" if he went over. Standing, and the last move ended under QUICK_MOVE_S ago: nothing to check, he goes at once."""
+        tilt = None
         recheck = self._sag_checked_t is None or self._clock() - self._sag_checked_t >= SAG_RECHECK_S or self._picture_hint()      # a clean check is repeated every few seconds of standing and at once after a rolled picture:
         if self.posture in ("stand", "unknown") and self._moved_at is not None and self._clock() - self._moved_at >= SAG_CHECK_AFTER_S and recheck:      # the legs sag AFTER a clean one (2026-11-15: 11.5 s still, roll 22 deg, then a back-up threw him over)
             self._sag_checked_at = self._moved_at
@@ -1123,6 +1125,15 @@ class SerialRobot:
             if self._sagged(tilt):
                 return self.recover_sag(tilt)
         if BETWEEN_MOVES != "attention":
+            if MOVE_TILT_GATE_DEG > 0 and self.posture in ("stand", "unknown"):
+                # The move gate (owner, 2026-11-15): two falls in one evening began with a walk sent while he stood 21 to 26 deg rolled (the timed sag check had not run: he had moved less than SAG_CHECK_AFTER_S before).
+                # Every move reads the tilt; off level by more than the gate and the move is not sent.
+                if tilt is None:
+                    tilt = self._tilt(0.3)
+                if tilt is not None and max(abs(tilt[0]), abs(tilt[1])) > MOVE_TILT_GATE_DEG:
+                    log.warning("move gate: the body is tilted pitch %+.0f roll %+.0f deg (more than %.0f): the move is not sent, he is laid down and stood up again", tilt[0], tilt[1], MOVE_TILT_GATE_DEG)
+                    self.move_gate_stops = getattr(self, "move_gate_stops", 0) + 1
+                    return self.recover_sag(tilt)
             return "ok"                                   # the standing flow sends nothing before a move (what the code did before 2026-11-02): the pose read, the tilt check and the stand-up wait
                                                           # added serial traffic in front of every walk, and the walks that followed showed no board echoes (docs/STATUS.md item 14)
         if self.posture == "stand" and self._moved_at is not None and self._clock() - self._moved_at < QUICK_MOVE_S:

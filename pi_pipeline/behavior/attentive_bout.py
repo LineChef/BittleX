@@ -190,8 +190,12 @@ def run_bout(robot, look, cfg: BoutConfig | None = None, *, pan_sign: str = "lef
 
 def main() -> None:
     import argparse
+    import os
 
     from . import ball_chase as chase
+    if os.environ.get("G2_ATTENTIVE_BOUT", "").strip().lower() not in ("1", "on", "true", "yes"):
+        print("the attentive bout (face-following claw look) is switched off (owner, 2026-11-15: the active look after a punt replaced it). Nothing was moved. To run it anyway: G2_ATTENTIVE_BOUT=1")
+        return
     ap = argparse.ArgumentParser(description="One supervised attentive bout (claw gaze-follow from the attention pose). Needs the owner's go; the voice service stopped.")
     ap.add_argument("--minutes", type=float, default=2.0)
     ap.add_argument("--labels", default=None, help="comma-separated labels to follow (default: any detection; or G2_ATTENTIVE_LABELS)")

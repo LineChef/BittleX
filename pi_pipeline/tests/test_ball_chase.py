@@ -631,6 +631,7 @@ def test_the_standing_flow_sends_nothing_extra_before_a_move_or_at_session_start
     """2026-11-02: the pose read, the tilt check and the stand-up polling put extra serial traffic in front of every walk, and the walks after them showed no board echoes. In the
     default flow a move sends exactly what it sent before: no `j`, no `gp`, nothing (a move's `gP` stays: the IMU print is left on, 2026-11-15)."""
     assert bc.BETWEEN_MOVES == "stand"
+    monkeypatch.setattr(bc, "MOVE_TILT_GATE_DEG", 0.0)                                 # the move gate (owner, 2026-11-15) adds one tilt read per move on purpose; this pins the flow without it
     lk = _PoseLink("stand")
     t = iter(np.arange(0, 100000, 0.2))
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
@@ -1302,3 +1303,51 @@ def test_the_long_walk_is_never_aimed_into_the_balls_touch_zone(monkeypatch):
     monkeypatch.setattr(bc, "WALK_AIM_IN", 3.5)
     c = bc.ChasePlanner().decide(reading(11.0, 0))
     assert abs(c.seconds - (start + (11.0 - 4.0) / pace)) < 0.02                                       # the floor follows the punt reach
+
+
+# ---- the move gate (owner, 2026-11-15): no move is sent while the body is tilted more than MOVE_TILT_GATE_DEG
+
+def _move_robot(tilt, posture="stand"):
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    r = bc.SerialRobot(Link(), sleep=lambda s: None, clock=lambda: 100.0)
+    r.posture, r._moved_at = posture, 99.5                                           # moved 0.5 s ago: the timed sag check does not run (the fall's case)
+    r._tilt = lambda seconds=0.5: tilt
+    r.reseats = []
+    r.recover_sag = lambda t=None: (r.reseats.append(t), "ok")[1]
+    return r
+
+
+def test_the_move_gate_stops_a_move_while_he_stands_rolled_and_recovers_instead():
+    r = _move_robot((0.0, 22.0))
+    assert r.stand_up() == "ok" and r.reseats == [(0.0, 22.0)] and r.move_gate_stops == 1
+    pitched = _move_robot((-15.0, 3.0))
+    assert pitched.stand_up() == "ok" and len(pitched.reseats) == 1
+
+
+def test_the_move_gate_lets_a_level_body_go_and_can_be_switched_off(monkeypatch):
+    ok = _move_robot((3.0, -4.0))
+    assert ok.stand_up() == "ok" and ok.reseats == []
+    no_imu = _move_robot(None)
+    assert no_imu.stand_up() == "ok" and no_imu.reseats == []                         # no reading: nothing to judge (the other guards still apply)
+    monkeypatch.setattr(bc, "MOVE_TILT_GATE_DEG", 0.0)
+    off = _move_robot((0.0, 30.0))
+    assert off.stand_up() == "ok" and off.reseats == []
+
+
+def test_every_motion_goes_through_the_move_gate():
+    r = _move_robot((0.0, 25.0))
+    r._skill = lambda *a, **k: "ok"
+    for call in (lambda: r.walk(1.0), lambda: r.turn(10.0, 1.0), lambda: r.back(1.0), lambda: r.walk_scripted(1.0)):
+        r.reseats.clear()
+        call()
+        assert len(r.reseats) == 1
+
+
+def test_the_attentive_bout_is_off_unless_switched_on(monkeypatch, capsys):
+    from pi_pipeline.behavior import attentive_bout
+    monkeypatch.delenv("G2_ATTENTIVE_BOUT", raising=False)
+    attentive_bout.main()
+    assert "switched off" in capsys.readouterr().out

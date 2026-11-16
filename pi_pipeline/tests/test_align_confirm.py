@@ -97,6 +97,7 @@ def test_the_coast_is_learned_from_the_turns_of_the_session(monkeypatch):
 def test_the_legs_are_checked_for_sag_again_when_the_last_check_is_old(monkeypatch):
     """2026-11-15: 11.5 s standing still, the legs sagged after the one clean check of that stand (roll 22 deg), and the next move threw him over."""
     from pi_pipeline.tests.test_ball_chase import _PoseLink
+    monkeypatch.setattr(bc, "MOVE_TILT_GATE_DEG", 0.0)                                 # this test counts the timed check's reads; the move gate (every move) has its own tests
     lk = _PoseLink("stand")
     t = {"now": 0.0}
     r = bc.SerialRobot(lk, sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])

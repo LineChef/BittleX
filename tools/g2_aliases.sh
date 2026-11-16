@@ -386,7 +386,7 @@ print('voltage', b.read_voltage(l))
 PYEOF
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2attend [MINUTES [TARGET [live [stream]]]]  -- one supervised attentive bout (default 2 min): G2 holds the attention pose with the claw up and turns the camera toward what the camera model detects (largest first; with TARGET, a named object from the object gallery as well), looks around now and then, then puts the claw down and stands up the standard way. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2attendstop ends a bout at once.
+# g2attend [MINUTES [TARGET [live [stream]]]]  -- (SWITCHED OFF 2026-11-15: refuses unless G2_ATTENTIVE_BOUT=1) one supervised attentive bout (default 2 min): G2 holds the attention pose with the claw up and turns the camera toward what the camera model detects (largest first; with TARGET, a named object from the object gallery as well), looks around now and then, then puts the claw down and stands up the standard way. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2attendstop ends a bout at once.
 g2attend() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
