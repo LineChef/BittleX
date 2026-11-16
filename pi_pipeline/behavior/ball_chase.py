@@ -1096,6 +1096,17 @@ class SerialRobot:
         at = getattr(self, "_picture_sag_at", None)
         return at is not None and self._clock() - at <= PICTURE_SAG_HINT_S
 
+    def _already_fell(self, tilt) -> bool:
+        """A tilt read before a move that is past the fall angle: he is not sagging, he has fallen (2026-11-16: the move gate and the sag check re-stood a G2 lying on his side, twice, and the session ran
+        on). He is laid in the rest position, never sent a stand, and the caller gets "fell"."""
+        if tilt is None or max(abs(tilt[0]), abs(tilt[1])) < math.degrees(self._fall_rad):
+            return False
+        log.warning("the body reads pitch %+.0f roll %+.0f deg before a move: he has fallen (not a sag): laid in rest, no stand-up", tilt[0], tilt[1])
+        self.last_fall = {"pitch": round(tilt[0], 1), "roll": round(tilt[1], 1), "way": "found fallen before a move", "posture": self.posture}
+        self.posture = "rest"
+        self._tx("krest")
+        return True
+
     def _sagged(self, tilt) -> bool:
         """Standing, but tilted away from how he stood after his last good stand-up: the legs have let go (the pose read cannot see it, it reports the commanded angles). A rolled picture lowers the bar."""
         if tilt is None:
@@ -1123,6 +1134,8 @@ class SerialRobot:
             self._sag_checked_at = self._moved_at
             self._sag_checked_t = self._clock()
             tilt = self._tilt()
+            if self._already_fell(tilt):
+                return "fell"
             if self._sagged(tilt):
                 return self.recover_sag(tilt)
         if BETWEEN_MOVES != "attention":
@@ -1131,6 +1144,8 @@ class SerialRobot:
                 # Every move reads the tilt; off level by more than the gate and the move is not sent.
                 if tilt is None:
                     tilt = self._tilt(0.3)
+                if self._already_fell(tilt):
+                    return "fell"
                 if tilt is not None and max(abs(tilt[0]), abs(tilt[1])) > MOVE_TILT_GATE_DEG:
                     log.warning("move gate: the body is tilted pitch %+.0f roll %+.0f deg (more than %.0f): the move is not sent, he is laid down and stood up again", tilt[0], tilt[1], MOVE_TILT_GATE_DEG)
                     self.move_gate_stops = getattr(self, "move_gate_stops", 0) + 1

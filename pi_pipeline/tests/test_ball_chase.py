@@ -1363,3 +1363,12 @@ def test_rest_then_stand_centres_the_claw_lies_down_in_rest_and_stands_up_from_r
     assert "krest" in sent and "kbalance" in sent and sent.index("krest") < sent.index("kbalance")     # rest first, then the stand-up
     assert r._claw == (0.0, 0.0) and r.posture == "stand"
     assert lk.last_motion_command in ("krest", "kbalance")
+
+
+def test_a_move_found_fallen_before_it_starts_lays_him_in_rest_and_reports_a_fall_not_a_sag():
+    for tilt in ((5.0, 80.0), (-100.0, 3.0)):
+        r = _move_robot(tilt)
+        assert r.stand_up() == "fell" and r.reseats == [] and r.posture == "rest" and r.last_fall["way"] == "found fallen before a move"
+        assert r._lk.sent.count("krest") == 1                                                # laid in rest, no stand-up and no recovery
+    sag = _move_robot((0.0, 22.0))
+    assert sag.stand_up() == "ok" and len(sag.reseats) == 1                                  # a sag (under the fall angle) is still re-stood
