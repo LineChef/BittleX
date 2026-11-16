@@ -167,7 +167,7 @@ def main() -> None:
     if not imu_print.board_answers(link):
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")
         return
-    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(behavior/step_cal.py, 2026-11-16): no shutter click in this look
+    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)       # the shutter click plays on every picture, as everywhere else (2026-11-16: the owner asked why it was silent)
     robot = chase.SerialRobot(link)
     stop_path = os.path.expanduser(STOP_FILE)
     if os.path.exists(stop_path):

@@ -453,7 +453,7 @@ g2stepcal() {
   local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
   if [ -n "$dir" ]; then
     local dest="$HOME/Desktop/G2Memory/g2_pictures/stepcal/$(basename "$dir")"; mkdir -p "$dest"
-    scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null && echo "pictures where the ball was missed copied to $dest"
+    scp "$G2_PI:$dir/*.jpg" "$dest/" 2>&1 | tail -2; echo "pictures where the ball was missed: $dest ($(ls "$dest" | wc -l | tr -d " ") files)"
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
