@@ -187,8 +187,8 @@ Raspberry Pi Zero 2 W
 - → **512 MB RAM is the hard ceiling** for anything on-Pi — local Whisper/VLM are
   borderline-to-infeasible (matches the pidog-embodiment benchmarks noted in
   Phase 8). Favours cloud STT + Claude-side scene reasoning.
-- → The Pi's CSI connector is unused — the camera goes to the Grove Vision module,
-  not the Pi.
+- → The Pi's CSI connector is unused. The camera is the Grove Vision AI V2 module,
+  which plugs into the Pi's USB port (`/dev/ttyACM0`), not into a Grove port.
 
 **Software-stack expectations (from bring-up research — full runbook +
 open-Q answers in [`pi-bring-up.md`](../guides/pi-bring-up.md)):**

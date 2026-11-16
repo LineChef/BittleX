@@ -59,7 +59,7 @@ TX and RX cross: each board's transmit line goes to the other's receive line. Pi
 Part 2: Everything wired into the Pi
 ------------------------------------
 
-Once Part 1 is built, the Pi's 40-pin header also feeds the audio pair. The AI head connects to the BiBoard by its Grove cable and to the Pi over Wi-Fi, so it adds no wires to the header.
+Once Part 1 is built, the Pi's 40-pin header also feeds the audio pair. The AI head connects to the BiBoard by its Grove cable (power and commands only); its camera data goes over a USB cable to the Pi (`/dev/ttyACM0`), and its trigger, voice and mic stream run over Wi-Fi, so it adds no wires to the header.
 
 ### 2.1 Header map
 
@@ -141,6 +141,7 @@ Notes:
 ### 2.3 Petoi AI head
 
 - Power and serial: The head's 4-pin R T V G connector goes to the BiBoard G1 (Grove, UART2) on a 4-wire Grove cable. The head's transmit line is left unconnected, so the Pi stays the only sender.
+- Camera data: Pictures and detections come to the Pi over a USB cable from the head to the Pi's USB port (`/dev/ttyACM0`). The camera does not use the Grove socket.
 - Trigger, voice and mic stream: These run from the Pi to the head over Wi-Fi, with no wires.
 
 G1 is the only UART-capable Grove socket on the BiBoard V1. G2 is I²C, and G3 and G4 are analog.

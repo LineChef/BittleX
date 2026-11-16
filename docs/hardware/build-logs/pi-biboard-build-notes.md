@@ -39,7 +39,7 @@ edge, three ports along the bottom:
   mistake** — it may not boot, or boot erratically. The two ports are
   physically identical; only the tiny silkscreen text tells them apart.
 - The **microSD slot** is on the short edge, opposite the CSI camera
-  connector (unused on G2 — vision runs through BiBoard's Grove module).
+  connector (unused on G2: vision runs on the Grove Vision module, which plugs into the Pi's USB port).
 - No power button: The Pi boots the instant power is applied. To turn
   off: `sudo shutdown now` over SSH, wait ~10s for the LED to go dark, then
   unplug.
