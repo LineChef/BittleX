@@ -84,12 +84,12 @@ def reading(distance=14.0, bearing=3.0):
     return bf.BallReading(120.0, 150.0, 800, 24, 24, 24.0, distance, bearing, False)
 
 
-def run_watch(vanish_at=None, still=reading(), seconds=10.0):
+def run_watch(vanish_at=None, still=reading(), seconds=10.0, on_ready=None):
     c = Clock()
     r = WatchRobot()
     said, spoken = [], []
     res = pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: Script(c, vanish_at), lambda j: [], lambda cam: still, pw.WatchConfig(seconds=seconds, stable_n=6),
-                              lf.LiveConfig(tick_s=0.05), say=said.append, announce=spoken.append, sleep=c.sleep, clock=c)
+                              lf.LiveConfig(tick_s=0.05), say=said.append, announce=spoken.append, sleep=c.sleep, clock=c, on_ready=on_ready)
     return res, r, spoken
 
 
@@ -129,3 +129,32 @@ def test_the_chase_starts_from_the_acquired_reading_without_taking_a_picture_fir
     robot = FakeRobot()
     out = bc.run_chase(robot, Cam([picture([disc(122, 110, 50)])]), lambda: False, max_steps=1, first_reading=reading(14.0, 3.0), sleep=lambda s: None, say=lambda m: None, dry_run=True)
     assert out == "steps" and asked == []
+
+
+def test_the_ready_cue_comes_once_the_claw_is_up():
+    c = Clock()
+    r = WatchRobot()
+    seen = []
+    pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: Script(c), lambda j: [], lambda cam: reading(), pw.WatchConfig(seconds=3.0, stable_n=6), lf.LiveConfig(tick_s=0.05),
+                        say=lambda *_: None, sleep=c.sleep, clock=c, on_ready=lambda: seen.append(list(r.calls)))
+    assert len(seen) == 1 and seen[0][:2] == ["relax", ("claw", 0.0, 120.0)]               # the cue is given after the attention pose and the claw raise
+
+
+class OldSightingGrabber(Script):
+    """The ball was seen before the claw could pan (in the rows the stream recorded), then not for a while: the lost clock must not already be running when the follow starts."""
+
+    def __init__(self, clock):
+        super().__init__(clock)
+        self.rows = [{"det": [("ball", 0.7)], "t_capture": -5.0}]
+
+    def take(self):
+        t = self.clock()
+        return (t - 0.2, [], int(t / 0.25) + 1) if t < 2.0 else (t - 0.2, [("ball", 1.0, 0.5, 0.6, 0.1, 0.1)], int(t / 0.25) + 1)
+
+
+def test_a_sighting_before_the_claw_was_up_does_not_start_the_lost_clock():
+    c = Clock()
+    r = WatchRobot()
+    res = pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: OldSightingGrabber(c), lambda j: [], lambda cam: reading(), pw.WatchConfig(seconds=8.0, stable_n=4, lost_after_s=2.5, never_seen_s=4.0),
+                              lf.LiveConfig(tick_s=0.05), say=lambda *_: None, sleep=c.sleep, clock=c)
+    assert res.ended in ("stopped", "timeout") and res.found                                 # it waited for the ball to come back into view

@@ -102,8 +102,11 @@ def main() -> None:
             print("punt:", state)
             if state == "fell":
                 return
-        r = watch_after_punt(robot, wrapped, make_grabber, target.detections, find_still, WatchConfig(seconds=args.seconds, lost_turn_deg=args.turn), pan_sign=chase.CLAW_PAN_SIGN,
-                             announce=announce, stopped=stop)
+        wcfg = WatchConfig(seconds=args.seconds, lost_turn_deg=args.turn)
+        if args.no_punt:
+            wcfg = WatchConfig(seconds=max(args.seconds, 25.0), never_seen_s=15.0, lost_turn_deg=args.turn)      # the dry run waits for you to roll the ball
+        r = watch_after_punt(robot, wrapped, make_grabber, target.detections, find_still, wcfg, pan_sign=chase.CLAW_PAN_SIGN, announce=announce, stopped=stop,
+                             on_ready=(lambda: announce("roll the ball now")) if args.no_punt else None)
         print(result_line(r))
         try:
             json.dump({"result": r.ended, "found": r.found, "last_side": r.last_side, "last_bearing": r.last_bearing, "pictures": r.pictures, "moves": r.moves, "seconds": r.seconds,

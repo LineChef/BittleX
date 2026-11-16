@@ -79,9 +79,9 @@ def _world_bearing(pan_log: lf.PanLog, t_capture: float, det) -> float:
 
 
 def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: WatchConfig | None = None, lcfg: lf.LiveConfig | None = None, *, pan_sign: str = "left", say=print,
-                     announce=None, sleep=time.sleep, clock=time.monotonic, stopped=lambda: False) -> WatchResult:
+                     announce=None, sleep=time.sleep, clock=time.monotonic, stopped=lambda: False, on_ready=None) -> WatchResult:
     """`make_grabber(find_fn, cfg, clock, save)` -> a started-able grabber (the live follow's); `camera` takes the still (`look()`); `find_still(camera) -> BallReading | None` finds the ball in a still
-    (the chase's own find and confirm). Never raises. On return the claw is back at the centre and lowered when the ball was found; otherwise it is left up for the caller's turn and look."""
+    (the chase's own find and confirm). `on_ready()` is called once the claw is up and the follow starts (the dry run says "roll the ball now"). Never raises. On return the claw is back at the centre and lowered when the ball was found; otherwise it is left up for the caller's turn and look."""
     wcfg = wcfg or WatchConfig()
     lcfg = lcfg or lf.LiveConfig(seconds=wcfg.seconds)
     res = WatchResult()
@@ -102,7 +102,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         pan_log = lf.PanLog(0.0, t_up)
         follower = lf.LiveFollower(lcfg, pan_sign, pan_log)
         det = StopDetector(wcfg)
-        state = {"last_seen_t": None, "last_bearing": None, "reason": None}
+        state = {"last_seen_t": None, "last_bearing": None, "reason": None, "seen_in_loop": False}
         for row in list(grab.rows):                              # what the stream saw before the claw was up (the claw has not panned: the world bearing is the offset)
             if row["det"]:
                 off = (row["det"][0][1] - 0.5) * 2.0 * lcfg.fov_half_deg
@@ -114,19 +114,22 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
             if d is not None:
                 b = _world_bearing(pan_log, t_cap, d)
                 state["last_seen_t"], state["last_bearing"] = now, b
+                state["seen_in_loop"] = True
                 if det.add(t_cap, b, float(d[4])):
                     state["reason"] = "stopped"
                     return True
             else:
                 det.clear()
                 ref = state["last_seen_t"]
-                if ref is not None and now - ref > wcfg.lost_after_s:
+                if state["seen_in_loop"] and now - ref > wcfg.lost_after_s:            # seen while following, and not for this long
                     state["reason"] = "lost"
                     return True
-                if ref is None and now - t_up > wcfg.never_seen_s:
+                if not state["seen_in_loop"] and now - t_up > wcfg.never_seen_s:       # the clock starts when the claw is up, not at the punch (the first sightings were before it could pan)
                     state["reason"] = "lost"
                     return True
             return False
+        if on_ready is not None:
+            on_ready()
         out = lf.follow_loop(robot, grab, follower, pan_log, lcfg, base=base, pan=0.0, seconds=wcfg.seconds, say=say, sleep=sleep, clock=clock, stopped=stopped, on_picture=on_picture)
         res.moves = len(out["moves"])
         res.pictures = len(grab.rows)
