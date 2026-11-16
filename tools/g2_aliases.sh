@@ -443,7 +443,7 @@ g2liftcal() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2punttest [dry]  -- the post-punt watch: stands G2 up from rest, punts the ball (it must be in punt range), follows it rolling with the claw until it stops, takes a picture, says "target acquired" and goes on with the chase (turn, walk, dial in, one more punt), or, when the ball is lost, turns toward the side it was last seen on and does the normal claw look. `dry` = no punt and no chase: you roll the ball by hand and he only watches. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2puntstop ends it.
+# g2punttest [dry]  -- the active look (the post-punt watch): stands G2 up from rest, punts the ball (it must be in punt range), follows it rolling with the claw until it stops, takes a picture, says "target acquired" and goes on with the chase (turn, walk, dial in, one more punt), or, when the ball is lost, turns toward the side it was last seen on and does the normal claw look. `dry` = no punt and no chase: you roll the ball by hand and he only watches. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2puntstop ends it.
 g2punttest() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
