@@ -73,6 +73,7 @@ class WatchResult:
     rows: list | None = None           # the stream's per-frame log (time, detections, bad frames), for the report
     move_log: list | None = None
     bad_frames: int = 0
+    got_it: bool = False               # "Got it." was already said for this punt (the goal's scorer then does not say it again)
     source: str = ""                  # where the reading came from: "still" (the picture after the stop) or "stream" (the stream's own last sightings, when the still missed)
     stream_reading: object | None = None   # what the stream's last sightings said, for the log
     still_diag: dict | None = None     # when the still found nothing: the biggest green blob in it (numbers only)
@@ -106,8 +107,8 @@ def _world_bearing(pan_log: lf.PanLog, t_capture: float, det) -> float:
 
 
 def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: WatchConfig | None = None, lcfg: lf.LiveConfig | None = None, *, pan_sign: str = "left", say=print,
-                     announce=None, sleep=time.sleep, clock=time.monotonic, stopped=lambda: False, on_ready=None) -> WatchResult:
-    """`make_grabber(find_fn, cfg, clock, save)` -> a started-able grabber (the live follow's); `camera` takes the still (`look()`); `find_still(camera) -> BallReading | None` finds the ball in a still
+                     announce=None, sleep=time.sleep, clock=time.monotonic, stopped=lambda: False, on_ready=None, judge_success=None) -> WatchResult:
+    """`make_grabber(find_fn, cfg, clock, save)` -> a started-able grabber (the live follow's); `judge_success(after)` -> True when the punt counts as a hit by the goal's own rule (`after` is {"distance_in", "bearing_deg"} of the ball, or None when it is out of sight): "Got it." is said as soon as two stream sightings in a row say so, or when the ball is lost, or at the end, always before "I lost the ball"; `camera` takes the still (`look()`); `find_still(camera) -> BallReading | None` finds the ball in a still
     (the chase's own find and confirm). `on_ready()` is called once the claw is up and the follow starts (the dry run says "roll the ball now"). Never raises. On return the claw is back at the centre and lowered when the ball was found; otherwise it is left up for the caller's turn and look."""
     wcfg = wcfg or WatchConfig()
     lcfg = lcfg or lf.LiveConfig(seconds=wcfg.seconds)
@@ -133,7 +134,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         pan_log = lf.PanLog(0.0, t_up)
         follower = lf.LiveFollower(lcfg, pan_sign, pan_log)
         det = StopDetector(wcfg)
-        state = {"last_seen_t": None, "last_bearing": None, "reason": None, "seen_in_loop": False, "sights": []}
+        state = {"last_seen_t": None, "last_bearing": None, "reason": None, "seen_in_loop": False, "sights": [], "got_it": False, "succ_n": 0}
         for row in list(grab.rows):                              # what the stream saw before the claw was up (the claw has not panned: the world bearing is the offset)
             if row["det"]:
                 off = (row["det"][0][1] - 0.5) * 2.0 * lcfg.fov_half_deg
@@ -147,6 +148,14 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
                 state["last_seen_t"], state["last_bearing"] = now, b
                 state["seen_in_loop"] = True
                 state["sights"].append((t_cap, b, 0.0, float(d[4]), float(d[5]), float(d[2]), float(d[3])))      # (time, world bearing, -, width, height, cx, cy): the stream's own sightings
+                if judge_success is not None and not state["got_it"]:
+                    from ..vision import ball_finder as bf
+                    dist_now = bf.DIST_K / max(1.0, max(float(d[4]), float(d[5])) * bf.FRAME_PX)
+                    state["succ_n"] = state["succ_n"] + 1 if judge_success({"distance_in": dist_now, "bearing_deg": b}) else 0
+                    if state["succ_n"] >= 2:                                   # two sightings in a row show the ball went: the punt was good, say so now (2026-11-16)
+                        state["got_it"] = True
+                        if announce is not None:
+                            announce("Got it.")
                 if det.add(t_cap, b, float(d[4])):
                     state["reason"] = "stopped"
                     return True
@@ -198,6 +207,13 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
             res.found, res.source, res.reading = True, "stream", stream     # the stream's bearing is already G2's own direction (the claw's pan is in it)
         else:
             res.ended = "lost"
+        if judge_success is not None and not state["got_it"]:              # not said during the follow: judge the end result by the same rule ("Got it." comes before "I lost the ball", and before the rest and the stand-up)
+            after = {"distance_in": res.reading.distance_in, "bearing_deg": res.reading.bearing_deg} if res.found else None
+            if judge_success(after):
+                state["got_it"] = True
+                if announce is not None:
+                    announce("Got it.")
+        res.got_it = state["got_it"]
         # Either way (owner, 2026-11-15): claw centred, down into the rest position, the eased stand-up, and only then "target acquired" or the turn toward the last side
         settle = getattr(robot, "rest_then_stand", None)
         if callable(settle):
@@ -213,7 +229,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         else:
             say("watch: the ball is out of sight: lost")
             if announce is not None:
-                announce("I lost it")
+                announce("I lost the ball")
         return res
     except Exception:  # noqa: BLE001
         log.exception("the post-punt watch failed")

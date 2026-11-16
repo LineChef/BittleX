@@ -103,7 +103,7 @@ def test_a_rolling_ball_is_followed_until_it_stops_then_the_still_acquires_it():
 
 def test_a_ball_that_vanishes_is_lost_with_the_side_it_was_last_seen_on():
     res, robot, spoken = run_watch(vanish_at=1.5)
-    assert res.ended == "lost" and not res.found and spoken == ["I lost it"]
+    assert res.ended == "lost" and not res.found and spoken == ["I lost the ball"]
     assert res.last_bearing is not None and res.last_side == (1 if res.last_bearing > 0 else -1)         # the side is the sign of the last world bearing (the claw's direction plus the offset)
     assert robot.calls[-1] == ("claw", 0.0, 0.0)                                              # the claw goes home before the caller's turn and look
 
@@ -112,7 +112,7 @@ def test_a_still_without_the_ball_uses_the_streams_sightings_and_is_lost_only_wh
     res, robot, spoken = run_watch(still=None)
     assert res.found and res.source == "stream" and spoken == ["target acquired"]               # (2026-11-16: the stream had followed it; one missed picture does not lose it)
     res, robot, spoken = run_watch(still=None, vanish_at=1.5)
-    assert res.ended == "lost" and spoken == ["I lost it"]
+    assert res.ended == "lost" and spoken == ["I lost the ball"]
 
 
 def test_a_ball_still_rolling_at_the_limit_counts_as_stopped_where_it_is():
@@ -173,26 +173,26 @@ def _after_punt(post_punt_watch, **kw):
 
 def test_the_watch_replaces_the_one_picture_after_the_last_punt_and_feeds_the_scorer_its_reading():
     r = reading(30.0, 8.0)
-    out, trace = _after_punt(lambda: pw.WatchResult(ended="stopped", found=True, reading=r, pictures=40, bad_frames=3, moves=9))
+    out, trace = _after_punt(lambda **kw: pw.WatchResult(ended="stopped", found=True, reading=r, pictures=40, bad_frames=3, moves=9))
     ap = next(e for e in trace if e["kind"] == "after_punt")
     assert out == "punted" and ap["ball"]["distance_in"] == 30.0 and ap["watch"] == "stopped" and ap["claw_moves"] == 9 and ap["bad_frames"] == 3
 
 
 def test_a_lost_ball_is_an_after_punt_with_no_ball_and_a_watch_that_cannot_run_falls_back_to_the_one_picture():
-    out, trace = _after_punt(lambda: pw.WatchResult(ended="lost", found=False, last_side=-1))
+    out, trace = _after_punt(lambda **kw: pw.WatchResult(ended="lost", found=False, last_side=-1))
     ap = next(e for e in trace if e["kind"] == "after_punt")
     assert ap["ball"] is None and ap["watch"] == "lost" and ap["last_side"] == -1
-    out, trace = _after_punt(lambda: pw.WatchResult(ended="error"))
+    out, trace = _after_punt(lambda **kw: pw.WatchResult(ended="error"))
     ap = next(e for e in trace if e["kind"] == "after_punt")
     assert "watch" not in ap and ap["picture"] is True                                       # the old single picture was taken
-    out, trace = _after_punt(lambda: pw.WatchResult(ended="fell"))
+    out, trace = _after_punt(lambda **kw: pw.WatchResult(ended="fell"))
     assert out == "fell"
 
 
 def test_the_setting_switches_the_watch_off(monkeypatch):
     monkeypatch.setattr(bc, "POST_PUNT_WATCH", False)
     called = []
-    out, trace = _after_punt(lambda: called.append(1) or pw.WatchResult(ended="stopped", found=True, reading=reading()))
+    out, trace = _after_punt(lambda **kw: called.append(1) or pw.WatchResult(ended="stopped", found=True, reading=reading()))
     assert not called and next(e for e in trace if e["kind"] == "after_punt").get("watch") is None
 
 
@@ -257,12 +257,12 @@ def test_the_last_punt_of_an_attempt_leaves_the_arm_up_when_the_watch_will_run(m
             calls.append("punt_arm_up")
             return "ok"
     frames = [picture([disc(122, 110, 50)])]
-    bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda: pw.WatchResult(ended="stopped", found=True, reading=reading()),
+    bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda **kw: pw.WatchResult(ended="stopped", found=True, reading=reading()),
                  sleep=lambda s: None, say=lambda m: None)
     assert calls == ["punt_arm_up"]
     calls.clear()
     monkeypatch.setattr(bc, "POST_PUNT_WATCH", False)
-    bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda: pw.WatchResult(ended="stopped"), sleep=lambda s: None, say=lambda m: None)
+    bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda **kw: pw.WatchResult(ended="stopped"), sleep=lambda s: None, say=lambda m: None)
     assert calls == ["punt"]
 
 
@@ -302,9 +302,9 @@ def test_a_stopped_ball_rests_and_stands_before_target_acquired():
 
 def test_a_lost_ball_rests_and_stands_before_the_caller_turns_toward_the_last_side():
     res, events = _settle_run(vanish_at=1.5)
-    assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost it")]
+    assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost the ball")]
     res, events = _settle_run(still=None, vanish_at=1.5)
-    assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost it")]
+    assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost the ball")]
 
 
 def test_a_fall_while_resting_or_standing_ends_the_watch_as_a_fall_with_no_announcement():
@@ -379,3 +379,57 @@ def test_the_finder_diagnostic_reports_a_blob_too_small_for_the_finder():
     assert bf.find_ball(buf.getvalue()) is None
     d = bf.diagnose(buf.getvalue())
     assert d is not None and 8 <= d["area"] <= 60 and abs(d["x"] - 120) <= 3
+
+
+# ---- 2026-11-16: "Got it." right after a good punt, then "I lost the ball"
+
+def _judge(before=(2.5, 0.0)):
+    from pi_pipeline.goals.ball_punt import punt_succeeded
+    return lambda after: punt_succeeded(before, after)
+
+
+def _run_with_judge(vanish_at=None, still="default", judge=None):
+    events = []
+    c = Clock()
+    r = SettleRobot(events)
+    find_still = (lambda cam: reading()) if still == "default" else (lambda cam: still)
+    res = pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: Script(c, vanish_at=vanish_at), lambda j: [], find_still, pw.WatchConfig(seconds=6.0, stable_n=6), lf.LiveConfig(tick_s=0.05),
+                              say=lambda *_: None, announce=lambda m: events.append(("say", m)), sleep=c.sleep, clock=c, judge_success=judge or _judge())
+    return res, events
+
+
+def test_got_it_is_said_during_the_follow_as_soon_as_the_stream_shows_the_ball_went_and_only_once():
+    res, events = _run_with_judge()
+    says = [e[1] for e in events if isinstance(e, tuple) and e[0] == "say"]
+    assert says == ["Got it.", "target acquired"] and res.got_it                                   # the ball rolled well away from the punch spot: the punt was good, said before everything else
+    first_say = next(i for i, e in enumerate(events) if e == ("say", "Got it."))
+    assert first_say < events.index("rest_then_stand")                                            # and before he lies down and stands up
+
+
+def test_a_ball_lost_after_a_punt_says_got_it_first_and_then_i_lost_the_ball():
+    res, events = _run_with_judge(vanish_at=1.5)
+    says = [e[1] for e in events if isinstance(e, tuple) and e[0] == "say"]
+    assert res.ended == "lost" and says[-2:] == ["Got it.", "I lost the ball"] and events.index(("say", "Got it.")) < events.index("rest_then_stand")
+
+
+def test_no_got_it_when_the_ball_is_still_where_the_claw_hit_it():
+    res, events = _run_with_judge(judge=lambda after: False)
+    says = [e[1] for e in events if isinstance(e, tuple) and e[0] == "say"]
+    assert "Got it." not in says and not res.got_it
+
+
+def test_the_watch_works_without_a_judge_and_says_no_got_it():
+    res, robot, spoken = run_watch()
+    assert spoken == ["target acquired"] and not res.got_it
+
+
+def test_the_punt_rule_matches_the_scorer_and_the_runner_does_not_repeat_got_it():
+    from pi_pipeline.goals import ball_punt as bp
+    assert bp.punt_succeeded((2.5, 0.0), None)                                                    # out of sight: hit_unseen
+    assert bp.punt_succeeded((2.5, 0.0), {"distance_in": 9.0, "bearing_deg": 2.0})               # farther: a hit
+    assert not bp.punt_succeeded((2.5, 0.0), {"distance_in": 3.2, "bearing_deg": 1.0})           # barely moved: not yet
+    import inspect
+
+    from pi_pipeline.goals import runner
+    src = inspect.getsource(runner)
+    assert "got_it_announced" in src and "outcome.success and getattr(self.approach" in src

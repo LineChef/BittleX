@@ -92,6 +92,14 @@ def moved_in(before: tuple, after: dict) -> float:
     return math.sqrt(max(0.0, d0 * d0 + d1 * d1 - 2 * d0 * d1 * math.cos(math.radians(b1 - b0))))
 
 
+def punt_succeeded(before: tuple, after: dict | None) -> bool:
+    """The scorer's hit rule as one function (2026-11-16: "Got it." is said as soon as this is true, not only when the attempt ends): the ball out of sight, or farther away than FARTHER_IN, or moved at
+    least HIT_IN. `before` is (distance, bearing) at the punch, `after` the ball's {"distance_in", "bearing_deg"} or None."""
+    if after is None:
+        return True
+    return float(after["distance_in"]) - before[0] >= FARTHER_IN or moved_in(before, after) >= HIT_IN
+
+
 def align_stats(trace: list) -> dict:
     """The fine-alignment pulses and what the next picture showed: overshoots (the ball swung past straight to the other side) and pulses that did not move him."""
     pulses = overshoots = no_moves = 0
@@ -130,6 +138,7 @@ class BallPunt:
         self._cam = None
         self.last_pack_pct = None                                           # the pack % read before the last attempt (kept with every attempt, not learned from yet)
         self.wall_check = wall_check
+        self.got_it_announced = False
         self._last_watch = None                                             # (time, WatchResult) of the last attempt's post-punt watch: the next attempt starts from where the ball ended
 
     # ---------------------------------------------------------------------------------------------------- settings
@@ -192,7 +201,7 @@ class BallPunt:
             from .walls import make_wall_check
             self.wall_check = make_wall_check()                              # walls rank above the punt; None without a wall calibration from this hardware
 
-    def _watch(self, ctx):
+    def _watch(self, ctx, before_punt=None):
         """The post-punt watch (behavior/punt_watch.py) with this session's robot and camera: the claw follows the rolling ball on the camera's continuous stream until it stops, one picture fixes where it
         ended. Remembered for the next attempt. Never raises; None-like result (lost) when the camera cannot stream."""
         import time as _t
@@ -220,7 +229,16 @@ class BallPunt:
             find_still.last_diag = bf.diagnose(jpeg) if (jpeg and ball is None) else None       # a miss: the biggest green blob in it, as numbers (no picture is kept)
             return bc.confirm_ball(camera, ball, _t.sleep, None)
         find_still.last_diag = None
-        r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget().detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=ctx.announce, stopped=ctx.stop)
+        at = before_punt if (before_punt and before_punt[0] is not None) else (None, None)
+        before = (VANISHED_AT_IN, 0.0) if at[0] is None else (float(at[0]), float(at[1]))       # the scorer's own stand-in when the ball vanished at the claw
+        said = {"got_it": False}
+
+        def announce(text):
+            if text == "Got it.":
+                said["got_it"] = True
+                self.got_it_announced = True
+            ctx.announce(text)
+        r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget().detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=announce, judge_success=lambda after: punt_succeeded(before, after), stopped=ctx.stop)
         self._last_watch = (_t.monotonic(), r)
         return r
 
@@ -273,6 +291,7 @@ class BallPunt:
         chase = _chase()
         ps.apply(chase, {k: v for k, v in settings.items() if k in ps.SPEC})
         planner = chase.ChasePlanner()
+        self.got_it_announced = False                                       # (the watch says "Got it." right after a good punt; the runner then does not say it again)
         trace: list = []
         from .standing import apply as apply_standing, learn as learn_standing
         walls_used = apply_standing("walls")                                 # the walls goal's current values (its chase_wall_in and turn) for this attempt
@@ -298,7 +317,7 @@ class BallPunt:
                     planner.last_bearing = float(w.last_bearing) - deg     # ... which is the aimed claw look first: where the ball was last seen, now relative to his new heading
                     planner.last_side = side
         ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1, first_reading=first,
-                                post_punt_watch=lambda: self._watch(ctx),
+                                post_punt_watch=lambda before=None: self._watch(ctx, before),
                                 max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),
                                 trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace, wall_check=self.wall_check, battery_checked=True)
         from .walls import events_from_trace

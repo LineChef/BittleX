@@ -139,7 +139,8 @@ class GoalSession:
                     counted += 1
                     successes += int(outcome.success)
                 if outcome.counted:
-                    self._speak("Got it." if outcome.success else "Missed.")
+                    if not (outcome.success and getattr(self.approach, "got_it_announced", False)):      # (the active look already said "Got it." right after the punt)
+                        self._speak("Got it." if outcome.success else "Missed.")
                 if outcome.fell or result.ended == "fell":          # (a fall after a successful punt is scored as the punt, but the session still ends)
                     why = "fell"
                     break

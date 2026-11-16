@@ -2089,12 +2089,12 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 if after_punt_look:
                     watched = False
                     if post_punt_watch is not None and POST_PUNT_WATCH:
-                        w = post_punt_watch()                  # the claw follows the ball until it stops, one picture fixes where it ended (behavior/punt_watch.py)
+                        w = post_punt_watch(before=(planner.punt_log[-1] if planner.punt_log else None))                  # the claw follows the ball until it stops, one picture fixes where it ended (behavior/punt_watch.py)
                         if w.ended not in ("error", "no_board"):
                             watched = True
                             after = w.reading if w.found else None
                             note(kind="after_punt", ball=_ball_dict(after), picture=True, watch=w.ended, last_side=w.last_side, good_pictures=w.pictures, bad_frames=w.bad_frames, claw_moves=w.moves,
-                                 source=w.source, stream=_ball_dict(w.stream_reading), stream_sightings=w.sightings, still_diag=w.still_diag)
+                                 got_it=w.got_it, source=w.source, stream=_ball_dict(w.stream_reading), stream_sightings=w.sightings, still_diag=w.still_diag)
                             if w.ended == "fell":
                                 say("G2 fell while watching the ball: stopping (fall recovery is off)")
                                 return "fell"
