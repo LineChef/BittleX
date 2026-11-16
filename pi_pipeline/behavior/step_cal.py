@@ -3,7 +3,7 @@
 The chase times its approach with no feedback: a small step closer is NUDGE_IN_PER_S inches per second (a rough 2.8, from 8 logged nudges) and a long walk is the pace in `chase_pace` (4.2 in/s after a 1.0 s start,
 a number the logged walks do not agree with). This test measures them. G2 stands with the ball in front of him; for each trial the camera reads the ball's distance and bearing, he takes one timed step, the
 camera reads it again after he settles, and the FORWARD distance he covered is the ball's distance times the cosine of its bearing, before minus after. Small steps (`kwkF` scripted, the steps the nudges use)
-and long walks (the chase's own `walk`) are run in a fixed order, a few of each duration. Numbers only: no picture is saved.
+and long walks (the chase's own `walk`) are run in a fixed order, a few of each duration. Numbers only: no picture of a step is saved; the pictures where the ball was NOT found (at most 6) are kept for the owner to look at.
 
 If the ball gets too close for the next step he backs up and reads it again. A fall, a lost ball, a ball too close to back away from, or the stop file ends it; he is laid in rest at the end.
 
@@ -27,6 +27,7 @@ MAX_READ_IN = 36.0                 # the colour finder is only tested to this di
 GUESS_RATE = {"small": 3.5, "long": 8.0}   # generous inches per second, only to decide whether there is room for the step (the measurement replaces them)
 SETTLE_S = 1.5
 MAX_BACKUPS = 4
+MAX_MISS_PICTURES = 6              # at most this many pictures where the ball was missed are saved (the owner's yes, 2026-11-16)
 LOOK_TRIES = 3                     # pictures before a ball counts as not in view (a far ball can be missed by one picture)
 STOP_FILE = "~/.local/share/g2/stepcal_stop"
 
@@ -175,6 +176,9 @@ def main() -> None:
     from ..vision import ball_finder as bf
     shot = chase._SnapshotCamera(cam)                            # the chase's own camera steps: the light metered afresh, the stale frame dropped, a dim sighting confirmed by a second picture
 
+    miss_dir = os.path.expanduser(time.strftime("~/g2_claw_pics/stepcal_%Y%m%d_%H%M%S"))
+    misses = {"n": 0}
+
     def look():
         for attempt in range(1, LOOK_TRIES + 1):
             shot.refresh_exposure()
@@ -183,6 +187,11 @@ def main() -> None:
             if ball is not None:
                 return ball
             print(f"   look {attempt} of {LOOK_TRIES}: no ball; the biggest green blob in the picture: {bf.diagnose(jpeg) if jpeg else 'no picture'}")
+            if jpeg and misses["n"] < MAX_MISS_PICTURES:                  # only a picture where the ball was NOT found is kept (owner's yes, 2026-11-16: to see why); the steps' own pictures are never saved
+                os.makedirs(miss_dir, exist_ok=True)
+                misses["n"] += 1
+                with open(os.path.join(miss_dir, f"miss_{misses['n']:02d}.jpg"), "wb") as f:
+                    f.write(jpeg)
             time.sleep(0.5)
         return None
     res = None
@@ -198,6 +207,8 @@ def main() -> None:
             cam.close()
         finally:
             chase.ensure_rest(link)
+    if misses["n"]:
+        print(f"PICTURES: {miss_dir}")
     if res is not None:
         path = os.path.expanduser(time.strftime("~/g2_runs/stepcal_%Y%m%d_%H%M%S.json"))
         os.makedirs(os.path.dirname(path), exist_ok=True)

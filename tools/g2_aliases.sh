@@ -443,11 +443,18 @@ g2liftcal() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2stepcal [small|long|all] [REPEATS]  -- step calibration (default all, 3 repeats): with a ball about 30 in straight ahead, G2 takes timed small steps (0.4, 0.6, 0.9, 1.2 s) and long walks (1.5, 2.0, 3.0 s), the camera measures the forward inches each one covered (backing up when the ball gets close), and the summary gives inches per second, the start delay and the spread, with suggested constants. Numbers only, no pictures. Stops the voice service first (`g2stop voice`), brings it back after; `g2stepcalstop` ends it early.
+# g2stepcal [small|long|all] [REPEATS]  -- step calibration (default all, 3 repeats): with a ball about 30 in straight ahead, G2 takes timed small steps (0.4, 0.6, 0.9, 1.2 s) and long walks (1.5, 2.0, 3.0 s), the camera measures the forward inches each one covered (backing up when the ball gets close), and the summary gives inches per second, the start delay and the spread, with suggested constants. Numbers only, except that up to 6 pictures where the ball was NOT found are kept and copied to ~/Desktop/G2Memory/g2_pictures/stepcal. Stops the voice service first (`g2stop voice`), brings it back after; `g2stepcalstop` ends it early.
 g2stepcal() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
-  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.step_cal --kinds ${1:-all} --repeats ${2:-3} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  local out
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.step_cal --kinds ${1:-all} --repeats ${2:-3} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  printf '%s\n' "$out"
+  local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
+  if [ -n "$dir" ]; then
+    local dest="$HOME/Desktop/G2Memory/g2_pictures/stepcal/$(basename "$dir")"; mkdir -p "$dest"
+    scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null && echo "pictures where the ball was missed copied to $dest"
+  fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
 # g2stepcalstop  -- end a step calibration after the current step (he is laid in rest).
