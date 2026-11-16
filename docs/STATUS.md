@@ -55,6 +55,8 @@ G2 can wander a room, turn away from walls, react to bumps, stop to take picture
 
 G2 can be given a goal: find a ball, walk up to it and punt it. A session is up to ten attempts, and G2 adjusts its approach between attempts based on what worked. The session runs inside the voice service. More on this in [Goals](guides/goals.md). Results are mixed. Early sessions scored well, and later ones dropped. Part of the cause was a default turn speed far lower than the real turn speed, which made turns overshoot. The corrected default is deployed and has not been tested on G2.
 
+The active look is part of the goal: after the last punt of an attempt the claw follows the rolling ball on the camera's picture stream until it stops, one picture fixes where it ended, and the next attempt starts from there (or turns toward where the ball was last seen). On the last evening's runs it tracked the ball with 21 good pictures and 5 claw moves in the one run where the stream frames were accepted. A move gate now reads the body's tilt before every walk, turn, back and punt and stands him up again through rest when he is more than 12 degrees off level. Neither the gate nor the faster active-look start has been through a clean run yet: the evening's last runs ended in falls, one from a walk sent while he stood rolled about 22 degrees, one right after a stand-up with a board-started move two seconds before. The face-following attentive bout is switched off.
+
 What is deployed
 ----------------
 
@@ -97,7 +99,7 @@ Tested on the real robot
 
 ### Not yet run on G2
 
-The walls goal, "G2, practise", the spoken goal suggestions and operator overrides, the policy walk toward a ball with self-measured pace, vision reflexes while walking, the full application over a long period, the teach tool, the recognition labelling pictures, the per-leg wall look, conversation mode as a hardware test, G2 asking to explore, the sag check while walking, and the wall-loop handover.
+The active look in a full run, the move gate, the arm skills, the walls goal, "G2, practise", the spoken goal suggestions and operator overrides, the policy walk toward a ball with self-measured pace, vision reflexes while walking, the full application over a long period, the teach tool, the recognition labelling pictures, the per-leg wall look, conversation mode as a hardware test, G2 asking to explore, the sag check while walking, and the wall-loop handover.
 
 Known limitations
 -----------------
