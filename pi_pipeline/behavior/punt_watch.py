@@ -26,6 +26,7 @@ log = logging.getLogger("g2.punt_watch")
 class WatchConfig:
     seconds: float = 20.0              # the longest the ball is followed (owner, 2026-11-15: until it stops or rolls out of view; this is only the safety cap); then it counts as stopped where it is
     stable_n: int = 4                  # sightings (gaps allowed, a pale ball is seen only now and then) over which it must not have moved
+    jump_deg: float = 30.0             # a sighting this far from the last tracked bearing, soon after it, must be seen twice before the claw follows it
     lead_s: float = 0.5                # the claw aims this far ahead of the rolling ball (its bearing speed times this); 0 = off
     max_window_s: float = 4.0          # ... and they must all fall within this long
     bearing_tol_deg: float = 2.0       # the world bearing may vary this much over those pictures
@@ -143,7 +144,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
     """`make_grabber(find_fn, cfg, clock, save)` -> a started-able grabber (the live follow's); `judge_success(after)` -> True when the punt counts as a hit by the goal's own rule (`after` is {"distance_in", "bearing_deg"} of the ball, or None when it is out of sight): "Got it." is said as soon as two stream sightings in a row say so, or when the ball is lost, or at the end, always before "I lost the ball"; `camera` takes the still (`look()`); `find_still(camera) -> BallReading | None` finds the ball in a still
     (the chase's own find and confirm). `on_ready()` is called once the claw is up and the follow starts (the dry run says "roll the ball now"). Never raises. On return the claw is back at the centre and lowered when the ball was found; otherwise it is left up for the caller's turn and look."""
     wcfg = wcfg or WatchConfig()
-    lcfg = lcfg or lf.LiveConfig(seconds=wcfg.seconds, lead_s=wcfg.lead_s)
+    lcfg = lcfg or lf.LiveConfig(seconds=wcfg.seconds, lead_s=wcfg.lead_s, jump_deg=wcfg.jump_deg)
     res = WatchResult()
     t0 = clock()
     grab = None
@@ -174,7 +175,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
 
         def on_picture(pic, pan, now):
             t_cap, dets, idx = pic
-            d = follower.best(dets)
+            d = follower.tracked(t_cap, dets)
             if d is not None:
                 b = _world_bearing(pan_log, t_cap, d)
                 state["last_seen_t"], state["last_bearing"] = now, b

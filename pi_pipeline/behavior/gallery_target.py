@@ -54,6 +54,7 @@ class BallTarget:
     """The green ball, found the way the ball chase finds it: the colour finder (`vision/ball_finder.py`, plain numpy, no model). Same (label, score, cx, cy, w, h) form as the gallery's matches."""
 
     FRAME_PX = 240.0
+    MIN_SIZE = 0.03                          # a blob under about 7 px across (a ball more than about 45 in away) is noise in a stream picture (2026-11-16: 6 px blobs at the frame edges steered the claw)
 
     def __init__(self, color=None):
         self.color = color                    # the ball's own (r, g, b), sampled by the chase from close up: when the normal rules find nothing, the ball is looked for by this colour (2026-11-16)
@@ -68,7 +69,7 @@ class BallTarget:
                 return []
             f = self.FRAME_PX
             w, h = float(b.width) / f, float(b.height) / f
-            if w > 0.6 or h > 0.6 or not 0.5 <= w / max(h, 1e-6) <= 2.0:           # the ball is never most of the frame: a garbled picture (a size of 1.00 was seen) is not a sighting
+            if max(w, h) < self.MIN_SIZE or w > 0.6 or h > 0.6 or not 0.5 <= w / max(h, 1e-6) <= 2.0:           # the ball is never most of the frame: a garbled picture (a size of 1.00 was seen) is not a sighting
                 return []
             return [("ball", 1.0, float(b.x) / f, float(b.y) / f, w, h)]
         except Exception:  # noqa: BLE001

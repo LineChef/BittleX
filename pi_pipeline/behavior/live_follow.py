@@ -41,6 +41,8 @@ class LiveConfig:
     tilt_check_s: float = 1.0
     max_tilt_change_deg: float = 10.0
     lift_deg: float = 120.0
+    jump_deg: float = 0.0              # a sighting this many degrees from the last tracked one, soon after it, is held until a second sighting near it agrees (0 = off); the active look sets it (2026-11-16: tiny blobs at the frame edges steered the claw)
+    jump_window_s: float = 1.2         # 'soon after': the jump check applies to a sighting within this long of the last tracked one
     lead_s: float = 0.0                # aim this far ahead of a MOVING target (its measured bearing speed times this); 0 = off. The active look sets it (2026-11-16)
     lead_max_deg: float = 20.0         # the most the lead may add to the offset
 
@@ -70,11 +72,35 @@ class LiveFollower:
         self.cfg, self.sign, self.pan_log = cfg, pan_sign, pan_log
         self.last_used_t = -1e9
         self.reason = "start"
+        self._trk_b = None                 # the last tracked target's bearing (G2's own frame) and when
+        self._trk_t = None
+        self._jump_b = None                # a far sighting waiting for a second one near it
+        self._tr_cache: tuple | None = None
         self._hist: list[tuple] = []       # (capture time, the target's bearing in G2's own frame): its speed gives the lead
         self.lead_deg = 0.0
 
     def best(self, dets):
         return max(dets, key=lambda d: d[4] * d[5], default=None) if dets else None
+
+    def tracked(self, t_capture: float, dets):
+        """The detection to follow, or None: `best`, unless it is a jump (more than `jump_deg` from the last tracked bearing within `jump_window_s`) that no second sighting near it has confirmed. The answer is
+        kept per picture, so the follow loop and the watch see the same one."""
+        if self._tr_cache is not None and self._tr_cache[0] == t_capture:
+            return self._tr_cache[1]
+        d = self.best(dets)
+        if d is not None and self.cfg.jump_deg > 0:
+            from .ball_chase import claw_pan_body
+            world = claw_pan_body(self.pan_log.at(t_capture)) + (float(d[2]) - 0.5) * 2.0 * self.cfg.fov_half_deg
+            if self._trk_t is not None and 0 <= t_capture - self._trk_t <= self.cfg.jump_window_s and abs(world - self._trk_b) > self.cfg.jump_deg:
+                if self._jump_b is not None and abs(world - self._jump_b) <= 15.0:
+                    pass                                                        # a second sighting near the first far one: a real move, follow it
+                else:
+                    self._jump_b = world                                        # the first far sighting: wait for another
+                    d = None
+            if d is not None:
+                self._trk_b, self._trk_t, self._jump_b = world, t_capture, None
+        self._tr_cache = (t_capture, d)
+        return d
 
     def decide(self, t_capture: float, dets, now: float, pan_now: float):
         c = self.cfg
@@ -85,7 +111,7 @@ class LiveFollower:
         if now - t_capture > c.stale_s:
             self.reason = "picture too old"
             return None
-        d = self.best(dets)
+        d = self.tracked(t_capture, dets)
         if d is None:
             self.reason = "nothing in view"
             return None

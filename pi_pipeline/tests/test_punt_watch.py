@@ -558,3 +558,34 @@ def test_the_stream_probe_summarizes_brightness_and_the_exposure_lock_experiment
     assert s["after_lock"]["stdev"] < s["before_lock"]["stdev"] and s["min"] == 90.0 and s["max"] == 140.0
     assert "before_lock" not in sp.brightness_summary(means, None)
     assert sp.LOCK_AE.startswith(b"AT+SETREG") and b"0x3503" in sp.LOCK_AE and b"0x00" in sp.UNLOCK_AE
+
+
+def test_a_sighting_far_from_the_tracked_ball_is_held_until_a_second_one_agrees():
+    f = lf.LiveFollower(lf.LiveConfig(jump_deg=30.0), "left", lf.PanLog(0.0, 0.0))
+    ball = lambda x: [("ball", 1.0, x, 0.6, 0.1, 0.1)]                                       # noqa: E731
+    assert f.tracked(1.0, ball(0.5)) is not None                                             # the first sighting: tracked
+    assert f.tracked(1.3, ball(0.95)) is None                                                # a sighting about 40 deg away, 0.3 s later: held
+    assert f.tracked(1.3, ball(0.05)) is None                                                # (the same picture again gives the same answer)
+    assert f.tracked(1.6, ball(0.93)) is not None                                            # a second sighting near the far one: a real move, followed
+    g = lf.LiveFollower(lf.LiveConfig(jump_deg=30.0), "left", lf.PanLog(0.0, 0.0))
+    g.tracked(1.0, ball(0.5))
+    assert g.tracked(1.3, ball(0.95)) is None and g.tracked(1.6, ball(0.5)) is not None      # the far one never repeated: ignored, the tracked ball goes on
+    h = lf.LiveFollower(lf.LiveConfig(jump_deg=30.0), "left", lf.PanLog(0.0, 0.0))
+    h.tracked(1.0, ball(0.5))
+    assert h.tracked(3.5, ball(0.95)) is not None                                            # long after the last one: not a jump check
+    off = lf.LiveFollower(lf.LiveConfig(), "left", lf.PanLog(0.0, 0.0))
+    off.tracked(1.0, ball(0.5))
+    assert off.tracked(1.3, ball(0.95)) is not None                                          # off by default (the bout and the live follow are unchanged)
+
+
+def test_a_tiny_blob_is_not_a_ball_in_the_stream():
+    import io
+
+    from PIL import Image, ImageDraw
+
+    from pi_pipeline.behavior.gallery_target import BallTarget
+    im = Image.new("RGB", (240, 240), (110, 108, 106))
+    ImageDraw.Draw(im).ellipse((20, 150, 26, 156), fill=(30, 200, 40))                        # 6 px: under the size floor
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=95)
+    assert BallTarget().detections(buf.getvalue()) == []
