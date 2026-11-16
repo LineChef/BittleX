@@ -311,8 +311,10 @@ def test_the_default_search_starts_with_a_claw_look_then_turns_between_claw_look
 def test_once_the_ball_was_seen_only_straight_pictures_never_a_claw_look():
     p = bc.ChasePlanner()
     p.decide(reading(20, 30))                                                   # seen once (user, 2026-11-01: from then on straight pictures only)
-    kinds = [p.decide(None).kind for _ in range(2 + 5)]
-    assert "claw_look" not in kinds and kinds[:3] == ["look", "look", "search_turn"]
+    acts = [p.decide(None) for _ in range(2 + 5)]
+    kinds = [a.kind for a in acts]
+    # (owner-approved 2026-11-16) the one exception: a single claw look AIMED at where the ball was last seen, at the second empty picture; every other look is straight, and no blind claw look follows
+    assert kinds[:3] == ["look", "claw_look", "search_turn"] and acts[1].aim_deg == p.last_bearing and kinds.count("claw_look") == 1
 
 
 def test_back_up_moves_stop_at_the_attempt_budget():

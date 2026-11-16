@@ -35,6 +35,7 @@ KNOB_INFO = {
     "align_pulse_min_s": (0.1, "free", "alignment turns of at least", "s"),
     "align_tries": (1, "free", "alignment turns before giving up:", ""),
     "when_misaligned": (None, "free", "when I can't line up, I", ""),
+    "directed_look": (None, "fixed", "the claw look aimed at where the ball was last seen", ""),                 # the owner's switch (2026-11-16): never changed by G2
     "post_punt_watch": (None, "fixed", "watching the ball roll after a punt", ""),                    # the owner's switch (2026-11-15): never changed by G2
     "search_walk": (None, "fixed", "walking on blind after a full search circle", ""),        # only safe on a big floor: the user's call
     "max_seconds": (None, "fixed", "an attempt limit of", "s"),
@@ -211,8 +212,12 @@ class BallPunt:
             return lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=None)
 
         def find_still(camera):
+            from ..vision import ball_finder as bf
             jpeg = camera.look()
-            return bc.confirm_ball(camera, find_ball(jpeg) if jpeg else None, _t.sleep, None)
+            ball = find_ball(jpeg) if jpeg else None
+            find_still.last_diag = bf.diagnose(jpeg) if (jpeg and ball is None) else None       # a miss: the biggest green blob in it, as numbers (no picture is kept)
+            return bc.confirm_ball(camera, ball, _t.sleep, None)
+        find_still.last_diag = None
         r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget().detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=ctx.announce, stopped=ctx.stop)
         self._last_watch = (_t.monotonic(), r)
         return r
@@ -286,7 +291,10 @@ class BallPunt:
                     self.robot.turn(deg, abs(deg) / planner._turn_rate(side, False), stop_deg=abs(deg))
                 except Exception:  # noqa: BLE001
                     pass
-                planner.lost = chase.LOST_LOOKS - 1                         # the first empty picture starts the normal search
+                planner.lost = chase.LOST_LOOKS - 1                         # the first empty picture starts the search ...
+                if w.last_bearing is not None:
+                    planner.last_bearing = float(w.last_bearing) - deg     # ... which is the aimed claw look first: where the ball was last seen, now relative to his new heading
+                    planner.last_side = side
         ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1, first_reading=first,
                                 post_punt_watch=lambda: self._watch(ctx),
                                 max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),

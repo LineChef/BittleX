@@ -119,6 +119,20 @@ def _find(rgb: np.ndarray, dom_min: int, g_min: int, min_area: int) -> BallReadi
     return best
 
 
+def diagnose(jpeg: bytes) -> dict | None:
+    """Evidence for a picture where the finder found no ball (2026-11-16): the biggest round green blob at ANY size, as numbers only (nothing is saved): its pixel area, centre, size and the distance that size
+    would mean. Tells whether a missed ball was too small for the finder's limits or not green enough."""
+    rgb = _decode(jpeg)
+    if rgb is None:
+        return None
+    best = None
+    for name, dom, g in (("normal", DOM_MIN, G_MIN), ("dim", DIM_DOM_MIN, DIM_G_MIN)):
+        r = _find(rgb, dom, g, 4)
+        if r is not None and (best is None or r.area > best["area"]):
+            best = {"pass": name, "area": r.area, "x": round(r.x), "y": round(r.y), "w": r.width, "h": r.height, "dist_in": round(r.distance_in, 1)}
+    return best
+
+
 def find_ball_array(rgb: np.ndarray) -> BallReading | None:
     """The normal pass, then (nothing found) the close-up pass for a big, dim ball right in front of the camera, then the dim pass for a round green blob on the floor."""
     found = _find(rgb, DOM_MIN, G_MIN, MIN_AREA)

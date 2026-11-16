@@ -73,6 +73,30 @@ class WatchResult:
     rows: list | None = None           # the stream's per-frame log (time, detections, bad frames), for the report
     move_log: list | None = None
     bad_frames: int = 0
+    source: str = ""                  # where the reading came from: "still" (the picture after the stop) or "stream" (the stream's own last sightings, when the still missed)
+    stream_reading: object | None = None   # what the stream's last sightings said, for the log
+    still_diag: dict | None = None     # when the still found nothing: the biggest green blob in it (numbers only)
+    sightings: int = 0
+
+
+STREAM_WINDOW_S = 3.0              # the stream's sightings this recent at the end of the follow are the ball's last known place
+STREAM_MIN_N = 3                   # ... when there are at least this many of them (a single sighting can be a false one)
+
+
+def stream_reading(sights: list, end_t: float):
+    """The ball's place from the stream itself: the median of the last few sightings (their world bearing and size), as a BallReading with via="stream". None when too few or too old."""
+    import math
+    import statistics
+
+    from ..vision import ball_finder as bf
+    recent = [s for s in sights if end_t - s[0] <= STREAM_WINDOW_S][-6:]
+    if len(recent) < STREAM_MIN_N:
+        return None
+    med = lambda i: statistics.median(s[i] for s in recent)   # noqa: E731
+    f = bf.FRAME_PX
+    w, h = med(3) * f, med(4) * f
+    diam = max(w, h, 1.0)
+    return bf.BallReading(med(5) * f, med(6) * f, int(math.pi / 4.0 * diam * diam), int(w), int(h), diam, bf.DIST_K / diam, float(med(1)), False, "stream")
 
 
 def _world_bearing(pan_log: lf.PanLog, t_capture: float, det) -> float:
@@ -109,7 +133,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         pan_log = lf.PanLog(0.0, t_up)
         follower = lf.LiveFollower(lcfg, pan_sign, pan_log)
         det = StopDetector(wcfg)
-        state = {"last_seen_t": None, "last_bearing": None, "reason": None, "seen_in_loop": False}
+        state = {"last_seen_t": None, "last_bearing": None, "reason": None, "seen_in_loop": False, "sights": []}
         for row in list(grab.rows):                              # what the stream saw before the claw was up (the claw has not panned: the world bearing is the offset)
             if row["det"]:
                 off = (row["det"][0][1] - 0.5) * 2.0 * lcfg.fov_half_deg
@@ -122,6 +146,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
                 b = _world_bearing(pan_log, t_cap, d)
                 state["last_seen_t"], state["last_bearing"] = now, b
                 state["seen_in_loop"] = True
+                state["sights"].append((t_cap, b, 0.0, float(d[4]), float(d[5]), float(d[2]), float(d[3])))      # (time, world bearing, -, width, height, cx, cy): the stream's own sightings
                 if det.add(t_cap, b, float(d[4])):
                     state["reason"] = "stopped"
                     return True
@@ -142,6 +167,8 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         res.pictures = len([r for r in grab.rows if not r.get("bad")])
         res.bad_frames = sum(1 for r in grab.rows if r.get("bad"))
         res.rows, res.move_log = list(grab.rows), out["moves"]
+        end_t = clock()                                           # (before the stream is joined: the sightings' ages are measured from the end of the follow)
+        res.sightings = len(state["sights"])
         res.last_bearing = state["last_bearing"]
         res.last_side = 0 if state["last_bearing"] is None else (1 if state["last_bearing"] > 0 else -1)
         if out["ended"] in ("fell", "sag"):
@@ -154,17 +181,23 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         grab.join(timeout=3.0)                                    # the stream is ended (AT+BREAK) before the still is requested
         sleep(0.5)
         ball = None
+        stream = None
         if state["reason"] != "lost":
             res.ended = "stopped" if state["reason"] == "stopped" else "timeout"
             say(f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture")
             ball = find_still(camera)                                  # taken with the claw up and steady: this is where the ball ended
+            stream = stream_reading(state["sights"], end_t)            # ... and where the stream saw it last (2026-11-16: the still alone missed far balls the stream had followed)
+            res.stream_reading = stream
             if ball is None:
-                say("watch: no ball in the still: lost")
-        if ball is None:
-            res.ended = "lost"
-        else:
-            res.found = True
+                res.still_diag = getattr(find_still, "last_diag", None)
+                say("watch: no ball in the still" + (": using the stream's last sightings" if stream is not None else ": lost"))
+        if ball is not None:
+            res.found, res.source = True, "still"
             res.reading = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + _pan_body(out["pan"]))
+        elif stream is not None:
+            res.found, res.source, res.reading = True, "stream", stream     # the stream's bearing is already G2's own direction (the claw's pan is in it)
+        else:
+            res.ended = "lost"
         # Either way (owner, 2026-11-15): claw centred, down into the rest position, the eased stand-up, and only then "target acquired" or the turn toward the last side
         settle = getattr(robot, "rest_then_stand", None)
         if callable(settle):
@@ -174,7 +207,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         else:
             robot.claw_pose(0.0, 0.0)
         if res.found:
-            say(f"watch: target acquired: {ball.distance_in:.0f} in, {res.reading.bearing_deg:+.0f} deg from straight ahead")
+            say(f"watch: target acquired ({res.source}): {res.reading.distance_in:.0f} in, {res.reading.bearing_deg:+.0f} deg from straight ahead")
             if announce is not None:
                 announce("target acquired")
         else:

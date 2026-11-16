@@ -108,8 +108,10 @@ def test_a_ball_that_vanishes_is_lost_with_the_side_it_was_last_seen_on():
     assert robot.calls[-1] == ("claw", 0.0, 0.0)                                              # the claw goes home before the caller's turn and look
 
 
-def test_a_still_without_the_ball_is_lost_too():
+def test_a_still_without_the_ball_uses_the_streams_sightings_and_is_lost_only_when_the_stream_lost_it_too():
     res, robot, spoken = run_watch(still=None)
+    assert res.found and res.source == "stream" and spoken == ["target acquired"]               # (2026-11-16: the stream had followed it; one missed picture does not lose it)
+    res, robot, spoken = run_watch(still=None, vanish_at=1.5)
     assert res.ended == "lost" and spoken == ["I lost it"]
 
 
@@ -301,7 +303,7 @@ def test_a_stopped_ball_rests_and_stands_before_target_acquired():
 def test_a_lost_ball_rests_and_stands_before_the_caller_turns_toward_the_last_side():
     res, events = _settle_run(vanish_at=1.5)
     assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost it")]
-    res, events = _settle_run(still=None)
+    res, events = _settle_run(still=None, vanish_at=1.5)
     assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost it")]
 
 
@@ -312,3 +314,68 @@ def test_a_fall_while_resting_or_standing_ends_the_watch_as_a_fall_with_no_annou
 
 def test_the_watch_holds_until_the_ball_stops_or_leaves_view_with_a_safety_cap_of_twenty_seconds():
     assert pw.WatchConfig().seconds == 20.0
+
+
+# ---- 2026-11-16: the stream's own sightings, the aimed claw look, the finder diagnostic
+
+def test_the_stream_reading_is_the_median_of_the_last_sightings_and_needs_three_recent_ones():
+    sights = [(t, 10.0 + t, 0.0, 0.1, 0.1, 0.5, 0.6) for t in (1.0, 1.25, 1.5, 1.75, 2.0)]
+    r = pw.stream_reading(sights, end_t=2.2)
+    assert r.via == "stream" and abs(r.distance_in - bf.DIST_K / (0.1 * bf.FRAME_PX)) < 0.01 and r.bearing_deg == 11.5
+    assert pw.stream_reading(sights[:2], end_t=2.2) is None                                    # too few
+    assert pw.stream_reading(sights, end_t=9.0) is None                                        # all too old: the ball left
+
+
+def test_a_still_that_misses_falls_back_to_the_streams_sightings_and_records_what_the_still_held():
+    c = Clock()
+    r = WatchRobot()
+
+    def still(cam):
+        return None
+    still.last_diag = {"pass": "dim", "area": 9, "x": 120, "y": 100, "w": 4, "h": 4, "dist_in": 82.5}
+    res = pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: Script(c), lambda j: [], still, pw.WatchConfig(seconds=6.0, stable_n=6), lf.LiveConfig(tick_s=0.05), say=lambda *_: None,
+                              sleep=c.sleep, clock=c)
+    assert res.found and res.source == "stream" and res.reading.via == "stream" and res.still_diag["area"] == 9 and res.sightings >= 3
+
+
+def test_a_found_still_is_the_reading_when_it_is_there():
+    res, robot, spoken = run_watch()
+    assert res.source == "still" and res.stream_reading is not None
+
+
+def test_an_aimed_claw_look_points_at_the_bearing_and_a_little_each_side():
+    for b in (-30.0, -8.0, 0.0, 15.0, 40.0):
+        assert abs(bc.claw_pan_body(bc.pan_for_bearing(b)) - b) < 0.01
+    pans = bc.aim_pans(20.0)
+    assert len(pans) == 3 and abs(bc.claw_pan_body(pans[0]) - 20.0) < 0.01 and all(abs(p) <= bc.CLAW_PAN_MAX for p in pans)
+    assert bc.aim_pans(300.0)[0] == (bc.CLAW_PAN_MAX if bc.CLAW_PAN_SIGN == "right" else -bc.CLAW_PAN_MAX)       # past the arm's reach: clamped
+
+
+def test_the_planner_makes_one_aimed_claw_look_at_the_second_empty_picture_before_any_search(monkeypatch):
+    p = bc.ChasePlanner()
+    p.last_bearing, p.last_dist = 14.0, 20.0
+    assert p.decide(None).kind == "look"                                                      # 1 of 3: a plain look
+    a = p.decide(None)
+    assert a.kind == "claw_look" and a.aim_deg == 14.0                                        # 2: the look aimed at where it was last seen
+    assert p.decide(None).kind != "claw_look" or p.decide(None).aim_deg is None               # only once: after it the normal search goes on
+    p2 = bc.ChasePlanner()
+    p2.last_bearing = 14.0
+    p2.decide(None)
+    monkeypatch.setattr(bc, "DIRECTED_LOOK", False)
+    assert p2.decide(None).aim_deg is None
+    p3 = bc.ChasePlanner()                                                                    # nothing known: no aimed look
+    p3.decide(None)
+    assert p3.decide(None).aim_deg is None
+
+
+def test_the_finder_diagnostic_reports_a_blob_too_small_for_the_finder():
+    import io
+
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (240, 240), (120, 110, 100))
+    ImageDraw.Draw(im).ellipse((118, 100, 121, 103), fill=(20, 200, 30))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=95)
+    assert bf.find_ball(buf.getvalue()) is None
+    d = bf.diagnose(buf.getvalue())
+    assert d is not None and 8 <= d["area"] <= 60 and abs(d["x"] - 120) <= 3

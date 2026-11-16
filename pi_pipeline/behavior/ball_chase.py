@@ -52,6 +52,7 @@ SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that wa
 POST_PUNT_WATCH = True          # after the last punt of an attempt, follow the ball with the claw until it stops instead of taking one picture (behavior/punt_watch.py; the goal passes the watch in, 2026-11-15)
 SEARCH_WALK = False            # walk on blind after a full circle without the ball (off: only on a big floor, `--search-walk`)
 AFTER_PUNT_SETTLE_S = 1.0      # after the punch, before the picture that says where the ball went
+DIRECTED_LOOK = True            # (owner-approved 2026-11-16) at the second empty picture of a chase, when the ball's last bearing is known, ONE claw look aimed at it comes before any blind search
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
 MAX_TURN_DEG = 20.0             # the most one turn toward the ball turns him (user, 2026-11-01: turns smaller in general; it was 35: a 31 deg turn took 5 s)
@@ -250,6 +251,27 @@ WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch"
 CLAW_PAN_SHARE = {"right": 1.0, "left": 1.0}
 
 
+AIM_OFFSET_DEG = 12.0          # an aimed claw look takes the aimed pan and one each side of it this far
+CLAW_PAN_MAX = 45.0
+
+
+def pan_for_bearing(bearing: float) -> float:
+    """The arm pan that points the camera at G2's own bearing `bearing` (+ = right): the inverse of claw_pan_body, clamped to the arm's reach."""
+    share = CLAW_PAN_SHARE["right" if bearing > 0 else "left"] or 1.0
+    deg = bearing / share
+    pan = deg if CLAW_PAN_SIGN == "right" else -deg
+    return max(-CLAW_PAN_MAX, min(CLAW_PAN_MAX, pan))
+
+
+def aim_pans(bearing: float) -> list:
+    out = []
+    for off in (0.0, AIM_OFFSET_DEG, -AIM_OFFSET_DEG):
+        p = max(-CLAW_PAN_MAX, min(CLAW_PAN_MAX, pan_for_bearing(bearing) + off))
+        if p not in out:
+            out.append(p)
+    return out
+
+
 def claw_pan_body(pan: float) -> float:
     """The camera's direction, + = G2's right, for an arm pan of `pan` degrees: the commanded direction times the measured share for that side."""
     deg = pan if CLAW_PAN_SIGN == "right" else -pan
@@ -284,6 +306,7 @@ class Action:
     why: str = ""
     degrees2: float = 0.0      # a sidestep's closing turn: from the heading after the step to facing the ball again (so he does not lose it: the camera sees about 47 deg either side)
     scripted: bool = False     # a walk: Petoi's scripted walk (kwkF) instead of the learned policy (the dialing-in steps, NUDGE_GAIT)
+    aim_deg: float | None = None   # a claw look aimed at this body bearing (+ = right): the pans are centred on it instead of the usual left, right, centre
     stop_deg: float = 0.0      # a line-up turn: stop on the gyro once he has turned this many degrees (`seconds` is then only the fallback when no IMU frames arrive)
 
 
@@ -319,6 +342,7 @@ class ChasePlanner:
     circles: int = 0           # whole turns finished without the ball this search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
+    directed_done: bool = False         # the aimed claw look was made since the ball was last seen
     last_bearing: float | None = None   # the ball's bearing when it was last seen (None: not this attempt)
     last_edge: bool = False    # ... and whether it touched the picture's edge (it was leaving the view that way)
     search_side: int = 0       # the side this search turns toward, chosen when it starts (0 = not chosen); cleared when the ball is seen again
@@ -454,12 +478,16 @@ class ChasePlanner:
                 self.after_punt = True
                 self.punt_log.append((None, None))
                 return Action("punt", 0.0, why="the ball vanished at close range: it is at the claw: punt")
+            if DIRECTED_LOOK and self.claw_ok and not self.directed_done and self.lost >= 2 and self.last_bearing is not None:
+                self.directed_done = True
+                return Action("claw_look", aim_deg=float(self.last_bearing), why=f"no ball ({self.lost} of {LOST_LOOKS}): a claw look aimed at where it was last seen ({self.last_bearing:+.0f} deg)")
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
             self.track.clear()                                  # searching: the old place is no use
             return self._search_move()
         ball = self.track.see(ball)                           # too close for the camera (under 3 in) or at the frame edge: the bearing comes from the last good picture and what he has done since
         self.lost = 0
+        self.directed_done = False
         self.search_steps = 0
         self.search_i = 0
         self.circle_deg = 0.0
@@ -1651,7 +1679,7 @@ def _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, st
 
 
 def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None,
-              stamp: Callable[[], float] | None = None, after_punt: bool = False) -> tuple[str, BallReading | None]:
+              stamp: Callable[[], float] | None = None, after_punt: bool = False, aim_deg: float | None = None) -> tuple[str, BallReading | None]:
     """One look around with the arm: the camera to one side, then the other, then the centre, a picture at each (user, 2026-11-03: left, right, centre; from a sit all three are always taken); stops at the first sight of the ball. The arm goes back
     to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None). `stamp()` times the trace entries (the scorer needs when the ball was
     first seen); `after_punt` marks a look for where the ball went, which is not a search."""
@@ -1670,7 +1698,9 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
         if callable(pre):
             pre(True)                                                                # ... metered in the background while the claw is still moving, not after it has arrived (the picture then finds it done)
     from_sit = CLAW_FROM_SIT and not after_punt and hasattr(robot, "sit_down") and hasattr(robot, "stand_from_sit")
-    if from_sit:
+    if aim_deg is not None:
+        pans = aim_pans(aim_deg)                                                      # aimed at where the ball was last seen, and a little each side of it
+    elif from_sit:
         left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG            # the pan that points the camera to G2's left
         pans = [left, -left, 0.0]                                                     # always left first, then right (user, 2026-11-01), then the centre, claw still raised (user, 2026-11-03)
     else:
@@ -1936,7 +1966,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             if still > STILL_SAY_S:
                 say(f"[{steps}] stood still {still:.1f} s before this {act.kind}: " + ", ".join(f"{k} {v:.1f}" for k, v in sorted(parts.items(), key=lambda kv: -kv[1])[:4]) + f" ({steps - still_step} picture(s))")
         if act.kind == "claw_look":
-            state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2))
+            state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2), aim_deg=getattr(act, "aim_deg", None))
             note(kind="act", act="claw_look", why=act.why, state=state, found=pending is not None)
             if state == "fell":
                 say("G2 fell: stopping (fall recovery is off)")
@@ -2031,7 +2061,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                         if w.ended not in ("error", "no_board"):
                             watched = True
                             after = w.reading if w.found else None
-                            note(kind="after_punt", ball=_ball_dict(after), picture=True, watch=w.ended, last_side=w.last_side, good_pictures=w.pictures, bad_frames=w.bad_frames, claw_moves=w.moves)
+                            note(kind="after_punt", ball=_ball_dict(after), picture=True, watch=w.ended, last_side=w.last_side, good_pictures=w.pictures, bad_frames=w.bad_frames, claw_moves=w.moves,
+                                 source=w.source, stream=_ball_dict(w.stream_reading), stream_sightings=w.sightings, still_diag=w.still_diag)
                             if w.ended == "fell":
                                 say("G2 fell while watching the ball: stopping (fall recovery is off)")
                                 return "fell"
