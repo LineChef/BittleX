@@ -914,7 +914,7 @@ def test_standing_five_seconds_then_tilted_means_sagged_legs_even_in_the_standin
     tilt["pitch"] = -30.0                                                              # the legs let go
     lk.sent.clear()
     assert r.stand_up() == "ok"
-    assert bc.CLAW_LOOK_POSE in lk.sent and lk.sent.index(bc.CLAW_LOOK_POSE) < lk.sent.index("kbalance")        # attention pose first, then the stand-up
+    assert "krest" in lk.sent and bc.CLAW_LOOK_POSE not in lk.sent and lk.sent.index("krest") < lk.sent.index("kbalance")        # rest first (owner, 2026-11-16: never through the attention pose), then the stand-up
     assert r.posture == "stand"
 
 
@@ -1439,3 +1439,39 @@ def test_moves_that_can_carry_the_ball_or_him_are_not_checked_and_the_guard_can_
     monkeypatch.setattr(bc, "JUMP_GUARD", False)
     off, act = _seen_then_jump("align")
     assert off.jump_stops == 0 and act.kind == "walk"
+
+
+# ---- 2026-11-16: the gate before the claw look and the rest-first recovery
+
+def _look_robot(tilt):
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    t = iter(np.arange(0, 100000, 0.2))
+    r = bc.SerialRobot(Link(), sleep=lambda s: None, clock=t.__next__)
+    r.posture = "stand"
+    r._tilt = lambda seconds=0.5: tilt
+    r.recoveries = []
+    r.recover_sag = lambda tl=None: (r.recoveries.append(tl), "ok")[1]
+    return r
+
+
+def test_the_claw_look_entry_checks_the_tilt_first_and_recovers_through_rest():
+    rolled = _look_robot((0.0, 23.0))
+    assert rolled.sit_down() == "ok" and rolled.recoveries == [(0.0, 23.0)] and rolled.move_gate_stops == 1
+    level = _look_robot((1.0, -2.0))
+    assert level.sit_down() == "ok" and level.recoveries == []
+    fallen = _look_robot((5.0, 85.0))
+    assert fallen.sit_down() == "fell" and fallen.recoveries == [] and fallen.posture == "rest" and "krest" in fallen._lk.sent
+    blind = _look_robot(None)
+    assert blind.sit_down() == "ok" and blind.recoveries == []
+
+
+def test_sag_recovery_lies_down_in_rest_and_never_goes_through_the_attention_pose():
+    lk = _PoseLink("stand")
+    t = iter(np.arange(0, 100000, 0.2))
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
+    r.posture = "stand"
+    assert r.recover_sag((0.0, 22.0)) == "ok"
+    assert "krest" in lk.sent and bc.CLAW_LOOK_POSE not in lk.sent and lk.sent.index("krest") < lk.sent.index("kbalance")

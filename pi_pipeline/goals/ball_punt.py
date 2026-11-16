@@ -303,13 +303,20 @@ class BallPunt:
             if w.found and w.reading is not None:
                 first = w.reading                                            # the ball is where the watch left it: no search, the chase starts from that reading
                 ctx.say("starting from where the ball stopped")
-            elif w.last_side:
-                side = w.last_side
-                deg = side * 40.0
-                ctx.say(f"the ball was lost on the {'right' if side > 0 else 'left'}: turning that way, then the normal claw look")
+            elif w.last_side or w.last_bearing is not None:
+                lb = w.last_bearing
+                side = w.last_side or (1 if (lb or 0) > 0 else -1)
+                # Turn by where the ball was last seen, and only when it was well off to one side (2026-11-16: a fixed 40 deg turned him past a ball last seen nearly straight ahead and put it
+                # near the claw's pan limit); nearly ahead he stays and the aimed claw look points at it.
+                deg = 0.0 if (lb is not None and abs(lb) <= 25.0) else (max(-40.0, min(40.0, lb)) if lb is not None else side * 40.0)
+                if deg:
+                    ctx.say(f"the ball was lost on the {'right' if side > 0 else 'left'}: turning {abs(deg):.0f} deg that way, then the aimed claw look")
+                else:
+                    ctx.say("the ball was lost nearly straight ahead: no turn, the aimed claw look")
                 try:
                     self.robot.claw_pose(0.0, 0.0)
-                    self.robot.turn(deg, abs(deg) / planner._turn_rate(side, False), stop_deg=abs(deg))
+                    if deg:
+                        self.robot.turn(deg, abs(deg) / planner._turn_rate(side, False), stop_deg=abs(deg))
                 except Exception:  # noqa: BLE001
                     pass
                 planner.lost = chase.LOST_LOOKS - 1                         # the first empty picture starts the search ...

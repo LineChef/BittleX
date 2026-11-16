@@ -1242,16 +1242,11 @@ class SerialRobot:
         return self._stand_up_from(pose)
 
     def recover_sag(self, tilt=None) -> str:
-        """The legs have sagged (the body is tilted away from how he stands when they hold): down into the attention pose, then up again, back legs first. Used by every flow:
-        the goal sessions before a move (stand_up) and the voice service's stand guard while he stands idle."""
-        log.warning("legs sagged%s: down into the attention pose and up again, back legs first", "" if tilt is None else f" (pitch {tilt[0]:+.0f} roll {tilt[1]:+.0f} deg)")
+        """The legs have sagged (the body is tilted away from how he stands when they hold): the claw centred, down into the rest position, then the eased stand-up from rest (owner, 2026-11-16: never
+        through the attention pose, the move that tipped a rolled G2 over). Used by every flow: the goal sessions before a move (stand_up), the claw look's entry and the voice service's stand guard."""
+        log.warning("legs sagged%s: lying down in rest and standing up from rest", "" if tilt is None else f" (pitch {tilt[0]:+.0f} roll {tilt[1]:+.0f} deg)")
         self.posture = "stand"
-        self.relax()
-        if self.posture != "attention":
-            log.warning("the attention pose did not take (%s): leaving him as he is", self.posture)
-            self._moved_at = self._clock()
-            return "ok"
-        return self._stand_up_from("attention")
+        return self.rest_then_stand()
 
     def imu_alive(self, seconds: float = 1.0) -> bool:
         """Whether IMU frames are arriving (the stream switched on for `seconds`). A silent board makes every guard that reads the tilt do nothing, so the fall drill refuses to run on one."""
@@ -1376,6 +1371,17 @@ class SerialRobot:
     def sit_down(self) -> str:
         """The claw look starts from the "attention" pose (user, 2026-11-01; it used to be a sit): stand first, then CLAW_LOOK_POSE, then still. No fall check in it. Already in the
         attention pose: the pose is sent again (it drives every leg joint again) and no stand-up first; just stood up: no second stand-up."""
+        if MOVE_TILT_GATE_DEG > 0 and self.posture in ("stand", "unknown"):
+            # The move gate before the claw look too (owner-approved 2026-11-16): a fall began with the look's attention-pose entry while he stood rolled 23 deg for over 4 s; that entry is not a leg move
+            # the stand-up check sees. Past the fall angle he has already fallen; over the gate he is laid down in rest and stood up from rest first.
+            tilt = self._tilt(0.3) if callable(getattr(self._lk, "poll_imu", None)) else None
+            if self._already_fell(tilt):
+                return "fell"
+            if tilt is not None and max(abs(tilt[0]), abs(tilt[1])) > MOVE_TILT_GATE_DEG:
+                log.warning("move gate (claw look): the body is tilted pitch %+.0f roll %+.0f deg (more than %.0f): lying down in rest and standing up before the look", tilt[0], tilt[1], MOVE_TILT_GATE_DEG)
+                self.move_gate_stops = getattr(self, "move_gate_stops", 0) + 1
+                if self.recover_sag(tilt) == "fell":
+                    return "fell"
         self._pitch, self._roll = [], []
         self._tx("gP")
         if BETWEEN_MOVES == "attention" and self.posture in ("attention", "stand"):          # (the standing flow always stands first, as it did before 2026-11-02)

@@ -25,11 +25,12 @@ log = logging.getLogger("g2.punt_watch")
 @dataclass
 class WatchConfig:
     seconds: float = 20.0              # the longest the ball is followed (owner, 2026-11-15: until it stops or rolls out of view; this is only the safety cap); then it counts as stopped where it is
-    stable_n: int = 6                  # pictures in a row over which it must not have moved (about 1.5 s of the stream)
+    stable_n: int = 4                  # sightings (gaps allowed, a pale ball is seen only now and then) over which it must not have moved
+    max_window_s: float = 4.0          # ... and they must all fall within this long
     bearing_tol_deg: float = 2.0       # the world bearing may vary this much over those pictures
     size_tol: float = 0.15             # and its size this much (as a share of the mean): a ball rolling toward or away from him changes size
     min_span_s: float = 1.0
-    lost_after_s: float = 2.5          # seen before, and not for this long: lost
+    lost_after_s: float = 4.0          # seen before, and not for this long: lost (2.5 s was too short for a ball the finder sees only now and then)
     never_seen_s: float = 4.0          # never seen in the first this long of the follow: lost
     lost_turn_deg: float = 40.0        # the turn the caller makes toward the last-seen side
 
@@ -48,6 +49,10 @@ class StopDetector:
     def clear(self) -> None:
         self._s.clear()
 
+    def miss(self) -> None:
+        """A picture without the ball: no reset (the stop detector counts sightings, not consecutive pictures); old sightings fall out of the window instead."""
+        return None
+
     @property
     def stopped(self) -> bool:
         c = self.cfg
@@ -57,7 +62,7 @@ class StopDetector:
         bs = [x[1] for x in self._s]
         ws = [x[2] for x in self._s]
         mean_w = sum(ws) / len(ws)
-        return (ts[-1] - ts[0] >= c.min_span_s and max(bs) - min(bs) <= c.bearing_tol_deg and mean_w > 0 and (max(ws) - min(ws)) / mean_w <= c.size_tol)
+        return (c.min_span_s <= ts[-1] - ts[0] <= c.max_window_s and max(bs) - min(bs) <= c.bearing_tol_deg and mean_w > 0 and (max(ws) - min(ws)) / mean_w <= c.size_tol)
 
 
 @dataclass
@@ -80,8 +85,8 @@ class WatchResult:
     sightings: int = 0
 
 
-STREAM_WINDOW_S = 3.0              # the stream's sightings this recent at the end of the follow are the ball's last known place
-STREAM_MIN_N = 3                   # ... when there are at least this many of them (a single sighting can be a false one)
+STREAM_WINDOW_S = 5.0              # the stream's sightings this recent at the end of the follow are the ball's last known place
+STREAM_MIN_N = 2                   # ... when there are at least this many of them (a single sighting can be a false one)
 
 
 def stream_reading(sights: list, end_t: float):
@@ -160,7 +165,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
                     state["reason"] = "stopped"
                     return True
             else:
-                det.clear()
+                det.miss()
                 ref = state["last_seen_t"]
                 if state["seen_in_loop"] and now - ref > wcfg.lost_after_s:            # seen while following, and not for this long
                     state["reason"] = "lost"
@@ -191,15 +196,19 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         sleep(0.5)
         ball = None
         stream = None
-        if state["reason"] != "lost":
-            res.ended = "stopped" if state["reason"] == "stopped" else "timeout"
-            say(f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture")
-            ball = find_still(camera)                                  # taken with the claw up and steady: this is where the ball ended
+        lost_by_stream = state["reason"] == "lost"
+        res.ended = "stopped" if state["reason"] == "stopped" else ("lost" if lost_by_stream else "timeout")
+        say(("watch: the stream lost the ball: one last picture before giving up" if lost_by_stream else f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture"))
+        ball = find_still(camera)                                      # always: the claw is where the ball was last seen, and a ball that stopped in front of it may only have been missed by the stream
+        if not lost_by_stream:
             stream = stream_reading(state["sights"], end_t)            # ... and where the stream saw it last (2026-11-16: the still alone missed far balls the stream had followed)
             res.stream_reading = stream
-            if ball is None:
-                res.still_diag = getattr(find_still, "last_diag", None)
-                say("watch: no ball in the still" + (": using the stream's last sightings" if stream is not None else ": lost"))
+        if ball is None:
+            res.still_diag = getattr(find_still, "last_diag", None)
+            say("watch: no ball in the still" + (": using the stream's last sightings" if stream is not None else ": lost"))
+        elif lost_by_stream:
+            res.ended = "stopped"                                      # found again by the last picture: it had stopped where the claw was pointing
+            say("watch: the last picture found the ball: it had stopped")
         if ball is not None:
             res.found, res.source = True, "still"
             res.reading = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + _pan_body(out["pan"]))

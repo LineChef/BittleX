@@ -102,7 +102,7 @@ def test_a_rolling_ball_is_followed_until_it_stops_then_the_still_acquires_it():
 
 
 def test_a_ball_that_vanishes_is_lost_with_the_side_it_was_last_seen_on():
-    res, robot, spoken = run_watch(vanish_at=1.5)
+    res, robot, spoken = run_watch(vanish_at=1.5, still=None)
     assert res.ended == "lost" and not res.found and spoken == ["I lost the ball"]
     assert res.last_bearing is not None and res.last_side == (1 if res.last_bearing > 0 else -1)         # the side is the sign of the last world bearing (the claw's direction plus the offset)
     assert robot.calls[-1] == ("claw", 0.0, 0.0)                                              # the claw goes home before the caller's turn and look
@@ -113,6 +113,8 @@ def test_a_still_without_the_ball_uses_the_streams_sightings_and_is_lost_only_wh
     assert res.found and res.source == "stream" and spoken == ["target acquired"]               # (2026-11-16: the stream had followed it; one missed picture does not lose it)
     res, robot, spoken = run_watch(still=None, vanish_at=1.5)
     assert res.ended == "lost" and spoken == ["I lost the ball"]
+    res, robot, spoken = run_watch(vanish_at=1.5)                                           # the stream lost it but the last picture finds it where the claw points: it had stopped
+    assert res.found and res.ended == "stopped" and spoken == ["target acquired"]
 
 
 def test_a_ball_still_rolling_at_the_limit_counts_as_stopped_where_it_is():
@@ -301,7 +303,7 @@ def test_a_stopped_ball_rests_and_stands_before_target_acquired():
 
 
 def test_a_lost_ball_rests_and_stands_before_the_caller_turns_toward_the_last_side():
-    res, events = _settle_run(vanish_at=1.5)
+    res, events = _settle_run(vanish_at=1.5, still=None)
     assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost the ball")]
     res, events = _settle_run(still=None, vanish_at=1.5)
     assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost the ball")]
@@ -318,11 +320,12 @@ def test_the_watch_holds_until_the_ball_stops_or_leaves_view_with_a_safety_cap_o
 
 # ---- 2026-11-16: the stream's own sightings, the aimed claw look, the finder diagnostic
 
-def test_the_stream_reading_is_the_median_of_the_last_sightings_and_needs_three_recent_ones():
+def test_the_stream_reading_is_the_median_of_the_last_sightings_and_needs_two_recent_ones():
     sights = [(t, 10.0 + t, 0.0, 0.1, 0.1, 0.5, 0.6) for t in (1.0, 1.25, 1.5, 1.75, 2.0)]
     r = pw.stream_reading(sights, end_t=2.2)
     assert r.via == "stream" and abs(r.distance_in - bf.DIST_K / (0.1 * bf.FRAME_PX)) < 0.01 and r.bearing_deg == 11.5
-    assert pw.stream_reading(sights[:2], end_t=2.2) is None                                    # too few
+    assert pw.stream_reading(sights[:1], end_t=2.2) is None                                    # too few (two sightings within 5 s are enough, 2026-11-16)
+    assert pw.stream_reading(sights[:2], end_t=2.2) is not None
     assert pw.stream_reading(sights, end_t=9.0) is None                                        # all too old: the ball left
 
 
@@ -407,7 +410,7 @@ def test_got_it_is_said_during_the_follow_as_soon_as_the_stream_shows_the_ball_w
 
 
 def test_a_ball_lost_after_a_punt_says_got_it_first_and_then_i_lost_the_ball():
-    res, events = _run_with_judge(vanish_at=1.5)
+    res, events = _run_with_judge(vanish_at=1.5, still=None)
     says = [e[1] for e in events if isinstance(e, tuple) and e[0] == "say"]
     assert res.ended == "lost" and says[-2:] == ["Got it.", "I lost the ball"] and events.index(("say", "Got it.")) < events.index("rest_then_stand")
 
@@ -433,3 +436,65 @@ def test_the_punt_rule_matches_the_scorer_and_the_runner_does_not_repeat_got_it(
     from pi_pipeline.goals import runner
     src = inspect.getsource(runner)
     assert "got_it_announced" in src and "outcome.success and getattr(self.approach" in src
+
+
+# ---- 2026-11-16: a stop detector that tolerates missed frames, the last picture before giving up, the turn by the last bearing
+
+def test_the_stop_detector_counts_sightings_not_consecutive_pictures():
+    d = pw.StopDetector(pw.WatchConfig())
+    for t in (0.0, 0.6, 1.3, 2.1):                       # four steady sightings with missed pictures between them
+        d.miss()
+        d.add(t, 10.0, 0.1)
+    assert d.stopped
+    m = pw.StopDetector(pw.WatchConfig())
+    for t, b in ((0.0, 5.0), (0.6, 12.0), (1.3, 19.0), (2.1, 26.0)):
+        m.add(t, b, 0.1)                                 # still rolling: the bearing moves on every sighting
+    assert not m.stopped
+    old = pw.StopDetector(pw.WatchConfig())
+    for t in (0.0, 1.5, 3.0, 5.5):
+        old.add(t, 10.0, 0.1)                            # steady, but spread over more than 4 s: not one stop
+    assert not old.stopped
+
+
+def test_a_ball_the_stream_lost_gets_one_last_picture_and_is_found_if_it_stopped_there():
+    res, robot, spoken = run_watch(vanish_at=1.5)        # the default still finds the ball
+    assert res.found and res.ended == "stopped" and spoken == ["target acquired"]
+    res, robot, spoken = run_watch(vanish_at=1.5, still=None)
+    assert not res.found and res.ended == "lost" and spoken == ["I lost the ball"]
+
+
+def test_the_goal_turns_by_the_last_bearing_only_when_it_was_well_off_to_one_side():
+    import time as _t
+
+    from pi_pipeline.goals.approach import AttemptContext
+    from pi_pipeline.goals.ball_punt import BallPunt
+    turned = []
+
+    class Chase:
+        POST_PUNT_WATCH = True
+        LOST_LOOKS = 3
+        DEFAULT_MAX_SECONDS = 75.0
+
+        class ChasePlanner:
+            def __init__(self):
+                self.punt_log, self.walk_log, self.back_s, self.lost, self.last_bearing, self.last_side = [], [], 0.0, 0, None, 0
+
+            def _turn_rate(self, side, short):
+                return 25.0
+
+        @staticmethod
+        def run_chase(robot, camera, stop, **kw):
+            Chase.seen = kw
+            return "punted"
+    import pi_pipeline.goals.ball_punt as bp
+    orig = bp._chase
+    bp._chase = lambda: Chase
+    try:
+        for last_bearing, side, expect in ((5.0, 1, None), (-12.0, -1, None), (-33.0, -1, -33.0), (70.0, 1, 40.0), (None, -1, -40.0)):
+            ap = BallPunt(robot=type("R", (), {"claw_pose": lambda s, a, b: "ok", "turn": lambda s, d, secs, stop_deg=0.0: turned.append(d)})(), camera=object(), pace=None)
+            ap._last_watch = (_t.monotonic(), pw.WatchResult(ended="lost", found=False, last_side=side, last_bearing=last_bearing))
+            turned.clear()
+            ap.run_attempt({}, AttemptContext(stop=lambda: False, say=lambda m: None))
+            assert (turned[0] if turned else None) == expect, (last_bearing, turned)
+    finally:
+        bp._chase = orig
