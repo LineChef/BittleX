@@ -35,6 +35,7 @@ KNOB_INFO = {
     "align_pulse_min_s": (0.1, "free", "alignment turns of at least", "s"),
     "align_tries": (1, "free", "alignment turns before giving up:", ""),
     "when_misaligned": (None, "free", "when I can't line up, I", ""),
+    "post_punt_watch": (None, "fixed", "watching the ball roll after a punt", ""),                    # the owner's switch (2026-11-15): never changed by G2
     "search_walk": (None, "fixed", "walking on blind after a full search circle", ""),        # only safe on a big floor: the user's call
     "max_seconds": (None, "fixed", "an attempt limit of", "s"),
     "back_up_budget_s": (None, "fixed", "backing up at most", "s an attempt"),                    # no edge detector: the user's call
@@ -126,6 +127,7 @@ class BallPunt:
         self._cam = None
         self.last_pack_pct = None                                           # the pack % read before the last attempt (kept with every attempt, not learned from yet)
         self.wall_check = wall_check
+        self._last_watch = None                                             # (time, WatchResult) of the last attempt's post-punt watch: the next attempt starts from where the ball ended
 
     # ---------------------------------------------------------------------------------------------------- settings
     def knobs(self) -> list[Knob]:
@@ -187,6 +189,34 @@ class BallPunt:
             from .walls import make_wall_check
             self.wall_check = make_wall_check()                              # walls rank above the punt; None without a wall calibration from this hardware
 
+    def _watch(self, ctx):
+        """The post-punt watch (behavior/punt_watch.py) with this session's robot and camera: the claw follows the rolling ball on the camera's continuous stream until it stops, one picture fixes where it
+        ended. Remembered for the next attempt. Never raises; None-like result (lost) when the camera cannot stream."""
+        import time as _t
+
+        from ..behavior import ball_chase as bc
+        from ..behavior import live_follow as lf
+        from ..behavior import punt_watch as pw
+        from ..behavior.gallery_target import BallTarget
+        from ..vision.ball_finder import find_ball
+        cam = getattr(self.camera, "_cam", None)
+        if cam is None or not hasattr(cam, "_open"):
+            return pw.WatchResult(ended="error")
+        try:
+            cam._open()
+        except Exception:  # noqa: BLE001
+            return pw.WatchResult(ended="error")
+
+        def make(find, cfg, clock, _save):
+            return lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=None)
+
+        def find_still(camera):
+            jpeg = camera.look()
+            return bc.confirm_ball(camera, find_ball(jpeg) if jpeg else None, _t.sleep, None)
+        r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget().detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=ctx.announce, stopped=ctx.stop)
+        self._last_watch = (_t.monotonic(), r)
+        return r
+
     def close(self) -> None:
         if self._link is None:
             return
@@ -240,7 +270,25 @@ class BallPunt:
         from .standing import apply as apply_standing, learn as learn_standing
         walls_used = apply_standing("walls")                                 # the walls goal's current values (its chase_wall_in and turn) for this attempt
         t0 = time.monotonic()
-        ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1,
+        first = None
+        carry, self._last_watch = self._last_watch, None
+        if carry is not None and getattr(chase, "POST_PUNT_WATCH", False) and time.monotonic() - carry[0] < 120.0 and not ctx.stop():
+            w = carry[1]
+            if w.found and w.reading is not None:
+                first = w.reading                                            # the ball is where the watch left it: no search, the chase starts from that reading
+                ctx.say("starting from where the ball stopped")
+            elif w.last_side:
+                side = w.last_side
+                deg = side * 40.0
+                ctx.say(f"the ball was lost on the {'right' if side > 0 else 'left'}: turning that way, then the normal claw look")
+                try:
+                    self.robot.claw_pose(0.0, 0.0)
+                    self.robot.turn(deg, abs(deg) / planner._turn_rate(side, False), stop_deg=abs(deg))
+                except Exception:  # noqa: BLE001
+                    pass
+                planner.lost = chase.LOST_LOOKS - 1                         # the first empty picture starts the normal search
+        ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1, first_reading=first,
+                                post_punt_watch=lambda: self._watch(ctx),
                                 max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),
                                 trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace, wall_check=self.wall_check, battery_checked=True)
         from .walls import events_from_trace

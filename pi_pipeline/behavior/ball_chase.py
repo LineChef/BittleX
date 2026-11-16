@@ -49,6 +49,7 @@ APPROACH_MARGIN_IN = 1.0       # the long walk never plans to end closer than PU
 NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
+POST_PUNT_WATCH = True          # after the last punt of an attempt, follow the ball with the claw until it stops instead of taking one picture (behavior/punt_watch.py; the goal passes the watch in, 2026-11-15)
 SEARCH_WALK = False            # walk on blind after a full circle without the ball (off: only on a big floor, `--search-walk`)
 AFTER_PUNT_SETTLE_S = 1.0      # after the punch, before the picture that says where the ball went
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
@@ -1754,9 +1755,9 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], **kw) -> s
 
 def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
               settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print,
-              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None, battery_checked: bool = False, first_reading: BallReading | None = None) -> str:
+              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None, battery_checked: bool = False, first_reading: BallReading | None = None, post_punt_watch=None) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
-    Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went. `first_reading`: a reading in G2's own direction to start from (the post-punt watch found the ball).
+    Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went. `first_reading`: a reading in G2's own direction to start from (the post-punt watch found the ball). `post_punt_watch()` -> a punt_watch.WatchResult: with `after_punt_look` and POST_PUNT_WATCH on, it replaces the one picture after the last punt.
     `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one. `wall_check(jpeg, ball) -> WallSeen | None`: the wall
     reading for each straight-ahead picture (goals/walls.py makes one only with a wall calibration from the current hardware); with it he keeps CHASE_WALL_IN from walls."""
     planner = planner or ChasePlanner()
@@ -1974,12 +1975,23 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             sleep(1.5)                                    # the ball is rolling: look after it stops
             if state != "fell" and max_punts is not None and punts >= max_punts:
                 if after_punt_look:
-                    # One straight picture after the punch decides it (user, 2026-11-01): the ball gone from in front of the claw, or farther away, means it was punted. No claw look
-                    # or back-up here: if it is gone, the next attempt looks, then searches. Let him settle and drop one frame first (it can be from before the punch).
-                    sleep(AFTER_PUNT_SETTLE_S)
-                    jpeg = camera.look()                       # (_SnapshotCamera.look already drops the old frame)
-                    after = find_ball(jpeg) if jpeg else None
-                    note(kind="after_punt", ball=_ball_dict(after), picture=bool(jpeg))
+                    watched = False
+                    if post_punt_watch is not None and POST_PUNT_WATCH:
+                        w = post_punt_watch()                  # the claw follows the ball until it stops, one picture fixes where it ended (behavior/punt_watch.py)
+                        if w.ended not in ("error", "no_board"):
+                            watched = True
+                            after = w.reading if w.found else None
+                            note(kind="after_punt", ball=_ball_dict(after), picture=True, watch=w.ended, last_side=w.last_side, good_pictures=w.pictures, bad_frames=w.bad_frames, claw_moves=w.moves)
+                            if w.ended == "fell":
+                                say("G2 fell while watching the ball: stopping (fall recovery is off)")
+                                return "fell"
+                    if not watched:
+                        # One straight picture after the punch decides it (user, 2026-11-01): the ball gone from in front of the claw, or farther away, means it was punted. No claw look
+                        # or back-up here: if it is gone, the next attempt looks, then searches. Let him settle and drop one frame first (it can be from before the punch).
+                        sleep(AFTER_PUNT_SETTLE_S)
+                        jpeg = camera.look()                   # (_SnapshotCamera.look already drops the old frame)
+                        after = find_ball(jpeg) if jpeg else None
+                        note(kind="after_punt", ball=_ball_dict(after), picture=bool(jpeg))
                 say(f"punted {punts}: done")
                 say(f"ATTEMPT: punted at {planner.punt_log[-1] if planner.punt_log else '?'} (in, deg) after {steps} looks; walk steps (ball in, seconds): {planner.walk_log}")
                 return "punted"

@@ -31,6 +31,7 @@ SPEC = {
     "punch_lunge_s": ("PUNCH_LUNGE_S", float, 0.05, 0.6, "seconds for the lunge itself (smaller = harder and faster)"),
     "punch_hold_s": ("PUNCH_HOLD_S", float, 0.0, 1.0, "seconds the lunge is held before he comes back"),
     "lost_looks": ("LOST_LOOKS", int, 1, 8, "looks in a row without the ball before he starts searching"),
+    "post_punt_watch": ("POST_PUNT_WATCH", bool, None, None, "after the last punt of an attempt, follow the ball with the claw until it stops and go on from where it ended (off: one picture after the punch)"),
     "search_walk": ("SEARCH_WALK", bool, None, None, "after a full search circle, walk on blind (a big floor only; never on a desk)"),
     "max_seconds": (None, float, 10.0, 600.0, "an attempt ends (and he rests) after this many seconds"),
     # added with the goals plan (2026-10-31); a choice setting is (constant, str, the allowed values, None, what it does)

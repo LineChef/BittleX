@@ -158,3 +158,75 @@ def test_a_sighting_before_the_claw_was_up_does_not_start_the_lost_clock():
     res = pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: OldSightingGrabber(c), lambda j: [], lambda cam: reading(), pw.WatchConfig(seconds=8.0, stable_n=4, lost_after_s=2.5, never_seen_s=4.0),
                               lf.LiveConfig(tick_s=0.05), say=lambda *_: None, sleep=c.sleep, clock=c)
     assert res.ended in ("stopped", "timeout") and res.found                                 # it waited for the ball to come back into view
+
+
+def _after_punt(post_punt_watch, **kw):
+    frames = [picture([disc(122, 110, 50)])]
+    trace = []
+    robot = FakeRobot()
+    out = bc.run_chase(robot, FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, trace=trace, post_punt_watch=post_punt_watch,
+                       sleep=lambda s: None, say=lambda m: None, **kw)
+    return out, trace
+
+
+def test_the_watch_replaces_the_one_picture_after_the_last_punt_and_feeds_the_scorer_its_reading():
+    r = reading(30.0, 8.0)
+    out, trace = _after_punt(lambda: pw.WatchResult(ended="stopped", found=True, reading=r, pictures=40, bad_frames=3, moves=9))
+    ap = next(e for e in trace if e["kind"] == "after_punt")
+    assert out == "punted" and ap["ball"]["distance_in"] == 30.0 and ap["watch"] == "stopped" and ap["claw_moves"] == 9 and ap["bad_frames"] == 3
+
+
+def test_a_lost_ball_is_an_after_punt_with_no_ball_and_a_watch_that_cannot_run_falls_back_to_the_one_picture():
+    out, trace = _after_punt(lambda: pw.WatchResult(ended="lost", found=False, last_side=-1))
+    ap = next(e for e in trace if e["kind"] == "after_punt")
+    assert ap["ball"] is None and ap["watch"] == "lost" and ap["last_side"] == -1
+    out, trace = _after_punt(lambda: pw.WatchResult(ended="error"))
+    ap = next(e for e in trace if e["kind"] == "after_punt")
+    assert "watch" not in ap and ap["picture"] is True                                       # the old single picture was taken
+    out, trace = _after_punt(lambda: pw.WatchResult(ended="fell"))
+    assert out == "fell"
+
+
+def test_the_setting_switches_the_watch_off(monkeypatch):
+    monkeypatch.setattr(bc, "POST_PUNT_WATCH", False)
+    called = []
+    out, trace = _after_punt(lambda: called.append(1) or pw.WatchResult(ended="stopped", found=True, reading=reading()))
+    assert not called and next(e for e in trace if e["kind"] == "after_punt").get("watch") is None
+
+
+def test_the_ball_goal_carries_where_the_ball_stopped_into_the_next_attempt():
+    from pi_pipeline.goals.approach import AttemptContext
+    from pi_pipeline.goals.ball_punt import BallPunt
+    seen = {}
+
+    class Chase:
+        POST_PUNT_WATCH = True
+        LOST_LOOKS = 3
+        DEFAULT_MAX_SECONDS = 75.0
+
+        class ChasePlanner:
+            def __init__(self):
+                self.punt_log, self.walk_log, self.back_s, self.lost = [], [], 0.0, 0
+
+            def _turn_rate(self, side, short):
+                return 25.0
+
+        @staticmethod
+        def run_chase(robot, camera, stop, **kw):
+            seen.update(kw)
+            return "punted"
+    ap = BallPunt(robot=type("R", (), {"claw_pose": lambda s, a, b: "ok", "turn": lambda s, d, secs, stop_deg=0.0: seen.setdefault("turned", d)})(), camera=object(), pace=None)
+    import pi_pipeline.goals.ball_punt as bp
+    orig = bp._chase
+    bp._chase = lambda: Chase
+    try:
+        import time as _t
+        ap._last_watch = (_t.monotonic(), pw.WatchResult(ended="stopped", found=True, reading=reading(20.0, 5.0)))
+        ap.run_attempt({}, AttemptContext(stop=lambda: False, say=lambda m: None))
+        assert seen["first_reading"].distance_in == 20.0 and ap._last_watch is None             # used once
+        seen.clear()
+        ap._last_watch = (_t.monotonic(), pw.WatchResult(ended="lost", found=False, last_side=-1))
+        ap.run_attempt({}, AttemptContext(stop=lambda: False, say=lambda m: None))
+        assert seen["first_reading"] is None and seen["turned"] == -40.0                         # turned toward the side it was last seen on, then the normal search
+    finally:
+        bp._chase = orig
