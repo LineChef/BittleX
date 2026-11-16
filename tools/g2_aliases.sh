@@ -415,12 +415,12 @@ g2seen() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2stream [SECONDS]  -- camera only, G2 does not move: asks the camera module for a continuous stream of pictures (AT+INVOKE=-1,0,0) and prints how many pictures a second arrive and how far apart (default 6 s). Rests G2 and stops the voice service first (g2stop voice) and starts it again after; the first frames are copied to the Mac.
+# g2stream [SECONDS [--compare | --sensor-opt N | --lock-ae]]  -- (options added 2026-11-16: --compare runs every picture size and prints the rates; --lock-ae freezes the sensor's auto exposure after 2 s and compares the brightness before and after) camera only, G2 does not move: asks the camera module for a continuous stream of pictures (AT+INVOKE=-1,0,0) and prints how many pictures a second arrive and how far apart (default 6 s). Rests G2 and stops the voice service first (g2stop voice) and starts it again after; the first frames are copied to the Mac.
 g2stream() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
   local out
-  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.vision.stream_probe --seconds ${1:-6} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
+  out="$(ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.vision.stream_probe --seconds ${1:-6} ${@:2} 2>&1 | grep -v 'g2.snapshot exposure unchanged'")"
   printf '%s\n' "$out"
   local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
   if [ -n "$dir" ]; then

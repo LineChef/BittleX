@@ -18,6 +18,8 @@ from pathlib import Path
 
 LOOP_WITH_PICTURE = b"AT+INVOKE=-1,0,0\r\n"
 BREAK = b"AT+BREAK\r\n"
+LOCK_AE = b'AT+SETREG="0x3503","0x03"\r\n'      # OV5647: AEC and AGC manual (the exposure and gain stay where auto exposure last left them)
+UNLOCK_AE = b'AT+SETREG="0x3503","0x00"\r\n'    # back to automatic
 
 
 def analyze(arrivals: list[tuple[float, int, int]], other: list[str], seconds: float) -> dict:
@@ -31,11 +33,25 @@ def analyze(arrivals: list[tuple[float, int, int]], other: list[str], seconds: f
             "with_boxes": sum(1 for a in arrivals if a[2]), "other_lines": len(other), "other_sample": other[:3]}
 
 
-def run_probe(ser, seconds: float, outdir: Path | None = None, *, clock=time.monotonic, parse=None, sleep=time.sleep) -> dict:
+def brightness_summary(means: list, lock_at: float | None) -> dict:
+    """The pictures' mean brightness over the run: how much it swings, and (an exposure-lock experiment) before against after the lock."""
+    vals = [m[1] for m in means]
+    out = {"mean": round(statistics.mean(vals), 1), "min": min(vals), "max": max(vals), "stdev": round(statistics.pstdev(vals), 2)}
+    if lock_at is not None:
+        before = [v for t, v in means if t < lock_at]
+        after = [v for t, v in means if t >= lock_at]
+        if len(before) >= 2 and len(after) >= 2:
+            out["before_lock"] = {"mean": round(statistics.mean(before), 1), "stdev": round(statistics.pstdev(before), 2)}
+            out["after_lock"] = {"mean": round(statistics.mean(after), 1), "stdev": round(statistics.pstdev(after), 2)}
+    return out
+
+
+def run_probe(ser, seconds: float, outdir: Path | None = None, *, clock=time.monotonic, parse=None, sleep=time.sleep, lock_at: float | None = None) -> dict:
     from .snapshot import parse_invoke_line
     parse = parse or parse_invoke_line
-    arrivals, other = [], []
+    arrivals, other, means = [], [], []
     saved = 0
+    locked = False
     try:
         ser.reset_input_buffer()
         ser.write(BREAK)
@@ -54,15 +70,30 @@ def run_probe(ser, seconds: float, outdir: Path | None = None, *, clock=time.mon
                     other.append(line.strip()[:120])
                 continue
             arrivals.append((clock() - t0, len(snap.jpeg), len(snap.detections)))
+            try:
+                from .snapshot import exposure_stats
+                st = exposure_stats(snap.jpeg)
+                if st is not None:
+                    means.append((round(clock() - t0, 2), round(float(st.mean), 1)))
+            except Exception:  # noqa: BLE001
+                pass
+            if lock_at is not None and not locked and clock() - t0 >= lock_at:
+                ser.write(LOCK_AE)                                         # the experiment: freeze the sensor's auto exposure now (OV5647 0x3503 = manual exposure and gain)
+                locked = True
             if outdir is not None and saved < 5:
                 saved += 1
                 (outdir / f"frame_{saved}.jpg").write_bytes(snap.jpeg)
     finally:
         try:
             ser.write(BREAK)
+            if locked:
+                ser.write(UNLOCK_AE)                                      # always back to auto exposure
         except Exception:  # noqa: BLE001
             pass
-    return analyze(arrivals, other, seconds)
+    res = analyze(arrivals, other, seconds)
+    if means:
+        res["brightness"] = brightness_summary(means, lock_at if locked else None)
+    return res
 
 
 def main() -> None:
@@ -72,16 +103,20 @@ def main() -> None:
     from .snapshot import CameraSnapshotter
     ap = argparse.ArgumentParser(description="Camera-only probe: does AT+INVOKE=-1,0,0 stream pictures, and how fast? (G2 does not move)")
     ap.add_argument("--seconds", type=float, default=6.0)
+    ap.add_argument("--sensor-opt", type=int, choices=(0, 1, 2), default=0, help="the module's picture size option (0 is what the chase uses)")
+    ap.add_argument("--compare", action="store_true", help="run every size option in turn and print the rates side by side (2026-11-16: is 4.3 pictures a second a setting or the module's limit?)")
+    ap.add_argument("--lock-ae", action="store_true", help="the exposure-lock experiment: after 2 s of streaming, freeze the sensor's auto exposure and compare the pictures' brightness before and after (restored to auto at the end)")
     args = ap.parse_args()
-    cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(vision/stream_probe.py, 2026-11-15): no shutter click in this look
     outdir = Path(os.path.expanduser(time.strftime("~/g2_claw_pics/stream_%Y%m%d_%H%M%S")))
     outdir.mkdir(parents=True, exist_ok=True)
-    try:
-        cam._open()                                                    # the same start-up the snapshotter does (reset wait, sensor option, exposure)
-        res = run_probe(cam._ser, args.seconds, outdir)
-        print("STREAM:", res)
-    finally:
-        cam.close()
+    for opt in ((0, 1, 2) if args.compare else (args.sensor_opt,)):
+        cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=opt, ae_bump=settings.vision_ae_bump, click=False)  # MODE-SPECIFIC(vision/stream_probe.py, 2026-11-15): no shutter click in this look
+        try:
+            cam._open()                                                # the same start-up the snapshotter does (reset wait, sensor option, exposure)
+            res = run_probe(cam._ser, args.seconds, outdir if opt == args.sensor_opt or not args.compare else None, lock_at=2.0 if args.lock_ae else None)
+            print(f"STREAM (size option {opt}):", res)
+        finally:
+            cam.close()
     print(f"PICTURES: {outdir}")
 
 

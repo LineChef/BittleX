@@ -55,10 +55,15 @@ class BallTarget:
 
     FRAME_PX = 240.0
 
+    def __init__(self, color=None):
+        self.color = color                    # the ball's own (r, g, b), sampled by the chase from close up: when the normal rules find nothing, the ball is looked for by this colour (2026-11-16)
+
     def detections(self, jpeg: bytes) -> list:
         try:
-            from ..vision.ball_finder import find_ball
+            from ..vision.ball_finder import find_ball, find_ball_color
             b = find_ball(jpeg)
+            if b is None and self.color is not None:
+                b = find_ball_color(jpeg, self.color)
             if b is None:
                 return []
             f = self.FRAME_PX

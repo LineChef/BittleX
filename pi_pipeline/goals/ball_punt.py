@@ -201,7 +201,7 @@ class BallPunt:
             from .walls import make_wall_check
             self.wall_check = make_wall_check()                              # walls rank above the punt; None without a wall calibration from this hardware
 
-    def _watch(self, ctx, before_punt=None):
+    def _watch(self, ctx, before_punt=None, color=None):
         """The post-punt watch (behavior/punt_watch.py) with this session's robot and camera: the claw follows the rolling ball on the camera's continuous stream until it stops, one picture fixes where it
         ended. Remembered for the next attempt. Never raises; None-like result (lost) when the camera cannot stream."""
         import time as _t
@@ -210,6 +210,7 @@ class BallPunt:
         from ..behavior import live_follow as lf
         from ..behavior import punt_watch as pw
         from ..behavior.gallery_target import BallTarget
+        from ..vision import ball_finder as bf
         from ..vision.ball_finder import find_ball
         cam = getattr(self.camera, "_cam", None)
         if cam is None or not hasattr(cam, "_open"):
@@ -220,12 +221,13 @@ class BallPunt:
             return pw.WatchResult(ended="error")
 
         def make(find, cfg, clock, _save):
-            return lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=None)
+            return lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=None, diag_fn=bf.diagnose)
 
         def find_still(camera):
-            from ..vision import ball_finder as bf
             jpeg = camera.look()
             ball = find_ball(jpeg) if jpeg else None
+            if ball is None and jpeg and color is not None:
+                ball = bf.find_ball_color(jpeg, color)                                   # the pale ball the fixed rules miss, by its own colour
             find_still.last_diag = bf.diagnose(jpeg) if (jpeg and ball is None) else None       # a miss: the biggest green blob in it, as numbers (no picture is kept)
             return bc.confirm_ball(camera, ball, _t.sleep, None)
         find_still.last_diag = None
@@ -238,7 +240,7 @@ class BallPunt:
                 said["got_it"] = True
                 self.got_it_announced = True
             ctx.announce(text)
-        r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget().detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=announce, judge_success=lambda after: punt_succeeded(before, after), stopped=ctx.stop)
+        r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget(color).detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=announce, judge_success=lambda after: punt_succeeded(before, after), stopped=ctx.stop)
         self._last_watch = (_t.monotonic(), r)
         return r
 
@@ -324,7 +326,7 @@ class BallPunt:
                     planner.last_bearing = float(w.last_bearing) - deg     # ... which is the aimed claw look first: where the ball was last seen, now relative to his new heading
                     planner.last_side = side
         ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1, first_reading=first,
-                                post_punt_watch=lambda before=None: self._watch(ctx, before),
+                                post_punt_watch=lambda before=None, color=None: self._watch(ctx, before, color),
                                 max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),
                                 trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace, wall_check=self.wall_check, battery_checked=True)
         from .walls import events_from_trace

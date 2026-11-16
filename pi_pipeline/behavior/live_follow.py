@@ -41,6 +41,8 @@ class LiveConfig:
     tilt_check_s: float = 1.0
     max_tilt_change_deg: float = 10.0
     lift_deg: float = 120.0
+    lead_s: float = 0.0                # aim this far ahead of a MOVING target (its measured bearing speed times this); 0 = off. The active look sets it (2026-11-16)
+    lead_max_deg: float = 20.0         # the most the lead may add to the offset
 
 
 class PanLog:
@@ -68,6 +70,8 @@ class LiveFollower:
         self.cfg, self.sign, self.pan_log = cfg, pan_sign, pan_log
         self.last_used_t = -1e9
         self.reason = "start"
+        self._hist: list[tuple] = []       # (capture time, the target's bearing in G2's own frame): its speed gives the lead
+        self.lead_deg = 0.0
 
     def best(self, dets):
         return max(dets, key=lambda d: d[4] * d[5], default=None) if dets else None
@@ -86,6 +90,18 @@ class LiveFollower:
             self.reason = "nothing in view"
             return None
         off = (float(d[2]) - 0.5) * 2.0 * c.fov_half_deg                       # + = the target is to his right, as the picture showed it
+        self.lead_deg = 0.0
+        if c.lead_s > 0:
+            from .ball_chase import claw_pan_body
+            self._hist.append((t_capture, claw_pan_body(self.pan_log.at(t_capture)) + off))
+            self._hist = [h for h in self._hist if t_capture - h[0] <= 1.5][-6:]
+            if len(self._hist) >= 2 and self._hist[-1][0] - self._hist[0][0] >= 0.4:
+                ts, bs = [h[0] for h in self._hist], [h[1] for h in self._hist]
+                mt, mb = sum(ts) / len(ts), sum(bs) / len(bs)
+                den = sum((t - mt) ** 2 for t in ts)
+                speed = sum((t - mt) * (b - mb) for t, b in zip(ts, bs)) / den if den > 0 else 0.0     # deg per second, + = moving right
+                self.lead_deg = max(-c.lead_max_deg, min(c.lead_max_deg, speed * c.lead_s))
+                off += self.lead_deg                                            # aim where a rolling target will be by the time the claw gets there
         if abs(off) < c.deadband_deg:
             self.reason = f"{d[0]} centred ({off:+.0f} deg)"
             return None
@@ -95,7 +111,7 @@ class LiveFollower:
         if abs(want - pan_now) < c.min_move_deg:
             self.reason = f"{d[0]}: already there"
             return None
-        self.reason = f"follow {d[0]} ({off:+.0f} deg off, pan at the picture {pan_c:+.0f})"
+        self.reason = f"follow {d[0]} ({off:+.0f} deg off{f', lead {self.lead_deg:+.0f}' if self.lead_deg else ''}, pan at the picture {pan_c:+.0f})"
         return want
 
 
@@ -167,9 +183,10 @@ class StreamGrabber(Grabber):
     Two threads: the READER only reads lines and timestamps them (nothing else may delay the read: a late read loses bytes), the PROCESSOR decodes, checks that the picture is whole (`valid_jpeg`), finds the
     target and publishes it. A bad frame is counted and skipped: it is neither a sighting nor a miss."""
 
-    def __init__(self, ser, find_fn, cfg: LiveConfig, *, clock=time.monotonic, save=None, parse=None, latency_s: float = 0.25, sleep=time.sleep):
+    def __init__(self, ser, find_fn, cfg: LiveConfig, *, clock=time.monotonic, save=None, parse=None, latency_s: float = 0.25, sleep=time.sleep, diag_fn=None):
         super().__init__(lambda: None, find_fn, cfg, clock=clock, save=save)
         self.ser, self.parse, self.latency_s, self._sleep = ser, parse, latency_s, sleep
+        self.diag_fn = diag_fn                 # a picture with no sighting: `diag_fn(jpeg)` says what green blob it held (numbers only), for the per-frame log
         self.bad = 0
         self.dropped = 0
         self._q: "list[tuple]" = []
@@ -236,7 +253,21 @@ class StreamGrabber(Grabber):
                     except Exception:  # noqa: BLE001
                         pass
                 row = {"n": n, "t_call": round(t, 3), "t_done": round(t, 3), "t_capture": round(t - self.latency_s, 3), "grab_s": round(t - prev, 3) if prev is not None else 0.0,
-                       "det": [(d[0], round(d[2], 3)) for d in dets]}
+                       "det": [(d[0], round(d[2], 3)) for d in dets], "bytes": len(snap.jpeg)}
+                try:
+                    from ..vision.snapshot import exposure_stats
+                    st = exposure_stats(snap.jpeg)
+                    row["mean"] = None if st is None else round(float(st.mean))      # the picture's brightness: an exposure swing shows here
+                except Exception:  # noqa: BLE001
+                    row["mean"] = None
+                if dets:
+                    bd = max(dets, key=lambda d: d[4] * d[5])
+                    row["best"] = (round(float(bd[2]), 3), round(float(bd[3]), 3), round(float(bd[4]), 3))      # centre x, centre y, width (frame fractions)
+                elif self.diag_fn is not None:
+                    try:
+                        row["diag"] = self.diag_fn(snap.jpeg)
+                    except Exception:  # noqa: BLE001
+                        row["diag"] = None
                 prev = t
                 with self._lock:
                     self.latest = (t - self.latency_s, dets, n)

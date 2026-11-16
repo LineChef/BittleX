@@ -57,6 +57,7 @@ SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that wa
 POST_PUNT_WATCH = True          # after the last punt of an attempt, follow the ball with the claw until it stops instead of taking one picture (behavior/punt_watch.py; the goal passes the watch in, 2026-11-15)
 SEARCH_WALK = False            # walk on blind after a full circle without the ball (off: only on a big floor, `--search-walk`)
 AFTER_PUNT_SETTLE_S = 1.0      # after the punch, before the picture that says where the ball went
+COLOR_SAMPLE_IN = 14.0         # a reading this close gives the ball's own colour for the active look (a big blob: a true colour, in this light)
 JUMP_GUARD = True              # (owner-approved 2026-11-16, after he walked 3 s through a ball at 5 in because a reading of 45 in appeared right after a line-up turn) a reading that puts the ball much farther away than the last one, when only a turn or a look has happened since, is a different green thing: it is treated as the ball having vanished at close range
 JUMP_NEAR_IN = 8.0             # the last reading was at most this far ...
 JUMP_IN = 15.0                 # ... and the new one is more than this much farther
@@ -358,6 +359,7 @@ class ChasePlanner:
     circles: int = 0           # whole turns finished without the ball this search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
+    ball_color: tuple | None = None      # the ball's own (r, g, b), the latest sample from a reading within COLOR_SAMPLE_IN (the active look matches the ball by it)
     prev_seen_dist: float | None = None  # the distance of the last reading that was accepted (the jump guard compares the next one with it)
     jump_stops: int = 0                  # readings the jump guard threw out this attempt
     directed_done: bool = False         # the aimed claw look was made since the ball was last seen
@@ -478,6 +480,8 @@ class ChasePlanner:
             self.considered.append(msg)
             self.jump_stops += 1
             return self.decide(None, wall)
+        if ball is not None and getattr(ball, "color", None) is not None and ball.distance_in <= COLOR_SAMPLE_IN:
+            self.ball_color = ball.color
         if ball is not None:
             self.prev_seen_dist = ball.distance_in                 # every accepted reading, including the ones a wall check answers with a look
         if ball is None:
@@ -2099,12 +2103,12 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 if after_punt_look:
                     watched = False
                     if post_punt_watch is not None and POST_PUNT_WATCH:
-                        w = post_punt_watch(before=(planner.punt_log[-1] if planner.punt_log else None))                  # the claw follows the ball until it stops, one picture fixes where it ended (behavior/punt_watch.py)
+                        w = post_punt_watch(before=(planner.punt_log[-1] if planner.punt_log else None), color=planner.ball_color)                  # the claw follows the ball until it stops, one picture fixes where it ended (behavior/punt_watch.py)
                         if w.ended not in ("error", "no_board"):
                             watched = True
                             after = w.reading if w.found else None
                             note(kind="after_punt", ball=_ball_dict(after), picture=True, watch=w.ended, last_side=w.last_side, good_pictures=w.pictures, bad_frames=w.bad_frames, claw_moves=w.moves,
-                                 got_it=w.got_it, source=w.source, stream=_ball_dict(w.stream_reading), stream_sightings=w.sightings, still_diag=w.still_diag)
+                                 got_it=w.got_it, source=w.source, stream=_ball_dict(w.stream_reading), stream_sightings=w.sightings, still_diag=w.still_diag, frames=w.frames, lead_deg_last=getattr(w, 'lead', None))
                             if w.ended == "fell":
                                 say("G2 fell while watching the ball: stopping (fall recovery is off)")
                                 return "fell"

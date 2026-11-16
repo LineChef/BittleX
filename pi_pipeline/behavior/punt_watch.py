@@ -26,6 +26,7 @@ log = logging.getLogger("g2.punt_watch")
 class WatchConfig:
     seconds: float = 20.0              # the longest the ball is followed (owner, 2026-11-15: until it stops or rolls out of view; this is only the safety cap); then it counts as stopped where it is
     stable_n: int = 4                  # sightings (gaps allowed, a pale ball is seen only now and then) over which it must not have moved
+    lead_s: float = 0.5                # the claw aims this far ahead of the rolling ball (its bearing speed times this); 0 = off
     max_window_s: float = 4.0          # ... and they must all fall within this long
     bearing_tol_deg: float = 2.0       # the world bearing may vary this much over those pictures
     size_tol: float = 0.15             # and its size this much (as a share of the mean): a ball rolling toward or away from him changes size
@@ -83,6 +84,7 @@ class WatchResult:
     stream_reading: object | None = None   # what the stream's last sightings said, for the log
     still_diag: dict | None = None     # when the still found nothing: the biggest green blob in it (numbers only)
     sightings: int = 0
+    frames: list | None = None         # the stream's per-picture log, compact, for the journal (numbers only)
 
 
 STREAM_WINDOW_S = 5.0              # the stream's sightings this recent at the end of the follow are the ball's last known place
@@ -105,6 +107,31 @@ def stream_reading(sights: list, end_t: float):
     return bf.BallReading(med(5) * f, med(6) * f, int(math.pi / 4.0 * diam * diam), int(w), int(h), diam, bf.DIST_K / diam, float(med(1)), False, "stream")
 
 
+def frame_log(rows: list, limit: int = 90) -> list:
+    """The stream's pictures as compact dicts for the journal: seconds from the first, bad (cut short), the ball's centre x / y and width, the picture's brightness and size, and for a picture with no
+    sighting the biggest green blob it held (area, x, y). Numbers only."""
+    if not rows:
+        return []
+    t0 = rows[0].get("t_capture", 0.0)
+    out = []
+    for r in rows[:limit]:
+        f = {"t": round(r.get("t_capture", t0) - t0, 1)}
+        if r.get("bad"):
+            f["bad"] = 1
+        else:
+            f["d"] = 1 if r.get("det") else 0
+            if r.get("best"):
+                f["ball"] = list(r["best"])
+            if r.get("mean") is not None:
+                f["mean"] = r["mean"]
+            f["bytes"] = r.get("bytes")
+            dg = r.get("diag")
+            if dg:
+                f["blob"] = [dg.get("area"), dg.get("x"), dg.get("y")]
+        out.append(f)
+    return out
+
+
 def _world_bearing(pan_log: lf.PanLog, t_capture: float, det) -> float:
     from .ball_chase import claw_pan_body
     cfg_fov = lf.LiveConfig().fov_half_deg
@@ -116,7 +143,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
     """`make_grabber(find_fn, cfg, clock, save)` -> a started-able grabber (the live follow's); `judge_success(after)` -> True when the punt counts as a hit by the goal's own rule (`after` is {"distance_in", "bearing_deg"} of the ball, or None when it is out of sight): "Got it." is said as soon as two stream sightings in a row say so, or when the ball is lost, or at the end, always before "I lost the ball"; `camera` takes the still (`look()`); `find_still(camera) -> BallReading | None` finds the ball in a still
     (the chase's own find and confirm). `on_ready()` is called once the claw is up and the follow starts (the dry run says "roll the ball now"). Never raises. On return the claw is back at the centre and lowered when the ball was found; otherwise it is left up for the caller's turn and look."""
     wcfg = wcfg or WatchConfig()
-    lcfg = lcfg or lf.LiveConfig(seconds=wcfg.seconds)
+    lcfg = lcfg or lf.LiveConfig(seconds=wcfg.seconds, lead_s=wcfg.lead_s)
     res = WatchResult()
     t0 = clock()
     grab = None
@@ -181,6 +208,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         res.pictures = len([r for r in grab.rows if not r.get("bad")])
         res.bad_frames = sum(1 for r in grab.rows if r.get("bad"))
         res.rows, res.move_log = list(grab.rows), out["moves"]
+        res.frames = frame_log(res.rows)
         end_t = clock()                                           # (before the stream is joined: the sightings' ages are measured from the end of the follow)
         res.sightings = len(state["sights"])
         res.last_bearing = state["last_bearing"]

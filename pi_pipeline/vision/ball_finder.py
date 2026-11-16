@@ -50,6 +50,7 @@ class BallReading:
     bearing_deg: float        # + = the ball is to G2's right, - = left (0 = straight ahead)
     touches_edge: bool        # the blob reaches the frame's edge: the ball is partly out of view, so size and distance are low estimates
     via: str = "normal"       # which pass found it: "normal", "close" (a big blob right at the claw) or "dim" (the loose pass: it also takes round green things on the floor, so the chase wants a second picture)
+    color: tuple | None = None  # the mean (r, g, b) of the blob's pixels, sampled where the ball is big (the chase keeps it from close up; the active look matches the ball by it, 2026-11-16)
 
 
 def _decode(jpeg: bytes) -> np.ndarray | None:
@@ -93,7 +94,12 @@ def _blobs(mask: np.ndarray):
 
 def _find(rgb: np.ndarray, dom_min: int, g_min: int, min_area: int) -> BallReading | None:
     dom = rgb[..., 1] - np.maximum(rgb[..., 0], rgb[..., 2])
-    mask = (dom >= dom_min) & (rgb[..., 1] >= g_min)
+    return _best_blob(rgb, (dom >= dom_min) & (rgb[..., 1] >= g_min), min_area)
+
+
+def _best_blob(rgb: np.ndarray, mask: np.ndarray, min_area: int) -> BallReading | None:
+    """The biggest round blob of `mask` (closed over 1 px gaps), as a reading; the shape tests are the same whatever made the mask."""
+    mask = mask.copy()
     mask[rgb.shape[0] - IGNORE_BOTTOM_PX:, :] = False
     for _ in range(2):                                     # close a 1 px gap or a highlight: grow, then shrink
         mask = _shift_or(mask)
@@ -116,10 +122,34 @@ def _find(rgb: np.ndarray, dom_min: int, g_min: int, min_area: int) -> BallReadi
         dist = DIST_K / max(diam, 1.0)
         cx = float(xs.mean())
         side_in = (cx - rgb.shape[1] / 2) * BALL_IN / max(diam, 1.0)
-        reading = BallReading(cx, float(ys.mean()), int(area), w, h, diam, dist, math.degrees(math.atan2(side_in, dist)), edge)
+        color = tuple(int(v) for v in rgb[ys, xs].mean(axis=0))
+        reading = BallReading(cx, float(ys.mean()), int(area), w, h, diam, dist, math.degrees(math.atan2(side_in, dist)), edge, "normal", color)
         if best is None or reading.area > best.area:
             best = reading
     return best
+
+
+COLOR_TOL = 0.04              # how far (in normalized red/green share) a pixel's colour may be from the ball's own colour
+COLOR_MIN_SUM = 150           # r + g + b: darker pixels have no reliable colour
+COLOR_MIN_DOM = 8             # green above the larger of red and blue: a gray or brown floor is never the ball's colour
+COLOR_MIN_AREA = 60           # a colour match is looser than the dominance rules, so it needs a bigger blob
+COLOR_MIN_Y = 65              # the centre at least this far down: the floor (walls and plants are above the horizon)
+
+
+def find_ball_color(jpeg: bytes, ref: tuple) -> BallReading | None:
+    """The ball found by ITS OWN colour (2026-11-16: the fixed green thresholds miss a pale ball at a distance): pixels whose red and green share of the light is within COLOR_TOL of `ref`'s, bright
+    enough, with green above red and blue, in a round blob of at least COLOR_MIN_AREA centred at row COLOR_MIN_Y or lower. `ref` is the (r, g, b) the chase sampled when the ball was close."""
+    rgb = _decode(jpeg)
+    if rgb is None or ref is None:
+        return None
+    s = np.maximum(rgb.sum(axis=2), 1)
+    rs, gs = float(ref[0]) / max(sum(ref), 1), float(ref[1]) / max(sum(ref), 1)
+    dom = rgb[..., 1] - np.maximum(rgb[..., 0], rgb[..., 2])
+    mask = (np.abs(rgb[..., 0] / s - rs) <= COLOR_TOL) & (np.abs(rgb[..., 1] / s - gs) <= COLOR_TOL) & (s >= COLOR_MIN_SUM) & (dom >= COLOR_MIN_DOM)
+    r = _best_blob(rgb, mask, COLOR_MIN_AREA)
+    if r is None or r.y < COLOR_MIN_Y:
+        return None
+    return dataclasses.replace(r, via="color")
 
 
 def diagnose(jpeg: bytes) -> dict | None:

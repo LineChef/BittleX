@@ -508,3 +508,53 @@ def test_the_chase_does_not_say_target_acquired_again_for_the_reading_the_active
     again = []
     bc.run_chase(FakeRobot(), FakeCamera([picture([disc(122, 110, 50)])]), lambda: False, max_steps=1, announce=again.append, sleep=lambda s: None, say=lambda m: None, dry_run=True)
     assert "target acquired" in again                                                       # without a first reading the chase announces the first sighting as before
+
+
+# ---- 2026-11-16: the lead, the frame log and the colour sample
+
+def test_the_claw_aims_ahead_of_a_rolling_ball_and_not_ahead_of_a_still_one():
+    cfg = lf.LiveConfig(lead_s=0.5, deadband_deg=1.0, min_move_deg=0.5)
+    still = lf.LiveFollower(cfg, "left", lf.PanLog(0.0, 0.0))
+    moving = lf.LiveFollower(cfg, "left", lf.PanLog(0.0, 0.0))
+    wants_still = wants_moving = None
+    for i, t in enumerate((1.0, 1.3, 1.6, 1.9)):
+        x_moving = 0.55 + 0.04 * i                                                          # the ball drifts right in the picture: it is rolling to the right
+        wants_still = still.decide(t, [("ball", 1.0, 0.6, 0.6, 0.1, 0.1)], t + 0.3, 0.0)
+        wants_moving = moving.decide(t, [("ball", 1.0, x_moving, 0.6, 0.1, 0.1)], t + 0.3, 0.0)
+    assert still.lead_deg == 0.0 and moving.lead_deg > 0.0
+    assert wants_moving is not None and wants_still is not None and abs(wants_moving) > abs(wants_still) - 1e-9   # the moving ball is led (a larger pan to the right, a more negative left-pan)
+    off = lf.LiveFollower(lf.LiveConfig(), "left", lf.PanLog(0.0, 0.0))                  # lead_s 0 (the default): no lead for anything
+    for t in (1.0, 1.3, 1.6, 1.9):
+        off.decide(t, [("ball", 1.0, 0.55 + 0.04 * t, 0.6, 0.1, 0.1)], t + 0.3, 0.0)
+    assert off.lead_deg == 0.0
+
+
+def test_the_frame_log_is_compact_numbers_only():
+    rows = [{"t_capture": 10.0, "det": [("ball", 0.5)], "best": (0.5, 0.6, 0.1), "mean": 120, "bytes": 6800},
+            {"t_capture": 10.25, "det": [], "mean": 118, "bytes": 6790, "diag": {"area": 9, "x": 120, "y": 100}},
+            {"t_capture": 10.5, "det": [], "bad": True}]
+    f = pw.frame_log(rows)
+    assert f[0] == {"t": 0.0, "d": 1, "ball": [0.5, 0.6, 0.1], "mean": 120, "bytes": 6800}
+    assert f[1]["d"] == 0 and f[1]["blob"] == [9, 120, 100] and f[2] == {"t": 0.5, "bad": 1}
+    assert pw.frame_log([]) == [] and len(pw.frame_log(rows * 80)) == 90
+
+
+def test_the_chase_keeps_the_balls_colour_from_a_close_reading_only():
+    close = bf.BallReading(120.0, 150.0, 800, 24, 24, 24.0, 8.0, 2.0, False, "normal", (100, 150, 90))
+    far = bf.BallReading(120.0, 150.0, 200, 12, 12, 12.0, 28.0, 2.0, False, "normal", (80, 120, 80))
+    p = bc.ChasePlanner()
+    p.decide(far)
+    assert p.ball_color is None                                                           # far: a smaller, poorer sample
+    p.decide(close)
+    assert p.ball_color == (100, 150, 90)
+    p.decide(far)
+    assert p.ball_color == (100, 150, 90)                                                 # kept
+
+
+def test_the_stream_probe_summarizes_brightness_and_the_exposure_lock_experiment():
+    from pi_pipeline.vision import stream_probe as sp
+    means = [(0.2, 120.0), (0.5, 90.0), (0.8, 140.0), (1.1, 100.0), (2.2, 110.0), (2.5, 110.5), (2.8, 109.5)]
+    s = sp.brightness_summary(means, lock_at=2.0)
+    assert s["after_lock"]["stdev"] < s["before_lock"]["stdev"] and s["min"] == 90.0 and s["max"] == 140.0
+    assert "before_lock" not in sp.brightness_summary(means, None)
+    assert sp.LOCK_AE.startswith(b"AT+SETREG") and b"0x3503" in sp.LOCK_AE and b"0x00" in sp.UNLOCK_AE
