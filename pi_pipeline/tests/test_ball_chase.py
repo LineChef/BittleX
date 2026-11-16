@@ -1351,3 +1351,15 @@ def test_the_attentive_bout_is_off_unless_switched_on(monkeypatch, capsys):
     monkeypatch.delenv("G2_ATTENTIVE_BOUT", raising=False)
     attentive_bout.main()
     assert "switched off" in capsys.readouterr().out
+
+
+def test_rest_then_stand_centres_the_claw_lies_down_in_rest_and_stands_up_from_rest():
+    lk = _PoseLink("stand")
+    t = iter(np.arange(0, 100000, 0.2))
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
+    r._claw = (30.0, 120.0)
+    assert r.rest_then_stand() == "ok"
+    sent = lk.sent
+    assert "krest" in sent and "kbalance" in sent and sent.index("krest") < sent.index("kbalance")     # rest first, then the stand-up
+    assert r._claw == (0.0, 0.0) and r.posture == "stand"
+    assert lk.last_motion_command in ("krest", "kbalance")

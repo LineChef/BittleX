@@ -588,6 +588,7 @@ SAG_TILT_DEG = 12.0            # standing, the body this far off the tilt measur
 PICTURE_SAG_HINT_S = 30.0       # how long a rolled picture keeps the body-tilt sag check stricter
 PICTURE_SAG_FACTOR = 0.6        # the body-tilt thresholds are this fraction of themselves while the hint is on (12 deg becomes 7)
 SAG_TILT_LEVEL_DEG = 20.0      # (2026-11-02: the board still read the stand while the back legs had let go and the body sat 33 deg nose-up; the next turn tipped him over)
+REST_SETTLE_S = 2.5            # the wait for the rest position when the board cannot answer pose reads (the active look's rest, then stand)
 ATTENTION_TRIES = 3            # kcalib sent this many times at most until the board reads the attention pose (2026-11-02: one sent 1 s after the stop at the end of a turn was ignored)
 POSE_TOL_DEG = 12.0            # a leg pose read with `j` names a known pose when every leg joint is within this of it
 POSE_WAIT_S = {"stand": 6.0, "attention": 3.0}      # the longest wait for a pose to read as reached after asking for it (the firmware stand-up from rest takes about 2 to 3 s)
@@ -1251,6 +1252,17 @@ class SerialRobot:
 
     def stand_up_from_rest(self) -> str:
         """The normal stand-up from the rest position (the firmware `kbalance` as the link plays it). "ok" or "fell"."""
+        return self._stand_up_from("rest")
+
+    def rest_then_stand(self) -> str:
+        """Claw centred and lowered, laid down in the rest position, then the eased stand-up from rest (owner, 2026-11-15: the end of the active look, before "target acquired" or the turn toward the
+        side the ball was lost on). "ok" or "fell"."""
+        if self.claw_pose(0.0, 0.0) == "fell":
+            return "fell"
+        self._tx("krest")
+        self.posture = "rest"
+        wait_for_pose(self._lk, "rest", sleep=self._sleep, clock=self._clock, fallback_s=REST_SETTLE_S)
+        self._sleep(0.5)
         return self._stand_up_from("rest")
 
     def stand_up_from_attention(self) -> str:

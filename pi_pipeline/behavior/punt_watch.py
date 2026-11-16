@@ -24,7 +24,7 @@ log = logging.getLogger("g2.punt_watch")
 
 @dataclass
 class WatchConfig:
-    seconds: float = 10.0              # the longest the ball is followed; then it counts as stopped where it is
+    seconds: float = 20.0              # the longest the ball is followed (owner, 2026-11-15: until it stops or rolls out of view; this is only the safety cap); then it counts as stopped where it is
     stable_n: int = 6                  # pictures in a row over which it must not have moved (about 1.5 s of the stream)
     bearing_tol_deg: float = 2.0       # the world bearing may vary this much over those pictures
     size_tol: float = 0.15             # and its size this much (as a share of the mean): a ball rolling toward or away from him changes size
@@ -153,29 +153,34 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         grab.stop_flag.set()
         grab.join(timeout=3.0)                                    # the stream is ended (AT+BREAK) before the still is requested
         sleep(0.5)
-        if state["reason"] == "lost":
+        ball = None
+        if state["reason"] != "lost":
+            res.ended = "stopped" if state["reason"] == "stopped" else "timeout"
+            say(f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture")
+            ball = find_still(camera)                                  # taken with the claw up and steady: this is where the ball ended
+            if ball is None:
+                say("watch: no ball in the still: lost")
+        if ball is None:
             res.ended = "lost"
+        else:
+            res.found = True
+            res.reading = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + _pan_body(out["pan"]))
+        # Either way (owner, 2026-11-15): claw centred, down into the rest position, the eased stand-up, and only then "target acquired" or the turn toward the last side
+        settle = getattr(robot, "rest_then_stand", None)
+        if callable(settle):
+            if settle() == "fell":
+                res.ended, res.found, res.reading = "fell", False, None
+                return res
+        else:
+            robot.claw_pose(0.0, 0.0)
+        if res.found:
+            say(f"watch: target acquired: {ball.distance_in:.0f} in, {res.reading.bearing_deg:+.0f} deg from straight ahead")
+            if announce is not None:
+                announce("target acquired")
+        else:
             say("watch: the ball is out of sight: lost")
             if announce is not None:
                 announce("I lost it")
-            robot.claw_pose(0.0, 0.0)                                 # the claw goes home before any turn or look that follows
-            return res
-        res.ended = "stopped" if state["reason"] == "stopped" else "timeout"
-        say(f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture")
-        ball = find_still(camera)
-        if ball is None:
-            res.ended = "lost"
-            say("watch: no ball in the still: lost")
-            if announce is not None:
-                announce("I lost it")
-            robot.claw_pose(0.0, 0.0)
-            return res
-        res.found = True
-        res.reading = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + _pan_body(out["pan"]))
-        say(f"watch: target acquired: {ball.distance_in:.0f} in, {res.reading.bearing_deg:+.0f} deg from straight ahead")
-        if announce is not None:
-            announce("target acquired")
-        robot.claw_pose(0.0, 0.0)                                 # the chase's first reading is from straight ahead with the claw home
         return res
     except Exception:  # noqa: BLE001
         log.exception("the post-punt watch failed")

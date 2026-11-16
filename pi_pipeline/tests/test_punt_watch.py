@@ -262,3 +262,53 @@ def test_the_last_punt_of_an_attempt_leaves_the_arm_up_when_the_watch_will_run(m
     monkeypatch.setattr(bc, "POST_PUNT_WATCH", False)
     bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda: pw.WatchResult(ended="stopped"), sleep=lambda s: None, say=lambda m: None)
     assert calls == ["punt"]
+
+
+class SettleRobot(WatchRobot):
+    """Records the order: the end of the watch is claw centred, rest, stand-up, and only then the announcement (owner, 2026-11-15)."""
+    fall = False
+
+    def __init__(self, events):
+        super().__init__()
+        self.events = events
+
+    def claw_pose(self, pan, lift):
+        r = super().claw_pose(pan, lift)
+        self.events.append(("claw", round(pan, 1), lift))
+        return r
+
+    def rest_then_stand(self):
+        self.events.append("rest_then_stand")
+        return "fell" if self.fall else "ok"
+
+
+def _settle_run(vanish_at=None, still="default", fall=False):
+    events = []
+    c = Clock()
+    robot = SettleRobot(events)
+    robot.fall = fall
+    find_still = (lambda cam: reading()) if still == "default" else (lambda cam: still)
+    res = pw.watch_after_punt(robot, object(), lambda find, cfg, clock, save: Script(c, vanish_at=vanish_at), lambda j: [], find_still, pw.WatchConfig(seconds=6.0, stable_n=6), lf.LiveConfig(tick_s=0.05),
+                              say=lambda *_: None, announce=lambda m: events.append(("say", m)), sleep=c.sleep, clock=c)
+    return res, events
+
+
+def test_a_stopped_ball_rests_and_stands_before_target_acquired():
+    res, events = _settle_run()
+    assert res.found and events[-2:] == ["rest_then_stand", ("say", "target acquired")]
+
+
+def test_a_lost_ball_rests_and_stands_before_the_caller_turns_toward_the_last_side():
+    res, events = _settle_run(vanish_at=1.5)
+    assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost it")]
+    res, events = _settle_run(still=None)
+    assert res.ended == "lost" and events[-2:] == ["rest_then_stand", ("say", "I lost it")]
+
+
+def test_a_fall_while_resting_or_standing_ends_the_watch_as_a_fall_with_no_announcement():
+    res, events = _settle_run(fall=True)
+    assert res.ended == "fell" and not res.found and res.reading is None and not any(isinstance(e, tuple) and e[0] == "say" for e in events)
+
+
+def test_the_watch_holds_until_the_ball_stops_or_leaves_view_with_a_safety_cap_of_twenty_seconds():
+    assert pw.WatchConfig().seconds == 20.0
