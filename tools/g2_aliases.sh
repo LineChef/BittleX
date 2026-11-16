@@ -443,6 +443,15 @@ g2liftcal() {
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
+# g2stepcal [small|long|all] [REPEATS]  -- step calibration (default all, 3 repeats): with a ball about 30 in straight ahead, G2 takes timed small steps (0.4, 0.6, 0.9, 1.2 s) and long walks (1.5, 2.0, 3.0 s), the camera measures the forward inches each one covered (backing up when the ball gets close), and the summary gives inches per second, the start delay and the spread, with suggested constants. Numbers only, no pictures. Stops the voice service first (`g2stop voice`), brings it back after; `g2stepcalstop` ends it early.
+g2stepcal() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.step_cal --kinds ${1:-all} --repeats ${2:-3} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
+# g2stepcalstop  -- end a step calibration after the current step (he is laid in rest).
+g2stepcalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/stepcal_stop" && echo "stop sent: the calibration ends after the current step"; }
 # g2punttest [dry]  -- the active look (the post-punt watch): stands G2 up from rest, punts the ball (it must be in punt range), follows it rolling with the claw until it stops, takes a picture, says "target acquired" and goes on with the chase (turn, walk, dial in, one more punt), or, when the ball is lost, turns toward the side it was last seen on and does the normal claw look. `dry` = no punt and no chase: you roll the ball by hand and he only watches. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2puntstop ends it.
 g2punttest() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

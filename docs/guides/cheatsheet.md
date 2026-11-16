@@ -22,6 +22,7 @@ Most used
 - `g2seen NAME`: camera only: what the detector and the gallery see (no move)
 - `g2stream`: camera only: can the module stream pictures, and how fast?
 - `g2liftcal`: step the claw lift with a ball in view (hands near)
+- `g2stepcal`: measure how far timed steps really go (ball 30 in ahead, hands near)
 - `g2punttest dry`: watch a hand-rolled ball with the claw (no punt)
 - `g2punttest`: punt, watch it roll, acquire it, go on (hands near)
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
@@ -377,6 +378,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2serial`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2ssh`: [Most used](#most-used), [Setup](#setup)
 - `g2standup`: [Most used](#most-used)
+- `g2stepcal`: [Most used](#most-used)
 - `g2stop`: [Most used](#most-used), [Stop and safety](#stop-and-safety)
 - `g2stream`: [Most used](#most-used)
 - `g2sync`: [Most used](#most-used), [Data and review](#data-and-review)

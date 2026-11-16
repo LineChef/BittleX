@@ -195,3 +195,14 @@ bash tools/g2_deploy_when_online.sh --once        # the same, without the alias
 ```
 
 A deploy restarts the voice service, so it never changes the settings file, and it refuses to run during a walk. The settings file is the only thing to change to dial in the punt.
+
+Step calibration
+----------------
+
+The approach is timed with no camera feedback, so the step lengths the planner uses (small steps closer at about 2.8 inches per second, the long walk at a fitted pace and start delay) should be checked against what G2 actually covers. `g2stepcal` measures it with the camera: the ball's forward distance before and after each timed step, as the distance times the cosine of its bearing. No pictures are saved.
+
+1. Put G2 on his feet on the floor with the green ball about 30 inches straight ahead, nothing else green in view, hands near. Confirm the floor label with `g2floor`.
+2. Run `g2stepcal` (all kinds, 3 repeats), or `g2stepcal small 2` for a shorter run. The voice service stops first and comes back after.
+3. He takes small steps of 0.4, 0.6, 0.9 and 1.2 seconds, then long walks of 1.5, 2.0 and 3.0 seconds. When the ball gets too close for the next step he backs up and reads it again.
+4. Read the summary: the median forward inches for each duration with the range, the straight-line fit (rate and start delay), and the suggested `NUDGE_IN_PER_S` and walk pace. `g2stepcalstop` ends it after the current step.
+5. The run ends early on a fall, a lost ball, or a ball that stays too close; the result file is saved on the Pi in `~/g2_runs/`.
