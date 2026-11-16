@@ -93,14 +93,18 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
     try:
         grab = make_grabber(find_fn, lcfg, clock, None)
         grab.start()                                             # the stream starts at once: the ball is recorded while he moves into the attention pose
-        if robot.relax() == "fell" or robot._fell():
-            res.ended = "fell"
-            return res
-        if robot.claw_pose(0.0, lcfg.lift_deg) == "fell":
-            res.ended = "fell"
-            return res
-        sleep(0.3)
-        base = robot._tilt()
+        if callable(getattr(robot, "claw_is_up", None)) and robot.claw_is_up():
+            if robot._fell():                                    # the punt left the arm up: no attention-pose move, no raise: tracking can start at once
+                res.ended = "fell"
+                return res
+        else:
+            if robot.relax() == "fell" or robot._fell():
+                res.ended = "fell"
+                return res
+            if robot.claw_pose(0.0, lcfg.lift_deg) == "fell":
+                res.ended = "fell"
+                return res
+        base = robot._tilt(0.2)
         t_up = clock()
         pan_log = lf.PanLog(0.0, t_up)
         follower = lf.LiveFollower(lcfg, pan_sign, pan_log)
@@ -154,6 +158,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
             say("watch: the ball is out of sight: lost")
             if announce is not None:
                 announce("I lost it")
+            robot.claw_pose(0.0, 0.0)                                 # the claw goes home before any turn or look that follows
             return res
         res.ended = "stopped" if state["reason"] == "stopped" else "timeout"
         say(f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture")
@@ -163,6 +168,7 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
             say("watch: no ball in the still: lost")
             if announce is not None:
                 announce("I lost it")
+            robot.claw_pose(0.0, 0.0)
             return res
         res.found = True
         res.reading = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + _pan_body(out["pan"]))

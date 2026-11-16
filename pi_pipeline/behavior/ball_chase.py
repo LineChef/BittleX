@@ -1424,7 +1424,7 @@ class SerialRobot:
             return "fell"
         return self._punch()
 
-    def _punch(self) -> str:
+    def _punch(self, arm_up: bool = False) -> str:
         from ..link import transitions
         self.posture = "stand"
         self._pitch, self._roll = [], []
@@ -1432,7 +1432,7 @@ class SerialRobot:
         bal = transitions.balance_pose()                              # Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]
         cur = (0.0, list(bal[:4]), list(bal[4:]))
         keys = [(t, lift, [a + (-10 if i < 2 else 0) for i, a in enumerate(sh)], [b + (6 if i < 2 else 0) for i, b in enumerate(kn)]) for t, lift, sh, kn in punch_keys()]
-        keys.append((0.40, 0, list(bal[:4]), list(bal[4:])))           # and back to the balance pose
+        keys.append((0.80 if arm_up else 0.40, CLAW_LIFT_DEG if arm_up else 0, list(bal[:4]), list(bal[4:])))           # and back to the balance pose; with `arm_up` the arm goes on up to the look height meanwhile, slowly (the post-punt watch starts tracking at once)
         n = 0
         for t, lift, sh, kn in keys:
             steps = max(1, int(round(t * PUNCH_STEPS_PER_S)))
@@ -1450,7 +1450,18 @@ class SerialRobot:
         self._fell()
         self._imu_release()
         self._moved_at = self._clock()
+        if arm_up:
+            self._claw = (0.0, CLAW_LIFT_DEG)                           # the arm is up and centred: the next claw move starts from there
         return "ok"
+
+    def claw_is_up(self) -> bool:
+        return self._claw[1] >= CLAW_LIFT_DEG - 5.0
+
+    def punt_arm_up(self) -> str:
+        """The punt, with the arm left up at the look height (the post-punt watch can pan the claw at once)."""
+        if self.stand_up() == "fell":
+            return "fell"
+        return self._punch(arm_up=True)
 
     def punt(self) -> str:
         if self.stand_up() == "fell":
@@ -1969,7 +1980,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
         elif act.kind == "punt":
             if announce is not None:
                 announce("punting")                       # he says it right before the lunge (user, 2026-10-25)
-            state = robot.punt()
+            watching = after_punt_look and POST_PUNT_WATCH and post_punt_watch is not None and max_punts is not None and punts + 1 >= max_punts and callable(getattr(robot, "punt_arm_up", None))
+            state = robot.punt_arm_up() if watching else robot.punt()
             punts += 1
             note(kind="act", act="punt", why=act.why, state=state, at=planner.punt_log[-1] if planner.punt_log else None)
             sleep(1.5)                                    # the ball is rolling: look after it stops

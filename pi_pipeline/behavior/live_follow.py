@@ -154,8 +154,8 @@ def valid_jpeg(jpeg: bytes) -> bool:
 
         from PIL import Image
         im = Image.open(io.BytesIO(jpeg))
-        im.load()
-        return im.size[0] >= 64 and jpeg[-2:] == b"\xff\xd9"
+        im.load()                                                  # raises on a picture cut short; the module's frames do not end on the exact end-of-image bytes (2026-11-15: every frame was rejected by that rule)
+        return im.size[0] >= 64
     except Exception:  # noqa: BLE001
         return False
 

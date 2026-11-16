@@ -105,7 +105,7 @@ def test_a_ball_that_vanishes_is_lost_with_the_side_it_was_last_seen_on():
     res, robot, spoken = run_watch(vanish_at=1.5)
     assert res.ended == "lost" and not res.found and spoken == ["I lost it"]
     assert res.last_bearing is not None and res.last_side == (1 if res.last_bearing > 0 else -1)         # the side is the sign of the last world bearing (the claw's direction plus the offset)
-    assert ("claw", 0.0, 0.0) != robot.calls[-1]                                              # the claw stays up for the caller's turn and look
+    assert robot.calls[-1] == ("claw", 0.0, 0.0)                                              # the claw goes home before the caller's turn and look
 
 
 def test_a_still_without_the_ball_is_lost_too():
@@ -230,3 +230,35 @@ def test_the_ball_goal_carries_where_the_ball_stopped_into_the_next_attempt():
         assert seen["first_reading"] is None and seen["turned"] == -40.0                         # turned toward the side it was last seen on, then the normal search
     finally:
         bp._chase = orig
+
+
+def test_a_punt_that_leaves_the_arm_up_lets_the_watch_start_without_the_attention_move():
+    class UpRobot(WatchRobot):
+        def claw_is_up(self):
+            return True
+    c = Clock()
+    r = UpRobot()
+    res = pw.watch_after_punt(r, object(), lambda find, cfg, clock, save: Script(c), lambda j: [], lambda cam: reading(), pw.WatchConfig(seconds=6.0, stable_n=6), lf.LiveConfig(tick_s=0.05),
+                              say=lambda *_: None, sleep=c.sleep, clock=c)
+    assert "relax" not in r.calls and ("claw", 0.0, 120.0) not in r.calls[:1] and res.found
+
+
+def test_the_last_punt_of_an_attempt_leaves_the_arm_up_when_the_watch_will_run(monkeypatch):
+    calls = []
+
+    class R(FakeRobot):
+        def punt(self):
+            calls.append("punt")
+            return "ok"
+
+        def punt_arm_up(self):
+            calls.append("punt_arm_up")
+            return "ok"
+    frames = [picture([disc(122, 110, 50)])]
+    bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda: pw.WatchResult(ended="stopped", found=True, reading=reading()),
+                 sleep=lambda s: None, say=lambda m: None)
+    assert calls == ["punt_arm_up"]
+    calls.clear()
+    monkeypatch.setattr(bc, "POST_PUNT_WATCH", False)
+    bc.run_chase(R(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, after_punt_look=True, post_punt_watch=lambda: pw.WatchResult(ended="stopped"), sleep=lambda s: None, say=lambda m: None)
+    assert calls == ["punt"]
