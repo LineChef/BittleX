@@ -139,11 +139,20 @@ What happens next
 
 Testing follows a simple rule: collect data from normal runs first, then run a targeted test only where the logs cannot answer the question.
 
-1. Run one more 5-minute hardwood roam to confirm the legs stay level in the attention pose, the claw lifts on every look and the attention-pose entry log lines show its time.
-2. Find out what the BiBoard's own `up` moves before some attention stand-ups are.
-3. Run the ball goal inside the voice service again and read the stand-up and turn logs.
-4. Recalibrate the wall estimator for the claw camera, then improve the bump reflex for thin obstacles.
-5. Check the wake-word log after a few days of use.
-6. Capture more real walks for system identification, now with V7.
+1. Charge the pack and the Pi first. A ball goal run ends at the 30 percent pack gate, and the last runs reached it after three attempts.
+2. Read the active look's per-picture log from the last journal rows (`after_punt.frames`: seen or missed, brightness, size, the biggest green blob in a missed picture) and judge the new follow changes: matching the ball by its own colour, the lead on a moving ball, the check against false jumps.
+3. Run the camera-only probes, which move nothing: `g2stream 8 --lock-ae` shows whether freezing the sensor's auto exposure steadies the picture brightness (it swung between 48 and 127 within seconds), and `g2stream 6 --compare` shows whether 4.3 pictures a second is a picture-size setting or the module's own limit.
+4. Settle the rolled stand: a stand from rest sometimes leaves G2 rolled 16 to 23 degrees while every leg joint reads its stand angle. If he visibly leans at those times, check the servos and legs; if he does not, check the IMU's zero.
+5. Rerun the step calibration with the ball about 14 inches away (`g2stepcal small 2`, where the finder's distance is reliable), then set the small-step rate from the measured numbers.
+6. Run a few ball goal runs, changing one thing at a time, and read the stand-up, gate and active look logs after each.
+7. Run the arm skills test (`g2armskill`, one skill per run), which has not been run yet.
+
+Lower priority, when time allows:
+
+- Run one more 5-minute hardwood roam to confirm the legs stay level in the attention pose and the claw lifts on every look.
+- Find out what the BiBoard's own `up` moves before some attention stand-ups are.
+- Recalibrate the wall estimator for the claw camera, then improve the bump reflex for thin obstacles.
+- Check the wake-word log after a few days of use.
+- Capture more real walks for system identification, now with V7.
 
 Longer-term plans are in the [Roadmap](project-plan.md).
