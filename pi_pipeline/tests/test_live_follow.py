@@ -122,16 +122,27 @@ def test_the_step_report_finds_when_a_fixed_target_settled_and_counts_reversals(
     assert lf.step_report([{"t_capture": 0.0, "det": []}], [])["pictures_with_target"] == 0
 
 
-def test_the_stream_grabber_reads_pictures_as_they_arrive_and_always_breaks_at_the_end():
+def _real_jpeg():
+    import io
+
+    import numpy as np
+    from PIL import Image
+    b = io.BytesIO()
+    Image.fromarray(np.random.default_rng(3).integers(0, 255, (96, 96, 3), dtype=np.uint8)).save(b, "JPEG")
+    return b.getvalue()
+
+
+def test_the_stream_grabber_reads_pictures_skips_bad_frames_and_always_breaks_at_the_end():
     from pi_pipeline.vision import stream_probe as sp
+    good = _real_jpeg()
 
     class S:
-        jpeg = b"jpg"
-        detections = []
+        def __init__(self, jpeg):
+            self.jpeg, self.detections = jpeg, []
 
     class Ser:
-        def __init__(self, n):
-            self.lines, self.written = [b"p\n"] * n, []
+        def __init__(self, lines):
+            self.lines, self.written = list(lines), []
 
         def reset_input_buffer(self):
             pass
@@ -144,16 +155,18 @@ def test_the_stream_grabber_reads_pictures_as_they_arrive_and_always_breaks_at_t
                 return self.lines.pop(0)
             time.sleep(0.005)
             return b""
-    ser = Ser(5)
-    g = lf.StreamGrabber(ser, lambda jpeg: [ball(0.7)], lf.LiveConfig(), parse=lambda line, labels: S(), latency_s=0.25, sleep=lambda s: None)
+    ser = Ser([b"g\n", b"g\n", b"x\n", b"g\n", b"g\n", b"g\n"])               # "x" is a frame cut short
+    g = lf.StreamGrabber(ser, lambda jpeg: [ball(0.7)], lf.LiveConfig(), parse=lambda line, labels: S(good if line.startswith("g") else good[:200]), latency_s=0.25, sleep=lambda s: None)
     g.start()
-    deadline = time.time() + 2.0
-    while len(g.rows) < 5 and time.time() < deadline:
+    deadline = time.time() + 3.0
+    while len([r for r in g.rows if not r.get("bad")]) < 5 and time.time() < deadline:
         time.sleep(0.01)
     g.stop_flag.set()
-    g.join(timeout=2.0)
-    assert len(g.rows) == 5 and g.rows[0]["t_call"] - g.rows[0]["t_capture"] == pytest.approx(0.25, abs=0.01) and g.take()[2] == 5
+    g.join(timeout=3.0)
+    ok = [r for r in g.rows if not r.get("bad")]
+    assert len(ok) == 5 and g.bad == 1 and ok[0]["t_call"] - ok[0]["t_capture"] == pytest.approx(0.25, abs=0.01) and g.take()[2] == 5     # the cut frame is neither a sighting nor a miss
     assert ser.written[0] == sp.BREAK and sp.LOOP_WITH_PICTURE in ser.written and ser.written[-1] == sp.BREAK
+    assert lf.summarize(g.rows, [], 0, 2.0)["bad_frames"] == 1 and lf.valid_jpeg(good) and not lf.valid_jpeg(good[:200])
 
 
 def test_run_live_can_use_another_grabber():

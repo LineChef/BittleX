@@ -257,19 +257,14 @@ def main() -> None:
             if targets is None:
                 print("refused: --live needs --target (for example ball)")
                 return
-            n = {"i": 0}
-
-            def save(i, jpeg):
-                with open(os.path.join(outdir, f"pic_{i:03d}.jpg"), "wb") as f:
-                    f.write(jpeg)
             make = None
             if args.stream:
                 cam._open()                                                # the snapshotter's start-up (reset wait, sensor option, exposure), then the stream takes the port
-                make = lambda find, cfg, clock, sv: lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=sv)      # noqa: E731
-            res = lf.run_live(robot, cam.snapshot, targets.detections, lf.LiveConfig(seconds=args.minutes * 60.0), pan_sign=chase.CLAW_PAN_SIGN, save=save, make_grabber=make)
+                make = lambda find, cfg, clock, sv: lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=None)      # noqa: E731
+            res = lf.run_live(robot, cam.snapshot, targets.detections, lf.LiveConfig(seconds=args.minutes * 60.0), pan_sign=chase.CLAW_PAN_SIGN, save=None, make_grabber=make)
             lf.write_log(res, outdir)
             print("STEP:", lf.step_report(res["rows"], res["moves"]))
-            print(f"PICTURES: {outdir} ({res['summary'].get('pictures', 0)} pictures, {res['summary'].get('with_target', 0)} with the target)")
+            print(f"PICTURES: {outdir} (the tracking pictures are not saved: {res['summary'].get('pictures', 0)} pictures, {res['summary'].get('with_target', 0)} with the target; log only)")
             return
         run_bout(robot, look, cfg, pan_sign=chase.CLAW_PAN_SIGN)
         print(f"PICTURES: {outdir} ({seen['n']} pictures, {seen['with_det']} with a detection, best score {seen['best']:.2f})")

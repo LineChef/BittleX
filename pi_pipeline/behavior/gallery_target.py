@@ -62,7 +62,10 @@ class BallTarget:
             if b is None:
                 return []
             f = self.FRAME_PX
-            return [("ball", 1.0, float(b.x) / f, float(b.y) / f, float(b.width) / f, float(b.height) / f)]
+            w, h = float(b.width) / f, float(b.height) / f
+            if w > 0.6 or h > 0.6 or not 0.5 <= w / max(h, 1e-6) <= 2.0:           # the ball is never most of the frame: a garbled picture (a size of 1.00 was seen) is not a sighting
+                return []
+            return [("ball", 1.0, float(b.x) / f, float(b.y) / f, w, h)]
         except Exception:  # noqa: BLE001
             return []
 

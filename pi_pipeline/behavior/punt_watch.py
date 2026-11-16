@@ -70,6 +70,9 @@ class WatchResult:
     seconds: float = 0.0
     pictures: int = 0
     moves: int = 0
+    rows: list | None = None           # the stream's per-frame log (time, detections, bad frames), for the report
+    move_log: list | None = None
+    bad_frames: int = 0
 
 
 def _world_bearing(pan_log: lf.PanLog, t_capture: float, det) -> float:
@@ -132,7 +135,9 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
             on_ready()
         out = lf.follow_loop(robot, grab, follower, pan_log, lcfg, base=base, pan=0.0, seconds=wcfg.seconds, say=say, sleep=sleep, clock=clock, stopped=stopped, on_picture=on_picture)
         res.moves = len(out["moves"])
-        res.pictures = len(grab.rows)
+        res.pictures = len([r for r in grab.rows if not r.get("bad")])
+        res.bad_frames = sum(1 for r in grab.rows if r.get("bad"))
+        res.rows, res.move_log = list(grab.rows), out["moves"]
         res.last_bearing = state["last_bearing"]
         res.last_side = 0 if state["last_bearing"] is None else (1 if state["last_bearing"] > 0 else -1)
         if out["ended"] in ("fell", "sag"):

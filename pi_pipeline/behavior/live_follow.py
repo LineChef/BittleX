@@ -147,19 +147,37 @@ class Grabber(threading.Thread):
                 self.rows.append(row)
 
 
+def valid_jpeg(jpeg: bytes) -> bool:
+    """True when the picture decodes completely. The camera's stream under load (2026-11-15 dry run: about 40% of the frames) delivers pictures cut short or garbled; a bad frame says nothing about the ball."""
+    try:
+        import io
+
+        from PIL import Image
+        im = Image.open(io.BytesIO(jpeg))
+        im.load()
+        return im.size[0] >= 64 and jpeg[-2:] == b"\xff\xd9"
+    except Exception:  # noqa: BLE001
+        return False
+
+
 class StreamGrabber(Grabber):
     """The module's continuous picture stream (`AT+INVOKE=-1,0,0`, measured 2026-11-15: about 4.3 pictures a second, a steady 0.22 s gap) instead of one request per picture. The module sends pictures on its own, so
-    a picture's capture time is its arrival minus `latency_s` (the encode and the serial transfer; an estimate until measured from a run's log)."""
+    a picture's capture time is its arrival minus `latency_s` (the encode and the serial transfer; an estimate until measured from a run's log).
+
+    Two threads: the READER only reads lines and timestamps them (nothing else may delay the read: a late read loses bytes), the PROCESSOR decodes, checks that the picture is whole (`valid_jpeg`), finds the
+    target and publishes it. A bad frame is counted and skipped: it is neither a sighting nor a miss."""
 
     def __init__(self, ser, find_fn, cfg: LiveConfig, *, clock=time.monotonic, save=None, parse=None, latency_s: float = 0.25, sleep=time.sleep):
         super().__init__(lambda: None, find_fn, cfg, clock=clock, save=save)
         self.ser, self.parse, self.latency_s, self._sleep = ser, parse, latency_s, sleep
+        self.bad = 0
+        self.dropped = 0
+        self._q: "list[tuple]" = []
+        self._qlock = threading.Lock()
+        self._qev = threading.Event()
 
-    def run(self) -> None:
-        from ..vision.snapshot import parse_invoke_line
+    def _read(self) -> None:
         from ..vision.stream_probe import BREAK, LOOP_WITH_PICTURE
-        parse = self.parse or parse_invoke_line
-        n, prev = 0, None
         try:
             self.ser.reset_input_buffer()
             self.ser.write(BREAK)
@@ -171,8 +189,41 @@ class StreamGrabber(Grabber):
                 if not raw:
                     continue
                 t = self.clock()
+                with self._qlock:
+                    self._q.append((t, raw))
+                    while len(self._q) > 6:                    # the processor fell behind: the oldest frame goes
+                        self._q.pop(0)
+                        self.dropped += 1
+                self._qev.set()
+        finally:
+            try:
+                self.ser.write(BREAK)
+            except Exception:  # noqa: BLE001
+                pass
+            self._qev.set()
+
+    def run(self) -> None:
+        from ..vision.snapshot import parse_invoke_line
+        parse = self.parse or parse_invoke_line
+        reader = threading.Thread(target=self._read, name="live-stream-reader", daemon=True)
+        reader.start()
+        n, prev = 0, None
+        while not self.stop_flag.is_set() or self._q:
+            self._qev.wait(0.2)
+            self._qev.clear()
+            while True:
+                with self._qlock:
+                    item = self._q.pop(0) if self._q else None
+                if item is None:
+                    break
+                t, raw = item
                 snap = parse(raw.decode("utf-8", "replace"), [])
                 if snap is None:
+                    continue
+                if not valid_jpeg(snap.jpeg):
+                    self.bad += 1
+                    with self._lock:
+                        self.rows.append({"n": n, "t_call": round(t, 3), "t_done": round(t, 3), "t_capture": round(t - self.latency_s, 3), "grab_s": 0.0, "det": [], "bad": True})
                     continue
                 try:
                     dets = list(self.find_fn(snap.jpeg))
@@ -190,17 +241,17 @@ class StreamGrabber(Grabber):
                 with self._lock:
                     self.latest = (t - self.latency_s, dets, n)
                     self.rows.append(row)
-        finally:
-            try:
-                self.ser.write(BREAK)
-            except Exception:  # noqa: BLE001
-                pass
+            if self.stop_flag.is_set() and not reader.is_alive():
+                break
+        reader.join(timeout=2.0)
 
 
 def summarize(rows: list[dict], moves: list[dict], reversals: int, seconds: float) -> dict:
+    bad = sum(1 for r in rows if r.get("bad"))
+    rows = [r for r in rows if not r.get("bad")]
     grabs = [r["grab_s"] for r in rows] or [0.0]
     seen = [r for r in rows if r["det"]]
-    return {"pictures": len(rows), "pictures_per_s": round(len(rows) / seconds, 2) if seconds > 0 else 0.0, "with_target": len(seen),
+    return {"bad_frames": bad, "pictures": len(rows), "pictures_per_s": round(len(rows) / seconds, 2) if seconds > 0 else 0.0, "with_target": len(seen),
             "grab_s_mean": round(statistics.mean(grabs), 2), "grab_s_max": round(max(grabs), 2), "moves": len(moves), "reversals": reversals,
             "use_age_s_mean": round(statistics.mean([m["age_s"] for m in moves]), 2) if moves else None}
 

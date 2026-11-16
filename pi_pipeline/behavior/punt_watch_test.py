@@ -23,7 +23,7 @@ STOP_FILE = "~/.local/share/g2/ball_chase_stop"
 def result_line(r: WatchResult) -> str:
     side = {1: "right", -1: "left", 0: "unknown"}[r.last_side]
     return (f"WATCH: {r.ended}; found={r.found}; last seen {side}"
-            + ("" if r.last_bearing is None else f" ({r.last_bearing:+.0f} deg)") + f"; {r.pictures} pictures, {r.moves} claw moves, {r.seconds:.1f} s"
+            + ("" if r.last_bearing is None else f" ({r.last_bearing:+.0f} deg)") + f"; {r.pictures} good pictures ({r.bad_frames} bad frames skipped), {r.moves} claw moves, {r.seconds:.1f} s"
             + ("" if r.reading is None else f"; ball {r.reading.distance_in:.0f} in, {r.reading.bearing_deg:+.0f} deg from straight ahead"))
 
 
@@ -72,17 +72,13 @@ def main() -> None:
         if tts is not None:
             import threading
             threading.Thread(target=tts.speak, args=(text,), daemon=True).start()
-    outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/watch_%Y%m%d_%H%M%S"))
+    outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/watch_%Y%m%d_%H%M%S"))         # only the small JSON log goes here: the tracking pictures are never saved (owner, 2026-11-15)
     os.makedirs(outdir, exist_ok=True)
-
-    def save(i, jpeg):
-        with open(os.path.join(outdir, f"pic_{i:03d}.jpg"), "wb") as f:
-            f.write(jpeg)
     target = BallTarget()
     cam._open()
 
     def make_grabber(find, cfg, clock, _save):
-        return lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=save)
+        return lf.StreamGrabber(cam._ser, find, cfg, clock=clock, save=None)
 
     def find_still(camera):
         jpeg = camera.look()
@@ -109,8 +105,8 @@ def main() -> None:
                              on_ready=(lambda: announce("roll the ball now")) if args.no_punt else None)
         print(result_line(r))
         try:
-            json.dump({"result": r.ended, "found": r.found, "last_side": r.last_side, "last_bearing": r.last_bearing, "pictures": r.pictures, "moves": r.moves, "seconds": r.seconds,
-                       "rows": []}, open(os.path.join(outdir, "watch.json"), "w"))
+            json.dump({"result": r.ended, "found": r.found, "last_side": r.last_side, "last_bearing": r.last_bearing, "pictures": r.pictures, "move_count": r.moves, "seconds": r.seconds,
+                       "bad_frames": r.bad_frames, "rows": r.rows or [], "moves": r.move_log or []}, open(os.path.join(outdir, "watch.json"), "w"))
         except OSError:
             pass
         print(f"PICTURES: {outdir}")

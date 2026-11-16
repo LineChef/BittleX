@@ -396,7 +396,7 @@ g2attend() {
   local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \([^ ]*\).*/\1/p' | tail -1)"
   if [ -n "$dir" ]; then
     local dest="$HOME/Desktop/G2Memory/g2_pictures/bout/$(basename "$dir")"; mkdir -p "$dest"
-    scp -q "$G2_PI:$dir/*.jpg" "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null || scp -q "$G2_PI:$dir/*.jpg" "$dest/"; echo "bout pictures copied to $dest"
+    scp -q "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null; scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null; echo "bout files copied to $dest"
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
@@ -453,7 +453,7 @@ g2punttest() {
   local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \(.*\)$/\1/p' | tail -1)"
   if [ -n "$dir" ]; then
     local dest="$HOME/Desktop/G2Memory/g2_pictures/watch/$(basename "$dir")"; mkdir -p "$dest"
-    scp -q "$G2_PI:$dir/*.jpg" "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null || scp -q "$G2_PI:$dir/*.jpg" "$dest/"; echo "watch pictures copied to $dest"
+    scp -q "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null; scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null; echo "watch log copied to $dest"
   fi
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
