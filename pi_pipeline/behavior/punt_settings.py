@@ -31,6 +31,8 @@ SPEC = {
     "punch_lunge_s": ("PUNCH_LUNGE_S", float, 0.05, 0.6, "seconds for the lunge itself (smaller = harder and faster)"),
     "punch_hold_s": ("PUNCH_HOLD_S", float, 0.0, 1.0, "seconds the lunge is held before he comes back"),
     "lost_looks": ("LOST_LOOKS", int, 1, 8, "looks in a row without the ball before he starts searching"),
+    "nudge_proportional": ("NUDGE_PROPORTIONAL", bool, None, None, "a small step closer is timed to the gap to the ball (aiming at 3 in), not always the full step length"),
+    "walk_max_fraction": ("WALK_MAX_FRACTION", float, 0.2, 1.0, "one long walk covers at most this share of the distance to the ball, then he looks again (1.0 = the whole way, as before)"),
     "directed_look": ("DIRECTED_LOOK", bool, None, None, "at the second empty picture, one claw look aimed at where the ball was last seen, before any blind search"),
     "post_punt_watch": ("POST_PUNT_WATCH", bool, None, None, "after the last punt of an attempt, follow the ball with the claw until it stops and go on from where it ended (off: one picture after the punch)"),
     "search_walk": ("SEARCH_WALK", bool, None, None, "after a full search circle, walk on blind (a big floor only; never on a desk)"),

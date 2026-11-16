@@ -42,7 +42,12 @@ ALIGN_DEG = 12.0               # farther off straight than this: turn before wal
 PUNT_ALIGN_DEG = 12.0          # ... and before a punt
 PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 4.0      # camera to ball: the lunge reaches about this far (2.6 in threw the ball 18 in; 4.5 to 5 in was just out of reach, 2026-10-25)
 NUDGE_MAX_IN = 7.0             # between PUNT_MAX_IN and this: small steps closer, then punt anyway after NUDGES_BEFORE_PUNT of them
-NUDGE_S = 0.9
+NUDGE_S = 0.9                  # the longest small step (a full one moves about NUDGE_IN_PER_S x NUDGE_S inches)
+NUDGE_PROPORTIONAL = True      # (owner-approved 2026-11-16) a small step is timed to the gap, not always NUDGE_S: a fixed 0.9 s step moved about 2.5 in whatever the distance, so from 4 to 5 in it pushed the ball away or put it under the camera
+NUDGE_AIM_IN = 3.0             # a small step aims to leave the ball this far from the camera (the punch reaches it at about 2.6 to 3.75 in; under about 2 in the camera cannot see it)
+NUDGE_IN_PER_S = 2.8           # inches a small scripted step covers per second: 2.5 in in 0.9 s (median of 8 logged nudges, 2026-11-15/16); to be refitted by the calibration
+NUDGE_MIN_S = 0.4              # the shortest small step: a gait covers almost nothing in less
+WALK_MAX_FRACTION = 0.6        # (owner-approved 2026-11-16) one long walk covers at most this share of the distance to the ball, so a timed step that lands too far (the stride varies about 3.7 in) never carries him into it; then he looks again. 1.0 = off
 NUDGE_GAIT = "scripted"      # how the small steps closer are walked (user, 2026-11-04): "scripted" = Petoi's own forward walk (kwkF) for NUDGE_S, which is steadier than the learned policy for dialing in the distance; "policy" = the learned gait
 WALK_AIM_IN = 4.0              # a walk step is timed to leave the ball about this far from the camera (the ball is touched at about 3 in)
 APPROACH_MARGIN_IN = 1.0       # the long walk never plans to end closer than PUNT_MAX_IN + this, whatever WALK_AIM_IN says (owner, 2026-11-13): it is timed with no feedback and lands within about 1.6 in of its aim, the punt window is only about 1 in wide, so a walk aimed at 3.5 in pushed the ball about half the time; the small nudges (looked at after each) do the last inches
@@ -270,6 +275,13 @@ def aim_pans(bearing: float) -> list:
         if p not in out:
             out.append(p)
     return out
+
+
+def nudge_seconds(distance_in: float) -> float:
+    """How long a small step closer runs: the gap to NUDGE_AIM_IN at NUDGE_IN_PER_S, between NUDGE_MIN_S and NUDGE_S (the old fixed step when NUDGE_PROPORTIONAL is off)."""
+    if not NUDGE_PROPORTIONAL:
+        return NUDGE_S
+    return max(min(NUDGE_MIN_S, NUDGE_S), min(NUDGE_S, (distance_in - NUDGE_AIM_IN) / NUDGE_IN_PER_S))
 
 
 def claw_pan_body(pan: float) -> float:
@@ -541,7 +553,8 @@ class ChasePlanner:
         if near and not in_reach and abs(ball.bearing_deg) <= align_tol and self.nudges < NUDGES_BEFORE_PUNT:
             self.nudges += 1
             self.after_punt = False
-            return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})", scripted=NUDGE_GAIT == "scripted")
+            nudge_s = nudge_seconds(ball.distance_in)
+            return Action("walk", nudge_s, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer of {nudge_s:.1f} s ({self.nudges} of {NUDGES_BEFORE_PUNT})", scripted=NUDGE_GAIT == "scripted")
         if not near:
             self.align_turns = 0
         if near and abs(ball.bearing_deg) > align_tol:
@@ -577,7 +590,8 @@ class ChasePlanner:
             return Action("turn", max(MIN_MOVE_S, abs(deg) / self._turn_rate(side, False)), deg, stop_deg=abs(deg), why=f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
         if near and self.after_punt and ball.distance_in > CLOSE_IN_IN:
             self.after_punt = False
-            return Action("walk", 0.9, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer", scripted=NUDGE_GAIT == "scripted")
+            nudge_s = nudge_seconds(ball.distance_in)
+            return Action("walk", nudge_s, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer ({nudge_s:.1f} s)", scripted=NUDGE_GAIT == "scripted")
         if near:
             self.after_punt = True
             self.align_turns = 0
@@ -592,7 +606,8 @@ class ChasePlanner:
         self.nudges = 0
         from .chase_pace import WALK_START_S as start
         aim = max(WALK_AIM_IN, PUNT_MAX_IN + APPROACH_MARGIN_IN)                      # never aimed into the ball's touch zone: outside the punt reach plus a margin, then nudges
-        secs = min(WALK_MAX_S, max(MIN_MOVE_S, start + (ball.distance_in - aim) / self._walk_pace()))      # aim for WALK_AIM_IN: a gait needs a moment just to get moving, and the ball is touched at about 3 in
+        cover = min(ball.distance_in - aim, ball.distance_in * WALK_MAX_FRACTION)      # never the whole way in one timed step: it has no feedback and its stride varies (2026-11-16)
+        secs = min(WALK_MAX_S, max(MIN_MOVE_S, start + cover / self._walk_pace()))      # aim for WALK_AIM_IN: a gait needs a moment just to get moving, and the ball is touched at about 3 in
         self.walk_log.append((round(ball.distance_in, 1), round(secs, 1)))
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 

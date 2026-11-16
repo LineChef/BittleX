@@ -35,6 +35,8 @@ KNOB_INFO = {
     "align_pulse_min_s": (0.1, "free", "alignment turns of at least", "s"),
     "align_tries": (1, "free", "alignment turns before giving up:", ""),
     "when_misaligned": (None, "free", "when I can't line up, I", ""),
+    "nudge_proportional": (None, "fixed", "timing small steps to the gap", ""),                                 # the owner's switch (2026-11-16): never changed by G2
+    "walk_max_fraction": (None, "fixed", "the share of the distance one long walk covers", ""),
     "directed_look": (None, "fixed", "the claw look aimed at where the ball was last seen", ""),                 # the owner's switch (2026-11-16): never changed by G2
     "post_punt_watch": (None, "fixed", "watching the ball roll after a punt", ""),                    # the owner's switch (2026-11-15): never changed by G2
     "search_walk": (None, "fixed", "walking on blind after a full search circle", ""),        # only safe on a big floor: the user's call

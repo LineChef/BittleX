@@ -813,7 +813,7 @@ def test_after_turning_past_the_ball_the_search_goes_back_the_other_way(monkeypa
 def test_the_small_steps_closer_are_planned_as_scripted_walks_and_the_long_walk_is_not():
     p = bc.ChasePlanner()
     near = p.decide(reading(5.5, 0))                                                                 # between punt_max_in and nudge_max_in, straight ahead: a small step closer
-    assert near.kind == "walk" and near.scripted and near.seconds == bc.NUDGE_S
+    assert near.kind == "walk" and near.scripted and near.seconds == bc.nudge_seconds(5.5) and bc.NUDGE_MIN_S <= near.seconds <= bc.NUDGE_S
     far = bc.ChasePlanner().decide(reading(30, 0))
     assert far.kind == "walk" and not far.scripted                                                   # the long walk stays the learned policy
     old = bc.NUDGE_GAIT
@@ -1292,6 +1292,7 @@ def test_the_long_walk_is_never_aimed_into_the_balls_touch_zone(monkeypatch):
     monkeypatch.setattr(bc, "WALK_AIM_IN", 3.5)
     monkeypatch.setattr(bc, "PUNT_MAX_IN", 4.0)
     monkeypatch.setattr(bc, "APPROACH_MARGIN_IN", 1.0)
+    monkeypatch.setattr(bc, "WALK_MAX_FRACTION", 1.0)                                                 # (this test is about the aim; the share cap has its own test)
     p = bc.ChasePlanner()
     pace, start = p._walk_pace(), __import__("pi_pipeline.behavior.chase_pace", fromlist=["WALK_START_S"]).WALK_START_S
     a = p.decide(reading(11.0, 0))
@@ -1372,3 +1373,39 @@ def test_a_move_found_fallen_before_it_starts_lays_him_in_rest_and_reports_a_fal
         assert r._lk.sent.count("krest") == 1                                                # laid in rest, no stand-up and no recovery
     sag = _move_robot((0.0, 22.0))
     assert sag.stand_up() == "ok" and len(sag.reseats) == 1                                  # a sag (under the fall angle) is still re-stood
+
+
+# ---- 2026-11-16: proportional small steps and the long-walk cap (owner-approved after the overshoot data)
+
+def test_a_small_step_is_timed_to_the_gap_aiming_at_three_inches(monkeypatch):
+    assert bc.nudge_seconds(4.1) == bc.NUDGE_MIN_S                                       # 1.1 in to go: the shortest step
+    assert bc.NUDGE_MIN_S < bc.nudge_seconds(5.0) < bc.NUDGE_S                          # 2.0 in to go: a part of the full step
+    assert bc.nudge_seconds(6.0) == bc.NUDGE_S and bc.nudge_seconds(9.0) == bc.NUDGE_S  # 3 in or more to go: the full step, never longer
+    assert abs(bc.nudge_seconds(5.5) - 2.5 / bc.NUDGE_IN_PER_S) < 1e-9
+    monkeypatch.setattr(bc, "NUDGE_PROPORTIONAL", False)
+    assert bc.nudge_seconds(4.1) == bc.NUDGE_S                                           # off: the old fixed step
+    monkeypatch.setattr(bc, "NUDGE_PROPORTIONAL", True)
+    monkeypatch.setattr(bc, "NUDGE_S", 0.3)
+    assert bc.nudge_seconds(9.0) == 0.3 and bc.nudge_seconds(3.2) <= 0.3                 # a tuned step length is still the ceiling (and the floor never goes above it)
+
+
+def test_the_planner_uses_the_proportional_step_for_both_small_steps():
+    near = bc.ChasePlanner().decide(reading(4.4, 0))
+    assert near.kind == "walk" and near.seconds == bc.nudge_seconds(4.4) < bc.NUDGE_S
+    p = bc.ChasePlanner()
+    p.after_punt = True
+    again = p.decide(reading(4.6, 0))                                                    # the ball still 4.6 in away after the punt: step closer, timed to the gap
+    assert again.kind == "walk" and again.seconds == bc.nudge_seconds(4.6)
+
+
+def test_one_long_walk_covers_at_most_sixty_percent_of_the_distance_then_he_looks_again(monkeypatch):
+    p = bc.ChasePlanner()
+    pace, start = p._walk_pace(), __import__("pi_pipeline.behavior.chase_pace", fromlist=["WALK_START_S"]).WALK_START_S
+    a = p.decide(reading(20.0, 0))
+    assert abs(a.seconds - min(bc.WALK_MAX_S, start + 12.0 / pace)) < 0.02               # 20 in: not 15 in to the aim but 60% = 12 in
+    close = bc.ChasePlanner().decide(reading(8.0, 0))
+    aim = max(bc.WALK_AIM_IN, bc.PUNT_MAX_IN + bc.APPROACH_MARGIN_IN)
+    assert abs(close.seconds - min(bc.WALK_MAX_S, max(bc.MIN_MOVE_S, start + min(8.0 - aim, 8.0 * bc.WALK_MAX_FRACTION) / pace))) < 0.02      # the gap to the aim or the share, whichever is smaller
+    monkeypatch.setattr(bc, "WALK_MAX_FRACTION", 1.0)
+    whole = bc.ChasePlanner().decide(reading(20.0, 0))
+    assert whole.seconds >= a.seconds                                                    # off: the whole way, as before
