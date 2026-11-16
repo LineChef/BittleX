@@ -27,6 +27,7 @@ MAX_READ_IN = 36.0                 # the colour finder is only tested to this di
 GUESS_RATE = {"small": 3.5, "long": 8.0}   # generous inches per second, only to decide whether there is room for the step (the measurement replaces them)
 SETTLE_S = 1.5
 MAX_BACKUPS = 4
+LOOK_TRIES = 3                     # pictures before a ball counts as not in view (a far ball can be missed by one picture)
 STOP_FILE = "~/.local/share/g2/stepcal_stop"
 
 
@@ -171,11 +172,19 @@ def main() -> None:
     if os.path.exists(stop_path):
         os.remove(stop_path)
 
+    from ..vision import ball_finder as bf
+    shot = chase._SnapshotCamera(cam)                            # the chase's own camera steps: the light metered afresh, the stale frame dropped, a dim sighting confirmed by a second picture
+
     def look():
-        cam.snapshot()                                           # the module answers with the previous request's picture: drop one
-        time.sleep(0.8)
-        snap = cam.snapshot()
-        return None if snap is None else find_ball(snap.jpeg)
+        for attempt in range(1, LOOK_TRIES + 1):
+            shot.refresh_exposure()
+            jpeg = shot.look()
+            ball = chase.confirm_ball(shot, find_ball(jpeg) if jpeg else None, time.sleep, None)
+            if ball is not None:
+                return ball
+            print(f"   look {attempt} of {LOOK_TRIES}: no ball; the biggest green blob in the picture: {bf.diagnose(jpeg) if jpeg else 'no picture'}")
+            time.sleep(0.5)
+        return None
     res = None
     try:
         chase._stand_if_lying(link, "kbalance")
