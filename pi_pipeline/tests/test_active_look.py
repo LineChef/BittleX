@@ -517,3 +517,26 @@ def test_a_stand_up_that_ends_rolled_is_repeated_once_and_every_stand_up_is_logg
     assert r._stand_up_from("rest") == "ok"
     assert [e["roll"] for e in r.stand_log] == [20.0, 2.0] and [e["repeat"] for e in r.stand_log] == [False, True]   # rolled 20 deg: once more from rest, level the second time
     assert sent.count("kbalance") == 2 and "krest" in sent
+
+
+def test_the_turn_calibration_logs_asked_against_counted_yaw_and_stops_on_a_fall():
+    from pi_pipeline.behavior import turn_cal as tc
+
+    class R(WatchRobot):
+        def __init__(self, fall_at=None):
+            super().__init__()
+            self.n, self.fall_at = 0, fall_at
+            self.last_turn_deg = self.last_turn_s = self.last_turn_end = None
+            self._roll, self._pitch = [1.0, 4.0], [0.0, 2.0]
+
+        def _tilt(self, *a, **k):
+            return (0.0, 1.0)
+
+        def turn(self, degrees, seconds, stop_deg=0.0):
+            self.n += 1
+            self.last_turn_deg, self.last_turn_s, self.last_turn_end = abs(degrees) * 2.0, 0.5, "gyro"       # overshoots by double, like the small turns do
+            return "fell" if self.fall_at == self.n else "ok"
+    out = tc.run_turn_cal(R(), asks=(6.0, 20.0), repeats=1, say=lambda *_: None, sleep=lambda s: None)
+    assert out["ended"] == "done" and len(out["trials"]) == 4 and out["summary"]["asked_6"]["overshoot_median"] == 2.0 and out["summary"]["asked_6"]["roll_swing_max"] == 3.0
+    out = tc.run_turn_cal(R(fall_at=2), asks=(6.0, 20.0), repeats=1, say=lambda *_: None, sleep=lambda s: None)
+    assert out["ended"] == "fell" and len(out["trials"]) == 2 and out["summary"]["fell"] == 1
