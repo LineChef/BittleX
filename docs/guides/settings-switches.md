@@ -43,6 +43,8 @@ Exploration and walls
 - `G2_PICTURE_PREP_EVERY_S`: Default: 0; What it does: camera warm-up for every picture (0) or only every N seconds
 - `G2_SURVEY_COOLDOWN_S`, `G2_SURVEY_FIRST_S`: Default: 60, 30; What it does: at most one picture stop this often; the first after this long
 - `G2_WALL_CAL`, `G2_WALL_LOG`, `G2_WALL_PICS`: Default: under `~/.local/share/g2/`; What it does: calibration file, look log, ring of near-wall pictures
+- `~/.local/share/g2/groom.json`: Default: `{"apply": false}` until `g2groom on`; What it does: whether the start-of-session picture grooming applies (moves the extras aside and queues the Pi's trash) or only reports
+- `~/.local/share/g2/ball_color.json`: Default: written by the chase from close samples; What it does: the ball's own colour remembered between sessions so the colour pass finds a far pale ball from the first look
 - `G2_WALL_PICS_DIR`: Default: `~/g2_wall_pics`; What it does: where `wall_pictures` saves the recognition shots
 
 Power and battery

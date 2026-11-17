@@ -128,6 +128,8 @@ Data and review
 - `g2pics`: the review page: pictures, facts, goals
 - `g2pics stop`: end the review page
 - `g2picscurate`: filter pictures (light, blur, duplicates)
+- `g2groom`: sync from the Pi, then groom the pictures (each session)
+- `g2groom on`: apply the grooming (`off` reports only)
 - `g2pimem`: G2's memory on the Pi, in the review page
 - `g2pimem search dishwasher`: search his memory as text
 - `g2mem 24`: Pi memory use, last 24 h
@@ -349,6 +351,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2focus`: [Most used](#most-used)
 - `g2followcal`: [Most used](#most-used)
 - `g2goal`: [Ball goal and punts](#ball-goal-and-punts)
+- `g2groom`: [Data and review](#data-and-review)
 - `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)
 - `g2libstatus`: [Camera model](#camera-model)
