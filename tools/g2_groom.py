@@ -11,7 +11,7 @@ a labels file) are never touched. Hand-named and promoted pictures are never tou
   * NEAR-DUPLICATES: the behaviour picture folders (bout, watch, stream, seen, contact, explore/survey) keep the best of each group of near-twins.
 
 A dry run by default: a report in ~/Desktop/G2Memory/_dedup_reports/. `--apply` MOVES the extras to ~/Desktop/G2Memory/_pruned/groom_<date>/ (nothing is deleted at once); the groomed-away pictures are deleted
-for good only after PURGE_DAYS. `--session` is the start of every hardware session (the hw-session skill); `--weekly` runs only when 7 days have passed. Both apply only when ~/.local/share/g2/groom.json says {"apply": true} (the owner switches it on). An apply also QUEUES the same removal for the Pi (the review page's queue, tools/g2_review_queue.py: the Pi's own restorable trash, sent at once when the Pi answers), so a sync cannot bring the pictures back; only the explore folders have that path, the rest are report only.
+for good only after PURGE_DAYS; the Pi's own trash is purged the same way (a queued `purge-trash --days 14`, so anything trashed there more than 14 days ago is deleted there for good). An apply also caps the training classes under promoted/. `--session` is the start of every hardware session (the hw-session skill); `--weekly` runs only when 7 days have passed. Both apply only when ~/.local/share/g2/groom.json says {"apply": true} (the owner switches it on). An apply also QUEUES the same removal for the Pi (the review page's queue, tools/g2_review_queue.py: the Pi's own restorable trash, sent at once when the Pi answers), so a sync cannot bring the pictures back; only the explore folders have that path, the rest are report only.
 """
 from __future__ import annotations
 
@@ -157,6 +157,28 @@ def apply(result: dict, root: str | None = None, queue: bool = True) -> dict:
     return {"moved": moved, "queued": queued, "report_only": only}
 
 
+PI_PURGE_MODULES = ("pi_pipeline.vision.exploration_pictures", "pi_pipeline.vision.claw_pictures")
+
+
+def queue_pi_purge(days: int = PURGE_DAYS) -> int:
+    """Queue the Pi's own trash purge (pictures trashed more than `days` ago are deleted there for good), once per module: an identical entry already waiting is not added again."""
+    import g2_review_queue as rq
+    waiting = {(e["module"], tuple(e["args"])) for e in rq.pending()}
+    n = 0
+    for module in PI_PURGE_MODULES:
+        args = ("purge-trash", "--days", str(days))
+        if (module, args) not in waiting:
+            rq.add(module, list(args), text=f"gallery grooming: delete Pi trash older than {days} days")
+            n += 1
+    return n
+
+
+def cap_training_classes() -> None:
+    """The training classes under promoted/ keep their best CLASS_CAP pictures (tools/curate_class.py --all-promoted): hand-named pictures never, the rest moved aside."""
+    import subprocess
+    subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "curate_class.py"), "--all-promoted", "--cap", str(ps.CLASS_CAP), "--apply"], check=False)
+
+
 def purge(days: int = PURGE_DAYS) -> int:
     """Delete for good the groomed-away folders older than `days` (only groom_<date> folders under _pruned)."""
     base = os.path.expanduser(PRUNED)
@@ -202,6 +224,13 @@ def main() -> None:
     if do_apply:
         r = apply(result)
         print(f"   moved {r['moved']} pictures aside and queued {r['queued']} for the Pi's trash; {r['report_only']} extras in folders with no Pi removal path stay (report only); purged {purge()} old groomed folder(s)")
+        queue_pi_purge()
+        try:
+            import g2_review_queue as rq
+            print("   Pi:", rq.apply().get("message"))                            # the queued removals and the trash purge go now when the Pi answers
+        except Exception as e:  # noqa: BLE001
+            print("   Pi: stays queued:", e)
+        cap_training_classes()
     if a.weekly or a.session:
         os.makedirs(os.path.dirname(os.path.expanduser(STATE)), exist_ok=True)
         open(os.path.expanduser(STATE), "w").write(time.strftime("%Y-%m-%d %H:%M:%S"))

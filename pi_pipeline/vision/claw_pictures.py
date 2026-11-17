@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from pathlib import Path
 
 ROOT = "~/g2_claw_pics"
@@ -39,6 +40,48 @@ def _inside(b: Path, rel: str) -> Path:
     return p
 
 
+def _index_path(tr: Path) -> Path:
+    return tr / ".trashed.json"
+
+
+def _read_index(tr: Path) -> dict:
+    try:
+        return json.loads(_index_path(tr).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _note_trashed(tr: Path, rels: list) -> None:
+    """When each picture went to the trash (the file's own time is its creation time, so the age of a trashed picture is kept here)."""
+    idx = _read_index(tr)
+    now = time.time()
+    for rel in rels:
+        idx[rel] = now
+    tr.mkdir(parents=True, exist_ok=True)
+    _index_path(tr).write_text(json.dumps(idx))
+
+
+def purge_trash(root: str, days: float = 14.0) -> int:
+    """Delete for good the trashed pictures that have been in the trash more than `days` (2026-11-17, owner-approved). A picture with no trashed time (trashed before this existed) starts its clock at
+    the first purge. Returns how many pictures were deleted."""
+    tr = trash_root(root)
+    if not tr.exists():
+        return 0
+    idx, now, gone = _read_index(tr), time.time(), 0
+    for f in sorted(tr.rglob("*.jpg")):
+        rel = str(f.relative_to(tr))
+        ts = idx.setdefault(rel, now)
+        if now - ts > days * 86400:
+            for victim in (f, f.with_suffix(".json")):
+                victim.unlink(missing_ok=True)
+            idx.pop(rel, None)
+            gone += 1
+    for rel in [r for r in idx if not (tr / r).exists()]:
+        idx.pop(rel, None)                                                  # restored or already gone
+    _index_path(tr).write_text(json.dumps(idx))
+    return gone
+
+
 def trash_pictures(root: str, rels: list[str]) -> list[str]:
     b, tr, moved = base(root), trash_root(root), []
     for rel in rels:
@@ -52,6 +95,7 @@ def trash_pictures(root: str, rels: list[str]) -> list[str]:
         if side.exists():
             side.replace(dst.with_suffix(".json"))
         moved.append(rel)
+    _note_trashed(tr, moved)
     return moved
 
 
@@ -78,9 +122,13 @@ def main(argv=None) -> None:
     for name in ("trash", "restore"):
         sp = sub.add_parser(name)
         sp.add_argument("paths", nargs="+")
+    sp = sub.add_parser("purge-trash")
+    sp.add_argument("--days", type=float, default=14.0)
     a = ap.parse_args(argv)
     try:
-        if a.cmd == "trash":
+        if a.cmd == "purge-trash":
+            print(json.dumps({"purged": purge_trash(a.root, a.days)}))
+        elif a.cmd == "trash":
             print(json.dumps({"moved": trash_pictures(a.root, a.paths)}))
         else:
             print(json.dumps({"restored": restore_pictures(a.root, a.paths)}))

@@ -26,9 +26,9 @@ import uuid
 DEFAULT_DIR = "~/Desktop/G2Memory"
 ALLOWED = {                                   # module -> the sub-commands that may be queued (reads are never queued)
     "pi_pipeline.memory.review": {"delete", "restore", "add-fact", "edit-fact", "add-observation", "edit-observation", "empty-trash"},
-    "pi_pipeline.vision.exploration_pictures": {"trash", "restore", "name", "label", "move", "empty-trash"},
+    "pi_pipeline.vision.exploration_pictures": {"trash", "restore", "name", "label", "move", "empty-trash", "purge-trash"},
     "pi_pipeline.vision.wall_pictures": {"trash", "restore", "empty-trash"},
-    "pi_pipeline.vision.claw_pictures": {"trash", "restore"},                 # the gallery grooming (2026-11-17): behaviour pictures only, calibration refused on the Pi too
+    "pi_pipeline.vision.claw_pictures": {"trash", "restore", "purge-trash"},                 # the gallery grooming (2026-11-17): behaviour pictures only, calibration refused on the Pi too
 }
 
 
