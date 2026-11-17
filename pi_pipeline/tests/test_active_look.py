@@ -372,3 +372,20 @@ def test_a_fall_a_sag_and_the_stop_file_end_the_follow_with_any_judge_and_any_tr
             tilting._roll, tilting._pitch = [30.0] * 10, [0.0] * 10
             res, _ = _run(tilting, tracker=tr, judge=make_judge(), cfg=lf.LiveConfig(seconds=5.0, tick_s=0.05, tilt_check_s=0.2))
             assert res.ended == "sag"
+
+
+def test_the_follow_calibration_can_freeze_exposure_for_the_run_and_always_restores_it_and_reports_the_brightness_spread():
+    from pi_pipeline.behavior import follow_cal as fc
+    c = Clock()
+
+    class Rows(LockableScript):
+        def __init__(self, clock):
+            super().__init__(clock)
+            self.rows = [{"t_done": 0.0, "det": [("ball", 0.5)], "mean": 150}, {"t_done": 0.3, "det": [], "mean": 110}, {"t_done": 0.6, "det": []}]
+    g = Rows(c)
+    out = fc.run_follow_cal(WatchRobot(), lambda f, cf, clk, sv: g, lambda j: [], steps=(10.0,), repeats=1, say=lambda *_: None, sleep=c.sleep, clock=c, exposure_lock=True)
+    assert g.lock_calls == [True, False] and out["summary"]["exposure_locked"] is True
+    assert out["summary"]["brightness"] == {"n": 2, "no_brightness": 1, "min": 110, "max": 150, "mean": 130.0, "stdev": 20.0}
+    g2 = Rows(c)
+    out2 = fc.run_follow_cal(WatchRobot(), lambda f, cf, clk, sv: g2, lambda j: [], steps=(10.0,), repeats=1, say=lambda *_: None, sleep=c.sleep, clock=c)
+    assert g2.lock_calls == [] and out2["summary"]["exposure_locked"] is False

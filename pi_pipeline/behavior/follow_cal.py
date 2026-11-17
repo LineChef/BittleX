@@ -7,7 +7,9 @@ G2 stands with a fixed ball in front of him (about 14 to 24 in, centred) and the
 left and right, twice each) back to the centre; each step's picture log gives the delay and the speed. Numbers only: no picture is saved. A fall, a lost ball (the ball must stay in view), a tilt of the
 body or the stop file ends it; he is laid in rest at the end. Runs ONLY on the owner's go, G2 on the floor, hands near, the voice service stopped (`g2followcal`).
 
-    python -m pi_pipeline.behavior.follow_cal [--steps 10,20,30] [--repeats 2]
+    python -m pi_pipeline.behavior.follow_cal [--steps 10,20,30] [--repeats 2] [--lock-ae]
+
+`--lock-ae` freezes the sensor's auto exposure for the run (undone at the end): run it once without and once with, and compare the brightness spread in the summary under the same pan steps.
 """
 from __future__ import annotations
 
@@ -43,6 +45,14 @@ def step_metrics(ts: float, te: float, pan_from: float, pan_to: float, rows: lis
     return out
 
 
+def brightness_stats(rows: list) -> dict | None:
+    """The spread of the pictures' brightness over the run (the stream grabber logs each picture's mean): min, max, standard deviation, and how many pictures had none (cut short)."""
+    vals = [r["mean"] for r in rows if r.get("mean") is not None]
+    if not vals:
+        return None
+    return {"n": len(vals), "no_brightness": len([r for r in rows if not r.get("bad") and r.get("mean") is None]), "min": min(vals), "max": max(vals), "mean": round(statistics.mean(vals), 1), "stdev": round(statistics.pstdev(vals), 2)}
+
+
 def summarize(trials: list) -> dict:
     out = {}
     for key in ("delay_s", "speed_deg_s", "command_s"):
@@ -58,12 +68,13 @@ def summarize(trials: list) -> dict:
 
 
 def run_follow_cal(robot, make_grabber, find, steps=(10.0, 20.0, 30.0), repeats: int = 2, *, lift_deg: float = 120.0, pan_sign: str = "left", say=print, sleep=time.sleep,
-                   clock=time.monotonic, stopped=lambda: False) -> dict:
+                   clock=time.monotonic, stopped=lambda: False, exposure_lock: bool = False) -> dict:
     """Returns {"ended", "trials", "summary"}. Never raises; the caller lays him in rest."""
     from .. import focus
     from . import live_follow as lf
     res = {"ended": "error", "trials": [], "summary": {}}
     grab = None
+    locked = False
     try:
         with focus.holding("follow_cal", "follow calibration"):
             if robot._tilt(1.5) is None:
@@ -77,6 +88,8 @@ def run_follow_cal(robot, make_grabber, find, steps=(10.0, 20.0, 30.0), repeats:
             base = robot._tilt()
             cfg = lf.LiveConfig()
             grab = make_grabber(find, cfg, clock, None)
+            if exposure_lock and callable(getattr(grab, "set_exposure_lock", None)):
+                locked = bool(grab.set_exposure_lock(True))
             grab.start()
             sleep(1.5)                                                       # the stream settles; the ball is seen at the centre
             res["ended"] = "done"
@@ -117,7 +130,14 @@ def run_follow_cal(robot, make_grabber, find, steps=(10.0, 20.0, 30.0), repeats:
                 grab.join(timeout=3.0)
             except Exception:  # noqa: BLE001
                 pass
+        if grab is not None and locked:
+            try:
+                grab.set_exposure_lock(False)                            # back to automatic exposure however the run ended
+            except Exception:  # noqa: BLE001
+                pass
         res["summary"] = summarize(res["trials"])
+        res["summary"]["exposure_locked"] = locked
+        res["summary"]["brightness"] = brightness_stats(list(getattr(grab, "rows", [])) if grab is not None else [])
         if res["trials"]:
             say(f"summary: {res['summary']}")
     return res
@@ -128,6 +148,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Follow calibration: pan steps with a fixed ball in view; measures the picture delay and the pan speed. G2 moves: owner's go only.")
     ap.add_argument("--steps", default="10,20,30")
     ap.add_argument("--repeats", type=int, default=2)
+    ap.add_argument("--lock-ae", action="store_true", help="freeze the sensor's auto exposure for the run (undone at the end)")
     args = ap.parse_args()
     from ..config import settings
     from ..link import imu_print
@@ -156,7 +177,7 @@ def main() -> None:
         chase._stand_if_lying(link, "kbalance")
         cam._open()
         res = run_follow_cal(robot, lambda f, c, clk, sv: lf.StreamGrabber(cam._ser, f, c, clock=clk, save=None), BallTracker(pan_sign=chase.CLAW_PAN_SIGN),
-                             steps=tuple(float(s) for s in args.steps.split(",")), repeats=max(1, args.repeats), pan_sign=chase.CLAW_PAN_SIGN, stopped=lambda: os.path.exists(stop_path))
+                             steps=tuple(float(s) for s in args.steps.split(",")), repeats=max(1, args.repeats), pan_sign=chase.CLAW_PAN_SIGN, stopped=lambda: os.path.exists(stop_path), exposure_lock=args.lock_ae)
         print(f"RESULT: {res['ended']}")
     except KeyboardInterrupt:
         print("ended")
