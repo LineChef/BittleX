@@ -150,7 +150,7 @@ Testing follows a simple rule: collect data from normal runs first, then run a t
 
 Waiting for a decision on the Mac, no Pi needed:
 - The 8 old exported candidate files in `rl_training/opencat-gym/trained/` (the ARM1, ARM1R, ARM1X and ARMW walking-policy candidates and their notes) that the cleanup tool lists for deletion: three of them were promoted earlier, so their trained weights are in the repo history.
-- Whether to delete the moved-aside near-duplicates for good (the green ball set, the raw captures, the pictures and exploration galleries) after a trial period: they sit in `~/Desktop/G2Memory/_pruned/`, nothing is deleted yet. The vision library (7,132 pictures, 87 percent flagged) is person-capture frames that differ only slightly in pose, so it needs a looser rule before anything is moved.
+- The vision library (7,132 pictures, 87 percent flagged as near-duplicates) is person-capture frames that differ only slightly in pose, so it needs a looser rule before anything is moved or deleted.
 
 Done this session: the camera-only probes (3.67 pictures a second is the module's limit and the smallest size is the fastest), the follow calibration with and without the exposure lock, the arm skills test (launch, toss, tossF, hunt and showOff ok; tossL and tossR play the same motion as toss), the small-step calibration, the picture class cap (250 a class, the green ball set pruned from 752 to 250 with the rest kept aside), and two turn calibrations.
 
