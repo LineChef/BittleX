@@ -109,7 +109,14 @@ do_task() {
       for f in command_log.jsonl noise.jsonl api_calls.jsonl power_log.jsonl; do
         rsync -a "$G2_PI:.local/share/g2/$f" "$MEM/logs/$f" 2>/dev/null
       done
-      rsync -a "$G2_PI:g2_logs/" "$MEM/logs/diag/" ;;
+      out="$(rsync -a "$G2_PI:g2_logs/" "$MEM/logs/diag/" 2>&1)"; rc=$?
+      # 2026-11-17: 43 old diagnostic session folders on the Pi are owned by root (made by sudo runs before 2026-11-12) and are 700, so the login user cannot read them: rsync exits 23. That alone is
+      # not a failure of the copy: everything readable was copied, so it is reported as a note and the unreadable folders are skipped. Any other rsync message is still a failure.
+      if [ "$rc" -eq 23 ] && ! printf '%s\n' "$out" | grep -vE 'Permission denied \(13\)|^rsync error: some files/attrs were not transferred|^$' | grep -q .; then
+        echo "note: $(printf '%s\n' "$out" | grep -c 'Permission denied (13)') Pi log folder(s) are root-owned and unreadable: skipped"; true
+      else
+        [ -n "$out" ] && printf '%s\n' "$out"; [ "$rc" -eq 0 ] ;
+      fi ;;
     *) echo "unknown task $1"; return 2 ;;
   esac
 }
