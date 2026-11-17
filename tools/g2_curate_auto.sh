@@ -19,6 +19,9 @@ say() { echo "$(date '+%Y-%m-%d %I:%M:%S %p')  $*" >> "$LOG"; echo "$*"; }
 
 case "${1:-run}" in
   run)
+    # the weekly gallery grooming (owner-approved 2026-11-17): Mac only, an allowlist of folders, never calibration or hand-named pictures; it runs at most once in 7 days and only reports
+    # until ~/.local/share/g2/groom.json says {"apply": true}; what it applies is moved aside and deleted after 14 days (tools/g2_groom.py)
+    "$ROOT/pi_pipeline/.venv/bin/python" "$ROOT/tools/g2_groom.py" --weekly >> "$LOG" 2>&1 || say "the weekly gallery grooming failed (see the log)"
     if [ -z "${G2_PI:-}" ]; then   # launchd has no shell profile: take the one line that sets it (the value is never printed)
       for f in "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.zprofile"; do
         [ -f "$f" ] && eval "$(grep -m1 '^export G2_PI=' "$f" 2>/dev/null)" && [ -n "${G2_PI:-}" ] && break
