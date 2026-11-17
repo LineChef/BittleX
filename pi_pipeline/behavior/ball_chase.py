@@ -456,7 +456,7 @@ class ChasePlanner:
                 self.search_steps = 0
                 return Action("search_walk", 2.0, why="a full circle without the ball: walk on and search again")
             if self.search_steps > per_circle:
-                self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning in place (user, 2026-10-25: "the desk isn't very long")
+                self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning (arc turns, a few steps forward each; user, 2026-10-25: "the desk isn't very long")
             rate = self._turn_rate(side, False)
             secs = min(abs(step) / rate, SEARCH_MOVE_MAX_S)              # a few steps, then look again (user, 2026-11-01: a 60 deg step at 6 deg/s was 10 s of turning)
             if move == "circle":

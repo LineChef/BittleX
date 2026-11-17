@@ -6,7 +6,7 @@
 For each gallery (vision_library, capture_raw, pictures, exploration; or the names given) it reports the picture count and size against a storage budget, the unreadable files, and the near-duplicate groups
 (average hash within picture_score.DEDUP_HAMMING of each other, so the same scene again): the best-scored picture of each group stays, the rest are the "extras". A contact sheet of the biggest groups (kept
 first, the extras after it) and a JSON report are written to ~/Desktop/G2Memory/_dedup_reports/. Nothing moves unless `--apply`, which MOVES the extras (and their .json notes) to
-~/Desktop/G2Memory/_pruned/<gallery>_<date>/ keeping their folder layout; nothing is deleted, and moving them back undoes it. Hand-named pictures (sidecar named_by "hand") are never extras.
+~/Desktop/G2Memory/_pruned/<gallery>_<date>/ keeping their folder layout; nothing is deleted, and moving them back undoes it. Protected pictures are never extras: hand-named (sidecar named_by "hand"), anything under promoted/, named/, auto/ or person/.
 """
 from __future__ import annotations
 
@@ -51,7 +51,12 @@ def scan(root: str) -> tuple[list, list]:
     return rows, bad
 
 
+PROTECTED_PARTS = ("/promoted/", "/named/", "/auto/", "/person/")      # hand-promoted and voice-named pictures, the nightly-regenerated set, and the face captures: never moved
+
+
 def _hand(path: str) -> bool:
+    if any(part in path for part in PROTECTED_PARTS):
+        return True
     side = os.path.splitext(path)[0] + ".json"
     try:
         return json.load(open(side)).get("named_by") == "hand"

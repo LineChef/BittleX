@@ -106,7 +106,7 @@ def test_planner_searches_toward_the_side_it_last_saw_and_never_gives_up():
     assert p.decide(None).kind == "look" and p.decide(None).kind == "look"                         # two more looks first (three real misses before a search)
     a = p.decide(None); assert a.kind == "search_turn" and a.degrees < 0
     kinds = [p.decide(None).kind for _ in range(bc.SEARCH_STEPS_PER_CIRCLE + 2)]
-    assert "search_walk" not in kinds and set(kinds) == {"search_turn"}                              # no blind walking by default (a desk): it keeps turning in place, never gives up
+    assert "search_walk" not in kinds and set(kinds) == {"search_turn"}                              # no blind walking by default (a desk): it keeps turning (an arc turn), never gives up
     bc.SEARCH_WALK = True
     try:
         q = bc.ChasePlanner(claw_ok=False); q.decide(reading(20, -30))

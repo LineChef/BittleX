@@ -1,4 +1,4 @@
-"""Turn calibration (hardware test, 2026-11-17): how well does the claw-equipped G2 turn in place? The ball goal lines the claw up with small gyro-stopped turns (`robot.turn(deg, s, stop_deg)`), and two of
+"""Turn calibration (hardware test, 2026-11-17): how well does the claw-equipped G2 turn (the firmware turn gaits are ARC turns that step forward, not a pivot)? The ball goal lines the claw up with small gyro-stopped turns (`robot.turn(deg, s, stop_deg)`), and two of
 the day's three falls began at the start of one. This runs the SAME call, no camera and no ball: G2 stands level, and for each asked size (default 6, 10 and 20 degrees) he turns right then left, twice. Each turn
 logs the asked and the counted yaw, how long it ran and what ended it (the gyro, the cap, a stale yaw), and the body's pitch and roll through the move, so the overshoot (counted over asked), a turn that does
 nothing and a roll at the start are all visible. Numbers only. A fall, a tilt of the body of more than the gate before a turn, or the stop file ends it; he is laid in rest at the end. Runs ONLY on the owner's go,

@@ -149,9 +149,8 @@ Testing follows a simple rule: collect data from normal runs first, then run a t
 8. Run ball goal runs, one change at a time, reading the stand-up, gate and active look logs after each. Check whether the claw's settle step (the exact final position sent twice more after every claw move except home) shortened the shaking, and how often a stand ends rolled.
 
 Waiting for a decision on the Mac, no Pi needed:
-- The near-duplicate cleanup of the galleries (`python tools/gallery_report.py`, dry run done): it would move 1,634 extras in the raw capture gallery, 271 in the pictures gallery and 285 in the exploration gallery aside. The vision library (7,132 pictures, 87 percent flagged) is person-capture frames that differ only slightly in pose, so a looser rule is needed before touching it.
-- The 8 old exported candidate files in `rl_training/opencat-gym/trained/` that the cleanup tool lists for deletion.
-- Reword "turn in place" in the code comments and docs to "arc turn" where it describes `kwkL` and `kwkR`.
+- The 8 old exported candidate files in `rl_training/opencat-gym/trained/` (the ARM1, ARM1R, ARM1X and ARMW walking-policy candidates and their notes) that the cleanup tool lists for deletion: three of them were promoted earlier, so their trained weights are in the repo history.
+- Whether to delete the moved-aside near-duplicates for good (the green ball set, the raw captures, the pictures and exploration galleries) after a trial period: they sit in `~/Desktop/G2Memory/_pruned/`, nothing is deleted yet. The vision library (7,132 pictures, 87 percent flagged) is person-capture frames that differ only slightly in pose, so it needs a looser rule before anything is moved.
 
 Done this session: the camera-only probes (3.67 pictures a second is the module's limit and the smallest size is the fastest), the follow calibration with and without the exposure lock, the arm skills test (launch, toss, tossF, hunt and showOff ok; tossL and tossR play the same motion as toss), the small-step calibration, the picture class cap (250 a class, the green ball set pruned from 752 to 250 with the rest kept aside), and two turn calibrations.
 

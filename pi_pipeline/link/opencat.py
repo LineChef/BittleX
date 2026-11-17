@@ -57,10 +57,11 @@ STAND = "kup"                   # neutral standing posture
 
 # --- locomotion skills ----------------------------------------------------
 # `wkR` is the firmware's L/R mirror of `wkL` -- the skill parser accepts an
-# `R` suffix and mirrors. At near-zero forward these become a shuffling pivot
-# (turn-ish). `kang <deg>` (IMU closed-loop) is the cleaner turn-in-place but
-# needs on-hardware tuning -- see cliff_guard.py.
-WALK_LEFT = "kwkL"              # curved walk left / near-zero-fwd pivot left
+# `R` suffix and mirrors. These are ARC turns: G2 steps forward a few steps while
+# he curves (seen on hardware 2026-11-17), not a pivot on the spot. `vtL`/`vtR` are a
+# candidate true pivot (unproven). `kang <deg>` is not a turn: the decoded skill is a
+# constant pose -- see cliff_guard.py.
+WALK_LEFT = "kwkL"              # arc turn left: a curved walk (steps forward while turning), not a pivot
 WALK_RIGHT = "kwkR"            # mirror of wkL
 WALK_BACKWARD = "kbkF"          # walk backward
 CARPET_WALK = "kcarpetF"        # OpenCat gait tuned for carpet (higher foot clearance,

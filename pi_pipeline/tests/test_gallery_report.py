@@ -23,3 +23,9 @@ def test_groups_keep_the_best_and_never_list_a_hand_named_picture_as_an_extra():
     rows[-1]["hand"] = False
     gs = gr.groups(rows)
     assert gs[0][0]["path"] == "a1" and sorted(r["path"] for r in gr.extras(gs)) == ["a2", "a3", "h"]       # the best scored stays
+
+
+def test_promoted_named_auto_and_person_pictures_are_never_extras():
+    for part in ("promoted", "named", "auto", "person"):
+        assert gr._hand(f"/x/{part}/greenball/a.jpg") is True
+    assert gr._hand("/x/explore/survey/a.jpg") is False
