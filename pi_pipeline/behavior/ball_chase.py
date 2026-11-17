@@ -1500,7 +1500,7 @@ class SerialRobot:
         if state != "fell" and CLAW_SETTLE_RESENDS > 0 and not (pan == 0.0 and lift == 0.0):
             for _ in range(CLAW_SETTLE_RESENDS):                   # (owner, 2026-11-17) the settle step: a short pause, then the exact final position again, so the servos stop hunting sooner
                 self._sleep(CLAW_SETTLE_PAUSE_S)
-                self._tx(f"i0 {pan} 1 {lift}")
+                self._tx(f"i0 {int(round(pan))} 1 {int(round(lift))}")
         self._claw = (pan, lift)
         self._imu_release()
         if state != "fell" and pan == 0.0 and lift == 0.0:

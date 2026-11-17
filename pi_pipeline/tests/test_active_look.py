@@ -399,4 +399,4 @@ def test_every_claw_move_ends_with_the_settle_step_and_home_keeps_its_own_confir
     r = bc.SerialRobot(Link(), sleep=lambda s: None, clock=lambda: 0.0)
     r._fell = lambda: False
     assert r.claw_pose(20.0, 120.0) == "ok"
-    assert [c for c in r._lk.sent if c.startswith("i")][-bc.CLAW_SETTLE_RESENDS:] == ["i0 20.0 1 120.0"] * bc.CLAW_SETTLE_RESENDS
+    assert [c for c in r._lk.sent if c.startswith("i")][-bc.CLAW_SETTLE_RESENDS:] == ["i0 20 1 120"] * bc.CLAW_SETTLE_RESENDS
