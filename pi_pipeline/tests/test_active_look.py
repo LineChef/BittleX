@@ -540,3 +540,20 @@ def test_the_turn_calibration_logs_asked_against_counted_yaw_and_stops_on_a_fall
     assert out["ended"] == "done" and len(out["trials"]) == 4 and out["summary"]["asked_6"]["overshoot_median"] == 2.0 and out["summary"]["asked_6"]["roll_swing_max"] == 3.0
     out = tc.run_turn_cal(R(fall_at=2), asks=(6.0, 20.0), repeats=1, say=lambda *_: None, sleep=lambda s: None)
     assert out["ended"] == "fell" and len(out["trials"]) == 2 and out["summary"]["fell"] == 1
+
+
+def test_the_turn_calibration_measures_forward_travel_from_a_fixed_ball_and_the_turn_skill_can_be_swapped():
+    from pi_pipeline.behavior import ball_chase as bc
+    from pi_pipeline.behavior import turn_cal as tc
+    assert bc.SerialRobot.__init__.__code__ and "turn_tokens" in bc.SerialRobot.turn.__code__.co_names
+    seen = iter([bc.BallReading(120.0, 150.0, 100, 12, 12, 12.0, 18.0, 0.0, False, "normal"), bc.BallReading(120.0, 150.0, 100, 12, 12, 12.0, 15.0, 10.0, False, "normal")])
+
+    class R(WatchRobot):
+        last_turn_deg, last_turn_s, last_turn_end = 6.0, 0.5, "gyro"
+        _roll, _pitch = [0.0, 1.0], [0.0, 1.0]
+
+        def _tilt(self, *a, **k): return (0.0, 0.0)
+        def turn(self, degrees, seconds, stop_deg=0.0): return "ok"
+    out = tc.run_turn_cal(R(), asks=(6.0,), repeats=1, say=lambda *_: None, sleep=lambda s: None, look=lambda: next(seen, None))
+    t = out["trials"][0]
+    assert t["fwd_in"] == round(18.0 - 15.0 * 0.985, 1) and out["trials"][1].get("fwd_in") is None               # the 2nd look found no ball: no number, no crash

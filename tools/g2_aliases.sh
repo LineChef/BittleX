@@ -468,11 +468,11 @@ g2followcal() {
 }
 # g2followcalstop  -- end a follow calibration after the current step (he is laid in rest).
 g2followcalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/followcal_stop" && echo "stop sent: the calibration ends after the current step"; }
-# g2turncal [ASKS [REPEATS]]  -- turn calibration (default ASKS 6,10,20 degrees and 2 repeats): the ball goal's gyro-stopped small turns, right then left, with NO ball and NO camera, logging the asked against the counted yaw, what ended each turn and the body's roll and pitch swing (two of three falls on 2026-11-17 began at the start of one). Runs ONLY on your go, G2 standing level on the floor, hands near; it stops the voice service first (g2stop voice) and starts it again after. Ends on a fall, a tilt, or `g2turncalstop`; he is laid in rest.
+# g2turncal [ASKS [REPEATS [--token wk|vt|cr|tr] [--ball]]]  -- (`--token vt` turns with kvtL/kvtR, a candidate pivot; `--ball` = a ball fixed 14 to 20 in straight ahead, the camera measures how far each turn moves him forward) turn calibration (default ASKS 6,10,20 degrees and 2 repeats): the ball goal's gyro-stopped small turns, right then left, with NO ball and NO camera, logging the asked against the counted yaw, what ended each turn and the body's roll and pitch swing (two of three falls on 2026-11-17 began at the start of one). Runs ONLY on your go, G2 standing level on the floor, hands near; it stops the voice service first (g2stop voice) and starts it again after. Ends on a fall, a tilt, or `g2turncalstop`; he is laid in rest.
 g2turncal() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
-  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.turn_cal --asks ${1:-6,10,20} --repeats ${2:-2} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.turn_cal --asks ${1:-6,10,20} --repeats ${2:-2} ${@:3} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
 # g2turncalstop  -- end a turn calibration after the current turn (he is laid in rest).
