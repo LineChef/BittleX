@@ -34,14 +34,16 @@ def analyze(arrivals: list[tuple[float, int, int]], other: list[str], seconds: f
 
 
 def brightness_summary(means: list, lock_at: float | None) -> dict:
-    """The pictures' mean brightness over the run: how much it swings, and (an exposure-lock experiment) before against after the lock."""
+    """The pictures' mean brightness over the run: how much it swings, and (an exposure-lock experiment) before against after the lock, with the counts and the whole series so a thin split is visible."""
     vals = [m[1] for m in means]
-    out = {"mean": round(statistics.mean(vals), 1), "min": min(vals), "max": max(vals), "stdev": round(statistics.pstdev(vals), 2)}
+    out = {"mean": round(statistics.mean(vals), 1), "min": min(vals), "max": max(vals), "stdev": round(statistics.pstdev(vals), 2), "series": [[t, v] for t, v in means][:60]}
     if lock_at is not None:
         before = [v for t, v in means if t < lock_at]
         after = [v for t, v in means if t >= lock_at]
-        if len(before) >= 2 and len(after) >= 2:
+        out["n_before_lock"], out["n_after_lock"] = len(before), len(after)
+        if before:
             out["before_lock"] = {"mean": round(statistics.mean(before), 1), "stdev": round(statistics.pstdev(before), 2)}
+        if after:
             out["after_lock"] = {"mean": round(statistics.mean(after), 1), "stdev": round(statistics.pstdev(after), 2)}
     return out
 

@@ -555,8 +555,8 @@ def test_the_stream_probe_summarizes_brightness_and_the_exposure_lock_experiment
     from pi_pipeline.vision import stream_probe as sp
     means = [(0.2, 120.0), (0.5, 90.0), (0.8, 140.0), (1.1, 100.0), (2.2, 110.0), (2.5, 110.5), (2.8, 109.5)]
     s = sp.brightness_summary(means, lock_at=2.0)
-    assert s["after_lock"]["stdev"] < s["before_lock"]["stdev"] and s["min"] == 90.0 and s["max"] == 140.0
-    assert "before_lock" not in sp.brightness_summary(means, None)
+    assert s["after_lock"]["stdev"] < s["before_lock"]["stdev"] and s["min"] == 90.0 and s["max"] == 140.0 and (s["n_before_lock"], s["n_after_lock"]) == (4, 3)
+    assert "before_lock" not in sp.brightness_summary(means, None) and sp.brightness_summary(means, 99.0)["n_after_lock"] == 0 and len(s["series"]) == 7
     assert sp.LOCK_AE.startswith(b"AT+SETREG") and b"0x3503" in sp.LOCK_AE and b"0x00" in sp.UNLOCK_AE
 
 
