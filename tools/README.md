@@ -24,6 +24,7 @@ Running G2 from the Mac
 - [`g2_run_summary.py`](g2_run_summary.py): What it does: Summarizes the goal runs from the Pi's journal: sessions, attempts, pack percent, the active look's numbers and per-picture log, and the newest fall with its tilt trace. Read-only.
 - [`g2_wait_goal_end.sh`](g2_wait_goal_end.sh): What it does: Waits until no goal session runs on the Pi (the `goal_running` file gone for two checks); says "could not verify" when the Pi does not answer.
 - [`g2_deploy_safe.sh`](g2_deploy_safe.sh): What it does: Deploys the last commit only when the Pi is idle (or waits with `--wait`), then verifies that the Pi's commit is HEAD.
+- [`g2_security_check.sh`](g2_security_check.sh): What it does: Read-only security check of the Pi: listening sockets, SSH settings, firewall, updates, accounts and sudo, radios, file permissions, and the `.env` key names (never values).
 - [`g2_session_end_check.sh`](g2_session_end_check.sh): What it does: Read-only end-of-session checks: services, clock, board clues, waiting deploy watcher, guardrail integrity, git against deployed, cleanup dry run.
 - [`g2_promote_policy.sh`](g2_promote_policy.sh): What it does: Promotes a trained policy to the default and queues its deploy.; Guide: [`gait-deployment.md`](../docs/guides/gait-deployment.md)
 - [`g2_explore.sh`](g2_explore.sh): What it does: Starts, stops and inspects a supervised exploration session on the Pi (the voice service always comes back).; Guide: [`exploration-mode.md`](../docs/guides/exploration-mode.md)
