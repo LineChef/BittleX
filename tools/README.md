@@ -7,6 +7,7 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 Documentation
 -------------
 
+- [`g2_precommit_checks.sh`](g2_precommit_checks.sh): What it does: The commit checks in one run: the full suite alone, ruff, mode parity, docs, and the staged diff's privacy and attribution counts (`--push-scan` adds the outgoing range). One PASS or FAIL line each.
 - [`check_docs.py`](check_docs.py): Doc checks: broken links, facts in the wrong page, orphan pages, stale generated pages. The pre-commit hook runs it.
 - [`gen_backlog.py`](gen_backlog.py): Regenerates `docs/backlog.md` from the item headings.
 - [`build_docs_bundle.py`](build_docs_bundle.py): Builds the docs bundle for the website (pages, navigation manifest, search index, assets) from git-tracked files; CI publishes it to GitHub Pages. [`docs-bundle.md`](../docs/guides/docs-bundle.md)
@@ -18,6 +19,12 @@ Running G2 from the Mac
 
 - [`g2_aliases.sh`](g2_aliases.sh): What it does: The `g2*` shell helpers (`g2`, `g2rl`, `g2pics`, `g2wifi`, …). `g2help` lists them.; Guide: [`shell-helpers.md`](../docs/guides/shell-helpers.md)
 - [`g2_deploy_when_online.sh`](g2_deploy_when_online.sh): What it does: Waits for the Pi to answer, then `rsync`s `pi_pipeline/` and the deployed policy and restarts the voice service. Refuses during an exploration or a walk.; Guide: [`pi-bring-up.md`](../docs/guides/pi-bring-up.md)
+- [`g2_preflight.sh`](g2_preflight.sh): What it does: Read-only check before a hardware session: what runs on the Pi, deployed commit against HEAD, the Pi's clock, the last pack reading and the floor label. Moves nothing.
+- [`pi_read.sh`](pi_read.sh): What it does: Fixed read-only questions to the Pi (`status`, `battery`, `journal`, `falls`, `goal-log`, `goal-running`); nothing else can be run through it.
+- [`g2_run_summary.py`](g2_run_summary.py): What it does: Summarizes the goal runs from the Pi's journal: sessions, attempts, pack percent, the active look's numbers and per-picture log, and the newest fall with its tilt trace. Read-only.
+- [`g2_wait_goal_end.sh`](g2_wait_goal_end.sh): What it does: Waits until no goal session runs on the Pi (the `goal_running` file gone for two checks); says "could not verify" when the Pi does not answer.
+- [`g2_deploy_safe.sh`](g2_deploy_safe.sh): What it does: Deploys the last commit only when the Pi is idle (or waits with `--wait`), then verifies that the Pi's commit is HEAD.
+- [`g2_session_end_check.sh`](g2_session_end_check.sh): What it does: Read-only end-of-session checks: services, clock, board clues, waiting deploy watcher, guardrail integrity, git against deployed, cleanup dry run.
 - [`g2_promote_policy.sh`](g2_promote_policy.sh): What it does: Promotes a trained policy to the default and queues its deploy.; Guide: [`gait-deployment.md`](../docs/guides/gait-deployment.md)
 - [`g2_explore.sh`](g2_explore.sh): What it does: Starts, stops and inspects a supervised exploration session on the Pi (the voice service always comes back).; Guide: [`exploration-mode.md`](../docs/guides/exploration-mode.md)
 - [`g2_safe_stop.sh`](g2_safe_stop.sh): What it does: Rests G2, then stops whatever controls him. Never stop a controller any other way.; Guide: [`operating-g2.md`](../docs/guides/operating-g2.md)
