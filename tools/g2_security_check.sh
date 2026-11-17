@@ -2,7 +2,7 @@
 # Read-only security check of G2's Pi (2026-11-17): what listens on the network, how SSH is set up, the firewall, updates, who can log in, radios, file permissions, and the .env's key NAMES.
 #   tools/g2_security_check.sh
 # Changes nothing and prints no secret: the .env is checked by names only (rule A2) plus its mode and owner, and the API key's expiry DATE line (not a secret). Needs G2_PI. A check that cannot run
-# (no passwordless sudo, a tool not installed) says "could not verify": it never reads as passed. Tick off the hardening checklist in docs/guides/pi-bring-up.md from this output.
+# (no passwordless sudo, a tool not installed) says "could not verify": it never reads as passed. Keep the results private (not in the repo); the checklist in docs/guides/pi-bring-up.md is generic advice.
 set -uo pipefail
 : "${G2_PI:?set G2_PI to user@host of the Pi}"
 ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" 'bash -s' <<'REMOTE' || { echo "could not verify: the Pi did not answer" >&2; exit 3; }

@@ -361,9 +361,9 @@ time", and numbers to decide voice-only vs voice+vision co-residency.
 9\. Security hardening — G2 is a mic + camera on the home network
 ------------------------------------------------------------
 
-The robot's SD card holds the API key (`.env`), the memory DB (names, prefs,
-conversation history), and the household roster (`.env` `G2_BONDS`). Treat a
-lost/stolen robot as a full disclosure of those. Bring-up checklist:
+The robot holds a revocable API key and private household data. Keep it
+physically secure, and if it is ever lost, revoke the key first. Bring-up
+checklist:
 
 - [ ] **SSH: key only.** In Raspberry Pi Imager set an SSH *public key*, not a
       password; then `PasswordAuthentication no` in `/etc/ssh/sshd_config`.
@@ -376,8 +376,8 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
       SSID that can't reach the internet if the API is needed). `wifi.powersave 2`
       is already set in §3.
 - [ ] **The BiBoard has its own Wi-Fi + BLE** (for Petoi's mobile app). If the
-      app is not used, disable the board's Wi-Fi, or at least change its AP
-      password — otherwise it's a second, open radio into the robot.
+      app is not used, disable the board's Wi-Fi, or set a strong access-point
+      password.
 - [ ] **API key is revocable.** Note where to revoke it (Anthropic console) so a
       lost robot is a 2-minute fix. Consider a dedicated key with a spend cap.
 - [ ] **Memory hygiene:** `python -m pi_pipeline.memory export --scrub` before
