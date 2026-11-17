@@ -26,7 +26,7 @@ if [ -f "$terms" ]; then
     if [ "${n:-0}" = "0" ]; then echo "PASS  staged diff: no private terms (count 0)"; else echo "FAIL  staged diff: $n line(s) match the privacy terms"; fail=1; fi
   fi
 else echo "note: no .gitprivacy-terms, the privacy count was skipped"; fi
-a="$(git diff --cached | grep -ciE "co-authored-by|generated with claude" || true)"
+a="$(git diff --cached -- . ':(exclude)tools/g2_precommit_checks.sh' | grep -ciE "co-authored-by|generated with claude" || true)"      # (this script holds the pattern itself: it is left out, or it would always match)
 if [ "${a:-0}" = "0" ]; then echo "PASS  staged diff: no attribution lines"; else echo "FAIL  staged diff: $a attribution line(s)"; fail=1; fi
 if [ "$SCAN" = 1 ]; then
   h="$(git log origin/development..HEAD --format=%B | grep -ciE "co-authored|anthropic|claude" || true)"
