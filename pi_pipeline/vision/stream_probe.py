@@ -70,13 +70,14 @@ def run_probe(ser, seconds: float, outdir: Path | None = None, *, clock=time.mon
                     other.append(line.strip()[:120])
                 continue
             arrivals.append((clock() - t0, len(snap.jpeg), len(snap.detections)))
-            try:
-                from .snapshot import exposure_stats
-                st = exposure_stats(snap.jpeg)
-                if st is not None:
-                    means.append((round(clock() - t0, 2), round(float(st.mean), 1)))
-            except Exception:  # noqa: BLE001
-                pass
+            if lock_at is not None:                                       # brightness costs a decode per picture: only for the exposure-lock experiment, so a plain rate measurement is not slowed by it (2026-11-17: 2.8 against 4.3 pictures a second)
+                try:
+                    from .snapshot import exposure_stats
+                    st = exposure_stats(snap.jpeg)
+                    if st is not None:
+                        means.append((round(clock() - t0, 2), round(float(st.mean), 1)))
+                except Exception:  # noqa: BLE001
+                    pass
             if lock_at is not None and not locked and clock() - t0 >= lock_at:
                 ser.write(LOCK_AE)                                         # the experiment: freeze the sensor's auto exposure now (OV5647 0x3503 = manual exposure and gain)
                 locked = True
