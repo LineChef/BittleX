@@ -139,14 +139,16 @@ What happens next
 
 Testing follows a simple rule: collect data from normal runs first, then run a targeted test only where the logs cannot answer the question.
 
-1. Charge the pack and the Pi first. A ball goal run ends at the 30 percent pack gate, and the last runs reached it after three attempts.
-2. Read the active look's per-picture log from the last journal rows (`after_punt.frames`: seen or missed, brightness, size, the biggest green blob in a missed picture). The follow now runs on the shared active look with a tracking filter (lead, coasting through missed pictures, a check against false jumps), the ball's own colour and a motion fallback; none of it has been through a run yet.
-3. Run the camera-only probes, which move nothing: `g2stream 8 --lock-ae` shows whether freezing the sensor's auto exposure steadies the picture brightness (it swung between 48 and 127 within seconds), and `g2stream 6 --compare` shows whether 4.3 pictures a second is a picture-size setting or the module's own limit.
-4. Run the follow calibration (`g2followcal`, a fixed ball 14 to 24 inches ahead, hands near): it measures the delay from a pan command to the picture showing the move and the claw's pan speed. Tune the follow's gain, lead and coasting from those numbers, and judge a change by the per-picture log of the next runs.
-5. Settle the rolled stand: a stand from rest sometimes leaves G2 rolled 16 to 23 degrees while every leg joint reads its stand angle. If he visibly leans at those times, check the servos and legs; if he does not, check the IMU's zero.
-6. Rerun the step calibration with the ball about 14 inches away (`g2stepcal small 2`, where the finder's distance is reliable), then set the small-step rate from the measured numbers.
-7. Run a few ball goal runs, changing one thing at a time, and read the stand-up, gate and active look logs after each. Turn the experimental exposure lock on for one run only if the probe shows it helps.
-8. Run the arm skills test (`g2armskill`, one skill per run), which has not been run yet.
+1. Charge the pack and the Pi first. A ball goal run ends at the 30 percent pack gate.
+2. Find the cause of the fall in the last run (a turn in place after a look, from a level stand, left him upside down within a second). The log shows the scripted turn and a rest command sent in the same second, and the gyro-stopped turn ending after 0.01 s ("ended by cap"). Read the fall's tilt trace and the board's own log (`g2cmds --board`) and settle why the turn ended at once before any run turns in place again.
+3. Check the far-ball changes on a run: every look now falls back to the ball's own colour, the watch takes up to three more pictures before it says the ball is lost, and each missed look is noted as numbers with at most six missed-ball pictures per session kept on the Pi (`~/g2_claw_pics/misses_*`). Read those pictures and the journal first, then judge whether "I lost the ball" with the ball 4 to 5 feet away still happens.
+4. Read the active look's per-picture log from the last journal rows (`after_punt.frames`: seen or missed, brightness, size, the biggest green blob in a missed picture). The follow runs on the shared active look with a tracking filter, the ball's own colour and a motion fallback; one run has seen it so far.
+5. Tune the follow from the calibration. The claw's command-to-picture delay measured 0.8 to 1.0 s (median), about twice the 0.4 s the follow assumes, and the picture swings between brightness 0 and 235 while the claw pans (30 to 20 standard deviation with the experimental exposure lock on). Set the lead and coasting from the delay, then judge each change by the per-picture log of the next runs. Try the exposure lock on one ball goal run only.
+6. Judge the new small-step rate (4.1 inches a second, measured from 8 trials with the ball 14 inches away) by the nudges in the next runs: the approach should land near 3 inches without overshooting.
+7. Run a few ball goal runs, changing one thing at a time, and read the stand-up, gate and active look logs after each. Five stand-ups from rest in a row ended within 2.4 degrees of level, so the earlier 16 to 23 degree rolled stand is still unexplained: look at the end of stands that follow a goal run.
+8. Check whether the claw's settle step (the exact final position sent twice more after every claw move except home) shortened the shaking after moves.
+
+Done this session: the camera-only probes (3.67 pictures a second is the module's limit and the smallest size is the fastest), the follow calibration with and without the exposure lock, and the arm skills test (launch, toss, tossF, hunt and showOff all returned ok; tossL and tossR play the same motion as toss).
 
 Lower priority, when time allows:
 
