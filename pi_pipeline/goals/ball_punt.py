@@ -334,6 +334,7 @@ class BallPunt:
         extra = {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}
         if self.pace is not None:
             extra["pace"] = self.pace.snapshot()
+        extra["stand_ends"] = list(getattr(self.robot, "stand_log", []) or [])        # (owner-approved 2026-11-17) how level every stand-up ended, to see how often a stand is rolled
         return AttemptResult(ended, round(time.monotonic() - t0, 1), trace, extra)
 
     # ---------------------------------------------------------------------------------------------------- scoring

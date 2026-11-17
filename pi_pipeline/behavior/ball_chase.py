@@ -651,6 +651,8 @@ class Camera(Protocol):
     def look(self) -> bytes | None: ...
 
 
+STAND_LEVEL_DEG = 8.0          # (owner-approved 2026-11-17, after two falls that began on a rolled stand) a stand-up that ends more than this off level on pitch or roll is repeated once: laid in rest and stood up again
+FINAL_TILT_S = 0.3             # (same) the tilt is read afresh this long right before every walk, turn, back-up and punt, whatever the last move was and however long ago
 MOVE_TILT_GATE_DEG = 12.0       # (owner, 2026-11-15, after two falls) BEFORE EVERY move (walk, turn, back, punt) the body's tilt is read; more than this far off level on pitch or roll and the move is NOT sent: he is laid down and stood up again (recover_sag: attention pose, then via rest). 0 turns it off
 SAG_TILT_DEG = 12.0            # standing, the body this far off the tilt measured right after his last good stand-up (or 20 deg off level before there is one): the legs have sagged
 PICTURE_SAG_HINT_S = 30.0       # how long a rolled picture keeps the body-tilt sag check stricter
@@ -835,6 +837,8 @@ class SerialRobot:
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
         self._sag_checked_t: float | None = None          # when the last sag check was made (a standing G2 is checked again every SAG_RECHECK_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
+        self.stand_log: list = []                         # one entry per stand-up: where from, the pitch and roll it ended at, and whether it was the repeat (for the journal)
+        self._level_retry = False
         self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
         self._posed_at: float | None = None               # when the legs last changed pose (attention, stand-up): the next move is checked once against the real tilt (_gate)
         self._gate_done_at: float | None = None
@@ -1026,8 +1030,33 @@ class SerialRobot:
         if not IMU_PRINT_STAYS_ON:
             self._tx("gp")
 
+    def _tilt_before_move(self) -> str:
+        """The last look before any leg move or punt (owner-approved 2026-11-17: both falls that day began on a stand that was rolled 20 to 26 deg; the stand-up and the quick-move shortcut had not read it afresh):
+        the tilt is read for FINAL_TILT_S right now. Past the fall angle he has already fallen; off level by more than MOVE_TILT_GATE_DEG he is laid down in rest and stood up again, and if he is still off the
+        move is not sent (treated as a fall: the session stops and he is laid in rest). No IMU frames: nothing to judge by. "ok" or "fell"."""
+        if MOVE_TILT_GATE_DEG <= 0 or self.posture not in ("stand", "unknown") or not callable(getattr(self._lk, "poll_imu", None)):
+            return "ok"
+        t = self._tilt(FINAL_TILT_S)
+        if t is None:
+            return "ok"
+        if self._already_fell(t):
+            return "fell"
+        if max(abs(t[0]), abs(t[1])) <= MOVE_TILT_GATE_DEG:
+            return "ok"
+        log.warning("final tilt check: the body is tilted pitch %+.0f roll %+.0f deg (more than %.0f): the move is not sent, he is laid down and stood up again", t[0], t[1], MOVE_TILT_GATE_DEG)
+        self.move_gate_stops = getattr(self, "move_gate_stops", 0) + 1
+        if self.recover_sag(t) == "fell":
+            return "fell"
+        t = self._tilt(FINAL_TILT_S)
+        if t is not None and max(abs(t[0]), abs(t[1])) > MOVE_TILT_GATE_DEG:
+            log.warning("final tilt check: still tilted (pitch %+.0f roll %+.0f deg) after standing again: the move is not sent, the session stops", t[0], t[1])
+            return "fell"
+        return "ok"
+
     def _skill(self, token: str, seconds: float, stop_yaw_deg: float | None = None) -> str:
         if self._gate() == "fell":
+            return "fell"
+        if self._tilt_before_move() == "fell":
             return "fell"
         self._pitch, self._roll = [], []
         self._tx("gP")
@@ -1371,6 +1400,16 @@ class SerialRobot:
                 t = self._tilt(0.3)
                 if t is not None:
                     self._stand_tilt = t                  # how he stands when the legs hold: the sag check compares with this
+                    self.stand_log.append({"from": pose, "pitch": round(t[0], 1), "roll": round(t[1], 1), "repeat": bool(self._level_retry)})
+                    del self.stand_log[:-40]
+                    log.info("stand-up from %s ended pitch %+.1f roll %+.1f deg", pose, t[0], t[1])
+                    if max(abs(t[0]), abs(t[1])) > STAND_LEVEL_DEG and not self._level_retry and pose != "attention":
+                        log.warning("the stand-up ended %+.0f / %+.0f deg off level (more than %.0f): laying him down in rest and standing up once more", t[0], t[1], STAND_LEVEL_DEG)
+                        self._level_retry = True
+                        try:
+                            return self.rest_then_stand()
+                        finally:
+                            self._level_retry = False
                 self.leg_check(f"stand-up from {pose}")
         self._moved_at = self._clock()
         self._posed_at = self._moved_at
@@ -1542,6 +1581,8 @@ class SerialRobot:
 
     def _punch(self, arm_up: bool = False) -> str:
         from ..link import transitions
+        if self._tilt_before_move() == "fell":
+            return "fell"
         self.posture = "stand"
         self._pitch, self._roll = [], []
         self._tx("gP")

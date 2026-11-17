@@ -462,3 +462,58 @@ def test_far_misses_are_noted_and_at_most_six_pictures_are_kept_per_session(tmp_
     assert len(saved) == miss_log.MAX_PICTURES == 6 and miss_log.notes()[-1]["blob"]["area"] > 10
     miss_log.begin_session()
     assert miss_log.notes() == []
+
+
+# ---- 2026-11-17 (owner-approved after two falls on a rolled stand): the final tilt check before every move, the level check after every stand-up
+def _tilt_robot(monkeypatch, tilts):
+    from pi_pipeline.behavior import ball_chase as bc
+    sent = []
+
+    class L:
+        def send(self, c, read_reply=False, settle=0.0): sent.append(c); return ""
+        def poll_imu(self): return []
+    r = bc.SerialRobot(L(), sleep=lambda s: None, clock=lambda: 0.0)
+    seq = iter(tilts)
+    r._tilt = lambda seconds=0.5: next(seq, (0.0, 0.0))
+    r._already_fell = lambda t: False
+    r.posture = "stand"
+    return r, sent, bc
+
+
+def test_the_final_tilt_check_lets_a_level_body_move_and_stops_a_rolled_one(monkeypatch):
+    r, sent, bc = _tilt_robot(monkeypatch, [(1.0, 2.0)])
+    assert r._tilt_before_move() == "ok" and r.move_gate_stops == 0 if hasattr(r, "move_gate_stops") else True
+    r, sent, bc = _tilt_robot(monkeypatch, [(0.0, 23.0), (0.0, 1.0)])
+    calls = []
+    r.recover_sag = lambda t=None: calls.append(t) or "ok"
+    assert r._tilt_before_move() == "ok" and calls == [(0.0, 23.0)] and r.move_gate_stops == 1       # rolled 23 deg: laid down and stood up again, then level: goes on
+    r, sent, bc = _tilt_robot(monkeypatch, [(0.0, 23.0), (0.0, 21.0)])
+    r.recover_sag = lambda t=None: "ok"
+    assert r._tilt_before_move() == "fell"                                                             # still rolled after standing again: the move is not sent
+
+
+def test_every_leg_move_and_every_punt_ends_with_the_final_tilt_check(monkeypatch):
+    import inspect
+    from pi_pipeline.behavior import ball_chase as bc
+    assert "_tilt_before_move" in inspect.getsource(bc.SerialRobot._skill) and "_tilt_before_move" in inspect.getsource(bc.SerialRobot._punch)
+    assert bc.FINAL_TILT_S == 0.3 and bc.STAND_LEVEL_DEG == 8.0 and bc.MOVE_TILT_GATE_DEG == 12.0
+
+
+def test_a_stand_up_that_ends_rolled_is_repeated_once_and_every_stand_up_is_logged(monkeypatch):
+    r, sent, bc = _tilt_robot(monkeypatch, [])
+    tick = {"t": 0.0}
+
+    def clock():
+        tick["t"] += 0.5
+        return tick["t"]
+    r._clock = clock                                                          # a clock that moves, so the stand-up's wait loop ends
+    monkeypatch.setattr(bc, "wait_for_pose", lambda *a, **k: "stand")
+    monkeypatch.setattr(r, "leg_check", lambda *a, **k: None)
+    r._fell = lambda: False
+    r._imu_release = lambda: None
+    ends = iter([(0.0, 20.0), (0.0, 2.0)])
+    r._tilt = lambda seconds=0.5: next(ends, (0.0, 0.0))
+    r.claw_pose = lambda *a, **k: "ok"
+    assert r._stand_up_from("rest") == "ok"
+    assert [e["roll"] for e in r.stand_log] == [20.0, 2.0] and [e["repeat"] for e in r.stand_log] == [False, True]   # rolled 20 deg: once more from rest, level the second time
+    assert sent.count("kbalance") == 2 and "krest" in sent

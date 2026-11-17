@@ -1060,6 +1060,7 @@ def test_the_leg_check_names_a_joint_that_holds_the_wrong_angle_after_a_stand_up
 # ---- falls at transitions, the firmware-reading levers (user, 2026-11-06): whole-cycle stop and pre-position (both default off, unproven)
 
 def _timed_robot(monkeypatch, sent):
+    monkeypatch.setattr(bc, "MOVE_TILT_GATE_DEG", 0.0)                         # these tests time the turn itself: the tilt read before a move would move their fake clock
     t = {"now": 0.0}
     class L:
         def send(self, c, read_reply=False, settle=0.0): sent.append((round(t["now"], 2), c)); return ""
