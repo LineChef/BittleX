@@ -14,7 +14,7 @@ r() { ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" "$1"; }
 safe() { [[ "$1" =~ ^[A-Za-z0-9_.:\ \|\-]+$ ]] || { echo "refused: only letters, digits, space and | : _ . - are allowed" >&2; exit 2; }; }
 case "$sub" in
   status) r 'echo "services: $(systemctl is-active g2-voice g2-explore g2-punt g2-baseline | tr "\n" " ")"; if [ -e ~/.local/share/g2/goal_running ]; then echo "goal: RUNNING"; else echo "goal: idle"; fi; echo "deployed: $(cat ~/bittleX/pi_pipeline/.deployed_commit 2>/dev/null)"; echo "clock: $(date) ntp-synced: $(timedatectl show -p NTPSynchronized --value)"; echo "up: $(uptime -p)"' ;;
-  battery) r 'tail -n 3 ~/.local/share/g2/battery_voltage.csv; v=$(tail -n 1 ~/.local/share/g2/battery_voltage.csv | cut -d, -f2); cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -c "from pi_pipeline.power import battery; print(\"newest: %d percent\" % battery.pack_percent(float(\"$v\")))" 2>/dev/null' ;;
+  battery) r 'tail -n 3 ~/.local/share/g2/battery_voltage.csv; line=$(tail -n 1 ~/.local/share/g2/battery_voltage.csv); v=$(echo "$line" | cut -d, -f2); t=$(echo "$line" | cut -d, -f1); cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -c "from pi_pipeline.power import battery; print(\"newest: %d percent (logged $t; the log is only as fresh as that time: the run gate reads the pack again)\" % battery.pack_percent(float(\"$v\")))" 2>/dev/null' ;;
   journal) pat="${1:-g2.goal}"; since="${2:-10 minutes ago}"; safe "$pat"; safe "$since"
            r "journalctl -u g2-voice --since '$since' --no-pager | grep -E '$pat' | sed 's/g2pi python\[[0-9]*\]: //' | cut -c1-200 | tail -n 40" ;;
   falls) r 'ls -t ~/.local/share/g2/falls/*.json 2>/dev/null | head -3' ;;
