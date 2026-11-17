@@ -199,7 +199,7 @@ A deploy restarts the voice service, so it never changes the settings file, and 
 Step calibration
 ----------------
 
-The approach is timed with no camera feedback, so the step lengths the planner uses (small steps closer at about 2.8 inches per second, the long walk at a fitted pace and start delay) should be checked against what G2 actually covers. `g2stepcal` measures it with the camera: the ball's forward distance before and after each timed step, as the distance times the cosine of its bearing. No pictures are saved.
+The approach is timed with no camera feedback, so the step lengths the planner uses (small steps closer at about 4.1 inches per second, the long walk at a fitted pace and start delay) should be checked against what G2 actually covers. `g2stepcal` measures it with the camera: the ball's forward distance before and after each timed step, as the distance times the cosine of its bearing. No pictures are saved.
 
 1. Put G2 on his feet on the floor with the green ball about 30 inches straight ahead, nothing else green in view, hands near. Confirm the floor label with `g2floor`.
 2. Run `g2stepcal` (all kinds, 3 repeats), or `g2stepcal small 2` for a shorter run. The voice service stops first and comes back after.

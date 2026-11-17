@@ -1380,7 +1380,7 @@ def test_a_move_found_fallen_before_it_starts_lays_him_in_rest_and_reports_a_fal
 def test_a_small_step_is_timed_to_the_gap_aiming_at_three_inches(monkeypatch):
     assert bc.nudge_seconds(4.1) == bc.NUDGE_MIN_S                                       # 1.1 in to go: the shortest step
     assert bc.NUDGE_MIN_S < bc.nudge_seconds(5.0) < bc.NUDGE_S                          # 2.0 in to go: a part of the full step
-    assert bc.nudge_seconds(6.0) == bc.NUDGE_S and bc.nudge_seconds(9.0) == bc.NUDGE_S  # 3 in or more to go: the full step, never longer
+    assert bc.nudge_seconds(7.0) == bc.NUDGE_S and bc.nudge_seconds(9.0) == bc.NUDGE_S  # about 3.7 in or more to go (a full step covers NUDGE_IN_PER_S x NUDGE_S): the full step, never longer
     assert abs(bc.nudge_seconds(5.5) - 2.5 / bc.NUDGE_IN_PER_S) < 1e-9
     monkeypatch.setattr(bc, "NUDGE_PROPORTIONAL", False)
     assert bc.nudge_seconds(4.1) == bc.NUDGE_S                                           # off: the old fixed step

@@ -45,7 +45,7 @@ NUDGE_MAX_IN = 7.0             # between PUNT_MAX_IN and this: small steps close
 NUDGE_S = 0.9                  # the longest small step (a full one moves about NUDGE_IN_PER_S x NUDGE_S inches)
 NUDGE_PROPORTIONAL = True      # (owner-approved 2026-11-16) a small step is timed to the gap, not always NUDGE_S: a fixed 0.9 s step moved about 2.5 in whatever the distance, so from 4 to 5 in it pushed the ball away or put it under the camera
 NUDGE_AIM_IN = 3.0             # a small step aims to leave the ball this far from the camera (the punch reaches it at about 2.6 to 3.75 in; under about 2 in the camera cannot see it)
-NUDGE_IN_PER_S = 2.8           # inches a small scripted step covers per second: 2.5 in in 0.9 s (median of 8 logged nudges, 2026-11-15/16); to be refitted by the calibration
+NUDGE_IN_PER_S = 4.1           # inches a small scripted step covers per second: g2stepcal small 2 on hardwood, 2026-11-17 (8 trials, ball 14 in away: 2.5 in in 0.6 s, 3.3 in in 0.9 s, 5.7 in in 1.2 s; the earlier 2.8 came from 8 logged nudges)
 NUDGE_MIN_S = 0.4              # the shortest small step: a gait covers almost nothing in less
 WALK_MAX_FRACTION = 0.6        # (owner-approved 2026-11-16) one long walk covers at most this share of the distance to the ball, so a timed step that lands too far (the stride varies about 3.7 in) never carries him into it; then he looks again. 1.0 = off
 NUDGE_GAIT = "scripted"      # how the small steps closer are walked (user, 2026-11-04): "scripted" = Petoi's own forward walk (kwkF) for NUDGE_S, which is steadier than the learned policy for dialing in the distance; "policy" = the learned gait
