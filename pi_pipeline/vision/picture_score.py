@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFile
 
 CLASS_CAP = 250
 DIST_BIN_IN = 4.0
@@ -49,9 +49,19 @@ def hamming(a: int, b: int) -> int:
 
 def measure(jpeg: bytes) -> dict | None:
     """The picture's own numbers, or None when it cannot be read."""
-    try:
-        im = Image.open(io.BytesIO(jpeg)).convert("RGB")
-    except Exception:  # noqa: BLE001
+    im = None
+    for lenient in (False, True):                                               # the camera's pictures are often cut short by a few bytes (no end marker): they still decode whole when truncation is allowed
+        ImageFile.LOAD_TRUNCATED_IMAGES = lenient
+        try:
+            im = Image.open(io.BytesIO(jpeg))
+            im.load()
+            im = im.convert("RGB")
+            break
+        except Exception:  # noqa: BLE001
+            im = None
+        finally:
+            ImageFile.LOAD_TRUNCATED_IMAGES = False
+    if im is None:
         return None
     mean, contrast = brightness_contrast(im)
     return {"mean": round(mean, 1), "contrast": round(contrast, 1), "sharp": round(sharpness(im), 1), "hash": ahash(im)}

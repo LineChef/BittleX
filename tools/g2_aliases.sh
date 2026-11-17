@@ -477,8 +477,17 @@ g2turncal() {
 }
 # g2turncalstop  -- end a turn calibration after the current turn (he is laid in rest).
 g2turncalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/turncal_stop" && echo "stop sent: the calibration ends after the current turn"; }
-# g2groom [apply]  -- groom the picture galleries (tools/g2_groom.py): a report of the extras (the auto-saved named classes over the cap of 250, near-twins in the behaviour picture folders), calibration and hand-named pictures never touched; it runs at the start of every hardware session (hw-session). Only applies when ~/.local/share/g2/groom.json says {"apply": true} (or `g2groom apply` once); an apply moves the extras aside on the Mac and queues the same removal for the Pi's trash.
-g2groom() { if [ "${1:-}" = apply ]; then python3 "$G2_ROOT/tools/g2_groom.py" --apply; else python3 "$G2_ROOT/tools/g2_groom.py" --session; fi; }
+# g2groom [run|apply|on|off|status]  -- (`on`/`off` switch the start-of-session grooming between applying and only reporting) groom the picture galleries (tools/g2_groom.py): a report of the extras (the auto-saved named classes over the cap of 250, near-twins in the behaviour picture folders), calibration and hand-named pictures never touched; it runs at the start of every hardware session (hw-session). Only applies when ~/.local/share/g2/groom.json says {"apply": true} (or `g2groom apply` once); an apply moves the extras aside on the Mac and queues the same removal for the Pi's trash.
+g2groom() {
+  local cfg="$HOME/.local/share/g2/groom.json"
+  case "${1:-run}" in
+    apply) python3 "$G2_ROOT/tools/g2_groom.py" --apply ;;
+    on)  mkdir -p "$(dirname "$cfg")" && echo '{"apply": true}' > "$cfg" && echo "grooming now APPLIES at the start of every hardware session (extras moved aside for 14 days, the Pi trash queued)" ;;
+    off) mkdir -p "$(dirname "$cfg")" && echo '{"apply": false}' > "$cfg" && echo "grooming now only REPORTS" ;;
+    status) cat "$cfg" 2>/dev/null || echo "no config: report only"; cat "$HOME/.local/share/g2/groom_last" 2>/dev/null && echo ;;
+    *) python3 "$G2_ROOT/tools/g2_groom.py" --session ;;
+  esac
+}
 # g2punttest [dry]  -- the active look (the post-punt watch): stands G2 up from rest, punts the ball (it must be in punt range), follows it rolling with the claw until it stops, takes a picture, says "target acquired" and goes on with the chase (turn, walk, dial in, one more punt), or, when the ball is lost, turns toward the side it was last seen on and does the normal claw look. `dry` = no punt and no chase: you roll the ball by hand and he only watches. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2puntstop ends it.
 g2punttest() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

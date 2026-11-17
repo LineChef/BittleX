@@ -187,6 +187,7 @@ def test_counts_give_the_true_totals_for_the_tab_labels(tmp_path):
     app = G.App(G.Remote("pi", runner=FakePi()))
     c = app.counts()
     assert c["facts"] == 24 and c["exchanges"] == 310 and c["observations"] == 12 and c["pictures"] == 0 and c["trash"] == 0
+    assert c["pictures_mb"] == 0.0 and c["pictures_budget_mb"] == G.PICTURE_BUDGET_MB == 100.0          # the Pictures tab shows its size against the budget
     from pi_pipeline.memory import review
     import sqlite3
     db = tmp_path / "m.db"

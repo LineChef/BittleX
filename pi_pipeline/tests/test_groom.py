@@ -64,7 +64,7 @@ def test_apply_moves_the_extras_aside_and_never_a_calibration_picture(tmp_path, 
     monkeypatch.setattr(gm, "PRUNED", str(tmp_path / "pruned"))
     res = gm.plan(root, cap=3)
     n = gm.apply(res, root, queue=False)
-    assert n["moved"] == 4 and n["report_only"] == 1 and len(list((tmp_path / "pruned").rglob("*.jpg"))) == 4        # the explore folder only; the bout twin is report only
+    assert n["moved"] == 5 and n["report_only"] == 0 and len(list((tmp_path / "pruned").rglob("*.jpg"))) == 5
     assert len(list((tmp_path / "g2_pictures" / "wall").glob("*.jpg"))) == 4 and len(list((tmp_path / "g2_pictures" / "liftcal").rglob("*.jpg"))) == 4
     res["bad"] = {"kept": 0, "extras": [os.path.join(root, "wall", "shot_000.jpg")]}
     try:
@@ -94,9 +94,9 @@ def test_apply_queues_the_same_removal_for_the_pi_and_leaves_the_other_folders_r
     monkeypatch.delenv("G2_PI", raising=False)
     res = gm.plan(root, cap=3)
     out = gm.apply(res, root)
-    assert out["moved"] == 4 and out["queued"] == 4 and out["report_only"] == 1                   # the 4 green ball extras; the one bout twin is report only
+    assert out["moved"] == 5 and out["queued"] == 5 and out["report_only"] == 0                   # the 4 green ball extras and the one bout twin: every folder has a Pi removal path now
     import g2_review_queue as rq
-    q = rq.pending()
-    assert len(q) == 1 and q[0]["module"] == "pi_pipeline.vision.exploration_pictures" and q[0]["args"][0] == "trash"
-    assert all(a.startswith("named/greenball/") for a in q[0]["args"][1:])                       # paths under the Pi's explore_pictures folder
-    assert (tmp_path / "g2_pictures" / "bout" / "bout_1" / "a_twin.jpg").exists() or (tmp_path / "g2_pictures" / "bout" / "bout_1" / "a.jpg").exists()
+    q = {e["module"]: e for e in rq.pending()}
+    ex, claw = q["pi_pipeline.vision.exploration_pictures"], q["pi_pipeline.vision.claw_pictures"]
+    assert ex["args"][0] == "trash" and all(a.startswith("named/greenball/") for a in ex["args"][1:])      # paths under the Pi's explore_pictures folder
+    assert claw["args"][0] == "trash" and all(a.startswith("bout_1/") for a in claw["args"][1:])            # Mac bout/bout_1/x.jpg -> Pi ~/g2_claw_pics/bout_1/x.jpg

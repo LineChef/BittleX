@@ -32,7 +32,9 @@ NEAR_DUP_FOLDERS = ("bout", "watch", "stream", "seen", "contact", "explore/surve
 CAL_WORDS = ("cal", "wall", "ring", "localizer", "labels", "claw", "calib")      # a folder or file with any of these is calibration or recognition data: refused
 AUTO_NAMED_BY = ("ball_chase",)                                               # only pictures the robot saved by itself in a named class are groomed; a hand or voice name protects a picture
 PURGE_DAYS = 14
-APPLY_FOLDERS = ("explore",)                                                  # only these have a Pi removal path (the Pi's own trash command); the others are report only
+APPLY_MAP = {"explore": "pi_pipeline.vision.exploration_pictures", "bout": "pi_pipeline.vision.claw_pictures", "watch": "pi_pipeline.vision.claw_pictures",
+             "stream": "pi_pipeline.vision.claw_pictures", "seen": "pi_pipeline.vision.claw_pictures", "contact": "pi_pipeline.vision.claw_pictures"}      # folder -> the Pi module whose restorable `trash` removes the same pictures
+APPLY_FOLDERS = tuple(APPLY_MAP)
 STATE = "~/.local/share/g2/groom_last"
 CONFIG = "~/.local/share/g2/groom.json"
 PRUNED = "~/Desktop/G2Memory/_pruned"
@@ -137,13 +139,17 @@ def apply(result: dict, root: str | None = None, queue: bool = True) -> dict:
                     os.makedirs(os.path.dirname(to), exist_ok=True)
                     shutil.move(src, to)
             moved += 1
-            rels.append(os.path.relpath(p, os.path.join(root, top)))              # the path under the Pi's explore_pictures folder
+            rels.append((APPLY_MAP[top], os.path.relpath(p, os.path.join(root, top if top == "explore" else ""))))      # explore: the path under the Pi's explore_pictures; the claw folders: <kind>/<kind>_<time>/pic under ~/g2_claw_pics minus the kind folder
     queued = 0
     if queue and rels:
         import g2_review_queue as rq                                              # tools/ is on the path: the review page's queue, the one that sends edits to the Pi
-        for i in range(0, len(rels), 40):
-            rq.add("pi_pipeline.vision.exploration_pictures", ["trash"] + rels[i:i + 40], text=f"gallery grooming: trash {len(rels[i:i + 40])} extra pictures on the Pi too")
-            queued += len(rels[i:i + 40])
+        for module in sorted({m for m, _ in rels}):
+            mine = [r for m, r in rels if m == module]
+            if module.endswith("claw_pictures"):
+                mine = [r.split("/", 1)[1] if "/" in r else r for r in mine]            # Mac: bout/bout_<time>/pic.jpg  ->  Pi: bout_<time>/pic.jpg under ~/g2_claw_pics
+            for i in range(0, len(mine), 40):
+                rq.add(module, ["trash"] + mine[i:i + 40], text=f"gallery grooming: trash {len(mine[i:i + 40])} extra pictures on the Pi too")
+                queued += len(mine[i:i + 40])
         try:
             print("   Pi:", rq.apply().get("message"))                            # sent now when the Pi answers; otherwise it stays queued for the next sync
         except Exception as e:  # noqa: BLE001

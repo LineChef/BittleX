@@ -97,3 +97,11 @@ def test_a_chase_starts_with_the_remembered_colour_and_the_sample_is_noted(tmp_p
     assert planner.ball_color == (111, 151, 113) and store.load() == (110, 150, 112)   # a close reading sets the colour at once; the saved median only moves past a 6 difference
     import inspect
     assert "ball_color_store.load()" in inspect.getsource(bc._chase_loop)
+
+
+def test_a_picture_cut_short_by_a_few_bytes_is_still_scored_and_a_real_fragment_is_not():
+    whole = jpeg(11)
+    cut = whole[:-12]                                                      # the camera's cut-short picture: the end marker and a few bytes missing
+    assert ps.measure(cut) is not None and ps.measure(cut)["sharp"] > 20
+    assert ps.measure(whole[:300]) is None                                 # a stub of the file: nothing to score
+    assert ps.measure(b"") is None
