@@ -389,3 +389,14 @@ def test_the_follow_calibration_can_freeze_exposure_for_the_run_and_always_resto
     g2 = Rows(c)
     out2 = fc.run_follow_cal(WatchRobot(), lambda f, cf, clk, sv: g2, lambda j: [], steps=(10.0,), repeats=1, say=lambda *_: None, sleep=c.sleep, clock=c)
     assert g2.lock_calls == [] and out2["summary"]["exposure_locked"] is False
+
+
+def test_every_claw_move_ends_with_the_settle_step_and_home_keeps_its_own_confirm():
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    r = bc.SerialRobot(Link(), sleep=lambda s: None, clock=lambda: 0.0)
+    r._fell = lambda: False
+    assert r.claw_pose(20.0, 120.0) == "ok"
+    assert [c for c in r._lk.sent if c.startswith("i")][-bc.CLAW_SETTLE_RESENDS:] == ["i0 20.0 1 120.0"] * bc.CLAW_SETTLE_RESENDS

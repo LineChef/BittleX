@@ -108,6 +108,8 @@ SCAN_TURN_DEG = 30.0           # a turn step between two claw looks (a claw look
 
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
+CLAW_SETTLE_RESENDS = 2         # after every claw move (home has its own confirm): resend the exact final position this many times ...
+CLAW_SETTLE_PAUSE_S = 0.15     # ... this far apart (owner, 2026-11-17: the claw sometimes shook for a while after reaching a position)
 CLAW_LIFT_DEG = 120.0         # (user, 2026-11-03) the look: attention pose, raise the claw to this (120 deg: +30 was seen to go up, 120 is near the top of the lift servo), pan left, picture, pan right, picture, centre, picture, lower, stand up
 CLAW_RAISE_DEG = None          # the first move of a look from the attention pose: straight up this far; None = CLAW_LIFT_DEG (40 deg tipped him nose down from the attention pose twice on 2026-11-03, BEFORE it was known that positive lift is up and that the legs were straight: check he holds before trusting a high raise)
 CLAW_RAISE_FIRST = True        # (user, 2026-11-02) from the attention pose the claw sits between the front legs and cannot pan there: raise it straight up first (lift CLAW_LIFT_DEG, pan 0), then
@@ -1495,6 +1497,10 @@ class SerialRobot:
             if i % 5 == 0 and self._fell():
                 state = "fell"
                 break
+        if state != "fell" and CLAW_SETTLE_RESENDS > 0 and not (pan == 0.0 and lift == 0.0):
+            for _ in range(CLAW_SETTLE_RESENDS):                   # (owner, 2026-11-17) the settle step: a short pause, then the exact final position again, so the servos stop hunting sooner
+                self._sleep(CLAW_SETTLE_PAUSE_S)
+                self._tx(f"i0 {pan} 1 {lift}")
         self._claw = (pan, lift)
         self._imu_release()
         if state != "fell" and pan == 0.0 and lift == 0.0:
