@@ -53,7 +53,7 @@ voice / conversation
 memory
 ------
 
-- `g2mem [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]`: inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi).
+- `g2memory [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]`: inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi). (Named g2mem until 2026-11-17: a second g2mem, the Pi's RAM log, hid it. `g2mem` is the RAM log.)
 - `g2pimem`: G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
 - `g2embedder`: move the object gallery to the DINOv2 embedder: push-model / bench / switch / revert, each its own step (tools/g2_switch_embedder.sh); the labelled pictures are never touched.
 - `g2places`: feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics.
@@ -111,6 +111,7 @@ operate G2 (Mac -> Pi)
 - `g2puntstop`: end a punt attempt now (he rests, the voice service comes back).
 - `g2puntset [NAME VALUE / init]`: show the punt settings a run would use now (the file ~/.local/share/g2/punt_settings.json on the Pi), change one (g2puntset punt_max_in 3.5), or write the file with every default (init). Read at the start of every run: no deploy.
 - `g2goal [list/show GOAL/set GOAL .../run GOAL/stop/status/history GOAL/suggestions/confirm/cancel GOAL KNOB/verdict GOAL N right/wrong/pin/limit/undo/forget GOAL KNOB .../overrides GOAL/reset GOAL --yes/pull/report [GOAL]]`: goals G2 works toward and what he learned (docs/guides/goals.md). run = one session without the voice command (the same as saying "G2, ball goal"): it runs inside the running voice service, which is not stopped (the port stays open); stop = end it (he rests). apply = send the edits queued in the review page's Goals tab to the Pi (also done by pull and run); pull = copy the journal and the learned state to ~/Desktop/G
+- `g2mem [HOURS]`: the Pi's memory log (default the last 24 hours): lowest available memory, G2's biggest total, swap, memory pressure, OOM kills, overall and between notes (voice service start, goal attempts, explorations). G2 off: from the copy `g2goal pull` last made.
 - `g2ball`: start the ball goal yourself (the same as saying "G2, ball goal"): up to 10 punt attempts; stops the voice service on the Pi, stands G2 up from rest, rests him at the end, starts the voice service and copies the goal data to the Mac. G2 in rest on the floor, the ball in front of him, your hands near.
 - `g2ballstop`: stop it: the attempt ends at its next step (a second or two), G2 rests, the voice service comes back. If it is still moving after that, say "emergency stop" or run app --halt.
 - `g2deploy [--once/--cancel/--max-hours N/--replace]`: push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once; --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.

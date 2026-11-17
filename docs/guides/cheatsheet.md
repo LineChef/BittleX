@@ -130,6 +130,7 @@ Data and review
 - `g2pimem`: G2's memory on the Pi, in the review page
 - `g2pimem search dishwasher`: search his memory as text
 - `g2mem 24`: Pi memory use, last 24 h
+- `g2memory facts`: G2's memory on this Mac, as text
 - `g2membackup`: snapshot the memory database
 - `g2data`: sync walk logs and run the quality gates
 - `g2cal status`: the calibration snapshots
@@ -353,6 +354,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2look`: [Claw and camera](#claw-and-camera)
 - `g2mem`: [Data and review](#data-and-review)
 - `g2membackup`: [Data and review](#data-and-review)
+- `g2memory`: [Data and review](#data-and-review)
 - `g2mic`: [Most used](#most-used), [Voice and mic](#voice-and-mic)
 - `g2micon`: [Voice and mic](#voice-and-mic)
 - `g2pcam`: [Camera model](#camera-model)

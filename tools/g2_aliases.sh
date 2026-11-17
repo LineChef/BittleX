@@ -264,11 +264,11 @@ g2audio() { _g2py -m pi_pipeline.voice.check_audio "${1:-devices}"; }   # device
 
 # ------------------------------------------------------------------- memory
 
-# g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]  -- inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi).
-g2mem() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
+# g2memory [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]  -- inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi). (Named g2mem until 2026-11-17: a second g2mem, the Pi's RAM log, hid it. `g2mem` is the RAM log.)
+g2memory() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
 # g2pimem  -- G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
 # "Empty trash" is the only permanent delete). It runs in the background: the first call starts it, later calls just open the browser. `g2pimem stop` ends it.
-# g2pimem <facts | log N | search <q> | usage | sightings N | ...>  prints text instead (the same CLI against the Pi; g2mem reads the Mac's copy).
+# g2pimem <facts | log N | search <q> | usage | sightings N | ...>  prints text instead (the same CLI against the Pi; g2memory reads the Mac's copy).
 g2pimem() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   case "${1:-ui}" in
