@@ -55,6 +55,8 @@ Other cleanup tools, each a dry run by default:
 - `python tools/curate_class.py FOLDER`: keeps one class under a cap.
 - The Pictures tab of the review page shows the gallery's size against its budget.
 
+A sync from the Pi does not undo the grooming: the pull copies without deleting, and a groomed picture is no longer in the Pi's pictures folder (it is in the Pi's trash), so it is not copied back. The behaviour folders on the Mac (`bout`, `watch`, `stream` and the others) are one-time copies that the sync never refreshes, and the wall pictures it does refresh are calibration pictures that the grooming never touches. The order matters when the Pi was off during a groom: the queued removals are sent at the start of the next sync, before it pulls.
+
 To undo a removal: move the picture back from `~/Desktop/G2Memory/_pruned/` on the Mac, and on the Pi restore it from its trash (`python -m pi_pipeline.vision.exploration_pictures restore PATH`, or `pi_pipeline.vision.claw_pictures` for the behaviour pictures).
 
 The far-ball class: `training_data/exploration/promoted/greenball-far/` holds pictures where the ball is 20 pixels or smaller across (about 4 to 5 feet away), labelled from the existing green ball pictures. It is local until it is promoted to the robot's gallery.
