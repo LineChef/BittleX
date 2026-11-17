@@ -33,7 +33,9 @@ from typing import Callable, Protocol
 
 from . import gait_cycle
 from ..body import FALL_DEG
+from ..vision import miss_log
 from ..vision.ball_finder import BallReading, find_ball
+from ..vision.ball_finder import find_ball_or_color as bf_find_ball_or_color
 
 log = logging.getLogger("g2.ball_chase")
 
@@ -1761,8 +1763,10 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     def per_pan(pan):
         jpeg = camera.look()
         lap("camera")
-        ball = confirm_ball(camera, find_ball(jpeg) if jpeg else None, sleep, trace)
+        ball = confirm_ball(camera, bf_find_ball_or_color(jpeg, getattr(planner, "ball_color", None)), sleep, trace)
         lap("find")
+        if ball is None:
+            miss_log.note_miss(jpeg, "claw_look")
         if ball is not None:
             if saver is not None:
                 saver.maybe_save(jpeg, ball, tag="claw")
@@ -1941,7 +1945,9 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 say(f"[{steps}] no picture from the camera: looking again")
                 note(kind="no_picture")
                 continue
-            ball = timed("confirm", confirm_ball, camera, timed("find", find_ball, jpeg), sleep, trace)         # a ball only the loose pass found needs a second picture (user, 2026-11-01: false balls)
+            ball = timed("confirm", confirm_ball, camera, timed("find", bf_find_ball_or_color, jpeg, planner.ball_color), sleep, trace)         # a ball only the loose pass found needs a second picture (user, 2026-11-01: false balls)
+            if ball is None:
+                miss_log.note_miss(jpeg, "chase_look")
             if saver is not None:
                 saver.maybe_save(jpeg, ball)
             if last_move is not None and planner.pace is not None and not dry_run:

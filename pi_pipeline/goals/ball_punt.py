@@ -139,6 +139,8 @@ class BallPunt:
         self.last_pack_pct = None                                           # the pack % read before the last attempt (kept with every attempt, not learned from yet)
         self.wall_check = wall_check
         self.got_it_announced = False
+        from ..vision import miss_log
+        miss_log.begin_session()                                            # the missed-ball pictures are counted per session (at most 6)
         self._last_watch = None                                             # (time, WatchResult) of the last attempt's post-punt watch: the next attempt starts from where the ball ended
 
     # ---------------------------------------------------------------------------------------------------- settings
@@ -211,7 +213,7 @@ class BallPunt:
         from ..behavior import punt_watch as pw
         from ..behavior.ball_tracker import BallTracker
         from ..vision import ball_finder as bf
-        from ..vision.ball_finder import find_ball
+        from ..vision import miss_log
         cam = getattr(self.camera, "_cam", None)
         if cam is None or not hasattr(cam, "_open"):
             return pw.WatchResult(ended="error")
@@ -225,10 +227,8 @@ class BallPunt:
 
         def find_still(camera):
             jpeg = camera.look()
-            ball = find_ball(jpeg) if jpeg else None
-            if ball is None and jpeg and color is not None:
-                ball = bf.find_ball_color(jpeg, color)                                   # the pale ball the fixed rules miss, by its own colour
-            find_still.last_diag = bf.diagnose(jpeg) if (jpeg and ball is None) else None       # a miss: the biggest green blob in it, as numbers (no picture is kept)
+            ball = bf.find_ball_or_color(jpeg, color)                                    # the fixed rules, then the pale ball by its own colour
+            find_still.last_diag = miss_log.note_miss(jpeg, "watch_still") if (jpeg and ball is None) else None       # a miss: the biggest green blob as numbers, and up to 6 missed-ball pictures a session (owner's yes, 2026-11-17)
             return bc.confirm_ball(camera, ball, _t.sleep, None)
         find_still.last_diag = None
         at = before_punt if (before_punt and before_punt[0] is not None) else (None, None)

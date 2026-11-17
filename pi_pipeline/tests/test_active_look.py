@@ -400,3 +400,65 @@ def test_every_claw_move_ends_with_the_settle_step_and_home_keeps_its_own_confir
     r._fell = lambda: False
     assert r.claw_pose(20.0, 120.0) == "ok"
     assert [c for c in r._lk.sent if c.startswith("i")][-bc.CLAW_SETTLE_RESENDS:] == ["i0 20 1 120"] * bc.CLAW_SETTLE_RESENDS
+
+
+# ---- 2026-11-17 (owner-approved): far balls: the ball's own colour in every look, still retries before "lost", far-miss evidence
+def test_the_shared_finder_falls_back_to_the_balls_own_colour_and_the_chase_looks_use_it(monkeypatch):
+    from pi_pipeline.vision import ball_finder as bf
+    calls = []
+    monkeypatch.setattr(bf, "find_ball", lambda j: None)
+    monkeypatch.setattr(bf, "find_ball_color", lambda j, c: calls.append(c) or "found")
+    assert bf.find_ball_or_color(b"x", (1, 2, 3)) == "found" and calls == [(1, 2, 3)]
+    assert bf.find_ball_or_color(b"x", None) is None and bf.find_ball_or_color(b"", (1, 2, 3)) is None
+    import inspect
+    from pi_pipeline.behavior import ball_chase as bc
+    src = inspect.getsource(bc)
+    assert src.count("bf_find_ball_or_color") >= 3                              # the claw look and the walking look both use the shared finder (plus its import)
+
+
+def test_the_watch_looks_again_before_it_says_the_ball_is_lost():
+    from pi_pipeline.behavior import punt_watch as pw
+    c = Clock()
+    tries = {"n": 0}
+
+    def find_still(camera):
+        tries["n"] += 1
+        return None
+    find_still.last_diag = None
+    r = pw.watch_after_punt(WatchRobot(), object(), lambda f, cf, clk, sv: FixedScript(c, there=False), lambda j: [], find_still, pw.WatchConfig(seconds=1.0), say=lambda *_: None, announce=lambda *_: None, sleep=c.sleep, clock=c)
+    assert tries["n"] == 1 + pw.STILL_RETRIES and r.found is False
+    tries["n"] = 0
+
+    def second_time(camera):
+        tries["n"] += 1
+        return None if tries["n"] < 3 else bc_reading()
+    second_time.last_diag = None
+    c2 = Clock()
+    r2 = pw.watch_after_punt(WatchRobot(), object(), lambda f, cf, clk, sv: FixedScript(c2, there=False), lambda j: [], second_time, pw.WatchConfig(seconds=1.0), say=lambda *_: None, announce=lambda *_: None, sleep=c2.sleep, clock=c2)
+    assert tries["n"] == 3 and r2.found is True
+
+
+def bc_reading():
+    from pi_pipeline.vision import ball_finder as bf
+    return bf.BallReading(120.0, 150.0, 100, 12, 12, 12.0, 20.0, 0.0, False, "normal")
+
+
+def test_far_misses_are_noted_and_at_most_six_pictures_are_kept_per_session(tmp_path, monkeypatch):
+    import io
+    import os
+    import numpy as np
+    from PIL import Image
+    from pi_pipeline.vision import miss_log
+    monkeypatch.setenv("HOME", str(tmp_path))
+    rgb = np.zeros((240, 240, 3), dtype=np.uint8)
+    rgb[150:162, 100:112] = (60, 200, 60)                                        # a small green blob: worth a picture
+    buf = io.BytesIO(); Image.fromarray(rgb).save(buf, "JPEG"); green = buf.getvalue()
+    buf = io.BytesIO(); Image.fromarray(np.zeros((240, 240, 3), dtype=np.uint8)).save(buf, "JPEG"); empty = buf.getvalue()
+    miss_log.begin_session()
+    assert miss_log.note_miss(empty, "a") is None and miss_log.note_miss(None, "a") is None            # an empty floor: noted, no picture
+    for _ in range(9):
+        miss_log.note_miss(green, "watch_still")
+    saved = [f for d, _, fs in os.walk(tmp_path) for f in fs if f.startswith("miss_")]
+    assert len(saved) == miss_log.MAX_PICTURES == 6 and miss_log.notes()[-1]["blob"]["area"] > 10
+    miss_log.begin_session()
+    assert miss_log.notes() == []

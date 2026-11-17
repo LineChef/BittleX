@@ -54,6 +54,8 @@ class WatchResult:
 
 
 STREAM_WINDOW_S = 5.0              # the stream's sightings this recent at the end of the follow are the ball's last known place
+STILL_RETRIES = 3                  # more pictures from where the claw stands, one after the other, before the ball counts as lost
+STILL_RETRY_WAIT_S = 0.6
 STREAM_MIN_N = 2                   # ... when there are at least this many of them (a single sighting can be a false one)
 
 
@@ -124,6 +126,12 @@ def watch_after_punt(robot, camera, make_grabber, find_fn, find_still, wcfg: Wat
         res.ended = "stopped" if al.ended == "stopped" else ("lost" if lost_by_stream else "timeout")
         say(("watch: the stream lost the ball: one last picture before giving up" if lost_by_stream else f"watch: the ball {'has stopped' if res.ended == 'stopped' else 'is still rolling at the limit'}: taking a picture"))
         ball = find_still(camera)                                      # always: the claw is where the ball was last seen, and a ball that stopped in front of it may only have been missed by the stream
+        for i in range(STILL_RETRIES):                                 # (owner, 2026-11-17) a far ball is missed by one picture: look again, claw where it was last seen, before giving up
+            if ball is not None or stopped():
+                break
+            say(f"watch: no ball in the picture: looking again ({i + 1} of {STILL_RETRIES})")
+            sleep(STILL_RETRY_WAIT_S)
+            ball = find_still(camera)
         if not lost_by_stream:
             stream = stream_reading(al.sightings, al.ended_at)         # ... and where the stream saw it last (2026-11-16: the still alone missed far balls the stream had followed)
             res.stream_reading = stream

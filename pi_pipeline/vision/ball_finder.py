@@ -188,6 +188,14 @@ def find_ball_array(rgb: np.ndarray) -> BallReading | None:
     return found
 
 
+def find_ball_or_color(jpeg: bytes, color: tuple | None = None) -> BallReading | None:
+    """The one look every mode uses (2026-11-17, owner-approved after far balls were missed): the fixed rules first, then the ball's own colour (sampled when it was close) when those find nothing."""
+    ball = find_ball(jpeg) if jpeg else None
+    if ball is None and jpeg and color is not None:
+        ball = find_ball_color(jpeg, color)
+    return ball
+
+
 def find_ball(jpeg: bytes) -> BallReading | None:
     """The ball in this JPEG, or None (no picture, or nothing round and green)."""
     rgb = _decode(jpeg)
