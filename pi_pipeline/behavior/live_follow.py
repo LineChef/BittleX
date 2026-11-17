@@ -435,6 +435,7 @@ def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign
                                  on_ready=lambda: say(f"live follow: {cfg.seconds:.0f} s, claw up"), tilt_s=0.5, raise_settle_s=0.5)
             res["ended"] = "stopped" if al.ended == "stopped_by_user" else al.ended
             moves, reversals, rows = al.move_log, al.reversals, al.rows
+            res["frames"] = al.frames
     except Exception:  # noqa: BLE001
         log.exception("the live follow failed")
         res["ended"] = "error"
@@ -477,7 +478,7 @@ def write_log(res: dict, outdir: str) -> str | None:
     try:
         path = os.path.join(os.path.expanduser(outdir), "live_log.json")
         with open(path, "w") as f:
-            json.dump({"ended": res["ended"], "seconds": res["seconds"], "summary": res["summary"], "moves": res["moves"], "rows": res["rows"]}, f)
+            json.dump({"ended": res["ended"], "seconds": res["seconds"], "summary": res["summary"], "moves": res["moves"], "rows": res["rows"], "frames": res.get("frames", [])}, f)
         return path
     except OSError:
         return None

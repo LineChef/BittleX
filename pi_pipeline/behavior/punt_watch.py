@@ -18,7 +18,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from . import live_follow as lf
-from .active_look import StopDetector, StopLostConfig, StopOrLostJudge, run_active_look  # noqa: F401  (StopDetector is re-exported: it lived here first)
+from .active_look import StopDetector, StopLostConfig, StopOrLostJudge, frame_log, run_active_look  # noqa: F401  (StopDetector and frame_log are re-exported: they lived here first)
 
 log = logging.getLogger("g2.punt_watch")
 
@@ -71,31 +71,6 @@ def stream_reading(sights: list, end_t: float):
     w, h = med(3) * f, med(4) * f
     diam = max(w, h, 1.0)
     return bf.BallReading(med(5) * f, med(6) * f, int(math.pi / 4.0 * diam * diam), int(w), int(h), diam, bf.DIST_K / diam, float(med(1)), False, "stream")
-
-
-def frame_log(rows: list, limit: int = 90) -> list:
-    """The stream's pictures as compact dicts for the journal: seconds from the first, bad (cut short), the ball's centre x / y and width, the picture's brightness and size, and for a picture with no
-    sighting the biggest green blob it held (area, x, y). Numbers only."""
-    if not rows:
-        return []
-    t0 = rows[0].get("t_capture", 0.0)
-    out = []
-    for r in rows[:limit]:
-        f = {"t": round(r.get("t_capture", t0) - t0, 1)}
-        if r.get("bad"):
-            f["bad"] = 1
-        else:
-            f["d"] = 1 if r.get("det") else 0
-            if r.get("best"):
-                f["ball"] = list(r["best"])
-            if r.get("mean") is not None:
-                f["mean"] = r["mean"]
-            f["bytes"] = r.get("bytes")
-            dg = r.get("diag")
-            if dg:
-                f["blob"] = [dg.get("area"), dg.get("x"), dg.get("y")]
-        out.append(f)
-    return out
 
 
 def _world_bearing(pan_log: lf.PanLog, t_capture: float, det) -> float:

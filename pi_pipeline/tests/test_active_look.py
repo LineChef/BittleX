@@ -154,8 +154,8 @@ class LockableScript(Script):
         return True
 
 
-def _run(robot, tracker=None, judge=None, cfg=None, grab=None, vanish_at=None, **kw):
-    c = Clock()
+def _run(robot, tracker=None, judge=None, cfg=None, grab=None, vanish_at=None, clock=None, **kw):
+    c = clock or Clock()
     g = grab or Script(c, vanish_at=vanish_at)
     res = al.run_active_look(robot, lambda find, cf, clock, save: g, tracker or FakeTracker(), cfg or lf.LiveConfig(seconds=2.0, tick_s=0.05), judge=judge, say=lambda *_: None, sleep=c.sleep, clock=c, **kw)
     return res, g
@@ -283,3 +283,92 @@ def test_the_follow_calibration_loop_takes_each_step_out_and_back_and_stops_on_a
     f = Cal()
     f.fall_at = 3
     assert fc.run_follow_cal(f, lambda find, cfg, clock, save: Rows(c), lambda j: [], steps=(10.0,), repeats=1, say=lambda *_: None, sleep=c.sleep, clock=c)["ended"] == "fell"
+
+
+# ---- 2026-11-17 (owner-approved): a judge per mode, the per-picture log for every use, the arm height per call, safety no mode can widen
+class FixedScript(Script):
+    """A grabber whose target sits at one place in every picture (cx as a share of the width), or is never there."""
+
+    def __init__(self, clock, cx=0.5, there=True):
+        super().__init__(clock)
+        self.cx, self.there = cx, there
+
+    def take(self):
+        t = self.clock()
+        return (t - 0.2, [("person", 0.9, self.cx, 0.5, 0.2, 0.4)] if self.there else [], int(t / 0.25) + 1)
+
+
+def test_a_greeting_style_look_ends_centred_once_the_target_has_stayed_in_the_middle():
+    cfg = lf.LiveConfig(seconds=20.0, tick_s=0.05)
+    c = Clock()
+    res, _ = _run(WatchRobot(), cfg=cfg, judge=al.CenteredJudge(hold_s=1.0, tol_deg=6.0), grab=FixedScript(c, 0.5), clock=c)
+    assert res.ended == "centred"                                              # right in the middle for a second
+    c = Clock()
+    res, _ = _run(WatchRobot(), cfg=lf.LiveConfig(seconds=2.0, tick_s=0.05), judge=al.CenteredJudge(hold_s=1.0, tol_deg=6.0), grab=FixedScript(c, 0.9), clock=c)
+    assert res.ended == "time"                                                 # 35 deg off the middle in every picture (the fake claw never turns): never centred
+    c = Clock()
+    res, _ = _run(WatchRobot(), cfg=lf.LiveConfig(seconds=3.0, tick_s=0.05), judge=al.CenteredJudge(hold_s=5.0, lost_after_s=1.0), grab=FixedScript(c, 0.5, there=False), clock=c)
+    assert res.ended == "time"                                                 # never seen: "lost" needs a first sighting, so only the time ends it
+
+
+def test_every_use_keeps_the_per_picture_log_in_its_result_and_the_live_follow_writes_it():
+    from pi_pipeline.behavior import punt_watch
+    assert punt_watch.frame_log is al.frame_log                                # one log format, defined once
+    rows = [{"t_capture": 5.0, "det": [("x", 0.5)], "best": (0.5, 0.5, 0.1), "mean": 100, "bytes": 6000}, {"t_capture": 5.3, "det": [], "mean": 90, "bytes": 5900, "diag": {"area": 7, "x": 3, "y": 4}}]
+
+    class Rows(Script):
+        def __init__(self, clock):
+            super().__init__(clock)
+            self.rows = rows
+    c = Clock()
+    res = al.run_active_look(WatchRobot(), lambda f, cf, clk, sv: Rows(c), lambda j: [], lf.LiveConfig(seconds=1.0, tick_s=0.05), say=lambda *_: None, sleep=c.sleep, clock=c)
+    assert res.frames == al.frame_log(rows) and res.frames[0]["ball"] == [0.5, 0.5, 0.1] and res.frames[1]["blob"] == [7, 3, 4]
+
+
+def test_a_mode_picks_the_arm_height_and_the_default_stays_120():
+    r = WatchRobot()
+    _run(r, lift_deg=90.0)
+    assert r.calls[:2] == ["relax", ("claw", 0.0, 90.0)]
+    r2 = WatchRobot()
+    _run(r2)
+    assert r2.calls[1] == ("claw", 0.0, al.DEFAULT_LIFT_DEG) and al.DEFAULT_LIFT_DEG == 120.0
+
+
+def test_safety_is_the_same_for_every_mode_a_config_can_lower_the_limits_but_never_raise_them():
+    seen = {}
+
+    class Spy(lf.LiveConfig):
+        pass
+    orig = lf.follow_loop
+
+    def spy(robot, grab, follower, pan_log, cfg, **kw):
+        seen["cfg"] = cfg
+        return orig(robot, grab, follower, pan_log, cfg, **kw)
+    lf.follow_loop = spy
+    try:
+        _run(WatchRobot(), cfg=lf.LiveConfig(seconds=0.5, tick_s=0.05, max_tilt_change_deg=45.0, tilt_check_s=9.0))
+        assert seen["cfg"].max_tilt_change_deg == al.MAX_TILT_CHANGE_DEG == 10.0 and seen["cfg"].tilt_check_s == al.MAX_TILT_CHECK_S                    # raised values are clamped
+        _run(WatchRobot(), cfg=lf.LiveConfig(seconds=0.5, tick_s=0.05, max_tilt_change_deg=4.0, tilt_check_s=0.5))
+        assert seen["cfg"].max_tilt_change_deg == 4.0 and seen["cfg"].tilt_check_s == 0.5                                                               # lowered values are kept
+    finally:
+        lf.follow_loop = orig
+
+
+def test_a_fall_a_sag_and_the_stop_file_end_the_follow_with_any_judge_and_any_tracker():
+    judges = (al.TimeOnlyJudge, lambda: al.StopOrLostJudge(al.StopLostConfig(seconds=20.0)), lambda: al.CenteredJudge())
+    trackers = (FakeTracker(), lambda j: [])
+    for make_judge in judges:
+        for tr in trackers:
+            class Falls(WatchRobot):
+                def _fell(self):
+                    return True
+            res, _ = _run(Falls(), tracker=tr, judge=make_judge())
+            assert res.ended == "fell"
+            res, _ = _run(WatchRobot(), tracker=tr, judge=make_judge(), stopped=lambda: True)
+            assert res.ended == "stopped_by_user"
+            tilting = WatchRobot()
+            tilts = iter([(0.0, 0.0)] + [(0.0, 30.0)] * 400)
+            tilting._tilt = lambda *a, **k: next(tilts)
+            tilting._roll, tilting._pitch = [30.0] * 10, [0.0] * 10
+            res, _ = _run(tilting, tracker=tr, judge=make_judge(), cfg=lf.LiveConfig(seconds=5.0, tick_s=0.05, tilt_check_s=0.2))
+            assert res.ended == "sag"

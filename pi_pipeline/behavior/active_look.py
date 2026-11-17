@@ -13,6 +13,8 @@ TRACKING METHOD the caller passes in.
   pictures and holds a sighting that jumps far from where the target should be until a second one agrees. Every knob is in `LiveConfig` (gain, tick, deadband, lead, coast, jump, exposure lock).
 * The END of the follow is decided by a JUDGE: `TimeOnlyJudge` (the default: follow for `seconds`) or `StopOrLostJudge` (the ball's: end when the target has stopped, or has been out of sight for
   `lost_after_s`). A judge is any object with `start(t_up, rows)` and `on_picture(pic, follower, now) -> str | None` (the end reason) and the attributes `sights`, `last_bearing`.
+* SAFETY is the same for every mode (owner, 2026-11-17): a fall, a body that tilts more than `MAX_TILT_CHANGE_DEG` from how it stood, and the stop file end the follow whatever the tracker and the judge are,
+  and a caller's config can lower those limits but never raise them (they are clamped here).
 * The RESULT says how it ended, the last bearing and side the target was seen on, the sightings, the per-picture log. This function never walks, never takes a still, never lowers the claw and never
   stands up: the caller owns what comes after (the ball's watch does a last picture, rests him and stands him up).
 
@@ -20,6 +22,7 @@ Every mode that follows with the claw calls this (the ball watch after a punt, t
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import time
 from collections import deque
@@ -28,6 +31,35 @@ from dataclasses import dataclass, field
 from . import live_follow as lf
 
 log = logging.getLogger("g2.active_look")
+
+MAX_TILT_CHANGE_DEG = 10.0         # the follow ends ("sag") when the body tilts this far from how it stood: the same limit in every mode
+MAX_TILT_CHECK_S = 1.0             # ... checked at least this often
+DEFAULT_LIFT_DEG = 120.0           # the arm's height for the look; a mode may ask for another with `lift_deg=`
+
+
+def frame_log(rows: list, limit: int = 90) -> list:
+    """The stream's pictures as compact dicts for a journal or a log (every mode that follows keeps this): seconds from the first, bad (cut short), the target's centre x / y and width, the picture's
+    brightness and size, and for a picture with no sighting the biggest green blob it held (area, x, y). Numbers only."""
+    if not rows:
+        return []
+    t0 = rows[0].get("t_capture", 0.0)
+    out = []
+    for r in rows[:limit]:
+        f = {"t": round(r.get("t_capture", t0) - t0, 1)}
+        if r.get("bad"):
+            f["bad"] = 1
+        else:
+            f["d"] = 1 if r.get("det") else 0
+            if r.get("best"):
+                f["ball"] = list(r["best"])
+            if r.get("mean") is not None:
+                f["mean"] = r["mean"]
+            f["bytes"] = r.get("bytes")
+            dg = r.get("diag")
+            if dg:
+                f["blob"] = [dg.get("area"), dg.get("x"), dg.get("y")]
+        out.append(f)
+    return out
 
 
 # ------------------------------------------------------------------------------------------------------------ tracker contract
@@ -150,10 +182,37 @@ class StopOrLostJudge(TimeOnlyJudge):
         return None
 
 
+class CenteredJudge(TimeOnlyJudge):
+    """For a look that is over once the claw has settled on the target (a greeting, "look at me"): ends "centred" when the target has stayed within `tol_deg` of the middle of the picture for `hold_s`.
+    With `lost_after_s` set it also ends "lost" when the target has been out of sight that long after being seen. Otherwise only the time ends it."""
+
+    def __init__(self, hold_s: float = 2.0, tol_deg: float = 6.0, lost_after_s: float | None = None):
+        super().__init__()
+        self.hold_s, self.tol, self.lost_after_s = hold_s, tol_deg, lost_after_s
+        self._since: float | None = None
+        self._seen = False
+
+    def on_picture(self, pic, follower, now) -> str | None:
+        d, _b = self._sight(pic, follower, now)
+        if d is None:
+            self._since = None
+            if self.lost_after_s is not None and self._seen and self.last_seen_t is not None and now - self.last_seen_t > self.lost_after_s:
+                return "lost"
+            return None
+        self._seen = True
+        off = (float(d[2]) - 0.5) * 2.0 * follower.cfg.fov_half_deg
+        if abs(off) > self.tol:
+            self._since = None
+            return None
+        if self._since is None:
+            self._since = now
+        return "centred" if now - self._since >= self.hold_s else None
+
+
 # ------------------------------------------------------------------------------------------------------------ the result
 @dataclass
 class ActiveLookResult:
-    ended: str = "error"               # "time" | "stopped" | "lost" (the judge's), "stopped_by_user" | "fell" | "sag" | "no_board" | "error"
+    ended: str = "error"               # "time" | "stopped" | "lost" | "centred" (the judge's), "stopped_by_user" | "fell" | "sag" | "no_board" | "error"
     seconds: float = 0.0
     pictures: int = 0                  # pictures that arrived whole
     bad_frames: int = 0
@@ -166,17 +225,20 @@ class ActiveLookResult:
     rows: list = field(default_factory=list)
     move_log: list = field(default_factory=list)
     arm_raised: bool = False           # the arm was moved up (False: it was already up)
+    frames: list = field(default_factory=list)      # the per-picture log (frame_log): numbers only, kept for every use
     ended_at: float = 0.0              # the clock when the follow ended (before the grabber was joined)
 
 
 # ------------------------------------------------------------------------------------------------------------ the shared behavior
 def run_active_look(robot, make_grabber, tracker, cfg: lf.LiveConfig | None = None, *, judge=None, pan_sign: str = "left", say=print, sleep=time.sleep, clock=time.monotonic,
                     stopped=lambda: False, save=None, snap_fn=None, on_ready=None, seconds: float | None = None, tilt_s: float = 0.2, raise_settle_s: float = 0.0,
-                    stream_first: bool = False) -> ActiveLookResult:
+                    stream_first: bool = False, lift_deg: float | None = None) -> ActiveLookResult:
     """Raise the arm to `cfg.lift_deg`, then follow with the claw using `tracker`, until the judge, the time, a fall, a sag or `stopped()` ends it. `make_grabber(find, cfg, clock, save)` builds the
     grabber (the stream's); None builds the picture-by-picture one from `snap_fn`. `on_ready()` is called once the follow starts. `stream_first` starts the stream before the arm goes up (the ball's
-    watch keeps what it saw while he moved). Never raises; the caller owns the grabber's pictures and everything after the follow."""
+    watch keeps what it saw while he moved). `lift_deg` overrides the arm's height (default `cfg.lift_deg`, 120). Never raises; the caller owns the grabber's pictures and everything after the follow."""
     cfg = cfg or lf.LiveConfig()
+    cfg = dataclasses.replace(cfg, lift_deg=cfg.lift_deg if lift_deg is None else float(lift_deg), max_tilt_change_deg=min(cfg.max_tilt_change_deg, MAX_TILT_CHANGE_DEG),
+                              tilt_check_s=min(cfg.tilt_check_s, MAX_TILT_CHECK_S))      # a mode may lower the safety limits, never raise them
     tracker = as_tracker(tracker)
     judge = judge or TimeOnlyJudge()
     res = ActiveLookResult()
@@ -231,6 +293,7 @@ def run_active_look(robot, make_grabber, tracker, cfg: lf.LiveConfig | None = No
                              stopped=stopped, on_picture=on_picture)
         rows = list(getattr(grab, "rows", []))
         res.rows, res.move_log, res.moves, res.pan, res.reversals = rows, out["moves"], len(out["moves"]), out["pan"], out["reversals"]
+        res.frames = frame_log(rows)
         res.pictures = len([r for r in rows if not r.get("bad")])
         res.bad_frames = sum(1 for r in rows if r.get("bad"))
         res.sightings, res.last_bearing = list(judge.sights), judge.last_bearing
