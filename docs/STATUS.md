@@ -150,6 +150,7 @@ Testing follows a simple rule: collect data from normal runs first, then run a t
 
 Waiting for a decision on the Mac, no Pi needed:
 - The 8 old exported candidate files in `rl_training/opencat-gym/trained/` (the ARM1, ARM1R, ARM1X and ARMW walking-policy candidates and their notes) that the cleanup tool lists for deletion: three of them were promoted earlier, so their trained weights are in the repo history.
+- The weekly gallery grooming (`tools/g2_groom.py`) is built and tested but not scheduled: the background curation loop that would run it is not installed on the Mac (`g2_curate_auto.sh status` says not scheduled). Its first dry run found 573 extras, all in the named green ball class; nothing else needed grooming. Applying needs `{"apply": true}` in `~/.local/share/g2/groom.json`.
 - The vision library (7,132 pictures, 87 percent flagged as near-duplicates) is person-capture frames that differ only slightly in pose, so it needs a looser rule before anything is moved or deleted.
 
 Done this session: the camera-only probes (3.67 pictures a second is the module's limit and the smallest size is the fastest), the follow calibration with and without the exposure lock, the arm skills test (launch, toss, tossF, hunt and showOff ok; tossL and tossR play the same motion as toss), the small-step calibration, the picture class cap (250 a class, the green ball set pruned from 752 to 250 with the rest kept aside), and two turn calibrations.
