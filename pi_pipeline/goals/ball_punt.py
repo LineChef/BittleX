@@ -292,7 +292,11 @@ class BallPunt:
         from ..behavior import punt_settings as ps
         chase = _chase()
         ps.apply(chase, {k: v for k, v in settings.items() if k in ps.SPEC})
+        from ..behavior import ball_color_store
+        ball_color_store.enable()
+        stand_n0 = len(getattr(self.robot, "stand_log", []) or [])                   # this attempt's stand-up endings only
         planner = chase.ChasePlanner()
+        planner.ball_color = ball_color_store.load()                 # the ball's colour from earlier sessions: the colour pass works from the first look (owner-approved 2026-11-17)
         self.got_it_announced = False                                       # (the watch says "Got it." right after a good punt; the runner then does not say it again)
         trace: list = []
         from .standing import apply as apply_standing, learn as learn_standing
@@ -334,7 +338,7 @@ class BallPunt:
         extra = {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}
         if self.pace is not None:
             extra["pace"] = self.pace.snapshot()
-        extra["stand_ends"] = list(getattr(self.robot, "stand_log", []) or [])        # (owner-approved 2026-11-17) how level every stand-up ended, to see how often a stand is rolled
+        extra["stand_ends"] = list(getattr(self.robot, "stand_log", []) or [])[stand_n0:]        # (owner-approved 2026-11-17) how level every stand-up ended, to see how often a stand is rolled
         return AttemptResult(ended, round(time.monotonic() - t0, 1), trace, extra)
 
     # ---------------------------------------------------------------------------------------------------- scoring

@@ -62,3 +62,38 @@ def test_replace_victim_rules():
     assert ps.replace_victim({"a": 0.5}, 0.9, cap=3) is None                  # room left
     assert ps.replace_victim({"a": 0.9, "b": 0.4, "c": None}, 0.5, cap=3) == "c"   # an unscored one is the first to go
     assert ps.replace_victim({"a": 0.9, "b": 0.8, "c": 0.7}, 0.5, cap=3) == ""     # not better than the worst
+
+
+def test_the_balls_colour_is_remembered_between_sessions_only_when_switched_on(tmp_path, monkeypatch):
+    from pi_pipeline.behavior import ball_color_store as store
+    monkeypatch.setattr(store, "PATH", str(tmp_path / "ball_color.json"))
+    monkeypatch.setattr(store, "ENABLED", False)
+    monkeypatch.setattr(store, "_samples", [])
+    store.note((120, 160, 120))
+    assert store.load() is None and not (tmp_path / "ball_color.json").exists()          # off: nothing is written (tests and tools)
+    store.enable()
+    for c in ((120, 160, 120), (124, 168, 124), (126, 166, 122)):
+        store.note(c)
+    assert store.load() == (120, 160, 120)                                             # saved by the first sample; the later medians are within 6 of it, so not saved again
+    before = (tmp_path / "ball_color.json").read_text()
+    store.note((125, 165, 123))                                                        # a small move: not saved again
+    assert (tmp_path / "ball_color.json").read_text() == before
+    monkeypatch.setattr(store, "_samples", [])
+    for _ in range(9):
+        store.note((100, 140, 100))                                                    # a lasting change: saved
+    assert store.load() == (100, 140, 100)
+
+
+def test_a_chase_starts_with_the_remembered_colour_and_the_sample_is_noted(tmp_path, monkeypatch):
+    from pi_pipeline.behavior import ball_chase as bc
+    from pi_pipeline.behavior import ball_color_store as store
+    monkeypatch.setattr(store, "PATH", str(tmp_path / "ball_color.json"))
+    monkeypatch.setattr(store, "_samples", [])
+    store.enable()
+    monkeypatch.setattr(store, "ENABLED", True)
+    store.note((110, 150, 112))
+    planner = bc.ChasePlanner()
+    planner.decide(bc.BallReading(120.0, 150.0, 900, 30, 30, 30.0, 8.0, 0.0, False, "normal", color=(111, 151, 113)))
+    assert planner.ball_color == (111, 151, 113) and store.load() == (110, 150, 112)   # a close reading sets the colour at once; the saved median only moves past a 6 difference
+    import inspect
+    assert "ball_color_store.load()" in inspect.getsource(bc._chase_loop)

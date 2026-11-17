@@ -33,6 +33,7 @@ from typing import Callable, Protocol
 
 from . import gait_cycle
 from ..body import FALL_DEG
+from . import ball_color_store
 from ..vision import miss_log
 from ..vision.ball_finder import BallReading, find_ball
 from ..vision.ball_finder import find_ball_or_color as bf_find_ball_or_color
@@ -486,6 +487,7 @@ class ChasePlanner:
             return self.decide(None, wall)
         if ball is not None and getattr(ball, "color", None) is not None and ball.distance_in <= COLOR_SAMPLE_IN:
             self.ball_color = ball.color
+            ball_color_store.note(ball.color)                       # remembered between sessions (only when a real entry point switched it on)
         if ball is not None:
             self.prev_seen_dist = ball.distance_in                 # every accepted reading, including the ones a wall check answers with a look
         if ball is None:
@@ -1980,6 +1982,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
     `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one. `wall_check(jpeg, ball) -> WallSeen | None`: the wall
     reading for each straight-ahead picture (goals/walls.py makes one only with a wall calibration from the current hardware); with it he keeps CHASE_WALL_IN from walls."""
     planner = planner or ChasePlanner()
+    if planner.ball_color is None:
+        planner.ball_color = ball_color_store.load()                 # the colour pass works from the first look of a session
     planner.claw_ok = callable(getattr(robot, "claw_pose", None))
     if pace is not None:
         planner.pace = pace
@@ -2343,6 +2347,7 @@ def _stand_if_lying(link, token: str = "kbalance") -> bool:
 
 
 def main() -> None:
+    ball_color_store.enable()
     """The chase from the command line, inside a task scope (util/task_scope.py): what the settings file and the command line changed is put back when it ends."""
     from ..util.task_scope import task_scope
     with task_scope("ball chase"):
