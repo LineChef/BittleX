@@ -15,6 +15,7 @@ Folders
 -------
 
 - `training_data/exploration/auto/`: Holds: The current curated set: `keep/survey/<date>/` survey pictures, `keep/named/<name>/` named objects, `contact/` overview thumbnails per group, `manifest.json`, `summary.txt`; Rebuilt?: Yes, every 30 minutes from `~/Desktop/G2Memory/g2_pictures/explore`
+- Class cap: no class keeps more than 250 pictures. The chase's picture saver skips poor pictures (dark, blown out, flat, blurry) and near-twins of the last few it saved, adds at most 40 a session, and at the cap replaces the lowest-scored picture only with a better one. The nightly pass (`g2_curate_auto.sh`, `tools/curate_class.py --all-promoted`) does the same for the Mac copy, moves the dropped ones to `G2Memory/_pruned/` instead of deleting, and never trims a picture a person named by hand.
 - `training_data/exploration/promoted/<name>/`: Holds: The labelled pictures you promoted: the training data the gallery learns from; Rebuilt?: **No**; this is the one to protect
 - `training_data/exploration/<date_time>/`: Holds: A manual curation from `g2picscurate`; the first one holds a few pictures `auto/` no longer has; Rebuilt?: Not automatically
 - `~/Desktop/G2Memory/g2_pictures/explore/`: Holds: The pulled originals, with the review page's state (`promoted.json`, `unpromoted.json`, `people.json`); Rebuilt?: Pull again from the Pi

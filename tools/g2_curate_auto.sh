@@ -31,6 +31,8 @@ case "${1:-run}" in
     fi
     ssh "$G2_PI" 'test -d ~/.local/share/g2/explore_pictures' 2>/dev/null || { say "no exploration pictures on the Pi yet"; exit 0; }
     mkdir -p "$IN" && rsync -a "$G2_PI:.local/share/g2/explore_pictures/" "$IN/" >> "$LOG" 2>&1 || { say "pull failed"; exit 1; }
+    # the class cap (owner-approved 2026-11-17): a class with more pictures than the cap keeps its best ones; the rest are moved aside, never deleted
+    "$ROOT/pi_pipeline/.venv/bin/python" "$ROOT/tools/curate_class.py" --all-promoted --cap 250 --apply >> "$LOG" 2>&1 || say "the class cap pass failed (see the log)"
     NEW="$OUT.new"; rm -rf "$NEW"
     if "$ROOT/pi_pipeline/.venv/bin/python" "$ROOT/tools/curate_exploration.py" "$IN" "$NEW" >> "$LOG" 2>&1; then
       rm -rf "$OUT.old"; [ -d "$OUT" ] && mv "$OUT" "$OUT.old"; mv "$NEW" "$OUT"; rm -rf "$OUT.old"

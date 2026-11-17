@@ -162,9 +162,10 @@ def test_the_loop_stops_on_the_flag_on_a_fall_and_in_dry_run_sends_nothing():
     assert not robot.moves
 
 
-def test_pictures_with_the_ball_are_saved_with_a_box_at_most_every_two_seconds(tmp_path):
+def test_pictures_with_the_ball_are_saved_with_a_box_at_most_every_two_seconds(tmp_path, monkeypatch):
     t = [0.0]
     saver = bc.PictureSaver(str(tmp_path), clock=lambda: t[0])
+    monkeypatch.setattr(saver, "_admit", lambda jpeg: (True, 0.5, None))           # the cap and the quality filter have their own tests (test_picture_cap.py): this one is about the interval and the sidecar
     jpeg = picture([disc(120, 110, 25)])
     ball = bf.find_ball(jpeg)
     saver.maybe_save(jpeg, ball); t[0] = 1.0; saver.maybe_save(jpeg, ball); t[0] = 2.5; saver.maybe_save(jpeg, ball); saver.maybe_save(jpeg, None)

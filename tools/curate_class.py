@@ -3,7 +3,7 @@
 
     python tools/curate_class.py FOLDER [--cap 250] [--protect session_] [--apply]
 
-Dry run by default: it scores every picture in FOLDER and writes a report; nothing moves. `--apply` MOVES the pictures that did not make the cut (with their `.json` notes) into `FOLDER/../_pruned/<name>/`,
+Dry run by default: it scores every picture in FOLDER and writes a report; nothing moves. `--apply` MOVES the pictures that did not make the cut (with their `.json` notes) to `~/Desktop/G2Memory/_pruned/<class>_<date>/` (outside every class folder),
 never deletes them, so every step is undoable by moving them back.
 
 A picture scores on its own quality (brightness, contrast, sharpness: `tools/curate_captures.py`), on whether the ball finder sees the ball in it, and on how well it fills a gap in the set. The cut:
@@ -19,40 +19,34 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
+import time
 
 import numpy as np
-from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import curate_captures as cc  # noqa: E402
 
-DIST_BIN_IN = 4.0
-BEARING_BIN_DEG = 10.0
-DEDUP_HAMMING = 6
-MIN_BRIGHT, MAX_BRIGHT, MIN_CONTRAST, MIN_SHARP = 40.0, 215.0, 18.0, 20.0
+from pi_pipeline.vision import picture_score as ps  # noqa: E402
+from pi_pipeline.vision.picture_score import choose as _choose  # noqa: E402,F401
+
+DIST_BIN_IN, BEARING_BIN_DEG, DEDUP_HAMMING = ps.DIST_BIN_IN, ps.BEARING_BIN_DEG, ps.DEDUP_HAMMING
 
 
 def score_one(path: str, need_ball: bool = True) -> dict:
     out = {"file": os.path.basename(path), "ok": False, "why": "", "quality": 0.0}
     try:
-        im = Image.open(path).convert("RGB")
         jpeg = open(path, "rb").read()
     except Exception:  # noqa: BLE001
         out["why"] = "unreadable"
         return out
-    mean, contrast = cc.brightness_contrast(im)
-    sharp = cc.sharpness(im)
-    out.update(mean=round(float(mean), 1), contrast=round(float(contrast), 1), sharp=round(float(sharp), 1), hash=cc.ahash(im))
-    if mean < MIN_BRIGHT:
-        out["why"] = "dark"
-    elif mean > MAX_BRIGHT:
-        out["why"] = "blown"
-    elif contrast < MIN_CONTRAST:
-        out["why"] = "flat"
-    elif sharp < MIN_SHARP:
-        out["why"] = "blurry"
+    m = ps.measure(jpeg)
+    if m is None:
+        out["why"] = "unreadable"
+        return out
+    out.update(m)
+    out["why"] = ps.reject_reason(m)
     ball = None
     if not out["why"]:
         from pi_pipeline.vision import ball_finder as bf
@@ -61,57 +55,53 @@ def score_one(path: str, need_ball: bool = True) -> dict:
             out["dist_in"], out["bearing_deg"] = round(ball.distance_in, 1), round(ball.bearing_deg, 1)
         elif need_ball:
             out["why"] = "no ball found"
-    out["quality"] = round(min(sharp / 200.0, 1.0) * 0.5 + min(contrast / 60.0, 1.0) * 0.3 + (1.0 - abs(mean - 128.0) / 128.0) * 0.2 + (0.3 if ball is not None else 0.0), 3)
+    out["quality"] = ps.quality(m, ball is not None)
     out["ok"] = not out["why"]
     return out
 
 
-def choose(rows: list, cap: int, protect: tuple = ("session_",), dedup: int = DEDUP_HAMMING) -> tuple[list, dict]:
-    """(kept file names, {file: reason dropped}). Pure: takes the scored rows."""
-    dropped: dict = {}
-    kept = [r["file"] for r in rows if r["file"].startswith(protect)]                   # always kept, whatever their score
-    for r in rows:
-        if not r["ok"] and not r["file"].startswith(protect):
-            dropped[r["file"]] = r["why"]
-    pool = sorted((r for r in rows if r["ok"] and not r["file"].startswith(protect)), key=lambda r: -r["quality"])
-    uniq = []
-    for r in pool:                                                              # best first: a later near-twin is the one dropped
-        if any(cc.hamming(r["hash"], u["hash"]) <= dedup for u in uniq):
-            dropped[r["file"]] = "near-duplicate"
-        else:
-            uniq.append(r)
-    room = max(0, cap - len(kept))
-    bins: dict = {}
-    for r in uniq:
-        key = (int(r.get("dist_in", 0) // DIST_BIN_IN), int((r.get("bearing_deg", 0) + 90) // BEARING_BIN_DEG))
-        bins.setdefault(key, []).append(r)
-    order = []
-    depth = 0
-    while len(order) < len(uniq):                                               # round-robin over the bins, the best of each bin first
-        for key in sorted(bins):
-            if depth < len(bins[key]):
-                order.append(bins[key][depth])
-        depth += 1
-    for r in order[:room]:
-        kept.append(r["file"])
-    for r in order[room:]:
-        dropped[r["file"]] = "over the cap (a better one fills the bin)"
-    return kept, dropped
+def choose(rows: list, cap: int, protect: tuple = ("session_",), dedup: int = DEDUP_HAMMING, protected_names=()) -> tuple[list, dict]:
+    pn = set(protected_names)
+    return ps.choose(rows, cap, protected=lambda n: n.startswith(protect) or n in pn, dedup=dedup)
+
+
+def hand_named(folder: str) -> set:
+    """Pictures a person named or promoted by hand (their sidecar says named_by "hand"): never trimmed."""
+    out = set()
+    for f in os.listdir(folder):
+        if f.endswith(".json"):
+            try:
+                if json.load(open(os.path.join(folder, f))).get("named_by") == "hand":
+                    out.add(os.path.splitext(f)[0] + ".jpg")
+            except Exception:  # noqa: BLE001
+                pass
+    return out
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("folder")
+    ap.add_argument("folder", nargs="?", help="a class folder; or use --all-promoted")
+    ap.add_argument("--all-promoted", action="store_true", help="every class folder under training_data/exploration/promoted with more pictures than the cap (the nightly pass): hand-named pictures are never trimmed")
     ap.add_argument("--cap", type=int, default=250)
     ap.add_argument("--protect", action="append", default=None)
     ap.add_argument("--no-need-ball", action="store_true")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--report", default=None)
+    ap.add_argument("--aside", default=None, help="where the dropped pictures go (default ~/Desktop/G2Memory/_pruned/<class>_<date>)")
     a = ap.parse_args()
+    if a.all_promoted:
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "training_data", "exploration", "promoted")
+        for name in sorted(os.listdir(root)):
+            d = os.path.join(root, name)
+            if os.path.isdir(d) and not name.startswith("_") and len([f for f in os.listdir(d) if f.lower().endswith((".jpg", ".jpeg"))]) > a.cap:
+                subprocess.run([sys.executable, os.path.abspath(__file__), d, "--cap", str(a.cap)] + (["--apply"] if a.apply else []), check=False)
+        return
+    if not a.folder:
+        ap.error("give a class folder or --all-promoted")
     folder = os.path.abspath(os.path.expanduser(a.folder))
     files = sorted(f for f in os.listdir(folder) if f.lower().endswith((".jpg", ".jpeg")))
     rows = [score_one(os.path.join(folder, f), not a.no_need_ball) for f in files]
-    kept, dropped = choose(rows, a.cap, tuple(a.protect or ["session_"]))
+    kept, dropped = choose(rows, a.cap, tuple(a.protect or ["session_"]), protected_names=hand_named(folder))
     reasons: dict = {}
     for why in dropped.values():
         reasons[why] = reasons.get(why, 0) + 1
@@ -126,7 +116,7 @@ def main() -> None:
             json.dump({"kept": kept, "dropped": dropped, "rows": [{k: v for k, v in r.items() if k != "hash"} for r in rows]}, f, indent=1)
         print(f"   report: {a.report}")
     if a.apply:
-        dest = os.path.join(os.path.dirname(folder), "_pruned", os.path.basename(folder))
+        dest = os.path.expanduser(a.aside or os.path.join("~/Desktop/G2Memory/_pruned", os.path.basename(folder) + time.strftime("_%Y%m%d")))      # OUTSIDE the class folders: the gallery reads every folder under promoted/ as a class
         os.makedirs(dest, exist_ok=True)
         for name in dropped:
             for ext in ("", ):

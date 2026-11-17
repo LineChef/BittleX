@@ -1649,15 +1649,60 @@ class SerialRobot:
 class PictureSaver:
     """Saves each picture with the ball found plus its box (JSON beside it), at most one per SAVE_EVERY_S. Training data for the "ball" class (user, 2026-10-25)."""
 
+    SESSION_MAX_SAVES = 40          # (owner-approved 2026-11-17) no session adds more than this many pictures of the class
+
     def __init__(self, folder: str, clock=time.monotonic):
         self._dir, self._clock, self._last = Path(os.path.expanduser(folder)), clock, -1e9
         self.saved = 0
+        self.skipped: dict = {}                                    # why a picture was not kept: "full", "poor", "same as a recent one", "not better than the worst"
+        self._recent_hashes: list = []
+
+    def _skip(self, why: str) -> None:
+        self.skipped[why] = self.skipped.get(why, 0) + 1
+
+    def _admit(self, jpeg: bytes) -> tuple[bool, float | None, dict | None]:
+        """The class cap (owner-approved 2026-11-17): a poor picture (dark, blown, flat, blurry) and a near-twin of one of the last few saved are not kept; at the cap (picture_score.CLASS_CAP in this
+        folder) a new picture replaces the lowest-scored one only if it scores higher. (admitted, its quality, its measures)."""
+        from ..vision import picture_score as ps
+        m = ps.measure(jpeg)
+        if m is None or ps.reject_reason(m):
+            self._skip("poor")
+            return False, None, m
+        if any(ps.hamming(m["hash"], h) <= ps.DEDUP_HAMMING for h in self._recent_hashes[-8:]):
+            self._skip("same as a recent one")
+            return False, None, m
+        q = ps.quality(m, True)
+        files = sorted(self._dir.glob("greenball_*.jpg")) if self._dir.exists() else []
+        if len(files) >= ps.CLASS_CAP:
+            existing = {}
+            for f in files:
+                try:
+                    existing[f.name] = float(json.loads(f.with_suffix(".json").read_text()).get("quality"))
+                except Exception:  # noqa: BLE001
+                    existing[f.name] = None
+            victim = ps.replace_victim(existing, q)
+            if victim == "":
+                self._skip("not better than the worst")
+                return False, q, m
+            if victim:
+                for gone in (self._dir / victim, (self._dir / victim).with_suffix(".json")):
+                    gone.unlink(missing_ok=True)
+                log.info("picture cap: %s (score %s) replaced by a better one (%.2f)", victim, existing[victim], q)
+        return True, q, m
 
     def maybe_save(self, jpeg: bytes, ball: BallReading | None, tag: str = "chase") -> None:
         if ball is None or self._clock() - self._last < SAVE_EVERY_S:
             return
+        if self.saved >= self.SESSION_MAX_SAVES:
+            self._skip("full")
+            return
         self._last = self._clock()
         self._dir.mkdir(parents=True, exist_ok=True)
+        admitted, qual, meas = self._admit(jpeg)
+        if not admitted:
+            return
+        if meas is not None:
+            self._recent_hashes.append(meas["hash"])
         name = time.strftime(f"greenball_{tag}_%Y%m%d_%H%M%S")              # the date too: the review page sorts by file name, and a time alone mixed nights together
         (self._dir / f"{name}.jpg").write_bytes(jpeg)
         mean = None
@@ -1673,7 +1718,7 @@ class PictureSaver:
             "file": f"{name}.jpg", "kind": "name:greenball", "pose": "named", "name": "greenball", "time": time.strftime("%Y-%m-%d %H:%M:%S"), "width": 240, "height": 240,
             "detections": [], "exposure": {"mean": mean}, "named_by": "ball_chase",
             "box_xywh": [round(ball.x - ball.width / 2), round(ball.y - ball.height / 2), ball.width, ball.height],
-            "distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}, indent=1))
+            "distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge, "quality": qual}, indent=1))
         self.saved += 1
 
 

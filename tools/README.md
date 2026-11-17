@@ -52,7 +52,7 @@ The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.m
 
 - [`camera_preview.py`](camera_preview.py): Live camera preview and on-demand capture for the Grove Vision AI V2.
 - [`curate_captures.py`](curate_captures.py): Filters a raw capture batch into a training-ready set (score, de-dup, rotate, pre-label).
-- [`curate_class.py`](curate_class.py): Keeps the best pictures of one class under a cap (quality, ball found, near-duplicates collapsed, spread over distance and bearing); a dry run by default, and `--apply` moves the rest aside, never deletes.
+- [`curate_class.py`](curate_class.py): Keeps the best pictures of one class under a cap (quality, ball found, near-duplicates collapsed, spread over distance and bearing); a dry run by default, and `--apply` moves the rest aside, never deletes. `--all-promoted` is the nightly pass (run by `g2_curate_auto.sh`): every class under `promoted/` with more than the cap keeps its best, and hand-named pictures are never trimmed.
 - [`auto_process_captures.py`](auto_process_captures.py): Runs everything after the manual capture step.
 - [`autobox_coco.py`](autobox_coco.py), [`interp_labels.py`](interp_labels.py): Auto-label with a COCO detector; interpolate box labels for a slow-pan capture.
 - [`promote_to_library.py`](promote_to_library.py), [`optimize_library.py`](optimize_library.py), [`check_library_overlap.py`](check_library_overlap.py): Promote a curated session into the library; balance it per class; flag near-duplicates.
