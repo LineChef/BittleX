@@ -63,8 +63,8 @@ def test_apply_moves_the_extras_aside_and_never_a_calibration_picture(tmp_path, 
     root = build(tmp_path)
     monkeypatch.setattr(gm, "PRUNED", str(tmp_path / "pruned"))
     res = gm.plan(root, cap=3)
-    n = gm.apply(res, root)
-    assert n == 5 and len(list((tmp_path / "pruned").rglob("*.jpg"))) == 5
+    n = gm.apply(res, root, queue=False)
+    assert n["moved"] == 4 and n["report_only"] == 1 and len(list((tmp_path / "pruned").rglob("*.jpg"))) == 4        # the explore folder only; the bout twin is report only
     assert len(list((tmp_path / "g2_pictures" / "wall").glob("*.jpg"))) == 4 and len(list((tmp_path / "g2_pictures" / "liftcal").rglob("*.jpg"))) == 4
     res["bad"] = {"kept": 0, "extras": [os.path.join(root, "wall", "shot_000.jpg")]}
     try:
@@ -85,3 +85,18 @@ def test_the_weekly_run_waits_seven_days_and_purges_only_old_groomed_folders(tmp
     os.utime(old, (time.time() - 30 * 86400,) * 2)
     os.utime(keep, (time.time() - 30 * 86400,) * 2)
     assert gm.purge(14) == 1 and not old.exists() and new.exists() and keep.exists()              # only an old groom_ folder is purged
+
+
+def test_apply_queues_the_same_removal_for_the_pi_and_leaves_the_other_folders_report_only(tmp_path, monkeypatch):
+    root = build(tmp_path)
+    monkeypatch.setattr(gm, "PRUNED", str(tmp_path / "pruned"))
+    monkeypatch.setenv("G2_REVIEW_DIR", str(tmp_path / "review"))
+    monkeypatch.delenv("G2_PI", raising=False)
+    res = gm.plan(root, cap=3)
+    out = gm.apply(res, root)
+    assert out["moved"] == 4 and out["queued"] == 4 and out["report_only"] == 1                   # the 4 green ball extras; the one bout twin is report only
+    import g2_review_queue as rq
+    q = rq.pending()
+    assert len(q) == 1 and q[0]["module"] == "pi_pipeline.vision.exploration_pictures" and q[0]["args"][0] == "trash"
+    assert all(a.startswith("named/greenball/") for a in q[0]["args"][1:])                       # paths under the Pi's explore_pictures folder
+    assert (tmp_path / "g2_pictures" / "bout" / "bout_1" / "a_twin.jpg").exists() or (tmp_path / "g2_pictures" / "bout" / "bout_1" / "a.jpg").exists()
