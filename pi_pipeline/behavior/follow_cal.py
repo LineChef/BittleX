@@ -20,6 +20,7 @@ import time
 
 FOV_DEG = 89.0                  # the measured full field of view over the frame width (the picture moves 1/89 of its width per degree of pan)
 STOP_FILE = "~/.local/share/g2/followcal_stop"
+STEP_WAIT_S = 3.0               # after each step (2026-11-17: 1.2 s left 1 to 4 pictures, too few for 17 of 24 steps)
 
 
 def step_metrics(ts: float, te: float, pan_from: float, pan_to: float, rows: list, fov_deg: float = FOV_DEG, sign: str = "left") -> dict:
@@ -31,7 +32,7 @@ def step_metrics(ts: float, te: float, pan_from: float, pan_to: float, rows: lis
     before = [x for t, x in seen if t <= ts]
     after = [(t, x) for t, x in seen if t > ts]
     out = {"step_deg": round(step, 1), "command_s": round(te - ts, 2), "delay_s": None, "speed_deg_s": None, "settled_deg": None, "pictures_after": len(after)}
-    if not before or len(after) < 3 or expect == 0:
+    if not before or len(after) < 2 or expect == 0:
         return out
     x0 = statistics.median(before[-3:])
     frac = [(t, (x - x0) / expect) for t, x in after]                         # 0 = not moved, 1 = moved the whole step
@@ -107,7 +108,7 @@ def run_follow_cal(robot, make_grabber, find, steps=(10.0, 20.0, 30.0), repeats:
                             if state == "fell" or robot._fell():
                                 res["ended"] = "fell"
                                 return res
-                            sleep(1.2)                                       # the pictures after the move arrive
+                            sleep(STEP_WAIT_S)                               # the pictures after the move arrive (about 3 a second, the ball seen in only some)
                             rows = [(r["t_done"], r["det"][0][1] if r.get("det") else None) for r in list(grab.rows) if not r.get("bad")]
                             m = step_metrics(ts, te, pan, to, [x for x in rows if x[0] <= clock()], sign=pan_sign)
                             m.update(to=to, repeat=rep)
