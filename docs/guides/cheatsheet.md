@@ -23,6 +23,7 @@ Most used
 - `g2stream`: camera only: can the module stream pictures, and how fast?
 - `g2liftcal`: step the claw lift with a ball in view (hands near)
 - `g2stepcal`: measure how far timed steps really go (ball 30 in ahead, hands near)
+- `g2followcal`: measure the claw's delay and pan speed (ball 14 to 24 in ahead)
 - `g2punttest dry`: watch a hand-rolled ball with the claw (no punt)
 - `g2punttest`: punt, watch it roll, acquire it, go on (hands near)
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
@@ -346,6 +347,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2feat`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2floor`: [Most used](#most-used), [Walk tests](#walk-tests)
 - `g2focus`: [Most used](#most-used)
+- `g2followcal`: [Most used](#most-used)
 - `g2goal`: [Ball goal and punts](#ball-goal-and-punts)
 - `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)

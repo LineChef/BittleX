@@ -10,6 +10,7 @@ only call it. This script fails when a mode builds its own.
     R2  a StandGuard built anywhere but gait/body_guards.py, or a body_guards.install(...) call without `on_fall=` and `on_silent=` (every mode ends the same way on a fall and on a deaf board)
     R3  a fall threshold written as a number other than pi_pipeline/body.py's FALL_DEG (`fall_deg=` / `fall_abort_deg=`)
     R6  a mode reading `settings.default_gait` to choose the walk instead of asking gait_mode.walk_choice()
+    R8  a second claw follow: follow_loop( or LiveFollower( called anywhere but behavior/active_look.py (every mode that follows with the claw calls active_look.run_active_look with its own tracking method)
     R7  a `MODE-SPECIFIC(...)` exception in the code that docs/specification/mode-exceptions.md does not list (the owner's explicit request, with the date)
   RATCHET (known today, listed in tools/mode_check_baseline.json; a NEW one is an error, fixing one means removing it from the baseline)
     R4  a mode file sends a stand / rest / attention command itself (send("kup" | "kbalance" | "kcalib" | "krest" | "d")) instead of calling the standard move
@@ -33,6 +34,8 @@ GUARD_HOME = "gait/body_guards.py"                                             #
 MODE_DIRS = ("behavior/", "voice/", "goals/", "app/")
 MODE_FILES = {"explore_session.py", "punt_launch.py", "goal_launch.py"}
 STANDARD_HOMES = {"behavior/ball_chase.py", "behavior/claw_survey.py"}            # the standard moves live here (SerialRobot: stand_up, sit_down, stand_from_sit, rest)
+FOLLOW_HOMES = {"behavior/active_look.py", "behavior/live_follow.py"}                # the shared active look, and the module that defines the follow loop it uses
+FOLLOW_CALL = re.compile(r"\b(follow_loop|LiveFollower)\(")
 LOOK_NAMES = re.compile(r"^\s*def\s+(run_claw_look|claw_scan|claw_look_sequence)\b", re.M)
 SEND_BODY = re.compile(r"""\b(?:send|_tx|_write_pose)\(\s*["'](kup|kbalance|kcalib|krest|d)["']""")
 FALL_NUM = re.compile(r"\b(fall_deg|fall_abort_deg)\s*[:=]\s*(?:float\s*=\s*)?([0-9]+(?:\.[0-9]+)?)")
@@ -88,6 +91,8 @@ def violations() -> list[dict]:
                 if rel not in registered:
                     add("R7", n, "a MODE-SPECIFIC exception that docs/specification/mode-exceptions.md does not list", True)
                 continue                                                          # a registered exception is allowed on this line
+            if rel not in FOLLOW_HOMES and FOLLOW_CALL.search(line) and not line.lstrip().startswith(("class ", "def ", "#")):
+                add("R8", n, "a second claw follow: every mode calls behavior/active_look.run_active_look with its own tracking method", True)
             if rel not in LOOK_HOME and LOOK_NAMES.match(line):
                 add("R1", n, "a second claw look: every mode calls claw_survey.run_claw_look (the ball chase's sequence)", True)
             for m in FALL_NUM.finditer(line):

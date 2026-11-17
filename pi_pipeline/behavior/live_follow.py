@@ -43,6 +43,9 @@ class LiveConfig:
     lift_deg: float = 120.0
     jump_deg: float = 0.0              # a sighting this many degrees from the last tracked one, soon after it, is held until a second sighting near it agrees (0 = off); the active look sets it (2026-11-16: tiny blobs at the frame edges steered the claw)
     jump_window_s: float = 1.2         # 'soon after': the jump check applies to a sighting within this long of the last tracked one
+    attention_first: bool = True       # the arm is not up yet: go into the attention pose first, then raise it (the standing rule: the claw look starts from the attention pose); the active look's switch
+    exposure_lock: bool = False        # freeze the sensor's auto exposure for the follow (an experiment: see `g2stream --lock-ae`; always restored afterwards)
+    coast_s: float = 0.0               # with no sighting in a picture, keep following the filter's prediction for this long after the last sighting (0 = off); the active look sets it (2026-11-17)
     lead_s: float = 0.0                # aim this far ahead of a MOVING target (its measured bearing speed times this); 0 = off. The active look sets it (2026-11-16)
     lead_max_deg: float = 20.0         # the most the lead may add to the offset
 
@@ -66,44 +69,75 @@ class PanLog:
 
 
 class LiveFollower:
-    """Pure logic: a picture's detections and its capture time in, the absolute pan to ask for (or None) out."""
+    """Pure logic: a picture's detections and its capture time in, the absolute pan to ask for (or None) out. A tracking filter (behavior/track_filter.py) keeps where the target is and how fast it moves, so the
+    claw LEADS a moving target, COASTS through pictures with no sighting, and does not follow a sighting that jumps far from where the target should be until a second one agrees."""
 
     def __init__(self, cfg: LiveConfig, pan_sign: str, pan_log: PanLog):
+        from .track_filter import BearingFilter
         self.cfg, self.sign, self.pan_log = cfg, pan_sign, pan_log
         self.last_used_t = -1e9
         self.reason = "start"
-        self._trk_b = None                 # the last tracked target's bearing (G2's own frame) and when
-        self._trk_t = None
+        self.filter = BearingFilter()      # the target's bearing in G2's own frame (+ = right) and its speed
         self._jump_b = None                # a far sighting waiting for a second one near it
         self._tr_cache: tuple | None = None
-        self._hist: list[tuple] = []       # (capture time, the target's bearing in G2's own frame): its speed gives the lead
         self.lead_deg = 0.0
+        self.coasting = False
 
     def best(self, dets):
         return max(dets, key=lambda d: d[4] * d[5], default=None) if dets else None
 
+    def world_bearing(self, t_capture: float, d) -> float:
+        """The sighting's bearing in G2's own frame: where the claw pointed when the picture was taken, plus the target's offset in the picture."""
+        from .ball_chase import claw_pan_body
+        return claw_pan_body(self.pan_log.at(t_capture)) + (float(d[2]) - 0.5) * 2.0 * self.cfg.fov_half_deg
+
+    def predicted(self, t: float) -> float | None:
+        """Where the tracked target should be at time `t` (None before any sighting): trackers use it to accept a weak sighting only near it."""
+        return self.filter.predict(t)
+
     def tracked(self, t_capture: float, dets):
-        """The detection to follow, or None: `best`, unless it is a jump (more than `jump_deg` from the last tracked bearing within `jump_window_s`) that no second sighting near it has confirmed. The answer is
-        kept per picture, so the follow loop and the watch see the same one."""
+        """The detection to follow, or None: `best`, unless it is a jump (more than `jump_deg` from where the filter expects the target, within `jump_window_s` of the last sighting) that no second sighting near it
+        has confirmed. An accepted sighting corrects the filter. The answer is kept per picture, so the follow loop and the watch see the same one."""
         if self._tr_cache is not None and self._tr_cache[0] == t_capture:
             return self._tr_cache[1]
         d = self.best(dets)
-        if d is not None and self.cfg.jump_deg > 0:
-            from .ball_chase import claw_pan_body
-            world = claw_pan_body(self.pan_log.at(t_capture)) + (float(d[2]) - 0.5) * 2.0 * self.cfg.fov_half_deg
-            if self._trk_t is not None and 0 <= t_capture - self._trk_t <= self.cfg.jump_window_s and abs(world - self._trk_b) > self.cfg.jump_deg:
-                if self._jump_b is not None and abs(world - self._jump_b) <= 15.0:
-                    pass                                                        # a second sighting near the first far one: a real move, follow it
-                else:
-                    self._jump_b = world                                        # the first far sighting: wait for another
-                    d = None
+        if d is not None:
+            world = self.world_bearing(t_capture, d)
+            age = self.filter.age(t_capture)
+            if self.cfg.jump_deg > 0 and age is not None and 0 <= age <= self.cfg.jump_window_s:
+                res = self.filter.residual(t_capture, world)
+                if res is not None and abs(res) > self.cfg.jump_deg:
+                    if self._jump_b is not None and abs(world - self._jump_b) <= 15.0:
+                        pass                                                    # a second sighting near the first far one: a real move, follow it
+                    else:
+                        self._jump_b = world                                    # the first far sighting: wait for another
+                        d = None
             if d is not None:
-                self._trk_b, self._trk_t, self._jump_b = world, t_capture, None
+                self.filter.update(t_capture, world)
+                self._jump_b = None
         self._tr_cache = (t_capture, d)
         return d
 
+    def _coast(self, t_capture: float, pan_now: float):
+        """No sighting in this picture: while the last accepted one is recent (`coast_s`), keep the claw pointed where the filter says the target is going."""
+        c = self.cfg
+        age = self.filter.age(t_capture)
+        if c.coast_s <= 0 or age is None or age > c.coast_s or self.filter.n < 2:
+            self.reason = "nothing in view"
+            return None
+        from .ball_chase import pan_for_bearing
+        pred = self.filter.predict(t_capture)
+        want = max(-c.pan_max_deg, min(c.pan_max_deg, pan_for_bearing(pred)))
+        if abs(want - pan_now) < c.min_move_deg:
+            self.reason = "coast: already there"
+            return None
+        self.coasting = True
+        self.reason = f"coast toward {pred:+.0f} deg ({age:.1f} s since the last sighting)"
+        return want
+
     def decide(self, t_capture: float, dets, now: float, pan_now: float):
         c = self.cfg
+        self.coasting = False
         if t_capture <= self.last_used_t:
             self.reason = "no new picture"
             return None
@@ -113,21 +147,12 @@ class LiveFollower:
             return None
         d = self.tracked(t_capture, dets)
         if d is None:
-            self.reason = "nothing in view"
-            return None
+            return self._coast(t_capture, pan_now)
         off = (float(d[2]) - 0.5) * 2.0 * c.fov_half_deg                       # + = the target is to his right, as the picture showed it
         self.lead_deg = 0.0
-        if c.lead_s > 0:
-            from .ball_chase import claw_pan_body
-            self._hist.append((t_capture, claw_pan_body(self.pan_log.at(t_capture)) + off))
-            self._hist = [h for h in self._hist if t_capture - h[0] <= 1.5][-6:]
-            if len(self._hist) >= 2 and self._hist[-1][0] - self._hist[0][0] >= 0.4:
-                ts, bs = [h[0] for h in self._hist], [h[1] for h in self._hist]
-                mt, mb = sum(ts) / len(ts), sum(bs) / len(bs)
-                den = sum((t - mt) ** 2 for t in ts)
-                speed = sum((t - mt) * (b - mb) for t, b in zip(ts, bs)) / den if den > 0 else 0.0     # deg per second, + = moving right
-                self.lead_deg = max(-c.lead_max_deg, min(c.lead_max_deg, speed * c.lead_s))
-                off += self.lead_deg                                            # aim where a rolling target will be by the time the claw gets there
+        if c.lead_s > 0 and self.filter.n >= 2:
+            self.lead_deg = max(-c.lead_max_deg, min(c.lead_max_deg, self.filter.v * c.lead_s))
+            off += self.lead_deg                                                # aim where a rolling target will be by the time the claw gets there
         if abs(off) < c.deadband_deg:
             self.reason = f"{d[0]} centred ({off:+.0f} deg)"
             return None
@@ -139,6 +164,13 @@ class LiveFollower:
             return None
         self.reason = f"follow {d[0]} ({off:+.0f} deg off{f', lead {self.lead_deg:+.0f}' if self.lead_deg else ''}, pan at the picture {pan_c:+.0f})"
         return want
+
+
+def call_find(find_fn, jpeg: bytes, t_capture: float):
+    """Run a tracking method on one picture: a tracker that says `wants_capture_time` is given when the picture was taken (so it can look up where the claw pointed), a plain function only the picture."""
+    if getattr(find_fn, "wants_capture_time", False):
+        return find_fn(jpeg, t_capture=t_capture)
+    return find_fn(jpeg)
 
 
 class Grabber(threading.Thread):
@@ -173,7 +205,7 @@ class Grabber(threading.Thread):
             k = self.cfg.capture_lag_requests
             t_cap = (self._starts[-1 - k] + self.cfg.capture_delay_s) if len(self._starts) > k else t_call
             try:
-                dets = list(self.find_fn(snap.jpeg))
+                dets = list(call_find(self.find_fn, snap.jpeg, t_cap))
             except Exception:  # noqa: BLE001
                 dets = []
             n += 1
@@ -218,6 +250,15 @@ class StreamGrabber(Grabber):
         self._q: "list[tuple]" = []
         self._qlock = threading.Lock()
         self._qev = threading.Event()
+
+    def set_exposure_lock(self, on: bool) -> bool:
+        """Freeze (True) or release (False) the sensor's auto exposure (OV5647 register 0x3503), before the stream starts and again after it ends. Returns whether the command was written."""
+        from ..vision.stream_probe import LOCK_AE, UNLOCK_AE
+        try:
+            self.ser.write(LOCK_AE if on else UNLOCK_AE)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
 
     def _read(self) -> None:
         from ..vision.stream_probe import BREAK, LOOP_WITH_PICTURE
@@ -269,7 +310,7 @@ class StreamGrabber(Grabber):
                         self.rows.append({"n": n, "t_call": round(t, 3), "t_done": round(t, 3), "t_capture": round(t - self.latency_s, 3), "grab_s": 0.0, "det": [], "bad": True})
                     continue
                 try:
-                    dets = list(self.find_fn(snap.jpeg))
+                    dets = list(call_find(self.find_fn, snap.jpeg, t - self.latency_s))
                 except Exception:  # noqa: BLE001
                     dets = []
                 n += 1
@@ -374,43 +415,30 @@ def follow_loop(robot, grab, follower: "LiveFollower", pan_log: PanLog, cfg: Liv
 
 def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign: str = "left", say=print, sleep=time.sleep, clock=time.monotonic,
              stopped=lambda: False, save=None, make_grabber=None) -> dict:
-    """One live follow run. Returns {"ended", "seconds", "summary", "moves", "rows"}. Never raises; the claw is lowered and G2 stands up the standard way however it ends (a fall leaves him in rest)."""
+    """One live follow run: the shared active look (behavior/active_look.py) for `cfg.seconds` with `find_fn` as its tracking method. Returns {"ended", "seconds", "summary", "moves", "rows"}. Never raises;
+    the claw is lowered and G2 stands up the standard way however it ends (a fall leaves him in rest)."""
     from .. import focus
+    from .active_look import run_active_look
     cfg = cfg or LiveConfig()
     res = {"ended": "error", "seconds": 0.0, "summary": {}, "moves": [], "rows": []}
     t0 = clock()
-    grab: Grabber | None = None
     moves: list[dict] = []
     reversals = 0
+    rows: list = []
     try:
         with focus.holding("attentive_bout", "supervised live follow"):
             if robot._tilt(1.5) is None:
                 say("live follow: no IMU frames from the board: is the BiBoard powered on? Nothing was moved.")
                 res["ended"] = "no_board"
                 return res
-            if robot.relax() == "fell" or robot._fell():
-                res["ended"] = "fell"
-                return res
-            if robot.claw_pose(0.0, cfg.lift_deg) == "fell":
-                res["ended"] = "fell"
-                return res
-            sleep(0.5)
-            base = robot._tilt()
-            pan_log = PanLog(0.0, clock())
-            follower = LiveFollower(cfg, pan_sign, pan_log)
-            grab = make_grabber(find_fn, cfg, clock, save) if make_grabber is not None else Grabber(snap_fn, find_fn, cfg, clock=clock, save=save)
-            grab.start()
-            res["ended"] = "time"
-            say(f"live follow: {cfg.seconds:.0f} s, claw up")
-            out = follow_loop(robot, grab, follower, pan_log, cfg, base=base, pan=0.0, seconds=cfg.seconds, say=say, sleep=sleep, clock=clock, stopped=stopped)
-            res["ended"], moves, reversals = out["ended"], out["moves"], out["reversals"]
+            al = run_active_look(robot, make_grabber, find_fn, cfg, pan_sign=pan_sign, say=say, sleep=sleep, clock=clock, stopped=stopped, save=save, snap_fn=snap_fn,
+                                 on_ready=lambda: say(f"live follow: {cfg.seconds:.0f} s, claw up"), tilt_s=0.5, raise_settle_s=0.5)
+            res["ended"] = "stopped" if al.ended == "stopped_by_user" else al.ended
+            moves, reversals, rows = al.move_log, al.reversals, al.rows
     except Exception:  # noqa: BLE001
         log.exception("the live follow failed")
         res["ended"] = "error"
     finally:
-        if grab is not None:
-            grab.stop_flag.set()
-            grab.join(timeout=3.0)
         res["seconds"] = round(clock() - t0, 1)
         try:
             if res["ended"] not in ("fell", "no_board"):
@@ -418,9 +446,9 @@ def run_live(robot, snap_fn, find_fn, cfg: LiveConfig | None = None, *, pan_sign
                 robot.stand_up()
         except Exception:  # noqa: BLE001
             log.exception("ending the live follow failed")
-    if grab is not None:
-        res["rows"], res["moves"] = grab.rows, moves
-        res["summary"] = summarize(grab.rows, moves, reversals, max(res["seconds"], 1e-6))
+    if rows:
+        res["rows"], res["moves"] = rows, moves
+        res["summary"] = summarize(rows, moves, reversals, max(res["seconds"], 1e-6))
     say(f"live follow ended ({res['ended']}) after {res['seconds']:.0f} s: {res['summary']}")
     return res
 

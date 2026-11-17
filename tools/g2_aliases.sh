@@ -459,6 +459,15 @@ g2stepcal() {
 }
 # g2stepcalstop  -- end a step calibration after the current step (he is laid in rest).
 g2stepcalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/stepcal_stop" && echo "stop sent: the calibration ends after the current step"; }
+# g2followcal [STEPS [REPEATS]]  -- follow calibration (default STEPS 10,20,30 and 2 repeats): with a fixed ball about 14 to 24 in straight ahead, the arm goes to 120 and the claw takes pan steps left and right while the camera streams; it measures the delay from a pan command to the picture showing the move and the pan speed, as numbers (no pictures), so the active look's gain, lead and coast can be tuned from them. Stops the voice service first (`g2stop voice`), brings it back after; `g2followcalstop` ends it early. Hands near.
+g2followcal() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.follow_cal --steps ${1:-10,20,30} --repeats ${2:-2} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
+# g2followcalstop  -- end a follow calibration after the current step (he is laid in rest).
+g2followcalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/followcal_stop" && echo "stop sent: the calibration ends after the current step"; }
 # g2punttest [dry]  -- the active look (the post-punt watch): stands G2 up from rest, punts the ball (it must be in punt range), follows it rolling with the claw until it stops, takes a picture, says "target acquired" and goes on with the chase (turn, walk, dial in, one more punt), or, when the ball is lost, turns toward the side it was last seen on and does the normal claw look. `dry` = no punt and no chase: you roll the ball by hand and he only watches. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2puntstop ends it.
 g2punttest() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

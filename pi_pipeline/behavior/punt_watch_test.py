@@ -38,7 +38,7 @@ def main() -> None:
     from ..vision.snapshot import CameraSnapshotter
     from . import ball_chase as chase
     from . import punt_settings as ps
-    from .gallery_target import BallTarget
+    from .ball_tracker import BallTracker
     ap = argparse.ArgumentParser(description="Punt, watch the ball roll with the claw, acquire it, and go on (or turn toward where it was last seen). Needs the owner's go.")
     ap.add_argument("--no-punt", action="store_true", help="dry run: no punt and no chase afterwards; roll the ball by hand")
     ap.add_argument("--seconds", type=float, default=WatchConfig.seconds, help="the longest the ball is followed")
@@ -74,7 +74,7 @@ def main() -> None:
             threading.Thread(target=tts.speak, args=(text,), daemon=True).start()
     outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/watch_%Y%m%d_%H%M%S"))         # only the small JSON log goes here: the tracking pictures are never saved (owner, 2026-11-15)
     os.makedirs(outdir, exist_ok=True)
-    target = BallTarget()
+    target = BallTracker(pan_sign=chase.CLAW_PAN_SIGN)
     cam._open()
 
     def make_grabber(find, cfg, clock, _save):
@@ -101,7 +101,7 @@ def main() -> None:
         wcfg = WatchConfig(seconds=args.seconds, lost_turn_deg=args.turn)
         if args.no_punt:
             wcfg = WatchConfig(seconds=max(args.seconds, 25.0), never_seen_s=15.0, lost_turn_deg=args.turn)      # the dry run waits for you to roll the ball
-        r = watch_after_punt(robot, wrapped, make_grabber, target.detections, find_still, wcfg, pan_sign=chase.CLAW_PAN_SIGN, announce=announce, stopped=stop,
+        r = watch_after_punt(robot, wrapped, make_grabber, target, find_still, wcfg, pan_sign=chase.CLAW_PAN_SIGN, announce=announce, stopped=stop,
                              on_ready=(lambda: announce("roll the ball now")) if args.no_punt else None)
         print(result_line(r))
         try:

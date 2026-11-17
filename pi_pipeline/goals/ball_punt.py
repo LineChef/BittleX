@@ -209,7 +209,7 @@ class BallPunt:
         from ..behavior import ball_chase as bc
         from ..behavior import live_follow as lf
         from ..behavior import punt_watch as pw
-        from ..behavior.gallery_target import BallTarget
+        from ..behavior.ball_tracker import BallTracker
         from ..vision import ball_finder as bf
         from ..vision.ball_finder import find_ball
         cam = getattr(self.camera, "_cam", None)
@@ -240,7 +240,7 @@ class BallPunt:
                 said["got_it"] = True
                 self.got_it_announced = True
             ctx.announce(text)
-        r = pw.watch_after_punt(self.robot, self.camera, make, BallTarget(color).detections, find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=announce, judge_success=lambda after: punt_succeeded(before, after), stopped=ctx.stop)
+        r = pw.watch_after_punt(self.robot, self.camera, make, BallTracker(color, pan_sign=bc.CLAW_PAN_SIGN), find_still, pw.WatchConfig(), pan_sign=bc.CLAW_PAN_SIGN, say=ctx.say, announce=announce, judge_success=lambda after: punt_succeeded(before, after), stopped=ctx.stop)
         self._last_watch = (_t.monotonic(), r)
         return r
 
