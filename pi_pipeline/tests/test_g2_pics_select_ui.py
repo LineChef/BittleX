@@ -82,3 +82,7 @@ def test_select_by_guess_picks_every_picture_with_that_guess(tmp_path):
     out = json.loads(r.stdout)
     assert out["opts"] == ["Select by G2's guess...", "mug (2)", "door (1)"]              # an already named picture is not counted
     assert out["picked"] == ["a", "b"] and out["menu"] == 2
+
+
+def test_groups_show_when_there_are_no_named_groups_so_the_looks_tab_is_not_empty():
+    assert "const secOpen=!named.length||!isClosed(sec);" in G.PAGE          # no section header exists to open without named groups
