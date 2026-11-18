@@ -573,3 +573,12 @@ def test_the_turn_calibration_logs_which_way_the_gyro_says_each_turn_went():
     lines = []
     out = tc.run_turn_cal(R(), asks=(45.0,), repeats=1, say=lines.append, sleep=lambda s: None)
     assert [t["got_signed"] for t in out["trials"]] == [-40.0, -40.0] and any("yaw change -40.0" in x for x in lines)
+    seen = []
+
+    class T(R):
+        last_turn_spikes = 2
+        def turn(self, degrees, seconds, stop_deg=0.0):
+            seen.append(seconds)
+            return "ok"
+    out = tc.run_turn_cal(T(), asks=(999.0,), repeats=1, timed_s=3.0, say=lines.append, sleep=lambda s: None)
+    assert seen == [2.0, 2.0] and [t["spikes"] for t in out["trials"]] == [2, 2] and out["trials"][0]["timed_s"] == 3.0      # timed: the turn gets 3 s / 1.5 and the spikes are logged

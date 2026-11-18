@@ -40,7 +40,7 @@ def _xy(ball):
     return ball.distance_in * math.cos(a), ball.distance_in * math.sin(a)
 
 
-def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, say=print, sleep=time.sleep, stopped=lambda: False, rate=lambda side: 45.0, look=None) -> dict:
+def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, timed_s: float = 0.0, say=print, sleep=time.sleep, stopped=lambda: False, rate=lambda side: 45.0, look=None) -> dict:
     """Returns {"ended", "trials", "summary"}. Never raises; the caller lays him in rest."""
     from .. import focus
     res = {"ended": "error", "trials": [], "summary": {}}
@@ -61,9 +61,11 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, say=print, 
                         side = 1 if sign > 0 else -1
                         before = robot._tilt(0.3)
                         secs = max(0.3, ask / rate(side))
+                        if timed_s > 0:
+                            secs = timed_s / 1.5                                         # the turn runs 1.5 x its length at most, and ALIGN_CAP_S is set to timed_s: it runs exactly timed_s with the gyro only counting
                         state = robot.turn(sign * ask, secs, stop_deg=ask)
                         roll, pitch = list(getattr(robot, "_roll", []) or []), list(getattr(robot, "_pitch", []) or [])
-                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
+                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "timed_s": timed_s or None, "spikes": getattr(robot, "last_turn_spikes", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
                              "ended_by": getattr(robot, "last_turn_end", None), "tilt_before": [round(x, 1) for x in before] if before else None,
                              "roll_swing": round(max(roll) - min(roll), 1) if roll else 0.0, "pitch_swing": round(max(pitch) - min(pitch), 1) if pitch else 0.0}
                         if look is not None:
@@ -74,7 +76,7 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, say=print, 
                                 t["side_in"] = round(after[1] - seen[1], 1)
                             seen = after
                         res["trials"].append(t)
-                        say(f"turn {t['dir']} asked {ask:g}: got {t['got']} deg (yaw change {t['got_signed']}) in {t['ran_s']} s, ended by {t['ended_by']}, roll swing {t['roll_swing']}, pitch swing {t['pitch_swing']}, forward {t.get('fwd_in')} in, state {state}")
+                        say(f"turn {t['dir']} asked {ask:g}: got {t['got']} deg (yaw change {t['got_signed']}, {t['spikes']} spikes) in {t['ran_s']} s, ended by {t['ended_by']}, roll swing {t['roll_swing']}, pitch swing {t['pitch_swing']}, forward {t.get('fwd_in')} in, state {state}")
                         if state == "fell" or robot._fell():
                             res["ended"] = "fell"
                             return res
@@ -96,6 +98,7 @@ def main() -> None:
     ap.add_argument("--asks", default="6,10,20")
     ap.add_argument("--repeats", type=int, default=2)
     ap.add_argument("--token", choices=("wk", "vt", "cr", "tr"), default="wk", help="the skill family to turn with: wk = kwkL/kwkR (the chase's), vt = kvtL/kvtR (a candidate pivot), cr, tr")
+    ap.add_argument("--timed", type=float, default=0.0, help="every turn runs exactly this many seconds with no gyro stop (asks are then ignored but must be given; use 999): the gyro only counts, to compare with the angle seen by eye")
     ap.add_argument("--cap", type=float, default=0.0, help="the longest one turn may run, in seconds, for this calibration only (0 = the ball goal's own cap, ALIGN_CAP_S): longer pivots show whether a turn stays in place")
     ap.add_argument("--ball", action="store_true", help="a ball fixed 14 to 20 in straight ahead: the camera measures how far each turn moves him forward")
     args = ap.parse_args()
@@ -112,7 +115,9 @@ def main() -> None:
     if not imu_print.board_answers(link):
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")
         return
-    if args.cap > 0:
+    if args.timed > 0:
+        chase.ALIGN_CAP_S = min(args.timed, 6.0)
+    elif args.cap > 0:
         chase.ALIGN_CAP_S = min(float(args.cap), 6.0)                 # this process only; never above the 6 s turn limit
     robot = chase.SerialRobot(link)
     robot.turn_tokens = (f"k{args.token}R", f"k{args.token}L")
@@ -140,7 +145,7 @@ def main() -> None:
                         return ball
                     time.sleep(0.5)
                 return None
-        res = run_turn_cal(robot, tuple(float(a) for a in args.asks.split(",")), max(1, args.repeats), stopped=lambda: os.path.exists(stop_path),
+        res = run_turn_cal(robot, tuple(float(a) for a in args.asks.split(",")), max(1, args.repeats), timed_s=min(args.timed, 6.0), stopped=lambda: os.path.exists(stop_path),
                            rate=lambda side: planner._turn_rate(side, False), look=look)
         print(f"RESULT: {res['ended']}")
     except KeyboardInterrupt:
