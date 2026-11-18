@@ -583,4 +583,12 @@ def test_the_turn_calibration_logs_which_way_the_gyro_says_each_turn_went():
             seen.append(seconds)
             return "ok"
     out = tc.run_turn_cal(T(), asks=(999.0,), repeats=1, timed_s=3.0, say=lines.append, sleep=lambda s: None)
+    stops = []
+
+    class N(R):
+        def turn(self, degrees, seconds, stop_deg=0.0):
+            stops.append((seconds, stop_deg))
+            return "ok"
+    tc.run_turn_cal(N(), asks=(999.0,), repeats=1, timed_s=1.5, nogyro=True, say=lines.append, sleep=lambda s: None)
+    assert stops == [(1.5, 0.0), (1.5, 0.0)]                                                           # --nogyro: a plain timed turn, no gyro stop (the whole-cycle stop applies only to these)
     assert seen == [2.0, 2.0] and [t["spikes"] for t in out["trials"]] == [2, 2] and out["trials"][0]["timed_s"] == 3.0      # timed: the turn gets 3 s / 1.5 and the spikes are logged
