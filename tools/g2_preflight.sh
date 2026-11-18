@@ -13,6 +13,8 @@ if [ -n "$dep" ] && [[ "$head_full" == "$dep"* ]]; then echo "deployed == HEAD (
 echo "== the pack (last logged reading)"; bash "$ROOT/tools/pi_read.sh" battery
 echo "== the floor label (ask the owner every time; this is only what it reads now)"
 ( source "$ROOT/tools/g2_aliases.sh" >/dev/null 2>&1; g2floor 2>&1 | tail -n 1 )
-echo "== gallery grooming (runs at the start of a hardware session: g2groom)"
+echo "== data pulled from the Pi (the sync-data skill pulls everything new first, then grooms; a task older than its limit says STALE)"
+bash "$ROOT/tools/g2_sync.sh" status 2>&1 | head -10
+echo "== gallery grooming (runs at the start of a hardware session, after the pull: sync-data skill / g2groom)"
 if [ -f "$HOME/.local/share/g2/groom_last" ]; then echo "last run: $(cat "$HOME/.local/share/g2/groom_last"); applies: $(grep -q '"apply": *true' "$HOME/.local/share/g2/groom.json" 2>/dev/null && echo yes || echo 'no (report only)')"; else echo "never run: run g2groom now"; fi
 echo "== the owner's go is still needed before anything moves G2"
