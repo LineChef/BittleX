@@ -18,9 +18,10 @@ NODE = shutil.which("node")
 def test_the_page_has_the_selection_boxes_the_group_buttons_and_the_room_bar():
     page = G.PAGE
     assert "/*SELECT_UI*/" not in page and "window.picSelect=" in page and "selbar" in page          # the file is inserted
-    for hook in ('picSelect.begin(tab==="pictures")', "picSelect.groupButtons(groups[g])", "picSelect.attach(c,p,groups[g])", "picSelect.end()", "picSelect.leave()"):
+    for hook in ("picSelect.begin(true,tab)", 'picSelect.begin(true,"walls")', "picSelect.groupButtons(groups[g])", "picSelect.attach(c,p,groups[g])", "picSelect.attach(c,p,items.filter", "picSelect.end()", "picSelect.leave()"):
         assert hook in page, hook
-    assert 'p.group!=="looks"' in page.split("picSelect.attach")[0][-200:]                          # look pictures get no box: they are throwaways with no room
+    assert page.count("picSelect.targets(p)") == 2                                                  # a card's own Name and Room buttons act on every ticked picture (user, 2026-11-17)
+    assert "g2fold_" in page and "foldSave();render()" in page and "foldSave();sync()" in page      # each tab remembers its open and closed sections and groups
 
 
 @pytest.mark.skipif(not NODE, reason="node is not installed")
