@@ -136,10 +136,18 @@ def main() -> None:
             cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
             shot = chase._SnapshotCamera(cam)
 
+            pic_dir = os.path.expanduser(f"~/g2_runs/turncal_pics_{time.strftime('%Y%m%d_%H%M%S')}")        # one picture before the first turn and one after every turn, for judging the rotation by eye (user, 2026-11-18)
+            os.makedirs(pic_dir, exist_ok=True)
+            looks = [0]
+
             def look():
-                for _ in range(3):
+                for attempt in range(3):
                     shot.refresh_exposure()
                     jpeg = shot.look()
+                    if attempt == 0 and jpeg:
+                        with open(os.path.join(pic_dir, f"look_{looks[0]:02d}.jpg"), "wb") as fh:
+                            fh.write(jpeg)
+                        looks[0] += 1
                     ball = chase.confirm_ball(shot, find_ball(jpeg) if jpeg else None, time.sleep, None)
                     if ball is not None:
                         return ball
