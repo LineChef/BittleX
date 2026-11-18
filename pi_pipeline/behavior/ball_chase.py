@@ -257,6 +257,7 @@ ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; o
 PIVOT_TOKENS = ("kvtL", "kvtR")
 PIVOT_CYCLE_S = 0.86            # one pivot cycle (72 frames), measured on G2 2026-11-18; the measured file (gait_cycles.json) wins when it has it
 PIVOT_DEG_PER_CYCLE = 20.0      # about how far one pivot cycle turns him, either side (2026-11-18 pictures and eye: 35 to 40 deg in 1.5 s); the camera corrects what is left
+PIVOT_MIN_DEG = 14.0            # a line-up turn smaller than this stays on the gyro-stopped arc: one pivot cycle is 20 deg or more, so the 3 to 6 deg align pulses turned 3 to 7 times too far (2026-11-18 goal run: -15 to +28 deg, "overshot")
 PIVOT_MAX_CYCLES = 2            # a pivot line-up turn is one or two cycles (about 20 or 40 deg), then a new picture
 PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP
 PIVOT_LEAN_DEG = float(os.environ.get("G2_PIVOT_LEAN_DEG", "8"))      # (owner, 2026-11-18) nose-up beyond this many degrees right after a pivot: the legs have let go on the back legs, so he is laid in rest and stood up from rest at once (recover_sag) instead of sitting unstable until the next move; 0 turns it off
@@ -1657,7 +1658,9 @@ class SerialRobot:
         right, left = (self.lineup_tokens or opencat.lineup_tokens(self.lineup_ball_in)) if stop_deg > 0 else self.turn_tokens          # the firmware walking-turn gaits (a curve, not a pivot); the turn calibration swaps in other skills to compare (2026-11-17)
         token = right if degrees > 0 else left
         if stop_deg > 0 and token in PIVOT_TOKENS:
-            return self._pivot_cycles(token, stop_deg, degrees > 0)
+            if stop_deg >= PIVOT_MIN_DEG:
+                return self._pivot_cycles(token, stop_deg, degrees > 0)
+            token = opencat.ARCS[0] if degrees > 0 else opencat.ARCS[1]                # a small pulse: the pivot cannot turn that little
         return self._skill(token, seconds, stop_yaw_deg=stop_deg if stop_deg > 0 and ALIGN_YAW_STOP else None)
 
     def _pivot_cycles(self, token: str, want_deg: float, right: bool) -> str:

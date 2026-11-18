@@ -67,6 +67,7 @@ WALK_BACKWARD = "kbkF"          # walk backward
 PIVOT_LEFT = "kvtL"             # the firmware pivot: turns him in place (decoded 2026-11-18: 72 frames, a closed cycle that starts and ends near the balance stand); `kvtR` is its mirror
 PIVOT_RIGHT = "kvtR"
 PIVOTS = (PIVOT_RIGHT, PIVOT_LEFT)
+ARCS = (WALK_RIGHT, WALK_LEFT)      # the arc turns (right, left), for the turns the pivot cannot do (a pulse smaller than one pivot cycle)
 
 
 def turn_tokens() -> tuple:

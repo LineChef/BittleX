@@ -140,8 +140,12 @@ def test_a_line_up_turn_in_the_band_is_whole_pivot_cycles_and_outside_it_the_gyr
     assert sent[-1] == ("kvtR", round(0.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 20.0 and r.last_turn_end == "cycles" and r.last_turn_signed == 20.0
     r.turn(-45.0, 1.0, stop_deg=45.0)                                  # two cycles, never more
     assert sent[-1] == ("kvtL", round(1.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 40.0 and r.last_turn_signed == -40.0
-    r.turn(8.0, 1.0, stop_deg=8.0)                                     # a small one is still a whole cycle (the camera corrects what is left)
+    r.turn(14.0, 1.0, stop_deg=14.0)                                   # the smallest turn that is a pivot: one cycle
     assert sent[-1][0] == "kvtR" and r.last_turn_deg == 20.0
+    r.turn(6.0, 1.0, stop_deg=6.0)                                     # an align pulse is smaller than one pivot cycle: the gyro-stopped arc (2026-11-18 goal run: a pivot turned it 3 to 7 times too far)
+    assert sent[-1][0] == "kwkR" and sent[-1][2] == (6.0 if bc.ALIGN_YAW_STOP else None)
+    r.turn(-6.0, 1.0, stop_deg=6.0)
+    assert sent[-1][0] == "kwkL"
     r.lineup_ball_in = 3.0
     r.turn(8.0, 1.0, stop_deg=8.0)                                     # right up against the ball: the arc, stopped on the gyro as before
     assert sent[-1][0] == "kwkR" and sent[-1][2] == (8.0 if bc.ALIGN_YAW_STOP else None)
