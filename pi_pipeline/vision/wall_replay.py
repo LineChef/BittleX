@@ -74,12 +74,49 @@ def replay(pictures_dir: str, cal: Calibration | None = None, labels: dict | Non
     return rows
 
 
+def replay_roam(roam_dir: str, roam_labels: dict, cal: Calibration | None = None) -> list:
+    """The roam pictures G2 kept at near looks (`ring/wall_*.jpg`) and what you labelled them in the Walls tab (`roam_labels.json`, keys like `ring/wall_..._near.jpg`): the label `nothing` says there was no
+    wall within about a foot, so the right action is none. Same columns as `replay`."""
+    from .embedder import to_image
+    cal = cal or Calibration.load()
+    rows = []
+    for key, info in sorted(roam_labels.items()):
+        jpg = Path(roam_dir) / key
+        if not jpg.exists():
+            continue
+        est = estimate(to_image(jpg.read_bytes()), cal)
+        near_groups = groups_within(est, TURN_IN)
+        nearest = None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1)
+        reading = WallReading(0.0, state_of(est), nearest, est.turn, True, near_groups, 3 if near_groups >= AHEAD_GROUPS else 0, clamped=bool(getattr(est, "clamped", False)))
+        rows.append({"shot": key, "label": info.get("label"), "true_in": info.get("distance_in"), "nearest_in": nearest, "state": reading.state, "action": decide(reading),
+                     "groups_in": [None if c is None else round(c / IN_TO_CM, 1) for c in est.group_cm]})
+    return rows
+
+
+def score(shot_rows: list, roam_rows: list) -> dict:
+    """How a detector scores: of the calibration shots that are walls (labels `wall_*`) with a known distance, how many it ACTS on by distance band (a wall within 24 in should be acted on, one farther should not),
+    and of the roam pictures labelled `nothing`, how many it wrongly acts on (the false alarms)."""
+    walls = [r for r in shot_rows if str(r["label"]).startswith("wall") and r["true_in"] is not None]
+    acts = lambda r: r["action"] != "none"  # noqa: E731
+    bands = {"within 12 in": [r for r in walls if r["true_in"] <= 12], "13 to 24 in": [r for r in walls if 12 < r["true_in"] <= 24], "farther than 24 in": [r for r in walls if r["true_in"] > 24]}
+    nothing = [r for r in roam_rows if str(r["label"]).lower() == "nothing"]
+    return {"wall acted on": {k: f"{sum(acts(r) for r in v)} of {len(v)}" for k, v in bands.items()}, "false alarms (labelled nothing, acted on)": f"{sum(acts(r) for r in nothing)} of {len(nothing)}",
+            "false alarm shots": [r["shot"] for r in nothing if acts(r)]}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("dir")
     ap.add_argument("--cal", default=None)
+    ap.add_argument("--score", action="store_true", help="DIR is the wall picture folder (shot_*.jpg, labels.json, ring/, roam_labels.json): score the detector on the calibration shots and on the roam pictures you labelled `nothing`")
     a = ap.parse_args(argv)
     cal = Calibration.load(a.cal) if a.cal else None
+    if a.score:
+        shots = replay(a.dir, cal)
+        roam = replay_roam(a.dir, json.loads((Path(a.dir) / "roam_labels.json").read_text()), cal) if (Path(a.dir) / "roam_labels.json").exists() else []
+        for k, v in score(shots, roam).items():
+            print(f"{k}: {v}")
+        return 0
     rows = replay(a.dir, cal)
     print(f"{'shot':9s} {'label':22s} {'true in':>7s} {'reads in':>8s} {'state':8s} {'groups (in)':34s} action")
     for r in rows:

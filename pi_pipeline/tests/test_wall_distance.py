@@ -148,3 +148,45 @@ def test_calibration_uses_the_lowest_base_of_any_group_and_a_wall_ahead_needs_tw
     assert wd.AHEAD_GROUPS == 2
     est = wd.WallEstimate(60.96, [60.96, 60.96, None, None, None], False, "right", "x")
     assert wd.groups_within(est, wd.TURN_IN) == 2                  # exactly 24 in counts at 24 in
+
+
+def _cal():
+    from pi_pipeline.vision.wall_distance import Calibration
+    return Calibration([(0.3333, 101.6), (0.375, 61.0), (0.4167, 30.5), (0.4583, 20.3)])
+
+
+def test_a_reading_at_the_calibrations_closest_row_needs_three_groups_behind_it(monkeypatch):
+    """2026-11-18: 44 of 63 roam pictures labelled `nothing` read exactly 8 in, the calibration's closest row, which every lower base also reads: it is a floor, not a distance."""
+    from pi_pipeline.vision import wall_distance as wd
+    rows = {"v": [0.5, None, 0.5, None, None]}
+    monkeypatch.setattr(wd, "base_rows", lambda img, loc=None, **k: (rows["v"], True))
+    est = wd.estimate(object(), _cal())
+    assert est.nearest_cm is None and est.group_cm == [None] * wd.GROUPS and est.clamped and est.reason.startswith("not believed: 2 of 5")      # two groups: not believed
+    rows["v"] = [0.5, 0.5, 0.5, None, None]
+    est = wd.estimate(object(), _cal())
+    assert est.clamped and abs(est.nearest_cm - 20.3) < 0.1 and est.turn in ("left", "right")                                                   # three groups: kept
+    rows["v"] = [0.40, 0.40, None, None, None]
+    est = wd.estimate(object(), _cal())
+    assert not est.clamped and est.nearest_cm is not None and est.nearest_cm > 20.3                                                             # a base above the closest row is a real measurement, never suppressed
+
+
+def test_blocked_is_judged_on_the_whole_picture_even_when_the_claw_jaw_rows_are_not_searched(monkeypatch):
+    """The bottom rows the floor model skips (the claw's own jaws) are not searched for an obstacle, but a picture that is foreground everywhere is still blocked."""
+    import numpy as np
+    from pi_pipeline.vision import wall_distance as wd
+
+    class Loc:
+        grid, floor_skip = 24, 6
+
+        def foreground_mask(self, img):
+            return np.ones((24, 24), dtype=bool)
+    rows, floor_visible = wd.base_rows(object(), Loc())
+    assert floor_visible is False
+
+    class Floor(Loc):
+        def foreground_mask(self, img):
+            m = np.zeros((24, 24), dtype=bool)
+            m[18:, :] = True                                                                                  # only the jaw rows differ from the floor
+            return m
+    rows, floor_visible = wd.base_rows(object(), Floor())
+    assert rows == [None] * wd.GROUPS and floor_visible is True                                               # the jaws are no obstacle

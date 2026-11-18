@@ -30,6 +30,10 @@ def base_rows(img, localizer: ForegroundLocalizer | None = None, *, groups: int 
     loc = localizer or ForegroundLocalizer()
     mask = loc.foreground_mask(img)
     g = loc.grid
+    covered = float(mask.mean())                                             # "blocked" is judged on the whole picture, jaws included
+    if loc.floor_skip:
+        mask = mask.copy()
+        mask[g - loc.floor_skip:, :] = False           # the bottom rows the floor model skips are the claw's own jaws (2026-11-18): they are not an obstacle, so they are not searched for one either
     rows = []
     for i in range(groups):
         c0, c1 = int(i * g / groups), max(int((i + 1) * g / groups), int(i * g / groups) + 1)
@@ -51,7 +55,6 @@ def base_rows(img, localizer: ForegroundLocalizer | None = None, *, groups: int 
                 break
             r = t - 1                                                        # too short (a sheen, a floor-grain patch): keep looking above it
         rows.append(None if found is None else min(1.0, found / g))
-    covered = float(mask.mean())
     return rows, covered < 0.9
 
 
@@ -92,6 +95,7 @@ class WallEstimate:
     blocked: bool                       # the obstacle fills the floor strip itself: closer than the calibration can tell
     turn: str | None                    # "left" / "right": toward the more open side; None when nothing is close
     reason: str
+    clamped: bool = False               # the nearest base sits at or below the calibration's closest row: the distance is that closest value (a floor), not a measurement
 
 
 def estimate(img, calibration: Calibration, *, near_cm: float = 30.0, localizer: ForegroundLocalizer | None = None) -> WallEstimate:
@@ -101,8 +105,14 @@ def estimate(img, calibration: Calibration, *, near_cm: float = 30.0, localizer:
     cm = [None if r is None else round(calibration.distance_cm(r), 1) for r in rows]
     seen = [c for c in cm if c is not None]
     nearest = min(seen) if seen else None
+    closest = min((d for _r, d in calibration.points), default=None)
+    clamped = bool(nearest is not None and closest is not None and nearest <= closest + 0.05)
+    if clamped:
+        n_near = sum(1 for c in cm if c is not None and round(c / IN_TO_CM, 1) <= TURN_IN)
+        if n_near < CLAMP_GROUPS:                                              # a base at or below the calibration's closest row reads that closest distance whatever its true one: with fewer than three column groups behind it, it is not believed (2026-11-18: 44 of 63 pictures labelled `nothing` read 8 in)
+            return WallEstimate(None, [None] * GROUPS, False, None, f"not believed: {n_near} of {GROUPS} groups read the closest calibrated row ({nearest / IN_TO_CM:.0f} in); raw groups {[None if c is None else round(c / IN_TO_CM, 1) for c in cm]}", True)
     if nearest is None or nearest > near_cm:
-        return WallEstimate(nearest, cm, False, None, "clear" if nearest is None else f"nearest {nearest:.0f} cm: not close")
+        return WallEstimate(nearest, cm, False, None, "clear" if nearest is None else f"nearest {nearest:.0f} cm: not close", clamped)
     half = GROUPS // 2
     left = [c if c is not None else 1e9 for c in cm[:half]]                    # the two outer groups on each side; the centre group is straight ahead and belongs to neither
     right = [c if c is not None else 1e9 for c in cm[half + 1:]]
@@ -110,10 +120,11 @@ def estimate(img, calibration: Calibration, *, near_cm: float = 30.0, localizer:
         side = "left" if min(left) > min(right) else "right"                   # turn toward the side whose nearest obstacle is farther away
     else:
         side = "left" if sum(left) >= sum(right) else "right"                  # a tie: the side with more room overall
-    return WallEstimate(nearest, cm, False, side, f"nearest {nearest:.0f} cm: would turn {side}")
+    return WallEstimate(nearest, cm, False, side, f"nearest {nearest:.0f} cm: would turn {side}", clamped)
 
 
 TURN_IN = 24.0                    # the steering distance: at about 3 in/s with a look every 3 to 5 s he covers 10 to 15 in between looks and the turn takes about 1.5 s, so a wall must be acted on at 24 in
+CLAMP_GROUPS = 3                 # how many column groups must read TURN_IN or closer when the nearest base is at the calibration's closest row (a clamped 8 in): that reading is a floor, not a measurement
 AHEAD_GROUPS = 2                 # how many of the five column groups must read TURN_IN or closer for "a wall is ahead" (was 3; on 2026-10-10 a plain wall at 12 to 24 in showed its base in only the two left groups, so 3 never fired; two looks of three must agree, so a one-off glare still does not steer)
 NEAR_IN = 12.0                    # "near" for the log: the nearest wall base at or inside 12 in (30 cm is the turn threshold of `estimate`)
 PICS_DIR = os.path.expanduser(os.environ.get("G2_WALL_PICS", "~/.local/share/g2/wall_pics"))
@@ -139,7 +150,7 @@ def log_dry_run(est: WallEstimate, path: str = LOG_PATH, *, extra: dict | None =
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         inch = lambda c: None if c is None else round(c / IN_TO_CM, 1)  # noqa: E731
         row = {"t": time.strftime("%Y-%m-%d %H:%M:%S"), "state": state_of(est), "nearest_in": inch(est.nearest_cm), "group_in": [inch(c) for c in est.group_cm],
-               "nearest_cm": est.nearest_cm, "group_cm": est.group_cm, "blocked": est.blocked, "turn": est.turn, "reason": est.reason, **(extra or {})}
+               "nearest_cm": est.nearest_cm, "group_cm": est.group_cm, "blocked": est.blocked, "turn": est.turn, "reason": est.reason, "clamped": est.clamped, **(extra or {})}
         with open(path, "a") as f:
             f.write(json.dumps(row) + "\n")
     except OSError:
@@ -160,6 +171,7 @@ class WallReading:
     ahead_votes: int = 0              # how many of the newest three looks (this one included) had AHEAD_GROUPS or more groups at TURN_IN or closer: a one-off glare reading is one vote
     prev_nearest_in: float | None = None     # the nearest wall of the look before this one, and how long ago it was (for "he is not getting anywhere")
     prev_age_s: float | None = None
+    clamped: bool = False             # the nearest base is at or below the calibration's closest row: the distance is a floor (8 in), not a measurement
 
 
 class WallLog:
@@ -206,7 +218,7 @@ class WallLog:
             prev = self.last
             mono = time.monotonic()
             self.last = WallReading(mono, st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], near_groups,
-                                    sum(self._votes), None if prev is None else prev.nearest_in, None if prev is None else round(mono - prev.t, 2))
+                                    sum(self._votes), None if prev is None else prev.nearest_in, None if prev is None else round(mono - prev.t, 2), clamped=bool(est.clamped))
         log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
         return est
 
