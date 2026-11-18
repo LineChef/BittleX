@@ -42,7 +42,14 @@ def record(folder, n: int, info: dict) -> None:
     (Path(folder) / "labels.json").write_text(json.dumps(labels, indent=1))
 
 
+def _refuse_calibration(folder) -> None:
+    from .wall_calibration_set import is_calibration_dir
+    if is_calibration_dir(folder):
+        raise SystemExit(f"{folder} is a wall calibration set: its pictures are never deleted, trashed or restored by this tool (they are what the calibration is built from)")
+
+
 def delete(folder, numbers) -> list:
+    _refuse_calibration(folder)
     labels = load_labels(folder)
     gone = []
     for n in numbers:
@@ -64,6 +71,7 @@ def _ring_dir() -> Path:
 
 def trash(folder, names) -> list:
     """Move wall pictures to a trash folder (nothing is erased): `shot_021` (a recognition shot: the picture, its sidecar and its labels entry) or `ring/wall_....jpg` (a roam picture). Returns the names moved."""
+    _refuse_calibration(folder)
     folder, ring = Path(folder), _ring_dir()
     labels, moved = load_labels(folder), []
     tdir = folder / "_trash"
@@ -103,6 +111,7 @@ def trash(folder, names) -> list:
 
 
 def restore(folder, names) -> list:
+    _refuse_calibration(folder)
     folder, ring = Path(folder), _ring_dir()
     labels, back = load_labels(folder), []
     tdir = folder / "_trash"
@@ -133,6 +142,7 @@ def restore(folder, names) -> list:
 
 
 def empty_trash(folder) -> int:
+    _refuse_calibration(folder)
     """The only permanent delete of a wall picture (the page's Empty trash): the recognition trash and the roam trash. Returns how many pictures were removed."""
     import shutil
     n = 0
@@ -166,7 +176,8 @@ def shot(args) -> int:
     from ..gait.stillness import StillnessWaiter
     from ..link.serial_link import SerialLink
     from .snapshot import CameraSnapshotter, exposure_stats
-    folder = Path(args.dir)
+    from . import wall_calibration_set as wcs
+    folder = wcs.set_dir(args.calibration) if args.calibration else Path(args.dir)
     folder.mkdir(parents=True, exist_ok=True)
     n = next_shot_number(folder)
     lk = SerialLink("/dev/serial0", baud=115200)
@@ -189,7 +200,7 @@ def shot(args) -> int:
         path = folder / f"shot_{n:03d}.jpg"
         path.write_bytes(snap.jpeg)
         st = exposure_stats(snap.jpeg)
-        info = {"label": args.label, "distance_in": args.inches, "angle_deg": args.angle, "note": args.note or "", "set": args.set, "still": still, "retaken": retaken,
+        info = {"label": args.label, "distance_in": args.inches, "angle_deg": args.angle, "note": args.note or "", "set": (f"calibration:{args.calibration}" if args.calibration else args.set), "still": still, "retaken": retaken,
                 "exposure": None if st is None else {"mean": round(st.mean, 1), "clip_high": round(st.clip_high, 4)}, "time": time.strftime("%Y-%m-%d %H:%M:%S")}
         try:
             from .embedder import to_image
@@ -198,7 +209,17 @@ def shot(args) -> int:
             info["base_rows"] = [None if r is None else round(r, 3) for r in rows]
         except Exception as e:  # noqa: BLE001
             info["estimator_error"] = repr(e)
+        if args.calibration:                                     # a calibration picture: the camera and arm state go with it, the set is hashed and locked read-only
+            try:
+                from ..attachments import current as _att
+                info["attachment"] = _att()
+            except Exception:  # noqa: BLE001
+                pass
+            wcs.unlock_file(folder / "labels.json")
         record(folder, n, info)
+        if args.calibration:
+            wcs.write_manifest(folder)
+            wcs.lock(folder)
         at = f" at {args.inches} in" if args.inches is not None else ""
         try:
             from ..voice import shutter
@@ -232,9 +253,12 @@ def main(argv=None) -> int:
     s.add_argument("--angle", type=float, default=0.0, help="degrees the body is rotated from square to the wall (left negative)")
     s.add_argument("--note", default="")
     s.add_argument("--set", default="exposure-checked")
+    s.add_argument("--calibration", default=None, metavar="NAME", help="a CALIBRATION picture: saved in its own protected set ~/g2_wall_calibration/NAME (never mixed with the roam pictures or the ordinary shots, hashed, read-only), for the wall calibration; give --inches")
     s.add_argument("--force", action="store_true")
     s.add_argument("--stay", action="store_true", help="G2 is already standing and stays standing: no stand-up before, no lying down after (faster; the person repositions him between pictures)")
     sub.add_parser("list")
+    v = sub.add_parser("verify", help="re-hash a calibration set and say what changed")
+    v.add_argument("name")
     d = sub.add_parser("delete")
     d.add_argument("numbers", nargs="+", type=int)
     sub.add_parser("empty-trash")
@@ -243,7 +267,14 @@ def main(argv=None) -> int:
         t.add_argument("names", nargs="+")
     a = ap.parse_args(argv)
     if a.cmd == "shot":
+        if a.calibration and a.inches is None:
+            raise SystemExit("a calibration picture needs --inches: the measured distance from the camera lens to the base of the wall")
         return shot(a)
+    if a.cmd == "verify":
+        from . import wall_calibration_set as wcs
+        res = wcs.verify(wcs.set_dir(a.name))
+        print(json.dumps(res))
+        return 0 if res["ok"] else 1
     if a.cmd == "list":
         for k, v in sorted(load_labels(a.dir).items()):
             e = v.get("exposure") or {}

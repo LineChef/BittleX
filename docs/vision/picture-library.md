@@ -23,6 +23,15 @@ Folders
 
 Everything under `training_data/` is local. Back up `promoted/` if the pictures matter; it is small.
 
+Wall pictures
+-------------
+
+Three kinds of wall picture exist, each in its own place, and they do different jobs. Walls are background to the object pipeline, so a wall is never an object class in the review page's Pictures tab.
+
+- Calibration sets: `~/g2_wall_calibration/<set>/` on the Pi, copied to `~/Desktop/G2Memory/g2_pictures/wall_calibration/<set>/` by the sync. These are the only pictures that build the wall calibration. They are taken by hand with `g2calpic SET INCHES`, with the camera at a ruler-measured distance from a flat wall, and nothing else writes there. Each set has a hash manifest, its files are read-only, the picture tools refuse to delete, trash or restore them, the groom never touches them, and `tools/g2_cal_verify.py` pins each set on the Mac the first time it is seen and reports any change, missing file or added file afterwards.
+- Ordinary shots: `~/g2_wall_pics` on the Pi and the loose `shot_*` files in `g2_pictures/wall/` on the Mac, taken by hand with `g2look`. The 43 from before the claw camera are kept as history; they are not a usable yardstick for the claw camera.
+- Roam pictures: `wall/ring/` on the Mac, from the Pi's `~/.local/share/g2/wall_pics`. The wall estimator saves one for every near or blocked look and one clear look every five minutes during any exploration, roam or goal, and the Pi keeps only the newest 20 (the Mac keeps them all). They are for checking the detector, not for calibrating it: they have no measured distance, and they are mostly the detector's own near claims. Label them in the Walls tab (`nothing` for no wall within about a foot) and score a detector on them with `python -m pi_pipeline.vision.wall_replay DIR --score`.
+
 Keeping labels clean
 --------------------
 

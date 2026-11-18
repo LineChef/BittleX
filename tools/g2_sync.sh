@@ -102,6 +102,9 @@ do_task() {
       rsync -a "$G2_PI:g2_wall_pics/" "$MEM/g2_pictures/wall/" 2>/dev/null
       rsync -a "$G2_PI:.local/share/g2/wall_pics/" "$MEM/g2_pictures/wall/ring/" 2>/dev/null
       rsync -a "$G2_PI:.local/share/g2/wall_dryrun.jsonl" "$MEM/g2_pictures/wall/wall_dryrun.jsonl" 2>/dev/null
+      mkdir -p "$MEM/g2_pictures/wall_calibration"            # the calibration sets: their own folder, copied without --delete, pinned and locked read-only (tools/g2_cal_verify.py)
+      rsync -a "$G2_PI:g2_wall_calibration/" "$MEM/g2_pictures/wall_calibration/" 2>/dev/null
+      python3 "$ROOT/tools/g2_cal_verify.py" --quiet || say "WALL CALIBRATION SET DIFFERS from its pinned copy: run python3 tools/g2_cal_verify.py"
       true ;;
     memorydb) G2_PI="$G2_PI" bash "$ROOT/tools/g2_memory_backup.sh" && prune_memorydb ;;
     logs)
