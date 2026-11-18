@@ -126,7 +126,7 @@ def main() -> None:
     elif args.cap > 0:
         chase.ALIGN_CAP_S = min(float(args.cap), 6.0)                 # this process only; never above the 6 s turn limit
     robot = chase.SerialRobot(link)
-    robot.turn_tokens = (f"k{args.token}R", f"k{args.token}L")
+    robot.turn_tokens = robot.lineup_tokens = (f"k{args.token}R", f"k{args.token}L")
     planner = chase.ChasePlanner()
     stop_path = os.path.expanduser(STOP_FILE)
     if os.path.exists(stop_path):

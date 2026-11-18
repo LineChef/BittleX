@@ -855,6 +855,7 @@ def _gyro_robot(deg_per_s, imu=True, coast_deg=1.0):
     def sleep(s): t["now"] += s
     lk = Link()
     r = bc.SerialRobot(lk, sleep=sleep, clock=lambda: t["now"])
+    r.lineup_tokens = ("kwkR", "kwkL")                                              # these tests are about the gyro stop, which is the same for the pivots; the fake link only knows the arc skills
     r.stand_up = lambda: "ok"
     return r, lk
 
@@ -1219,6 +1220,7 @@ def test_a_yaw_spike_at_the_start_of_a_turn_does_not_stop_it(monkeypatch):
     def sleep(s): t["now"] += s
     lk = Link()
     r = bc.SerialRobot(lk, sleep=sleep, clock=lambda: t["now"])
+    r.lineup_tokens = ("kwkR", "kwkL")                                              # the fake link only knows the arc skills
     r.stand_up = lambda: "ok"
     assert r.turn(30.0, 1.0, stop_deg=6.0) == "ok"
     at = {c: when for c, when in lk.sent}

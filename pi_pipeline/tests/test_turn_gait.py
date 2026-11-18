@@ -97,3 +97,28 @@ def test_the_pivot_has_eased_stop_frames_and_the_mirror_for_the_right_pivot():
     right, rmir = eased_stop.gait_frames("kvtR", False)
     assert left and len(left) == 72 and not lmir and right is left and rmir                                            # vtR is the firmware's mirror of vtL
     assert eased_stop.pose_at("kvtR", 0.3, 0.86) is not None
+
+
+def test_the_line_up_turns_use_the_pivot_by_default_and_every_other_turn_keeps_its_own_choice(monkeypatch):
+    monkeypatch.delenv("G2_LINEUP_GAIT", raising=False)
+    monkeypatch.delenv("G2_TURN_GAIT", raising=False)
+    assert opencat.lineup_tokens() == ("kvtR", "kvtL") and opencat.turn_tokens() == ("kwkR", "kwkL")                     # owner, 2026-11-18: the pivot for lining the claw up
+    monkeypatch.setenv("G2_LINEUP_GAIT", "arc")
+    assert opencat.lineup_tokens() == ("kwkR", "kwkL")
+
+    sent = []
+
+    class R(bc.SerialRobot):
+        def __init__(self):
+            self.lineup_tokens, self.turn_tokens = ("kvtR", "kvtL"), ("kwkR", "kwkL")
+
+        def stand_up(self):
+            return "ok"
+
+        def _skill(self, token, seconds, stop_yaw_deg=None):
+            sent.append((token, stop_yaw_deg))
+            return "ok"
+    r = R()
+    r.turn(20.0, 1.0, stop_deg=20.0)                 # a gyro-stopped line-up turn
+    r.turn(-20.0, 1.0)                               # any other (timed) turn
+    assert sent == [("kvtR", 20.0 if bc.ALIGN_YAW_STOP else None), ("kwkL", None)]

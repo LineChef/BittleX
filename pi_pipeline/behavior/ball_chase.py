@@ -859,6 +859,7 @@ class SerialRobot:
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
         self._sag_checked_t: float | None = None          # when the last sag check was made (a standing G2 is checked again every SAG_RECHECK_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
+        self.lineup_tokens = opencat.lineup_tokens()         # (right, left) for the gyro-stopped line-up turns: the pivots by default (link/opencat.lineup_tokens)
         self.turn_tokens = opencat.turn_tokens()             # (right, left): the arc turns, or the pivots with G2_TURN_GAIT=pivot (link/opencat.turn_tokens)
         self.stand_log: list = []                         # one entry per stand-up: where from, the pitch and roll it ended at, and whether it was the repeat (for the journal)
         self._level_retry = False
@@ -1598,7 +1599,7 @@ class SerialRobot:
         or after ALIGN_CAP_S; with no yaw reading the timed `seconds` apply. `last_turn_deg` / `last_turn_s` say what he did."""
         if self.stand_up() == "fell":
             return "fell"
-        right, left = self.turn_tokens                                  # the firmware walking-turn gaits (a curve, not a pivot); the turn calibration swaps in other skills to compare (2026-11-17)
+        right, left = self.lineup_tokens if stop_deg > 0 else self.turn_tokens          # the firmware walking-turn gaits (a curve, not a pivot); the turn calibration swaps in other skills to compare (2026-11-17)
         return self._skill(right if degrees > 0 else left, seconds, stop_yaw_deg=stop_deg if stop_deg > 0 and ALIGN_YAW_STOP else None)
 
     def back(self, seconds: float) -> str:

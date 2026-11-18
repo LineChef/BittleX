@@ -75,6 +75,14 @@ def turn_tokens() -> tuple:
     if os.environ.get("G2_TURN_GAIT", "arc").strip().lower() == "pivot":
         return PIVOT_RIGHT, PIVOT_LEFT
     return WALK_RIGHT, WALK_LEFT
+
+
+def lineup_tokens() -> tuple:
+    """(right, left) turn skills for the ball goal's gyro-stopped LINE-UP turns (the small pulses that point the claw at the ball, and the turns that face it before a walk): the in-place pivots `kvtR` / `kvtL` by default (owner, 2026-11-18: turning in place keeps him at the same distance from the ball), the arc turns with `G2_LINEUP_GAIT=arc`. Every other turn uses `turn_tokens()`."""
+    import os
+    if os.environ.get("G2_LINEUP_GAIT", "pivot").strip().lower() == "arc":
+        return WALK_RIGHT, WALK_LEFT
+    return PIVOT_RIGHT, PIVOT_LEFT
 CARPET_WALK = "kcarpetF"        # OpenCat gait tuned for carpet (higher foot clearance,
                                # different push) -- CarpetDetector switches to this on
                                # sustained slip. See pi_pipeline/gait/carpet.py + carpet_ref.npy.
