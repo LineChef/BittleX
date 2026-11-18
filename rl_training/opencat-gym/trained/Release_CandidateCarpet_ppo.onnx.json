@@ -1,0 +1,14 @@
+{
+ "residual_scale_deg": 30.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "probe_astall3mb_ppo",
+ "exported": "2026-10-20",
+ "heading_blind": true,
+ "levers": [
+  "heading_blind"
+ ],
+ "gait": "carpet",
+ "payload_profile": "pod",
+ "cmd_fwd_on_carpet": 0.1,
+ "note": "carpet-only gait, probe_astall3mb (carpet stall model, adaptive); candidate for hardware test 2026-10-20"
+}

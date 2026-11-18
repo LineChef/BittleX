@@ -68,6 +68,12 @@ rl_training/opencat-gym/robustness_sweep.json
 # V5 (2026-10-09): the live-view stream (watch_live.py) and the runner's report folder (force-add the result JSONs that back a decision)
 rl_training/opencat-gym/trained/live/
 rl_training/opencat-gym/trained/v5_report/
+# Training-phase report folders, candidate exports and probe output: local and regenerable by the phase scripts (force-add a result that backs a decision, as the tracked report files were)
+rl_training/opencat-gym/trained/*_report/
+rl_training/opencat-gym/trained/headprobe/
+rl_training/opencat-gym/trained/HEAVY*cand_ppo.onnx
+rl_training/opencat-gym/trained/CARPET*_cand_ppo.onnx
+rl_training/opencat-gym/trained/CARPETadapt3m_ppo.onnx
 rl_training/opencat-gym/trained/*.jsonl
 
 # Automated-iteration scratch
