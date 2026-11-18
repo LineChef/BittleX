@@ -1102,8 +1102,9 @@ def test_with_the_lever_off_or_no_cycle_the_turn_stops_on_time(monkeypatch, tmp_
 
 def test_the_gyro_stopped_line_up_turn_is_never_lengthened(monkeypatch):
     monkeypatch.setattr(bc, "CYCLE_STOP", True)
+    monkeypatch.setattr(bc, "PIVOT_CYCLE_STOP", True)
     src = __import__("inspect").getsource(bc.SerialRobot._skill)
-    assert "yaw0 is None and CYCLE_STOP" in src
+    assert "yaw0 is None and cycle_stop_for(token)" in src                      # the whole-cycle stop (arc turns and pivots alike) only ever follows a timed move, never a gyro-stopped one
 
 
 def test_the_preposition_asks_the_link_only_when_on(monkeypatch):
