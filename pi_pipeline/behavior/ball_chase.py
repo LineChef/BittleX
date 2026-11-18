@@ -668,7 +668,7 @@ POSE_WAIT_S = {"stand": 6.0, "attention": 3.0}      # the longest wait for a pos
 
 def default_gait() -> str:
     """The walk in use: "policy" (the learned walk) or "firmware" (Petoi's scripted arm gait, `kwkF`). Decided by the one rule every mode uses, `gait/gait_mode.walk_choice` (owner, 2026-11-13: tile or the
-    high step plays the learned V7 policy, hardwood the scripted walk); `G2_DEFAULT_GAIT` still sets the default for a floor with no rule."""
+    high step plays the learned ARMW policy, hardwood the scripted walk); `G2_DEFAULT_GAIT` still sets the default for a floor with no rule."""
     try:
         from ..gait import gait_mode
         return gait_mode.walk_choice()[0]

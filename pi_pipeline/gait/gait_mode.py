@@ -122,7 +122,7 @@ def allowed_gaits() -> list:
 
 
 def mode_policy(mode: str) -> str | None:
-    """The learned policy a gait plays AS IT IS (no scripted base): the profile's `hi_step_policy` for the high step ("G2, switch to high step": the trained V7 policy for the arm, owner 2026-11-13;
+    """The learned policy a gait plays AS IT IS (no scripted base): the profile's `hi_step_policy` for the high step ("G2, switch to high step": the arm's trained ARMW policy, owner 2026-11-18 (V7 before);
     `G2_HIGHSTEP_POLICY` overrides), else None (the gait is played the way it always was)."""
     if mode != "hi_step":
         return None
@@ -130,7 +130,7 @@ def mode_policy(mode: str) -> str | None:
 
 
 def floor_policy(floor: str | None) -> str | None:
-    """The learned policy the profile names for a floor (the arm: tile -> V7), else None (the default walk). `G2_FLOOR_POLICIES` (`tile=Release_CandidateV7_ppo.onnx,...`) overrides."""
+    """The learned policy the profile names for a floor (the arm: tile -> ARMW), else None (the default walk). `G2_FLOOR_POLICIES` (`tile=Release_CandidateARMW_ppo.onnx,...`) overrides."""
     fl = (floor or "").strip().lower()
     if not fl:
         return None
@@ -142,7 +142,7 @@ def floor_policy(floor: str | None) -> str | None:
 def walk_choice(floor: str = "auto") -> tuple:
     """THE walking gait, decided in one place for every mode (owner, 2026-11-13): (kind, policy name or None, why). kind "policy" is the learned walk (through PolicyWalker; the name picks the policy file,
     None the attachment's own), "firmware" is Petoi's scripted walk (the arm's `wkArmF`). In order: a spoken gait ("high step" plays its policy; carpet and a scripted high step go through PolicyWalker as
-    before); else the floor label (the arm on tile walks the V7 policy); else the default gait (scripted for the arm unless `G2_DEFAULT_GAIT=policy`)."""
+    before); else the floor label (the arm on tile walks the ARMW policy); else the default gait (scripted for the arm unless `G2_DEFAULT_GAIT=policy`)."""
     mode = current()
     pol = mode_policy(mode)
     if pol:
@@ -241,7 +241,7 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
     if gait not in allowed_gaits():                       # a gait this attachment is held away from: refused (None) with the reason
         return None, _held_message()
     set_mode(gait, path)
-    if mode_policy(gait):                                 # the high step with a learned policy of its own (the arm: V7): played as that policy, no scripted base
+    if mode_policy(gait):                                 # the high step with a learned policy of its own (the arm: ARMW): played as that policy, no scripted base
         return gait, f"{GAITS[gait].echo_on} I am using my trained walking policy."
     if not supports(policy_onnx, gait):
         if not GAITS[gait].scripted_fallback:             # carpet on a policy that never learned it: its normal walk, said out loud
@@ -273,7 +273,7 @@ def floor_note(label: str | None, path: str | None = None) -> str:
         return " " + GAITS["carpet"].echo_on if after == "carpet" else " Back to my default gait."
     fp = floor_policy(label)
     if fp and after == DEFAULT:
-        return " I will walk with my trained walking policy on this floor."          # the floor rule (the arm on tile: V7); a spoken gait still wins
+        return " I will walk with my trained walking policy on this floor."          # the floor rule (the arm on tile: ARMW); a spoken gait still wins
     if (label or "").strip().lower() and (_profile().get("floor_policies") and after == DEFAULT):
         return " I will use my scripted walk on this floor."
     return ""

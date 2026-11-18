@@ -100,7 +100,7 @@ class PolicyWalker:
                     extra["on_contact"] = self._on_contact
             from . import gait_mode
             mode = gait_mode.current()
-            _kind, _pname, _why = gait_mode.walk_choice()                      # the walk every mode uses (gait/gait_mode.py): the high step or a tile floor plays a named learned policy (the arm: V7)
+            _kind, _pname, _why = gait_mode.walk_choice()                      # the walk every mode uses (gait/gait_mode.py): the high step or a tile floor plays a named learned policy (the arm: ARMW)
             if _pname:
                 _pf = gait_mode.policy_file(_pname)
                 if _pf:

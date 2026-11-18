@@ -87,9 +87,9 @@
       "normal",
       "hi_step"
     ],
-    "hi_step_policy": "Release_CandidateV7_ppo.onnx",
+    "hi_step_policy": "Release_CandidateARMW_ppo.onnx",
     "floor_policies": {
-      "tile": "Release_CandidateV7_ppo.onnx"
+      "tile": "Release_CandidateARMW_ppo.onnx"
     }
   }
 }
