@@ -829,6 +829,7 @@ class SerialRobot:
         self.last_preposition: dict | None = None         # what the pre-position did before the last skill
         self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
         self.last_turn_deg: float | None = None
+        self.last_turn_trace: list = []                # (seconds since the turn started, yaw in deg) for every new yaw reading of the last gyro-watched turn: what the board really sent (2026-11-18: the counted turn angle did not match the real rotation, in opposite directions on the two sides)
         self.last_turn_spikes = 0                      # yaw jumps the last turn ignored as too fast to be real (each one throws away the yaw counted so far: data first, 2026-11-18)
         self.last_turn_signed: float | None = None     # the same turn with its sign (the IMU's yaw change: + is the way the board counts up), so a log can say which way a skill really turned him
         self.last_turn_s: float | None = None
@@ -1068,6 +1069,8 @@ class SerialRobot:
         self.last_turn_deg, self.last_turn_s, self.last_turn_end = None, None, None
         self.last_turn_signed = None
         self.last_turn_spikes = 0
+        trace: list = []
+        self.last_turn_trace = trace
         yaw0 = None
         if stop_yaw_deg is not None:
             self._sleep(0.15)                             # a few frames, so there is a yaw to count from
@@ -1094,6 +1097,8 @@ class SerialRobot:
             if yaw0 is not None:
                 if self._yaw is not None and self._yaw != last_yaw:
                     last_yaw, yaw_moved_t = self._yaw, self._clock()
+                    if len(trace) < 400:
+                        trace.append((round(yaw_moved_t - t0, 3), round(self._yaw, 1)))
                 elif self._clock() - yaw_moved_t > YAW_STALE_S and self._clock() - t0 >= seconds:
                     ended_by = "stale"                    # no new yaw: the IMU print is quiet, so the gyro cannot end this turn; the timed length does (a full run to the cap turned 50 degrees or more)
                     break

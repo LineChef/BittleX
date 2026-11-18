@@ -566,6 +566,7 @@ def test_the_turn_calibration_logs_which_way_the_gyro_says_each_turn_went():
     class R(WatchRobot):
         last_turn_deg, last_turn_s, last_turn_end = 40.0, 1.0, "gyro"
         last_turn_signed = -40.0
+        last_turn_trace = [(0.1, 1.0), (0.2, -3.0)]
         _roll, _pitch = [0.0, 1.0], [0.0, 1.0]
 
         def _tilt(self, *a, **k): return (0.0, 0.0)
@@ -573,6 +574,7 @@ def test_the_turn_calibration_logs_which_way_the_gyro_says_each_turn_went():
     lines = []
     out = tc.run_turn_cal(R(), asks=(45.0,), repeats=1, say=lines.append, sleep=lambda s: None)
     assert [t["got_signed"] for t in out["trials"]] == [-40.0, -40.0] and any("yaw change -40.0" in x for x in lines)
+    assert out["trials"][0]["yaw_trace"] == [(0.1, 1.0), (0.2, -3.0)]                                  # the raw yaw readings of each turn are kept with the trial
     seen = []
 
     class T(R):

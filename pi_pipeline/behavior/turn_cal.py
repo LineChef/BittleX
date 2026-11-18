@@ -65,7 +65,7 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, timed_s: fl
                             secs = timed_s / 1.5                                         # the turn runs 1.5 x its length at most, and ALIGN_CAP_S is set to timed_s: it runs exactly timed_s with the gyro only counting
                         state = robot.turn(sign * ask, secs, stop_deg=ask)
                         roll, pitch = list(getattr(robot, "_roll", []) or []), list(getattr(robot, "_pitch", []) or [])
-                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "timed_s": timed_s or None, "spikes": getattr(robot, "last_turn_spikes", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
+                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "yaw_trace": list(getattr(robot, "last_turn_trace", []) or []), "timed_s": timed_s or None, "spikes": getattr(robot, "last_turn_spikes", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
                              "ended_by": getattr(robot, "last_turn_end", None), "tilt_before": [round(x, 1) for x in before] if before else None,
                              "roll_swing": round(max(roll) - min(roll), 1) if roll else 0.0, "pitch_swing": round(max(pitch) - min(pitch), 1) if pitch else 0.0}
                         if look is not None:
