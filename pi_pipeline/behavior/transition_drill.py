@@ -219,7 +219,7 @@ def run_attention_stands(robot, cycles: int, *, say=print, sleep=time.sleep, hol
     return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "swings": swings, "end_tilts": ends, "poses": poses}
 
 
-MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF")
+MEASURE_GAITS = ("kwkL", "kwkR", "kwkF", "kbkF", "kvtL", "kvtR")
 MEASURE_S = 4.0
 
 

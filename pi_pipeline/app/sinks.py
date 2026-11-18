@@ -159,9 +159,9 @@ class WalkerSink:
             return
         self._firmware()
         if bias >= self._thr:
-            self._send_once(opencat.WALK_RIGHT)
+            self._send_once(opencat.WALK_RIGHT)      # steering while walking: a curve, not a turn
         elif bias <= -self._thr:
-            self._send_once(opencat.WALK_LEFT)
+            self._send_once(opencat.WALK_LEFT)      # steering while walking: a curve, not a turn
         else:
             self._send_once(opencat.skill("wkF"))
 
@@ -177,7 +177,7 @@ class WalkerSink:
         dur = min(9.0 if urgent else self.TURN_MAX_S, math.degrees(abs(r)) * self.TURN_GAIN / self._turn_rate(side))      # an urgent turn-around may take up to 9 s
         self._firmware()
         self._last = ""
-        self._send_once(opencat.WALK_RIGHT if r >= 0 else opencat.WALK_LEFT)
+        self._send_once(opencat.turn_tokens()[0] if r >= 0 else opencat.turn_tokens()[1])      # the one turn-skill choice (link/opencat.turn_tokens)
         self._turn_until = self._clock() + dur
         log.info("timed turn %s %.0f deg for %.1f s", side, math.degrees(abs(r)), dur)
         self._watch_turn(side, math.degrees(abs(r)), dur)

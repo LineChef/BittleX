@@ -29,7 +29,7 @@ floor lost entirely -> FREEZE and call a human.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..link import opencat
@@ -75,8 +75,8 @@ class CliffGuardConfig:
                                    #   (a turn sweeps the body/legs toward it) -> FREEZE.
                                    #   Must be < stop_dist so a turn-away band exists.
                                    #   Tune to the real turn's body-sweep radius.
-    turn_left_token: str = opencat.WALK_LEFT    # or "kang <deg>" once IMU-closed-loop
-    turn_right_token: str = opencat.WALK_RIGHT  #   turning is tuned on hardware
+    turn_left_token: str = field(default_factory=lambda: opencat.turn_tokens()[1])    # the one turn-skill choice (link/opencat.turn_tokens); or "kang <deg>" once IMU-closed-loop
+    turn_right_token: str = field(default_factory=lambda: opencat.turn_tokens()[0])   #   turning is tuned on hardware
     backup_token: str = opencat.WALK_BACKWARD
 
 

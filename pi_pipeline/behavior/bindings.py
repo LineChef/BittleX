@@ -111,7 +111,7 @@ class DriverBindings:
             fn = self.actuator and _call(self.actuator, "perform")
             if not fn:
                 return self._miss("turn")
-            fn(opencat.WALK_RIGHT if rad >= 0 else opencat.WALK_LEFT)
+            fn(opencat.turn_tokens()[0] if rad >= 0 else opencat.turn_tokens()[1])
             return f"turn_token:{'R' if rad >= 0 else 'L'}"
         if k is EffectKind.HEAD:
             fn = self.head and _call(self.head, "move", "set", "head")

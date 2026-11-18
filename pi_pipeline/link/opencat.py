@@ -64,6 +64,17 @@ STAND = "kup"                   # neutral standing posture
 WALK_LEFT = "kwkL"              # arc turn left: a curved walk (steps forward while turning), not a pivot
 WALK_RIGHT = "kwkR"            # mirror of wkL
 WALK_BACKWARD = "kbkF"          # walk backward
+PIVOT_LEFT = "kvtL"             # the firmware pivot: turns him in place (decoded 2026-11-18: 72 frames, a closed cycle that starts and ends near the balance stand); `kvtR` is its mirror
+PIVOT_RIGHT = "kvtR"
+PIVOTS = (PIVOT_RIGHT, PIVOT_LEFT)
+
+
+def turn_tokens() -> tuple:
+    """(right, left) turn skills for every turn G2 makes: the arc turns `kwkR` / `kwkL` by default, the in-place pivots `kvtR` / `kvtL` when `G2_TURN_GAIT=pivot` (owner, 2026-11-18: a switch, off until the pivot is proven in the ball goal). The one place that picks the turn skill."""
+    import os
+    if os.environ.get("G2_TURN_GAIT", "arc").strip().lower() == "pivot":
+        return PIVOT_RIGHT, PIVOT_LEFT
+    return WALK_RIGHT, WALK_LEFT
 CARPET_WALK = "kcarpetF"        # OpenCat gait tuned for carpet (higher foot clearance,
                                # different push) -- CarpetDetector switches to this on
                                # sustained slip. See pi_pipeline/gait/carpet.py + carpet_ref.npy.

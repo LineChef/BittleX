@@ -11,6 +11,7 @@ only call it. This script fails when a mode builds its own.
     R3  a fall threshold written as a number other than pi_pipeline/body.py's FALL_DEG (`fall_deg=` / `fall_abort_deg=`)
     R6  a mode reading `settings.default_gait` to choose the walk instead of asking gait_mode.walk_choice()
     R8  a second claw follow: follow_loop( or LiveFollower( called anywhere but behavior/active_look.py (every mode that follows with the claw calls active_look.run_active_look with its own tracking method)
+    R9  a turn skill picked outside link/opencat.turn_tokens(): `opencat.WALK_LEFT` / `WALK_RIGHT` in a mode file (every turn G2 makes uses the one choice, arc or pivot; steering while walking says `steering` on its line)
     R7  a `MODE-SPECIFIC(...)` exception in the code that docs/specification/mode-exceptions.md does not list (the owner's explicit request, with the date)
   RATCHET (known today, listed in tools/mode_check_baseline.json; a NEW one is an error, fixing one means removing it from the baseline)
     R4  a mode file sends a stand / rest / attention command itself (send("kup" | "kbalance" | "kcalib" | "krest" | "d")) instead of calling the standard move
@@ -36,6 +37,7 @@ MODE_FILES = {"explore_session.py", "punt_launch.py", "goal_launch.py"}
 STANDARD_HOMES = {"behavior/ball_chase.py", "behavior/claw_survey.py"}            # the standard moves live here (SerialRobot: stand_up, sit_down, stand_from_sit, rest)
 FOLLOW_HOMES = {"behavior/active_look.py", "behavior/live_follow.py"}                # the shared active look, and the module that defines the follow loop it uses
 FOLLOW_CALL = re.compile(r"\b(follow_loop|LiveFollower)\(")
+TURN_SKILL = re.compile(r"\bopencat\.WALK_(LEFT|RIGHT)\b")
 LOOK_NAMES = re.compile(r"^\s*def\s+(run_claw_look|claw_scan|claw_look_sequence)\b", re.M)
 SEND_BODY = re.compile(r"""\b(?:send|_tx|_write_pose)\(\s*["'](kup|kbalance|kcalib|krest|d)["']""")
 FALL_NUM = re.compile(r"\b(fall_deg|fall_abort_deg)\s*[:=]\s*(?:float\s*=\s*)?([0-9]+(?:\.[0-9]+)?)")
@@ -100,6 +102,8 @@ def violations() -> list[dict]:
                     add("R3", n, f"a fall threshold of {m.group(2)}: the body's is {fall:g} (pi_pipeline/body.py)", True)
             if rel not in ("config.py", "gait/gait_mode.py") and "settings.default_gait" in line:
                 add("R6", n, "the walk (learned or scripted) is chosen by gait_mode.walk_choice(), the one rule every mode uses; do not read settings.default_gait", True)
+            if is_mode(rel) and TURN_SKILL.search(line) and "steering" not in line and not line.lstrip().startswith("#"):
+                add("R9", n, "a turn skill chosen here: use opencat.turn_tokens() (the one arc or pivot choice every mode shares)", True)
             if is_mode(rel) and rel not in STANDARD_HOMES and SEND_BODY.search(line):
                 add("R4", n, "a mode sends a stand / rest / attention command itself instead of calling the standard move", False)
         for m in re.finditer(r"\bStandGuard\(", text):

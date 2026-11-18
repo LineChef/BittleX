@@ -33,6 +33,7 @@ from typing import Callable, Protocol
 
 from . import gait_cycle
 from ..body import FALL_DEG
+from ..link import opencat
 from . import ball_color_store
 from ..vision import miss_log
 from ..vision.ball_finder import BallReading, find_ball
@@ -251,6 +252,7 @@ ALIGN_FAR_DEG = 6.0
 ALIGN_CONFIRM_IN = 5.0         # at this range or closer a line-up turn is sized from two pictures that agree (the bearing swings 25 to 40 degrees from one picture to the next at 2 to 4 in: the camera is on the claw)
 ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; otherwise look once more and use the newest
 
+PIVOT_ALIGN_CAP_S = 4.0        # the same cap for the pivot gait (kvtL / kvtR): its slower side needs about 4 s for a 40 degree turn (2026-11-18 turn calibration); the arc turns keep ALIGN_CAP_S
 ALIGN_CAP_S = 1.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
 ALIGN_YAW_STOP = os.environ.get("G2_ALIGN_YAW_STOP", "1").strip().lower() not in ("0", "off", "false", "no")      # `0`: the line-up turns are timed (from the learned turn pace) instead of stopped on the yaw (owner's idea, 2026-11-08)
 YAW_SPIKE_RATE_DEG_S = 120.0   # a yaw change faster than this (plus the margin) cannot be a real turn (they run at about 30 deg/s): it is a sensor spike and is ignored. 2026-11-08: "asked 6.0 deg, got 22.4 deg in 0.02 s"
@@ -708,6 +710,11 @@ def align_stop_at(want_deg: float, coast_deg: float | None = None) -> float:
     """The yaw change at which a gyro-stopped turn is ended; `coast_deg` is the coast learned from this session's turns (None = ALIGN_COAST_DEG)."""
     return max(0.0, want_deg - align_stop_lead(want_deg, coast_deg))
 
+def align_cap_for(token: str) -> float:
+    """The longest a gyro-stopped turn with this skill may run: ALIGN_CAP_S for the arc turns, at least PIVOT_ALIGN_CAP_S for the pivots (a calibration may raise ALIGN_CAP_S for both)."""
+    return max(ALIGN_CAP_S, PIVOT_ALIGN_CAP_S) if token in ("kvtL", "kvtR") else ALIGN_CAP_S
+
+
 def _yaw_diff(a: float, b: float) -> float:
     """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
     return (a - b + 180.0) % 360.0 - 180.0
@@ -842,7 +849,7 @@ class SerialRobot:
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
         self._sag_checked_t: float | None = None          # when the last sag check was made (a standing G2 is checked again every SAG_RECHECK_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
-        self.turn_tokens = ("kwkR", "kwkL")                  # (right, left)
+        self.turn_tokens = opencat.turn_tokens()             # (right, left): the arc turns, or the pivots with G2_TURN_GAIT=pivot (link/opencat.turn_tokens)
         self.stand_log: list = []                         # one entry per stand-up: where from, the pitch and roll it ended at, and whether it was the repeat (for the journal)
         self._level_retry = False
         self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
@@ -1085,7 +1092,7 @@ class SerialRobot:
         t0, state = self._clock(), "ok"
         limit = seconds
         if yaw0 is not None:
-            limit = max(ALIGN_CAP_S, 1.5 * seconds)
+            limit = max(align_cap_for(token), 1.5 * seconds)
         spikes = 0
         ended_by = "timed" if yaw0 is None else "cap"
         stopped_at = None
@@ -1118,7 +1125,7 @@ class SerialRobot:
         ran = self._clock() - t0
         n_imu = min(len(self._imu_t), len(self._roll))
         self.last_move_imu = (list(self._imu_t[-n_imu:]) if n_imu else [], list(self._roll[-n_imu:]) if n_imu else [], list(self._pitch[-n_imu:]) if n_imu else [])      # the gait's own frames, before the stop and the stillness after it (the cycle measurement reads them)
-        if state != "fell" and yaw0 is None and CYCLE_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF"):
+        if state != "fell" and yaw0 is None and CYCLE_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF", "kvtL", "kvtR"):
             state = self._finish_cycle(token, ran)
             ran = self._clock() - t0
         if state != "fell" and yaw0 is None and EASED_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF"):

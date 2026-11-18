@@ -76,7 +76,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..link import opencat
@@ -110,8 +110,8 @@ class JamGuardConfig:
     min_forward_cmd: float = 0.04  # |forward command| below this -> not "walking forward"
 
     back_off_token: str = opencat.WALK_BACKWARD
-    turn_left_token: str = opencat.WALK_LEFT
-    turn_right_token: str = opencat.WALK_RIGHT
+    turn_left_token: str = field(default_factory=lambda: opencat.turn_tokens()[1])     # the one turn-skill choice (link/opencat.turn_tokens)
+    turn_right_token: str = field(default_factory=lambda: opencat.turn_tokens()[0])
 
 
 class JamGuard:
