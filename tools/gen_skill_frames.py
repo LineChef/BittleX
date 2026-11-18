@@ -51,7 +51,7 @@ def build(text: str) -> dict:
 
 
 GAIT_OUT = ROOT / "pi_pipeline" / "link" / "gait_frames.json"
-GAITS = ("wkL", "wkF", "bkF", "wkArmL", "wkArmF", "bkArmF")          # the gaits the Pi stops out of (a turn right is wkL mirrored): every frame, for the eased stop (behavior/eased_stop.py)
+GAITS = ("wkL", "wkF", "bkF", "wkArmL", "wkArmF", "bkArmF", "vtL")          # the gaits the Pi stops out of (a turn right is wkL mirrored): every frame, for the eased stop (behavior/eased_stop.py)
 
 
 def build_gaits(text: str) -> dict:

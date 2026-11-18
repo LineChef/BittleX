@@ -252,6 +252,9 @@ ALIGN_FAR_DEG = 6.0
 ALIGN_CONFIRM_IN = 5.0         # at this range or closer a line-up turn is sized from two pictures that agree (the bearing swings 25 to 40 degrees from one picture to the next at 2 to 4 in: the camera is on the claw)
 ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; otherwise look once more and use the newest
 
+PIVOT_TOKENS = ("kvtL", "kvtR")
+PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP
+PIVOT_LEAN_DEG = float(os.environ.get("G2_PIVOT_LEAN_DEG", "8"))      # (owner, 2026-11-18) nose-up beyond this many degrees right after a pivot: the legs have let go on the back legs, so he is laid in rest and stood up from rest at once (recover_sag) instead of sitting unstable until the next move; 0 turns it off
 PIVOT_ALIGN_CAP_S = 4.0        # the same cap for the pivot gait (kvtL / kvtR): its slower side needs about 4 s for a 40 degree turn (2026-11-18 turn calibration); the arc turns keep ALIGN_CAP_S
 ALIGN_CAP_S = 1.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
 ALIGN_YAW_STOP = os.environ.get("G2_ALIGN_YAW_STOP", "1").strip().lower() not in ("0", "off", "false", "no")      # `0`: the line-up turns are timed (from the learned turn pace) instead of stopped on the yaw (owner's idea, 2026-11-08)
@@ -710,6 +713,13 @@ def align_stop_at(want_deg: float, coast_deg: float | None = None) -> float:
     """The yaw change at which a gyro-stopped turn is ended; `coast_deg` is the coast learned from this session's turns (None = ALIGN_COAST_DEG)."""
     return max(0.0, want_deg - align_stop_lead(want_deg, coast_deg))
 
+def cycle_stop_for(token: str) -> bool:
+    """Whether a timed move with this skill keeps going to a whole gait cycle before it stops: the pivots by PIVOT_CYCLE_STOP, the arc turns and walks by CYCLE_STOP (unproven, off)."""
+    if token in PIVOT_TOKENS:
+        return PIVOT_CYCLE_STOP
+    return CYCLE_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF")
+
+
 def align_cap_for(token: str) -> float:
     """The longest a gyro-stopped turn with this skill may run: ALIGN_CAP_S for the arc turns, at least PIVOT_ALIGN_CAP_S for the pivots (a calibration may raise ALIGN_CAP_S for both)."""
     return max(ALIGN_CAP_S, PIVOT_ALIGN_CAP_S) if token in ("kvtL", "kvtR") else ALIGN_CAP_S
@@ -1125,10 +1135,10 @@ class SerialRobot:
         ran = self._clock() - t0
         n_imu = min(len(self._imu_t), len(self._roll))
         self.last_move_imu = (list(self._imu_t[-n_imu:]) if n_imu else [], list(self._roll[-n_imu:]) if n_imu else [], list(self._pitch[-n_imu:]) if n_imu else [])      # the gait's own frames, before the stop and the stillness after it (the cycle measurement reads them)
-        if state != "fell" and yaw0 is None and CYCLE_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF", "kvtL", "kvtR"):
+        if state != "fell" and yaw0 is None and cycle_stop_for(token):
             state = self._finish_cycle(token, ran)
             ran = self._clock() - t0
-        if state != "fell" and yaw0 is None and EASED_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF"):
+        if state != "fell" and yaw0 is None and EASED_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF", "kvtL", "kvtR"):
             state = self._eased_stop(token, self._clock() - t0)
         if state != "fell" and yaw0 is None and self._calm_before_stop() == "fell":          # (a gyro-stopped line-up turn is ended on its yaw at once: waiting would turn it further)
             state = "fell"
@@ -1148,6 +1158,9 @@ class SerialRobot:
                 if ended_by == "gyro" and stopped_at is not None:
                     self._learn_coast(self.last_turn_deg - stopped_at)
         self.last_turn_end = ended_by if stop_yaw_deg is not None else None
+        self.last_end_tilt, self.last_lean_fix, self.last_turn_arm = None, False, None
+        if token in PIVOT_TOKENS and state != "fell":
+            self._after_pivot()
         self.last_turn_spikes = spikes if stop_yaw_deg is not None else 0
         if yaw0 is None and drift0 is not None and token in ("kwkF", "kbkF", "kbkR", "kbkL") and self._yaw is not None:
             self.last_drift_deg = _yaw_diff(self._yaw, drift0)
@@ -1180,6 +1193,17 @@ class SerialRobot:
         self._sleep(0.5)                                  # the body settles before a picture
         self._posed_at = self._clock()
         return "ok"
+
+    def _after_pivot(self) -> None:
+        """Right after a pivot (data first, 2026-11-18): the body's (pitch, roll) and where the arm is are kept in `last_end_tilt` / `last_turn_arm`, and a nose-up lean past PIVOT_LEAN_DEG (he is sitting on the back legs) is put right at once with the same recover_sag every flow uses: laid in rest and stood up from rest, the eased stand-up only."""
+        self.last_turn_arm = tuple(self._claw)
+        t = self._tilt(FINAL_TILT_S)
+        self.last_end_tilt = None if t is None else (round(t[0], 1), round(t[1], 1))
+        if t is not None and PIVOT_LEAN_DEG > 0 and t[0] < -PIVOT_LEAN_DEG and not self._already_fell(t):
+            log.warning("after the pivot he leans back (pitch %+.0f deg, more than %.0f nose up): laid down and stood up again", t[0], PIVOT_LEAN_DEG)
+            self.last_lean_fix = True
+            self.pivot_lean_fixes = getattr(self, "pivot_lean_fixes", 0) + 1
+            self.recover_sag(t)
 
     def _tilt(self, seconds: float = 0.5):
         """The body's (pitch, roll) in degrees, the median of the IMU lines over `seconds` (the stream is switched on for it and off again), or None."""

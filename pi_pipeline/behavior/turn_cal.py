@@ -67,7 +67,7 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, timed_s: fl
                             secs = timed_s                                               # a plain timed turn (no gyro stop): the only kind the whole-cycle stop applies to
                         state = robot.turn(sign * ask, secs, stop_deg=0.0 if nogyro else ask)
                         roll, pitch = list(getattr(robot, "_roll", []) or []), list(getattr(robot, "_pitch", []) or [])
-                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "yaw_trace": list(getattr(robot, "last_turn_trace", []) or []), "timed_s": timed_s or None, "spikes": getattr(robot, "last_turn_spikes", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
+                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "yaw_trace": list(getattr(robot, "last_turn_trace", []) or []), "tilt_after": getattr(robot, "last_end_tilt", None), "arm": getattr(robot, "last_turn_arm", None), "lean_fixed": bool(getattr(robot, "last_lean_fix", False)), "timed_s": timed_s or None, "spikes": getattr(robot, "last_turn_spikes", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
                              "ended_by": getattr(robot, "last_turn_end", None), "tilt_before": [round(x, 1) for x in before] if before else None,
                              "roll_swing": round(max(roll) - min(roll), 1) if roll else 0.0, "pitch_swing": round(max(pitch) - min(pitch), 1) if pitch else 0.0}
                         if look is not None:
@@ -120,7 +120,7 @@ def main() -> None:
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")
         return
     if args.cycle_stop:
-        chase.CYCLE_STOP = args.cycle_stop == "on"
+        chase.CYCLE_STOP = chase.PIVOT_CYCLE_STOP = args.cycle_stop == "on"
     if args.timed > 0:
         chase.ALIGN_CAP_S = min(args.timed, 6.0)
     elif args.cap > 0:

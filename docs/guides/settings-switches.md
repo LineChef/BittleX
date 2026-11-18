@@ -27,6 +27,8 @@ Exploration and walls
 - `G2_FLOOR_POLICIES`: Default: the attachment profile's `floor_policies` (the arm: tile plays the ARMW policy, see [STATUS](../STATUS.md)); What it does: a floor label to a learned policy file, `tile=<policy file>,hardwood=<policy file>`; a floor with no entry walks the default gait (the arm: Petoi's scripted walk)
 - `G2_HIGHSTEP_POLICY`: Default: the attachment profile's `hi_step_policy` (the arm: the ARMW policy, see [STATUS](../STATUS.md)); What it does: the learned policy that "G2, switch to high step" plays
 - `G2_TURN_GAIT`: Default: `arc` (the firmware's `kwkR` / `kwkL` turns); What it does: `pivot` makes every turn in every mode use the in-place pivot gait (`kvtR` / `kvtL`) instead; the choice is made in one place, `link/opencat.turn_tokens`; the pivot has its own 4 second turn cap; Steering while walking is unaffected.
+- `G2_PIVOT_CYCLE_STOP`: Default: on; What it does: a timed pivot keeps going to the end of its 0.86 second cycle before it stops, so the legs end near the balance stand (turns stopped by the gyro are not affected); the arc turns use `G2_CYCLE_STOP` instead.
+- `G2_PIVOT_LEAN_DEG`: Default: 8; What it does: after a pivot, a nose-up lean of more than this many degrees lays him down and stands him up again at once (the eased stand-up); 0 turns the check off.
 - `G2_CLAW_LATE_S`: Default: 4; What it does: a claw look this many seconds past its plan skips the side pictures and lowers the claw
 - `G2_EXPLORE_HANDOVER`: Default: on; What it does: `0` stops "explore" from handing over to an exploration session
 - `G2_EXPLORE_REQUEST`: Default: on; What it does: G2 asks "Can I go exploring?" after idling in the voice service and walks only on a yes. `0` turns the asking off
