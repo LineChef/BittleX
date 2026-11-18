@@ -17,7 +17,7 @@ function allIn(group){return group.length>0&&group.every(q=>sel.has(q.path))}
 
 // ---- the page parts, made when first needed
 let mode="pictures";
-let wlab=null,wgo=null;
+let wlab=null,wgo=null,both=null;
 let bar=null,rooms=null,msg=null,inp=null,go=null,names=null,ninp=null,ngo=null,acc=null;
 function ensureBar(){
  if(bar||typeof document==="undefined")return;
@@ -33,15 +33,16 @@ function ensureBar(){
  go=el("button","btn","Set room");go.style.cssText="background:var(--accent);color:#fff;border-color:var(--accent)";
  ninp=document.createElement("input");ninp.type="text";ninp.setAttribute("list","selnames");ninp.placeholder="What is it? (dishwasher, mug, ...)";ninp.setAttribute("aria-label","Name for the selected pictures");
  ngo=el("button","btn","Name them");ngo.style.cssText="background:var(--accent);color:#fff;border-color:var(--accent)";
+ both=el("button","btn","Apply");both.style.cssText="background:var(--accent);color:#fff;border-color:var(--accent)";both.title="Set the room and the name together (fill in either one or both)";
  acc=el("button","btn","Accept G2's guesses");acc.title="Name each selected picture with the label G2 suggested for it (pictures with no guess are left alone)";
  wlab=document.createElement("input");wlab.type="text";wlab.placeholder="What do they show? (wall, door, chair, ...)";wlab.setAttribute("aria-label","Label for the selected wall pictures");
  wgo=el("button","btn","Label them");wgo.style.cssText="background:var(--accent);color:#fff;border-color:var(--accent)";wgo.onclick=applyWall;
  wlab.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();applyWall()}else if(ev.key==="Escape"){sel.clear();last=null;update()}};
  const none=el("button","btn","Clear selection"),hint=el("span","meta","Shift-click a second picture to pick everything between.");
- go.onclick=apply;ngo.onclick=applyName;acc.onclick=acceptGuesses;none.onclick=()=>{sel.clear();last=null;update()};
- inp.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();apply()}else if(ev.key==="Escape"){sel.clear();last=null;update()}};
- ninp.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();applyName()}else if(ev.key==="Escape"){sel.clear();last=null;update()}};
- bar.append(msg,inp,rooms,go,ninp,names,ngo,acc,wlab,wgo,none,hint);document.body.append(bar)}
+ go.onclick=applyBoth;ngo.onclick=applyBoth;both.onclick=applyBoth;acc.onclick=acceptGuesses;none.onclick=()=>{sel.clear();last=null;update()};
+ inp.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();applyBoth()}else if(ev.key==="Escape"){sel.clear();last=null;update()}};
+ ninp.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();applyBoth()}else if(ev.key==="Escape"){sel.clear();last=null;update()}};
+ bar.append(msg,inp,rooms,ninp,names,both,acc,wlab,wgo,none,hint);document.body.append(bar)}
 function knownNames(){const t=new Set();try{for(const p of data){if(p.name)t.add(p.name);if(p.guess&&p.guess.label)t.add(p.guess.label)}}catch(e){}if(window.lastName)t.add(window.lastName);return[...t].sort()}
 function roomNames(){const s=new Set();try{for(const p of data)if(p.room)s.add(p.room)}catch(e){}if(window.lastRoom)s.add(window.lastRoom);return[...s].sort()}
 async function apply(){
@@ -54,6 +55,18 @@ async function applyWall(){                                                     
  try{for(const p of ps)await api("/api/walls/label",{path:p.path,label:l,distance_in:p.distance_in==null?null:p.distance_in,note:p.note||""});sel.clear();last=null;wlab.value="";toast("Labelled "+ps.length+" wall picture(s): "+l);load()}catch(e){toast("Failed: "+e.message);load()}}
 function selected(){return [...sel].map(path=>reg.get(path)).filter(Boolean).map(r=>r.p)}
 function undoNames(done){return async()=>{await api("/api/pictures/move",{pairs:done.flatMap(r=>r.named.map(m=>[m.to,m.from]))})}}
+async function applyBoth(){                                                                // the room and the name for everything picked, in one go (either box may be left empty)
+ const room=(inp.value||"").trim().toLowerCase(),nm=(ninp.value||"").trim().replace(/\s+/g," ");
+ if(!room&&!nm){toast("Type a room, a name, or both");return}
+ const ps=selected();if(!ps.length){sel.clear();update();return}
+ const rp=ps.filter(p=>p.group!=="looks");let prevRooms=null,named=null;
+ try{
+  if(room&&rp.length){prevRooms=await setRooms(rp,room,true)}
+  if(nm){named=await api("/api/pictures/name",{paths:ps.map(p=>p.path),name:nm});window.lastName=nm}
+ }catch(e){toast("Failed: "+e.message);load();return}
+ sel.clear();last=null;inp.value="";ninp.value="";
+ const what=[room&&rp.length?"room "+room:"",nm?"named "+nm:""].filter(Boolean).join(", ");
+ toast(ps.length+" picture(s): "+what,async()=>{if(named)await undoNames([named])();if(prevRooms)await api("/api/pictures/room",{rooms:prevRooms});load()});load()}
 async function applyName(){                                                                // one name for everything picked
  const nm=(ninp.value||"").trim().replace(/\s+/g," ");if(!nm){toast("Type the name first");ninp.focus();return}
  const ps=selected();if(!ps.length){sel.clear();update();return}
@@ -68,8 +81,8 @@ function update(){
  for(const [path,r] of reg){const on=sel.has(path);if(r.input.checked!==on)r.input.checked=on;r.card.classList.toggle("picked",on)}
  for(const f of groupRefresh)f();
  if(!bar)return;const n=sel.size;
- const w=mode==="walls",lk=mode==="looks";for(const e of [inp,go])e.style.display=w||lk?"none":"";for(const e of [ninp,ngo,acc])e.style.display=w?"none":"";for(const e of [wlab,wgo])e.style.display=w?"":"none";bar.style.display=n?"flex":"none";document.body.classList.toggle("hasselbar",n>0);
- if(n){msg.textContent=n+" selected";wgo.textContent="Label "+n;go.textContent="Set room for "+n;ngo.textContent="Name "+n;const g=selected().filter(p=>p.guess&&p.guess.label&&!p.name).length;acc.textContent="Accept G2's guesses ("+g+")";acc.disabled=!g;
+ const w=mode==="walls",lk=mode==="looks";inp.style.display=w||lk?"none":"";for(const e of [ninp,both,acc])e.style.display=w?"none":"";for(const e of [wlab,wgo])e.style.display=w?"":"none";bar.style.display=n?"flex":"none";document.body.classList.toggle("hasselbar",n>0);
+ if(n){msg.textContent=n+" selected";wgo.textContent="Label "+n;both.textContent="Apply to "+n;const g=selected().filter(p=>p.guess&&p.guess.label&&!p.name).length;acc.textContent="Accept G2's guesses ("+g+")";acc.disabled=!g;
   names.replaceChildren(...knownNames().map(x=>{const o=document.createElement("option");o.value=x;return o}));if(!inp.value&&window.lastRoom)inp.placeholder="Room for these (last used: "+window.lastRoom+")";rooms.replaceChildren(...roomNames().map(r=>{const o=document.createElement("option");o.value=r;return o}))}}
 let groupRefresh=[];
 
