@@ -28,8 +28,8 @@ class WatchConfig(StopLostConfig):
     """The ball's follow: the shared stop-or-lost rule's numbers (behavior/active_look.py) plus the ball's own."""
     lost_turn_deg: float = 40.0        # the turn the caller makes toward the last-seen side (the goal now turns by the last bearing)
     jump_deg: float = 30.0             # a sighting this far from where the tracking filter expects the ball, soon after the last one, must be seen twice before the claw follows it
-    lead_s: float = 0.5                # the claw aims this far ahead of the rolling ball (its bearing speed times this); 0 = off
-    coast_s: float = 1.0               # with no sighting in a picture, the claw keeps following the filter's prediction for this long after the last sighting; 0 = off
+    lead_s: float = 0.9                # the claw aims this far ahead of the rolling ball (its bearing speed times this); 0 = off. (owner-approved 2026-11-17, set 2026-11-18: the follow calibration measured 0.8 to 1.0 s from a claw command to the picture it shows; it was 0.5)
+    coast_s: float = 1.5               # with no sighting in a picture, the claw keeps following the filter's prediction for this long after the last sighting; 0 = off. (it was 1.0: with a 0.8 to 1.0 s delay a picture or two with no ball is normal)
 
 
 @dataclass

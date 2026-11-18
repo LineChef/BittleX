@@ -589,3 +589,9 @@ def test_a_tiny_blob_is_not_a_ball_in_the_stream():
     buf = io.BytesIO()
     im.save(buf, "JPEG", quality=95)
     assert BallTarget().detections(buf.getvalue()) == []
+
+
+def test_the_ball_watch_leads_and_coasts_by_the_measured_command_to_picture_delay():
+    """The follow calibration (2026-11-17) measured 0.8 to 1.0 s from a claw command to the picture that shows it: the lead matches it, and the coast bridges a picture or two with no ball."""
+    cfg = pw.WatchConfig()
+    assert cfg.lead_s == 0.9 and cfg.coast_s == 1.5
