@@ -77,12 +77,22 @@ def turn_tokens() -> tuple:
     return WALK_RIGHT, WALK_LEFT
 
 
-def lineup_tokens() -> tuple:
-    """(right, left) turn skills for the ball goal's gyro-stopped LINE-UP turns (the small pulses that point the claw at the ball, and the turns that face it before a walk): the in-place pivots `kvtR` / `kvtL` by default (owner, 2026-11-18: turning in place keeps him at the same distance from the ball), the arc turns with `G2_LINEUP_GAIT=arc`. Every other turn uses `turn_tokens()`."""
+def lineup_tokens(ball_in=None) -> tuple:
+    """(right, left) turn skills for the ball goal's gyro-stopped LINE-UP turns (the pulses that point the claw at the ball, and the turns that face it before a walk). Owner, 2026-11-18: use both. `G2_LINEUP_GAIT`
+    is `auto` (default): the in-place pivots `kvtR` / `kvtL` while the ball is between `G2_PIVOT_MIN_IN` (5) and `G2_PIVOT_MAX_IN` (14) inches away (far enough that the pivot's small push forward does not shove
+    the ball, near enough that the camera's bearing is good), the arc turns `kwkR` / `kwkL` everywhere else and whenever the distance is unknown; `arc` or `pivot` force one of them. Every other turn uses `turn_tokens()`."""
     import os
-    if os.environ.get("G2_LINEUP_GAIT", "pivot").strip().lower() == "arc":
-        return WALK_RIGHT, WALK_LEFT
-    return PIVOT_RIGHT, PIVOT_LEFT
+    mode = os.environ.get("G2_LINEUP_GAIT", "auto").strip().lower()
+    if mode == "pivot":
+        return PIVOT_RIGHT, PIVOT_LEFT
+    if mode == "auto" and ball_in is not None:
+        try:
+            lo, hi = float(os.environ.get("G2_PIVOT_MIN_IN", "5")), float(os.environ.get("G2_PIVOT_MAX_IN", "14"))
+        except ValueError:
+            lo, hi = 5.0, 14.0
+        if lo <= float(ball_in) <= hi:
+            return PIVOT_RIGHT, PIVOT_LEFT
+    return WALK_RIGHT, WALK_LEFT
 CARPET_WALK = "kcarpetF"        # OpenCat gait tuned for carpet (higher foot clearance,
                                # different push) -- CarpetDetector switches to this on
                                # sustained slip. See pi_pipeline/gait/carpet.py + carpet_ref.npy.

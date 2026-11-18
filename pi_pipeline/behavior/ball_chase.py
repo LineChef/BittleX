@@ -255,6 +255,9 @@ ALIGN_CONFIRM_IN = 5.0         # at this range or closer a line-up turn is sized
 ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; otherwise look once more and use the newest
 
 PIVOT_TOKENS = ("kvtL", "kvtR")
+PIVOT_CYCLE_S = 0.86            # one pivot cycle (72 frames), measured on G2 2026-11-18; the measured file (gait_cycles.json) wins when it has it
+PIVOT_DEG_PER_CYCLE = 20.0      # about how far one pivot cycle turns him, either side (2026-11-18 pictures and eye: 35 to 40 deg in 1.5 s); the camera corrects what is left
+PIVOT_MAX_CYCLES = 2            # a pivot line-up turn is one or two cycles (about 20 or 40 deg), then a new picture
 PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP
 PIVOT_LEAN_DEG = float(os.environ.get("G2_PIVOT_LEAN_DEG", "8"))      # (owner, 2026-11-18) nose-up beyond this many degrees right after a pivot: the legs have let go on the back legs, so he is laid in rest and stood up from rest at once (recover_sag) instead of sitting unstable until the next move; 0 turns it off
 PIVOT_ALIGN_CAP_S = 4.0        # the same cap for the pivot gait (kvtL / kvtR): its slower side needs about 4 s for a 40 degree turn (2026-11-18 turn calibration); the arc turns keep ALIGN_CAP_S
@@ -881,7 +884,8 @@ class SerialRobot:
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
         self._sag_checked_t: float | None = None          # when the last sag check was made (a standing G2 is checked again every SAG_RECHECK_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
-        self.lineup_tokens = opencat.lineup_tokens()         # (right, left) for the gyro-stopped line-up turns: the pivots by default (link/opencat.lineup_tokens)
+        self.lineup_tokens: tuple | None = None              # (right, left) forced for the gyro-stopped line-up turns (the turn calibration); None: opencat.lineup_tokens(the ball's distance) decides, arcs far and pivots in the band
+        self.lineup_ball_in: float | None = None             # how far the ball was at the decision the next line-up turn belongs to (the run loop sets it)
         self.turn_tokens = opencat.turn_tokens()             # (right, left): the arc turns, or the pivots with G2_TURN_GAIT=pivot (link/opencat.turn_tokens)
         self.stand_log: list = []                         # one entry per stand-up: where from, the pitch and roll it ended at, and whether it was the repeat (for the journal)
         self._level_retry = False
@@ -1650,8 +1654,24 @@ class SerialRobot:
         or after ALIGN_CAP_S; with no yaw reading the timed `seconds` apply. `last_turn_deg` / `last_turn_s` say what he did."""
         if self.stand_up() == "fell":
             return "fell"
-        right, left = self.lineup_tokens if stop_deg > 0 else self.turn_tokens          # the firmware walking-turn gaits (a curve, not a pivot); the turn calibration swaps in other skills to compare (2026-11-17)
-        return self._skill(right if degrees > 0 else left, seconds, stop_yaw_deg=stop_deg if stop_deg > 0 and ALIGN_YAW_STOP else None)
+        right, left = (self.lineup_tokens or opencat.lineup_tokens(self.lineup_ball_in)) if stop_deg > 0 else self.turn_tokens          # the firmware walking-turn gaits (a curve, not a pivot); the turn calibration swaps in other skills to compare (2026-11-17)
+        token = right if degrees > 0 else left
+        if stop_deg > 0 and token in PIVOT_TOKENS:
+            return self._pivot_cycles(token, stop_deg, degrees > 0)
+        return self._skill(token, seconds, stop_yaw_deg=stop_deg if stop_deg > 0 and ALIGN_YAW_STOP else None)
+
+    def _pivot_cycles(self, token: str, want_deg: float, right: bool) -> str:
+        """A line-up turn with the pivot (owner, 2026-11-18): a whole number of its 0.86 s cycles, about PIVOT_DEG_PER_CYCLE degrees each, sized from the bearing, one or two at most, with no gyro stop (the gyro read a pivot
+        at 0.4 to 1.3 times its real size, and a gyro-stopped pivot asked for 20 turned 48 plus 32 of coast and flipped him). The run is cut short of the last cycle and the whole-cycle stop (PIVOT_CYCLE_STOP) carries it
+        to the boundary, so the legs end level. `last_turn_deg` is the estimate, `last_turn_end` says "cycles"."""
+        period, _src = gait_cycle.period_for(token, [], [], [])
+        period = period or PIVOT_CYCLE_S
+        n = max(1, min(PIVOT_MAX_CYCLES, int(round(want_deg / PIVOT_DEG_PER_CYCLE))))
+        state = self._skill(token, (n - 0.25) * period, stop_yaw_deg=None)
+        if state != "fell":
+            self.last_turn_deg, self.last_turn_end = n * PIVOT_DEG_PER_CYCLE, "cycles"
+            self.last_turn_signed = (1 if right else -1) * self.last_turn_deg
+        return state
 
     def back(self, seconds: float) -> str:
         if self.stand_up() == "fell":
@@ -2238,13 +2258,14 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             planner.track.clear()
             state = robot.turn(act.degrees, act.seconds)
         elif act.kind in ("turn", "search_turn", "align"):
+            robot.lineup_ball_in = None if ball is None else float(ball.distance_in)          # the line-up turn picks arc or pivot by how far the ball is (link/opencat.lineup_tokens)
             state = robot.turn(act.degrees, act.seconds, stop_deg=act.stop_deg) if act.stop_deg > 0 else robot.turn(act.degrees, act.seconds)
             last_turn_got = getattr(robot, "last_turn_deg", None)
             if act.kind in ("turn", "align"):
                 planner.track.turned((1 if act.degrees > 0 else -1) * (last_turn_got if last_turn_got is not None else (act.stop_deg if act.stop_deg > 0 else abs(act.degrees))))      # the ball is that far round
             else:
                 planner.track.clear()                                                    # a search turn: it is not about the ball
-            if ball is not None:
+            if ball is not None and getattr(robot, "last_turn_end", None) != "cycles":          # (a pivot of whole cycles is not the arc turn the pace book measures)
                 last_move = ("turn", getattr(robot, "last_turn_s", None) or act.seconds, act.degrees, ball)      # a gyro-stopped turn ran for its own time, not the timed fallback
         elif act.kind == "sidestep":
             planner.track.clear()

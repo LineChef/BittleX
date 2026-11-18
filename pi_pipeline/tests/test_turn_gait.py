@@ -99,26 +99,55 @@ def test_the_pivot_has_eased_stop_frames_and_the_mirror_for_the_right_pivot():
     assert eased_stop.pose_at("kvtR", 0.3, 0.86) is not None
 
 
-def test_the_line_up_turns_use_the_pivot_by_default_and_every_other_turn_keeps_its_own_choice(monkeypatch):
-    monkeypatch.delenv("G2_LINEUP_GAIT", raising=False)
-    monkeypatch.delenv("G2_TURN_GAIT", raising=False)
-    assert opencat.lineup_tokens() == ("kvtR", "kvtL") and opencat.turn_tokens() == ("kwkR", "kwkL")                     # owner, 2026-11-18: the pivot for lining the claw up
+def test_the_line_up_turn_uses_both_gaits_the_pivot_only_in_a_band_and_the_switch_can_force_either(monkeypatch):
+    for k in ("G2_LINEUP_GAIT", "G2_TURN_GAIT", "G2_PIVOT_MIN_IN", "G2_PIVOT_MAX_IN"):
+        monkeypatch.delenv(k, raising=False)
+    arc, piv = ("kwkR", "kwkL"), ("kvtR", "kvtL")
+    assert opencat.lineup_tokens() == arc and opencat.lineup_tokens(None) == arc                    # distance unknown: the arc
+    assert opencat.lineup_tokens(20.0) == arc and opencat.lineup_tokens(14.5) == arc                # far: the arc
+    assert opencat.lineup_tokens(14.0) == piv and opencat.lineup_tokens(8.0) == piv and opencat.lineup_tokens(5.0) == piv     # the band: the pivot, a bit away from the ball
+    assert opencat.lineup_tokens(4.9) == arc and opencat.lineup_tokens(3.0) == arc                  # right up against the ball: never the pivot (it pushes him forward a little)
     monkeypatch.setenv("G2_LINEUP_GAIT", "arc")
-    assert opencat.lineup_tokens() == ("kwkR", "kwkL")
+    assert opencat.lineup_tokens(8.0) == arc
+    monkeypatch.setenv("G2_LINEUP_GAIT", "pivot")
+    assert opencat.lineup_tokens(30.0) == piv
+    monkeypatch.setenv("G2_LINEUP_GAIT", "auto")
+    monkeypatch.setenv("G2_PIVOT_MIN_IN", "6")
+    monkeypatch.setenv("G2_PIVOT_MAX_IN", "10")
+    assert opencat.lineup_tokens(5.5) == arc and opencat.lineup_tokens(10.0) == piv and opencat.lineup_tokens(10.5) == arc
+    assert opencat.turn_tokens() == arc                                                              # every other turn is unaffected
 
+
+def test_a_line_up_turn_in_the_band_is_whole_pivot_cycles_and_outside_it_the_gyro_stopped_arc(monkeypatch):
+    for k in ("G2_LINEUP_GAIT", "G2_TURN_GAIT", "G2_PIVOT_MIN_IN", "G2_PIVOT_MAX_IN", "G2_GAIT_CYCLE_S"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(bc.gait_cycle, "period_for", lambda *a, **k: (None, "none"))                 # no measured period: the 0.86 s default
     sent = []
 
     class R(bc.SerialRobot):
         def __init__(self):
-            self.lineup_tokens, self.turn_tokens = ("kvtR", "kvtL"), ("kwkR", "kwkL")
+            self.lineup_tokens, self.lineup_ball_in, self.turn_tokens = None, None, ("kwkR", "kwkL")
 
         def stand_up(self):
             return "ok"
 
         def _skill(self, token, seconds, stop_yaw_deg=None):
-            sent.append((token, stop_yaw_deg))
+            sent.append((token, round(seconds, 3), stop_yaw_deg))
             return "ok"
     r = R()
-    r.turn(20.0, 1.0, stop_deg=20.0)                 # a gyro-stopped line-up turn
-    r.turn(-20.0, 1.0)                               # any other (timed) turn
-    assert sent == [("kvtR", 20.0 if bc.ALIGN_YAW_STOP else None), ("kwkL", None)]
+    r.lineup_ball_in = 10.0
+    r.turn(22.0, 1.0, stop_deg=22.0)                                   # one cycle (about 20 deg)
+    assert sent[-1] == ("kvtR", round(0.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 20.0 and r.last_turn_end == "cycles" and r.last_turn_signed == 20.0
+    r.turn(-45.0, 1.0, stop_deg=45.0)                                  # two cycles, never more
+    assert sent[-1] == ("kvtL", round(1.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 40.0 and r.last_turn_signed == -40.0
+    r.turn(8.0, 1.0, stop_deg=8.0)                                     # a small one is still a whole cycle (the camera corrects what is left)
+    assert sent[-1][0] == "kvtR" and r.last_turn_deg == 20.0
+    r.lineup_ball_in = 3.0
+    r.turn(8.0, 1.0, stop_deg=8.0)                                     # right up against the ball: the arc, stopped on the gyro as before
+    assert sent[-1][0] == "kwkR" and sent[-1][2] == (8.0 if bc.ALIGN_YAW_STOP else None)
+    r.lineup_ball_in = 30.0
+    r.turn(-20.0, 1.0, stop_deg=20.0)
+    assert sent[-1][0] == "kwkL"
+    r.lineup_ball_in = 10.0
+    r.turn(-20.0, 1.0)                                                 # a timed turn (no stop_deg) is not a line-up: its own choice
+    assert sent[-1][0] == "kwkL"
