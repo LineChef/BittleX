@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+import sys
 import threading
+import time
 import weakref
 
 from .heading_hold import default_foot_hold   # noqa: E402  -- re-exported: the everyday walks' default steering foot
@@ -59,6 +61,7 @@ class PolicyWalker:
         self._on_contact = on_contact            # called with the event dict when the hit-level IMU contact fires (the behaviour driver starts the hit sequence)
         self._on_fall = on_fall                  # called when a walk ended because G2 fell (the exploration halts instead of walking on, 2026-10-07)
         self._thread: threading.Thread | None = None
+        self._stopped_by = ""                  # who asked the running walk to stop (module.function), for the "policy walk ended" line
         self._stop = _Stop()
         self._lock = threading.Lock()
         _WALKERS.add(self)
@@ -74,6 +77,7 @@ class PolicyWalker:
         return t is not None and t.is_alive()
 
     def _run(self, seconds: float) -> None:
+        t0 = time.monotonic()
         try:
             run = self._run_fn
             if run is None:
@@ -129,6 +133,7 @@ class PolicyWalker:
                     log.info("carpet mode: %s at %.3f m/s", extra["policy_path"], cmd)
                 reason = run(self._link, cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
                              on_battery=self._on_battery, **extra)
+            log.info("policy walk ended: %s after %.1f s%s", reason, time.monotonic() - t0, self._stopped_by)      # why every walk ends, in every mode (2026-11-18: seven of twelve walks ended before the first step and the log did not say why)
             if reason == "fall" and self._on_fall is not None:
                 try:
                     self._on_fall()
@@ -152,6 +157,7 @@ class PolicyWalker:
             if self.busy:
                 return True
             self._stop = _Stop()
+            self._stopped_by = ""
             if self._hold:
                 self._stop.rest, self._stop.end_pose = False, "balance"
             secs = min(float(seconds), MAX_SECONDS) if seconds else MAX_SECONDS
@@ -165,6 +171,8 @@ class PolicyWalker:
             t = self._thread
             if t is None or not t.is_alive():
                 return
+            f = sys._getframe(1)
+            self._stopped_by = " (stop asked by %s.%s, rest=%s)" % (f.f_globals.get("__name__", "?").rsplit(".", 1)[-1], f.f_code.co_name, rest)
             self._stop.rest = rest
             if rest:
                 self._stop.end_pose = None

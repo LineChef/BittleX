@@ -589,7 +589,8 @@ class BehaviorDriver:
         blocked = w.state == "blocked"
         ahead = w.near_groups >= AHEAD_GROUPS and w.ahead_votes >= 2         # two of the five column groups of one picture read 24 in or closer on two of the newest three looks: a wall is ahead (a one-off glare reading is not)
         very_near = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN
-        if not (blocked or ahead or very_near or (w.state == "near" and w.confirmed)):
+        agree = w.near_groups >= AHEAD_GROUPS      # a close reading needs two column groups behind it (2026-11-18, tile: one group read 8 in off a grout line, 15 of 18 near looks, and cancelled the walk each time); the IMU contact still handles a real bump
+        if not (blocked or ahead or (very_near and agree) or (w.state == "near" and w.confirmed and agree)):
             return None
         if self._steer_repeats(now, w.nearest_in):
             return self._hit_wall(i, now, force=f"wall turned away from {self.STEER_REPEAT_N} times in {self.STEER_REPEAT_S:g} s and still {w.nearest_in if w.nearest_in is not None else 0:g} in ahead")

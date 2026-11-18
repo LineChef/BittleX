@@ -17,7 +17,7 @@ def _explorer(monkeypatch, steer="1"):
     return d, c
 
 
-def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5, groups=0, votes=None, prev=None, prev_age=None):
+def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5, groups=2, votes=None, prev=None, prev_age=None):
     return WallReading(c() - age, state, inches, turn, confirmed, groups, (2 if groups >= 3 else 0) if votes is None else votes, prev, prev_age)
 
 
@@ -146,13 +146,16 @@ def test_a_wall_turn_cancels_a_turn_that_is_already_running():
     assert len(link.sent) == n + 1
 
 
-def test_a_wall_ahead_is_acted_on_at_24_inches_when_three_groups_agree_and_at_12_inches_from_a_single_look(monkeypatch):
+def test_a_wall_ahead_is_acted_on_at_24_inches_when_three_groups_agree_and_at_12_inches_from_a_single_look_with_two_groups(monkeypatch):
     d, c = _explorer(monkeypatch)
     t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=3, turn="right")))
     assert [p for p in payloads(t, EffectKind.TURN) if p > 0] and ChirpMood.AVOID in payloads(t, EffectKind.CHIRP)        # three groups at 24 in or closer
     c.adv(6.0)
     t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=10.0, confirmed=False, groups=1, turn="left")))
-    assert [p for p in payloads(t, EffectKind.TURN) if p < 0]                                                         # one look at 12 in or closer is enough
+    assert not payloads(t, EffectKind.TURN)                                                                           # one group alone is not believed, however close (user, 2026-11-18: grout lines on tile read 8 in)
+    c.adv(6.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=10.0, confirmed=False, groups=2, turn="left")))
+    assert [p for p in payloads(t, EffectKind.TURN) if p < 0]                                                         # one look at 12 in or closer with two groups behind it is enough
     c.adv(6.0)
     t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=2)))
     assert ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP)                                                       # two groups at 24 in is not yet a wall ahead
@@ -285,3 +288,9 @@ def test_turns_away_from_walls_at_different_distances_do_not_count_as_a_loop(mon
         t = d.tick(DriverInputs(frame=[], wall=_wall(c, inches=inches, turn="right")))
         assert not [p for p in payloads(t, EffectKind.DIAG) if p[0] == "wall.hit"]
         c.adv(5.0)
+
+
+def test_a_single_group_reading_does_not_turn_him_even_when_confirmed_on_two_looks_in_a_row(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=8.0, confirmed=True, groups=1, turn="right")))
+    assert not payloads(t, EffectKind.TURN)                                                                           # the 2026-11-18 tile roam: 15 of 18 near looks had one group at 8 in and the rest far
