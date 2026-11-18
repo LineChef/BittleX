@@ -154,6 +154,11 @@ class Remote:
 
     def sync_pictures(self) -> str:
         CACHE.mkdir(parents=True, exist_ok=True)
+        try:                                                           # edits waiting on this Mac go to the Pi first, or the pull would bring back the pictures just named or moved
+            import g2_review_queue
+            g2_review_queue.apply(None, self.pi)
+        except Exception:  # noqa: BLE001
+            pass
         r = subprocess.run(["rsync", "-a", f"{self.pi}:.local/share/g2/explore_pictures/", str(CACHE) + "/"], capture_output=True, text=True, timeout=300)
         return "ok" if r.returncode == 0 else (r.stderr.strip().splitlines() or ["no pictures yet"])[-1]
 

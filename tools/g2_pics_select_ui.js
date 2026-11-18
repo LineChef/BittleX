@@ -75,7 +75,7 @@ let groupRefresh=[];
 
 window.picSelect={
  begin(on,m){reg=new Map();groupRefresh=[];mode=m||"pictures";if(on)ensureBar()},
- targets(p){return sel.has(p.path)&&sel.size>1?selected():[p]},                                // a card's own Name / Room button acts on every ticked picture when the card itself is ticked
+ targets(p){const t=selected();return t.length?t:[p]},                                // a card's own Name / Room button acts on every ticked picture whenever any are ticked (the prompt says how many)
  clear(){sel.clear();last=null;update()},                                  // the page is being drawn again: the boxes are made again
  attach(card,p,group){                                                                       // a box on one picture
   const input=document.createElement("input");input.type="checkbox";input.className="selbox";input.title="Pick this picture (Shift-click another to pick everything between)";input.setAttribute("aria-label","Pick this picture");
