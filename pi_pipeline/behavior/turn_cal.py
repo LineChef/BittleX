@@ -96,6 +96,7 @@ def main() -> None:
     ap.add_argument("--asks", default="6,10,20")
     ap.add_argument("--repeats", type=int, default=2)
     ap.add_argument("--token", choices=("wk", "vt", "cr", "tr"), default="wk", help="the skill family to turn with: wk = kwkL/kwkR (the chase's), vt = kvtL/kvtR (a candidate pivot), cr, tr")
+    ap.add_argument("--cap", type=float, default=0.0, help="the longest one turn may run, in seconds, for this calibration only (0 = the ball goal's own cap, ALIGN_CAP_S): longer pivots show whether a turn stays in place")
     ap.add_argument("--ball", action="store_true", help="a ball fixed 14 to 20 in straight ahead: the camera measures how far each turn moves him forward")
     args = ap.parse_args()
     from ..link import imu_print
@@ -111,6 +112,8 @@ def main() -> None:
     if not imu_print.board_answers(link):
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was moved.")
         return
+    if args.cap > 0:
+        chase.ALIGN_CAP_S = min(float(args.cap), 6.0)                 # this process only; never above the 6 s turn limit
     robot = chase.SerialRobot(link)
     robot.turn_tokens = (f"k{args.token}R", f"k{args.token}L")
     planner = chase.ChasePlanner()
