@@ -829,6 +829,7 @@ class SerialRobot:
         self.last_preposition: dict | None = None         # what the pre-position did before the last skill
         self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
         self.last_turn_deg: float | None = None
+        self.last_turn_signed: float | None = None     # the same turn with its sign (the IMU's yaw change: + is the way the board counts up), so a log can say which way a skill really turned him
         self.last_turn_s: float | None = None
         self._coast_deg: float | None = None             # the learned coast of a gyro-stopped turn (None = ALIGN_COAST_DEG until the first one)
         self.last_drift_deg: float | None = None         # how far the last plain walk or back-up turned him (the firmware yaw's change; the sign is the board's), None when there was no yaw reading
@@ -1064,6 +1065,7 @@ class SerialRobot:
         self._pitch, self._roll = [], []
         self._tx("gP")
         self.last_turn_deg, self.last_turn_s, self.last_turn_end = None, None, None
+        self.last_turn_signed = None
         yaw0 = None
         if stop_yaw_deg is not None:
             self._sleep(0.15)                             # a few frames, so there is a yaw to count from
@@ -1127,6 +1129,7 @@ class SerialRobot:
             self._fell()                                  # the last frames: where the yaw ended once the body had stopped
             if self._yaw is not None:
                 self.last_turn_deg, self.last_turn_s = abs(_yaw_diff(self._yaw, yaw0)), ran
+                self.last_turn_signed = _yaw_diff(self._yaw, yaw0)
                 log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s (ended by %s)", stop_yaw_deg, self.last_turn_deg, ran, ended_by)
                 if ended_by == "gyro" and stopped_at is not None:
                     self._learn_coast(self.last_turn_deg - stopped_at)

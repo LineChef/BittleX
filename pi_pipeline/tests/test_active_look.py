@@ -557,3 +557,19 @@ def test_the_turn_calibration_measures_forward_travel_from_a_fixed_ball_and_the_
     out = tc.run_turn_cal(R(), asks=(6.0,), repeats=1, say=lambda *_: None, sleep=lambda s: None, look=lambda: next(seen, None))
     t = out["trials"][0]
     assert t["fwd_in"] == round(18.0 - 15.0 * 0.985, 1) and out["trials"][1].get("fwd_in") is None               # the 2nd look found no ball: no number, no crash
+
+
+def test_the_turn_calibration_logs_which_way_the_gyro_says_each_turn_went():
+    """2026-11-18: the pivot test counted only the size of each turn, so it could not say whether a right command really turned him right; each trial now carries the signed yaw change."""
+    from pi_pipeline.behavior import turn_cal as tc
+
+    class R(WatchRobot):
+        last_turn_deg, last_turn_s, last_turn_end = 40.0, 1.0, "gyro"
+        last_turn_signed = -40.0
+        _roll, _pitch = [0.0, 1.0], [0.0, 1.0]
+
+        def _tilt(self, *a, **k): return (0.0, 0.0)
+        def turn(self, degrees, seconds, stop_deg=0.0): return "ok"
+    lines = []
+    out = tc.run_turn_cal(R(), asks=(45.0,), repeats=1, say=lines.append, sleep=lambda s: None)
+    assert [t["got_signed"] for t in out["trials"]] == [-40.0, -40.0] and any("yaw change -40.0" in x for x in lines)

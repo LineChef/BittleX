@@ -63,7 +63,7 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, say=print, 
                         secs = max(0.3, ask / rate(side))
                         state = robot.turn(sign * ask, secs, stop_deg=ask)
                         roll, pitch = list(getattr(robot, "_roll", []) or []), list(getattr(robot, "_pitch", []) or [])
-                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "ran_s": getattr(robot, "last_turn_s", None),
+                        t = {"asked": ask, "dir": "right" if sign > 0 else "left", "state": state, "got": getattr(robot, "last_turn_deg", None), "got_signed": None if getattr(robot, "last_turn_signed", None) is None else round(robot.last_turn_signed, 1), "ran_s": getattr(robot, "last_turn_s", None),
                              "ended_by": getattr(robot, "last_turn_end", None), "tilt_before": [round(x, 1) for x in before] if before else None,
                              "roll_swing": round(max(roll) - min(roll), 1) if roll else 0.0, "pitch_swing": round(max(pitch) - min(pitch), 1) if pitch else 0.0}
                         if look is not None:
@@ -74,7 +74,7 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, say=print, 
                                 t["side_in"] = round(after[1] - seen[1], 1)
                             seen = after
                         res["trials"].append(t)
-                        say(f"turn {t['dir']} asked {ask:g}: got {t['got']} deg in {t['ran_s']} s, ended by {t['ended_by']}, roll swing {t['roll_swing']}, pitch swing {t['pitch_swing']}, forward {t.get('fwd_in')} in, state {state}")
+                        say(f"turn {t['dir']} asked {ask:g}: got {t['got']} deg (yaw change {t['got_signed']}) in {t['ran_s']} s, ended by {t['ended_by']}, roll swing {t['roll_swing']}, pitch swing {t['pitch_swing']}, forward {t.get('fwd_in')} in, state {state}")
                         if state == "fell" or robot._fell():
                             res["ended"] = "fell"
                             return res
