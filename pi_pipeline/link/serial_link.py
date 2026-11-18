@@ -95,7 +95,15 @@ class SerialLink:
         self._imu = collections.deque(maxlen=64)
         self._other = collections.deque(maxlen=64)      # non-IMU lines seen by poll_imu(), see pop_other()
         self._fb = collections.deque(maxlen=16)         # `f` servo-feedback rows: a stream (~5 rows/s) that runs until the next command, never a reply
-        from ..telemetry.scripted_walks import ScriptedWalkLog
+        try:
+            from ..telemetry.scripted_walks import ScriptedWalkLog
+        except ImportError:                       # scripts run by path (run_gait.py, so g2walk) import this file as link.serial_link: no package above it (2026-11-18: g2walk failed at start)
+            import importlib.util as _ilu
+            _p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telemetry", "scripted_walks.py")
+            _spec = _ilu.spec_from_file_location("g2_scripted_walks", _p)
+            _mod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)
+            ScriptedWalkLog = _mod.ScriptedWalkLog
         self._scripted_walks = ScriptedWalkLog()
 
     @staticmethod
