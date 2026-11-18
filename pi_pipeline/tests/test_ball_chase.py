@@ -1,5 +1,6 @@
 """The green-ball finder and the chase loop (2026-10-25). Synthetic pictures (a grey floor and a lime disc), a fake robot and a fake camera: no hardware, no network."""
 import io
+import math
 
 import numpy as np
 import pytest
@@ -89,8 +90,8 @@ def test_planner_turns_then_walks_then_punts():
     a = p.decide(reading(30, -20)); assert a.kind == "turn" and a.degrees < 0
     a = p.decide(reading(30, 3)); assert a.kind == "walk" and bc.MIN_MOVE_S <= a.seconds <= bc.WALK_MAX_S
     a = p.decide(reading(3, 3)); assert a.kind == "punt"
-    a = p.decide(reading(3, 16)); assert a.kind == "align"                                         # near and off line: a small turn to line up before the punt
-    p.track.turned(16.0)                                                                             # (the run loop tells the track the turn he made)
+    a = p.decide(reading(3, 16)); assert a.kind == "punt"                                          # 3 in is inside the camera's blind range (4 in): the tracked bearing (3 deg, from the last good picture) answers, not the camera's 16 deg (owner, 2026-11-18)
+    a = bc.ChasePlanner().decide(reading(6, 16)); assert a.kind == "align"                          # where the camera is good, near and off line: a small turn to line up before the punt
     a = p.decide(reading(1.5, 0)); assert a.kind == "punt"                                           # too close to punt
 
 
@@ -1480,3 +1481,52 @@ def test_sag_recovery_lies_down_in_rest_and_never_goes_through_the_attention_pos
     r.posture = "stand"
     assert r.recover_sag((0.0, 22.0)) == "ok"
     assert "krest" in lk.sent and bc.CLAW_LOOK_POSE not in lk.sent and lk.sent.index("krest") < lk.sent.index("kbalance")
+
+
+def test_a_ball_that_vanishes_after_being_seen_far_off_the_claws_axis_is_not_at_the_claw():
+    """Owner, 2026-11-18: the ball was last seen +21 deg off, then vanished; he said "it is at the claw" and punted at an empty spot."""
+    p = bc.ChasePlanner()
+    p.decide(reading(3, 21))
+    a = p.decide(None)
+    assert a.kind in ("claw_look", "look") and "not at the claw" in a.why and a.kind != "punt"
+    q = bc.ChasePlanner()
+    q.decide(reading(3, 4))
+    assert q.decide(None).kind == "punt"                                                           # last seen straight ahead: it really is at the claw
+
+
+def test_a_sag_recovery_never_sends_a_stand_up_to_a_body_that_has_fallen(monkeypatch):
+    """2026-11-18: the lie-down from a rolled stand flipped him to 178 deg and the stand-up was sent anyway."""
+    sent = []
+
+    class R:
+        _fall_rad = math.radians(bc.FALL_DEG)
+        _lk = None
+        posture = "stand"
+        _sleep = staticmethod(lambda s: None)
+        _clock = staticmethod(lambda: 0.0)
+        last_fall = None
+
+        def claw_pose(self, *a, **k): return "ok"
+        def _tx(self, c, *a, **k): sent.append(c)
+        def _tilt(self, s): return (0.0, 178.0)
+        def _stand_up_from(self, pose): sent.append("STAND"); return "ok"
+        _already_fell = bc.SerialRobot._already_fell
+    monkeypatch.setattr(bc, "wait_for_pose", lambda *a, **k: "rest")
+    r = R()
+    assert bc.SerialRobot.rest_then_stand(r) == "fell" and "STAND" not in sent and r.posture == "rest"
+
+
+def test_every_sag_is_logged_with_what_he_was_doing_lately(tmp_path, monkeypatch):
+    """Owner, 2026-11-18: a line per sag (tilt, time since the stand-up and the last move, the last skill, gait seconds in the last 60 and 180 s, arm, pack) to find what the servo protection reacts to."""
+    import collections
+    import json
+    monkeypatch.setenv("G2_SAG_LOG", str(tmp_path / "sag.jsonl"))
+
+    class R:
+        _clock = staticmethod(lambda: 100.0)
+        _work = collections.deque([(95.0, 2.0), (50.0, 3.0), (-200.0, 9.0)])
+        _stood_at, _moved_at, last_move_token, _claw, posture = 80.0, 97.0, "kvtR", (0.0, 60.0), "stand"
+    bc.SerialRobot._log_sag(R(), (-18.0, 1.5))
+    rec = json.loads((tmp_path / "sag.jsonl").read_text().splitlines()[0])
+    assert rec["pitch"] == -18.0 and rec["roll"] == 1.5 and rec["since_stand_s"] == 20.0 and rec["since_move_s"] == 3.0 and rec["last_move"] == "kvtR"
+    assert rec["gait_s_60"] == 2.0 + 3.0 and rec["gait_s_180"] == 5.0 and rec["arm"] == [0.0, 60.0] and "pack_v" in rec and "floor" in rec        # the old move 300 s ago is outside both windows

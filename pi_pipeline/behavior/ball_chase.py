@@ -20,6 +20,7 @@ turn rates G2 measures himself (behavior/chase_pace.py). The goals framework (pi
 """
 from __future__ import annotations
 
+import collections
 import dataclasses
 import json
 import logging
@@ -77,6 +78,7 @@ STUCK_PUNTS = 3                # punts with the ball still in range before backi
 BACK_UP_S = 1.0
 SAVE_EVERY_S = 2.0
 BACK_BUDGET_S = 3.0            # the most backing up in one attempt (search moves, stuck punts and a vanished ball together): there is no edge detector, so keep it small on a desk (0 = never back up)
+VANISH_AXIS_DEG = 12.0           # a ball that vanishes at close range counts as "at the claw" only if its last bearing was within this of straight (the punt line-up limit, PUNT_ALIGN_DEG); farther off it was pushed or lost, so he looks instead of punting
 WHEN_VANISHED = "punt"         # the ball vanished at close range: "punt" (it is at the claw) or "back_up" (back off a little and look again)
 VANISH_BACK_S = 1.0
 
@@ -516,6 +518,10 @@ class ChasePlanner:
                         return self._back("back", VANISH_BACK_S, "the ball vanished after a line-up turn: I turned past it: back up and look again, then line up again")
                     self.lost = LOST_LOOKS
                     return Action("claw_look", why="the ball vanished after a line-up turn: I turned past it: a look around") if self.claw_ok else Action("look", 1.0, why="the ball vanished after a line-up turn: look again")
+                if self.last_bearing is not None and abs(self.last_bearing) > VANISH_AXIS_DEG:      # (owner, 2026-11-18) it was last seen well off the claw's axis: it is not at the claw, it was moved or lost; he punted at an empty spot
+                    self.lost = LOST_LOOKS
+                    why = f"the ball is gone and was last seen {self.last_bearing:+.0f} deg off straight: it is not at the claw: a look around"
+                    return Action("claw_look", why=why) if self.claw_ok else Action("look", 1.0, why=why)
                 if WHEN_VANISHED == "back_up" and self._can_back(VANISH_BACK_S):
                     return self._back("back", VANISH_BACK_S, "the ball vanished at close range: back off a little to see it")
                 self.after_punt = True
@@ -725,6 +731,19 @@ def align_cap_for(token: str) -> float:
     return max(ALIGN_CAP_S, PIVOT_ALIGN_CAP_S) if token in ("kvtL", "kvtR") else ALIGN_CAP_S
 
 
+def _last_pack_volts() -> float | None:
+    """The newest pack reading the voltage log holds (volts), or None."""
+    try:
+        p = os.path.expanduser("~/.local/share/g2/battery_voltage.csv")
+        with open(p, "rb") as fh:
+            fh.seek(0, 2)
+            fh.seek(max(0, fh.tell() - 200))
+            last = fh.read().decode(errors="ignore").strip().splitlines()[-1]
+        return float(last.split(",")[1])
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _yaw_diff(a: float, b: float) -> float:
     """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
     return (a - b + 180.0) % 360.0 - 180.0
@@ -856,6 +875,9 @@ class SerialRobot:
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
+        self._work: collections.deque = collections.deque(maxlen=200)      # (end time, seconds) of each firmware move: how hard the legs worked lately (the sag log's load proxy)
+        self._stood_at: float | None = None               # when the last stand-up finished
+        self.last_move_token: str | None = None
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
         self._sag_checked_t: float | None = None          # when the last sag check was made (a standing G2 is checked again every SAG_RECHECK_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
@@ -1083,6 +1105,7 @@ class SerialRobot:
         if self._tilt_before_move() == "fell":
             return "fell"
         self._pitch, self._roll = [], []
+        self.last_move_token = token
         self._tx("gP")
         self.last_turn_deg, self.last_turn_s, self.last_turn_end = None, None, None
         self.last_turn_signed = None
@@ -1134,6 +1157,7 @@ class SerialRobot:
                     yaw0 = self._yaw                      # too early to be a real turn: count from this reading instead
             self._sleep(0.02 if yaw0 is not None else 0.05)
         ran = self._clock() - t0
+        self._work.append((self._clock(), ran))
         n_imu = min(len(self._imu_t), len(self._roll))
         self.last_move_imu = (list(self._imu_t[-n_imu:]) if n_imu else [], list(self._roll[-n_imu:]) if n_imu else [], list(self._pitch[-n_imu:]) if n_imu else [])      # the gait's own frames, before the stop and the stillness after it (the cycle measurement reads them)
         if state != "fell" and yaw0 is None and cycle_stop_for(token):
@@ -1324,10 +1348,34 @@ class SerialRobot:
                 return "ok"                                   # the attention pose did not take: go as he is (logged above)
         return self._stand_up_from(pose)
 
+    def _log_sag(self, tilt) -> None:
+        """One line per sag in ~/.local/share/g2/sag_events.jsonl (G2_SAG_LOG; owner, 2026-11-18, to find what the servo protection reacts to: the P1S servos report no current or temperature, so the load is judged from
+        what he did lately): the tilt, how long since the last stand-up and the last move, the last move's skill, seconds of firmware gait in the last 60 and 180 s, where the arm is, the pack voltage last logged,
+        and the floor. Never raises."""
+        try:
+            now = self._clock()
+            work = lambda w: round(sum(d for t, d in self._work if now - t <= w), 1)  # noqa: E731
+            rec = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "pitch": None if tilt is None else round(tilt[0], 1), "roll": None if tilt is None else round(tilt[1], 1),
+                   "since_stand_s": None if self._stood_at is None else round(now - self._stood_at, 1), "since_move_s": None if self._moved_at is None else round(now - self._moved_at, 1),
+                   "last_move": self.last_move_token, "gait_s_60": work(60.0), "gait_s_180": work(180.0), "arm": list(self._claw), "posture": self.posture, "pack_v": _last_pack_volts()}
+            try:
+                from ..telemetry.autolog import get_surface
+                rec["floor"] = get_surface()
+            except Exception:  # noqa: BLE001
+                rec["floor"] = None
+            path = os.path.expanduser(os.environ.get("G2_SAG_LOG", "~/.local/share/g2/sag_events.jsonl"))
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a") as fh:
+                fh.write(json.dumps(rec) + "\n")
+            log.info("sag event: %s", rec)
+        except Exception:  # noqa: BLE001
+            log.debug("sag log failed", exc_info=True)
+
     def recover_sag(self, tilt=None) -> str:
         """The legs have sagged (the body is tilted away from how he stands when they hold): the claw centred, down into the rest position, then the eased stand-up from rest (owner, 2026-11-16: never
         through the attention pose, the move that tipped a rolled G2 over). Used by every flow: the goal sessions before a move (stand_up), the claw look's entry and the voice service's stand guard."""
         log.warning("legs sagged%s: lying down in rest and standing up from rest", "" if tilt is None else f" (pitch {tilt[0]:+.0f} roll {tilt[1]:+.0f} deg)")
+        self._log_sag(tilt)
         self.posture = "stand"
         return self.rest_then_stand()
 
@@ -1416,6 +1464,8 @@ class SerialRobot:
         self.posture = "rest"
         wait_for_pose(self._lk, "rest", sleep=self._sleep, clock=self._clock, fallback_s=REST_SETTLE_S)
         self._sleep(0.5)
+        if self._already_fell(self._tilt(FINAL_TILT_S)):         # (2026-11-18: the lie-down from a rolled stand flipped him to 178 deg and the stand-up was sent anyway) a fallen body is laid in rest and never sent a stand
+            return "fell"
         return self._stand_up_from("rest")
 
     def stand_up_from_attention(self) -> str:
@@ -1438,6 +1488,7 @@ class SerialRobot:
             self._sleep(0.05)
         self._imu_release()
         self.posture = "stand"
+        self._stood_at = self._clock()
         if state != "fell":
             got = wait_for_pose(self._lk, "stand", sleep=self._sleep, clock=self._clock, fallback_s=0.0)
             if got not in ("stand", "unknown"):

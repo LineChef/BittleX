@@ -13,7 +13,7 @@ import dataclasses
 import math
 import time
 
-BLIND_IN = 3.0          # nearer than this the camera bearing is not used
+BLIND_IN = 4.0          # nearer than this the camera bearing is not used (owner, 2026-11-18: was 3.0, which sat inside the punt range of 3.5 to 3.75 in; the claw was on the ball and the camera read it 20 to 30 deg off at 3 to 4 in)
 MAX_AGE_S = 20.0        # a track older than this is not used (the ball may have moved)
 MAX_DRIFT_IN = 8.0      # walked or backed up this far since the last good picture: the estimate is too uncertain to use
 

@@ -511,7 +511,7 @@ def test_a_stand_up_that_ends_rolled_is_repeated_once_and_every_stand_up_is_logg
     monkeypatch.setattr(r, "leg_check", lambda *a, **k: None)
     r._fell = lambda: False
     r._imu_release = lambda: None
-    ends = iter([(0.0, 20.0), (0.0, 2.0)])
+    ends = iter([(0.0, 20.0), (0.0, 0.0), (0.0, 2.0)])                      # the second read is the check that he has not fallen during the lie-down (level)
     r._tilt = lambda seconds=0.5: next(ends, (0.0, 0.0))
     r.claw_pose = lambda *a, **k: "ok"
     assert r._stand_up_from("rest") == "ok"

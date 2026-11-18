@@ -87,3 +87,15 @@ def test_losing_the_ball_for_good_clears_the_track():
     for _ in range(bc.LOST_LOOKS + 1):
         p.decide(None)
     assert not p.track.valid
+
+
+def test_a_picture_at_3_to_4_in_is_answered_by_the_track_not_the_camera_bearing():
+    """Owner, 2026-11-18: the blind range is 4 in (it was 3), above the punt range of 3.5 to 3.75 in: the claw was on the ball and the camera read it 20 to 30 deg off at 3 to 4 in."""
+    from pi_pipeline.behavior.ball_track import BLIND_IN, BallTrack
+    from pi_pipeline.vision.ball_finder import BallReading
+    assert BLIND_IN == 4.0
+    t = BallTrack()
+    t.see(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 9.0, -2.0, False))           # a good picture at 9 in, straight ahead
+    t.walked(4.0)
+    seen = t.see(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 3.5, 28.0, False))    # 3.5 in, the camera says +28
+    assert t.used_estimate and abs(seen.bearing_deg + 3.6) < 0.5
