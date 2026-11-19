@@ -299,7 +299,7 @@ def test_he_steps_closer_after_a_punt_that_left_the_ball_far_and_rests_never_bac
     assert bc.ChasePlanner().decide(reading(5.5, 2)).kind == "walk"                                  # just out of reach: a small step closer first
     q = bc.ChasePlanner()
     kinds = [q.decide(reading(5.5, 2)).kind for _ in range(bc.NUDGES_BEFORE_PUNT + 1)]
-    assert kinds == ["walk"] * bc.NUDGES_BEFORE_PUNT + ["punt"]                                       # three nudges that did not help, then punt anyway
+    assert kinds == ["walk"] * (bc.NUDGES_BEFORE_PUNT + 1)                                            # steps that did not help: more steps, no punch from out of reach (owner, 2026-11-19; was "then punt anyway")
     assert bc.ChasePlanner().decide(reading(1.0, 0)).kind == "punt"                                   # right in front of the ball: punt, never back up
 
 
@@ -313,7 +313,8 @@ def test_a_punt_that_barely_moved_him_is_sent_again_once():
     assert r.punt() == "ok" and [c for c in lk.sent if c == "kpickF"] == ["kpickF", "kpickF"]       # no IMU swing: the lunge did not play, so it is sent again, and only once
 
 
-def test_a_ball_that_vanishes_at_close_range_is_punted_not_searched_for_and_he_says_punting():
+def test_a_ball_that_vanishes_at_close_range_is_punted_not_searched_for_and_he_says_punting(monkeypatch):
+    monkeypatch.setattr(bc, "PUNT_ONLY_IN_REACH", False)                                           # (this run's ball is just out of reach: the rule under test is the vanished ball, not the reach rule)
     p = bc.ChasePlanner()
     p.decide(reading(4, 1))                                                                         # seen 4 in away ...
     a = p.decide(None); assert a.kind == "punt"                                                    # ... and gone: it is at the claw
@@ -1534,3 +1535,22 @@ def test_every_sag_is_logged_with_what_he_was_doing_lately(tmp_path, monkeypatch
     rec = json.loads((tmp_path / "sag.jsonl").read_text().splitlines()[0])
     assert rec["pitch"] == -18.0 and rec["roll"] == 1.5 and rec["since_stand_s"] == 20.0 and rec["since_move_s"] == 3.0 and rec["last_move"] == "kvtR"
     assert rec["gait_s_60"] == 2.0 + 3.0 and rec["gait_s_180"] == 5.0 and rec["arm"] == [0.0, 60.0] and "pack_v" in rec and "floor" in rec        # the old move 300 s ago is outside both windows
+
+
+def test_a_ball_still_out_of_reach_after_the_steps_is_not_punched_he_steps_more_then_backs_up(monkeypatch):
+    """Owner, 2026-11-19: he punted from just outside his reach. After NUDGES_BEFORE_PUNT steps: EXTRA_NUDGES more, then a back-up; never a punch from out of reach."""
+    monkeypatch.setattr(bc, "PUNT_ONLY_IN_REACH", True)
+    p = bc.ChasePlanner()
+    kinds = [p.decide(reading(5.5, 2)).kind for _ in range(bc.NUDGES_BEFORE_PUNT + bc.EXTRA_NUDGES)]
+    assert kinds == ["walk"] * (bc.NUDGES_BEFORE_PUNT + bc.EXTRA_NUDGES)
+    a = p.decide(reading(5.5, 2))
+    assert a.kind == "back" and "come in again" in a.why and p.nudges == 0
+    p2 = bc.ChasePlanner()
+    p2.back_s = bc.BACK_BUDGET_S                                                           # no back-up left: more steps, still no punch
+    for _ in range(bc.NUDGES_BEFORE_PUNT + bc.EXTRA_NUDGES + 2):
+        assert p2.decide(reading(5.5, 2)).kind == "walk"
+    assert bc.ChasePlanner().decide(reading(3.0, 2)).kind == "punt"                        # in reach: the punch as before
+    monkeypatch.setattr(bc, "PUNT_ONLY_IN_REACH", False)
+    p3 = bc.ChasePlanner()
+    kinds3 = [p3.decide(reading(5.5, 2)).kind for _ in range(bc.NUDGES_BEFORE_PUNT + 1)]
+    assert kinds3[-1] == "punt"                                                            # switched off: punches anyway, as before

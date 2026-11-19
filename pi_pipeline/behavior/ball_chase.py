@@ -56,6 +56,8 @@ WALK_MAX_FRACTION = 0.6        # (owner-approved 2026-11-16) one long walk cover
 NUDGE_GAIT = "scripted"      # how the small steps closer are walked (user, 2026-11-04): "scripted" = Petoi's own forward walk (kwkF) for NUDGE_S, which is steadier than the learned policy for dialing in the distance; "policy" = the learned gait
 WALK_AIM_IN = 4.0              # a walk step is timed to leave the ball about this far from the camera (the ball is touched at about 3 in)
 APPROACH_MARGIN_IN = 1.0       # the long walk never plans to end closer than PUNT_MAX_IN + this, whatever WALK_AIM_IN says (owner, 2026-11-13): it is timed with no feedback and lands within about 1.6 in of its aim, the punt window is only about 1 in wide, so a walk aimed at 3.5 in pushed the ball about half the time; the small nudges (looked at after each) do the last inches
+PUNT_ONLY_IN_REACH = os.environ.get("G2_PUNT_ONLY_IN_REACH", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) after NUDGES_BEFORE_PUNT small steps the ball still beyond PUNT_MAX_IN is NOT punched: up to EXTRA_NUDGES more steps, then back up and come in again; 0 = punch anyway as before
+EXTRA_NUDGES = 2
 NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
@@ -600,6 +602,13 @@ class ChasePlanner:
             self.after_punt = False
             nudge_s = nudge_seconds(ball.distance_in)
             return Action("walk", nudge_s, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer of {nudge_s:.1f} s ({self.nudges} of {NUDGES_BEFORE_PUNT})", scripted=NUDGE_GAIT == "scripted")
+        if PUNT_ONLY_IN_REACH and near and not in_reach and abs(ball.bearing_deg) <= align_tol and self.nudges >= NUDGES_BEFORE_PUNT:
+            if self.nudges < NUDGES_BEFORE_PUNT + EXTRA_NUDGES or not self._can_back(BACK_UP_S):      # never a punch from out of reach (owner, 2026-11-19: he punted from just outside it): more steps, then a back-up, and with no back-up left more steps
+                self.nudges += 1
+                nudge_s = nudge_seconds(ball.distance_in)
+                return Action("walk", nudge_s, why=f"ball {ball.distance_in:.1f} in ahead, still out of reach after {self.nudges - 1} steps: another small step closer of {nudge_s:.1f} s (no punch from out of reach)", scripted=NUDGE_GAIT == "scripted")
+            self.nudges = 0
+            return self._back("back", BACK_UP_S, f"ball {ball.distance_in:.1f} in ahead, still out of reach after {NUDGES_BEFORE_PUNT + EXTRA_NUDGES} steps: back up and come in again")
         if not near:
             self.align_turns = 0
         if near and abs(ball.bearing_deg) > align_tol:
