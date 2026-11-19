@@ -258,11 +258,16 @@ ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; o
 
 PIVOT_TOKENS = ("kvtL", "kvtR")
 PIVOT_CYCLE_S = 0.86            # one pivot cycle (72 frames), measured on G2 2026-11-18; the measured file (gait_cycles.json) wins when it has it
-PIVOT_DEG_PER_CYCLE = 20.0      # about how far one pivot cycle turns him, either side (2026-11-18 pictures and eye: 35 to 40 deg in 1.5 s); the camera corrects what is left
-PIVOT_MIN_DEG = 10.0            # a line-up turn smaller than this stays on the gyro-stopped arc: one pivot cycle is 20 deg or more, so the 3 to 6 deg align pulses turned 3 to 7 times too far (2026-11-18 goal run: -15 to +28 deg, "overshot"). Owner, 2026-11-19: 10 (was 14): a ball 10 to 14 deg off gets one whole cycle, about 20 deg, and the next picture corrects what is left
+PIVOT_DEG_PER_CYCLE = 26.0      # how far one pivot cycle turns the ball's bearing in the camera picture, either side (owner, 2026-11-19: was 20; the turn test with the ball 18 in straight ahead read 26.5, 29.4, 27.8 deg right and 32.1, 23.4, 21.4 deg left per 0.86 s cycle, with no forward push; the camera sits ahead of the turning centre, so this is the bearing the planner works in, a few degrees more than the body turns)
+PIVOT_MIN_DEG = 18.0            # a line-up turn smaller than this stays on the gyro-stopped arc (owner, 2026-11-19: was 10, then 14 before; one pivot cycle turns the camera bearing 26 to 28 deg, so an ask under about 70% of a cycle overshoots: a 10 deg ask would get 2.6 times too much). 18 deg and up: one cycle to about 39 deg, two cycles above that, up to about 52
 PIVOT_MAX_CYCLES = 2            # a pivot line-up turn is one or two cycles (about 20 or 40 deg), then a new picture
 SAG_RESEAT = os.environ.get("G2_SAG_RESEAT", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) a sag of SAG_RESEAT_MIN_ROLL_DEG or more is first answered by re-seating the legs WITHOUT lying down (link.reseat_eased: the legs bend part way and straighten); five lie-downs from a rolled stand flipped him. 0 = always the lie-down
 SAG_RESEAT_MIN_ROLL_DEG = 15.0
+LINEUP_BACKUP = os.environ.get("G2_LINEUP_BACKUP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) a ball closer than LINEUP_MIN_IN that needs a line-up turn is not turned at: he backs up to about LINEUP_BACK_TO_IN first and lines up from there with the pivot, then walks in (at 2 to 4 in the arcs walked him onto the ball and the bearing swung 25 to 40 deg); 0 = the small arc pulses at any range as before
+LINEUP_MIN_IN = 5.0            # closer than this a line-up needs room
+LINEUP_BACK_TO_IN = 9.0        # back up to about this far from the ball (8 to 10 in: where the pivot applies)
+LINEUP_BACKUP_TRIES = 2        # back-ups for room per attempt; then the small arc pulses as before
+LINEUP_BACK_MAX_S = 3.0        # the longest one such back-up (the pace is BACK_IN_S, a guess)
 PIVOT_FULL_BEARING = os.environ.get("G2_PIVOT_FULL_BEARING", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) where the line-up is a pivot (opencat.lineup_uses_pivot: the ball 5 to 14 in away) and the ball is PIVOT_MIN_DEG or more off, the turn is asked for the whole bearing (up to PIVOT_MAX_CYCLES cycles), not the 6 deg arc pulse that never reached the pivot; 0 = the 6 deg pulses as before
 PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP
 PIVOT_LEAN_DEG = float(os.environ.get("G2_PIVOT_LEAN_DEG", "8"))      # (owner, 2026-11-18) nose-up beyond this many degrees right after a pivot: the legs have let go on the back legs, so he is laid in rest and stood up from rest at once (recover_sag) instead of sitting unstable until the next move; 0 turns it off
@@ -379,6 +384,7 @@ class ChasePlanner:
     circle_deg: float = 0.0    # degrees turned in the current full-circle scan
     circles: int = 0           # whole turns finished without the ball this search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
+    lineup_backups: int = 0    # back-ups made this attempt to get room for a line-up (LINEUP_BACKUP_TRIES caps them)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
     ball_color: tuple | None = None      # the ball's own (r, g, b), the latest sample from a reading within COLOR_SAMPLE_IN (the active look matches the ball by it)
     prev_seen_dist: float | None = None  # the distance of the last reading that was accepted (the jump guard compares the next one with it)
@@ -615,6 +621,12 @@ class ChasePlanner:
             if self.prev_kind == "align" and not edge and self.align_before is not None and ball.bearing_deg * self.align_before < 0 and self._can_back(BACK_UP_S):
                 was, self.align_before, self.align_turns = self.align_before, None, 0         # overshot (user, 2026-11-01): back up, look again, then line up again from the start
                 return self._back("back", BACK_UP_S, f"overshot: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
+            if LINEUP_BACKUP and ball.distance_in < LINEUP_MIN_IN and self.lineup_backups < LINEUP_BACKUP_TRIES and not edge:
+                secs = min(LINEUP_BACK_MAX_S, max(0.5, (LINEUP_BACK_TO_IN - ball.distance_in) / BACK_IN_S))      # room first: the pace of a back-up is a guess (BACK_IN_S)
+                if self._can_back(secs):
+                    self.lineup_backups += 1
+                    self.align_turns, self.confirm_bearing, self.confirm_looks = 0, None, 0
+                    return self._back("back", secs, f"ball {ball.distance_in:.1f} in away and {ball.bearing_deg:+.0f} deg off: too close to line up, back up {secs:.1f} s to about {LINEUP_BACK_TO_IN:.0f} in first ({self.lineup_backups} of {LINEUP_BACKUP_TRIES})")
             if self.align_turns < ALIGN_TRIES and ball.distance_in <= ALIGN_CONFIRM_IN:      # close in the bearing swings from picture to picture: turn on two pictures that agree
                 first = self.confirm_bearing
                 if first is None or self.confirm_looks < 1 and abs(ball.bearing_deg - first) > ALIGN_CONFIRM_AGREE_DEG:

@@ -6,6 +6,17 @@ from pi_pipeline.behavior import ball_chase as bc
 from pi_pipeline.tests.test_ball_chase import reading
 
 
+import pytest as _pytest_lb
+
+
+@_pytest_lb.fixture(autouse=True)
+def _no_lineup_backup(monkeypatch):
+    """These tests exercise the line-up pulses close to the ball; the back-up-first rule (G2_LINEUP_BACKUP, tests/test_turn_gait.py) is off here."""
+    from pi_pipeline.behavior import ball_chase as _bc
+    monkeypatch.setattr(_bc, "LINEUP_BACKUP", False)
+
+
+
 def test_the_gyro_stop_leaves_early_by_the_coast_but_never_ends_a_small_turn_before_it_begins():
     assert bc.align_stop_lead(20.0) == bc.ALIGN_COAST_DEG                              # a big turn: the whole coast
     assert bc.ALIGN_STOP_LEAD_DEG <= bc.align_stop_lead(6.0) < bc.ALIGN_COAST_DEG       # a small one: less, so it still starts (the 2026-11-15 goal runs: asked 6, got 9 on average with the old 1.5 lead)

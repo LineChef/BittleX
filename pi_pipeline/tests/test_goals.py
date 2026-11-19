@@ -73,6 +73,17 @@ def test_goals_file_overrides_the_builtin_and_survives_a_bad_file(tmp_path):
 
 import random  # noqa: E402
 
+
+import pytest as _pytest_lb
+
+
+@_pytest_lb.fixture(autouse=True)
+def _no_lineup_backup(monkeypatch):
+    """These tests exercise the line-up pulses close to the ball; the back-up-first rule (G2_LINEUP_BACKUP, tests/test_turn_gait.py) is off here."""
+    from pi_pipeline.behavior import ball_chase as _bc
+    monkeypatch.setattr(_bc, "LINEUP_BACKUP", False)
+
+
 KN = [Knob("a", "float", lo=1.0, hi=5.0, step=1.0, label="a at"), Knob("b", "choice", options=("x", "y", "z")),
       Knob("c", "float", lo=0.0, hi=1.0, step=0.1, control="ask"), Knob("f", "float", lo=0.0, hi=9.0, step=1.0, control="fixed")]
 DIAG = {"bad": [("f", 1), ("a", -1)], "lost": [("b", "other")], "soft": [("c", -1)], "askfirst": [("c", -1), ("a", +1)]}

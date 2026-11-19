@@ -10,6 +10,17 @@ from pi_pipeline.behavior import ball_chase as bc
 from pi_pipeline.vision import ball_finder as bf
 
 
+import pytest as _pytest_lb
+
+
+@_pytest_lb.fixture(autouse=True)
+def _no_lineup_backup(monkeypatch):
+    """These tests exercise the line-up pulses close to the ball; the back-up-first rule (G2_LINEUP_BACKUP, tests/test_turn_gait.py) is off here."""
+    from pi_pipeline.behavior import ball_chase as _bc
+    monkeypatch.setattr(_bc, "LINEUP_BACKUP", False)
+
+
+
 @pytest.fixture(autouse=True)
 def _no_confirm_look(monkeypatch):
     """These tests size the line-up turn from ONE picture; the two-picture confirm has its own tests (test_align_confirm.py)."""
@@ -883,15 +894,17 @@ def test_a_gyro_turn_that_barely_moves_ends_at_the_cap_and_no_imu_means_the_time
     assert abs((at2["kbalance"] - at2["kwkR"]) - 1.0) < 0.1 and r2.last_turn_deg is None            # no yaw frames: the old timed turn
 
 
-def test_the_line_up_target_is_small_and_inside_its_limits():
-    """The arc pulse is at most ALIGN_MAX_DEG. Where the line-up is a pivot (the ball 5 to 14 in away, 14 deg or more off) it is asked for the whole bearing, up to two cycles (owner, 2026-11-19; tests/test_turn_gait.py)."""
-    for bearing, dist in ((75, 3), (13, 4), (8, 6)):
+def test_the_line_up_target_is_small_and_inside_its_limits(monkeypatch):
+    """The arc pulse is at most ALIGN_MAX_DEG. Where the line-up is a pivot (the ball 8 to 40 in away, 18 deg or more off) it is asked for the whole bearing, up to two cycles (owner, 2026-11-19; tests/test_turn_gait.py)."""
+    for bearing, dist in ((75, 3), (13, 4), (8, 6), (40, 6)):                                         # closer than the band (8 in): the small arc pulse
         a = bc.ChasePlanner().decide(reading(dist, bearing))
         assert a.kind == "align" and bc.ALIGN_MIN_DEG <= a.stop_deg <= bc.ALIGN_MAX_DEG
-    for bearing, dist in ((16, 6), (40, 6)):
+    monkeypatch.setenv("G2_PIVOT_MIN_IN", "5")                                                       # (the band is widened to reach the align pulses, which belong to a ball within the nudge range)
+    for bearing, dist in ((20, 6), (40, 6)):
         a = bc.ChasePlanner().decide(reading(dist, bearing))
         assert a.kind == "align" and bc.PIVOT_MIN_DEG <= a.stop_deg <= bc.PIVOT_DEG_PER_CYCLE * bc.PIVOT_MAX_CYCLES
-    assert bc.ChasePlanner().decide(reading(6, 40)).stop_deg == bc.PIVOT_DEG_PER_CYCLE * bc.PIVOT_MAX_CYCLES
+    assert bc.ChasePlanner().decide(reading(6, 40)).stop_deg == 40.0                                  # the whole bearing
+    assert bc.ChasePlanner().decide(reading(6, 70)).stop_deg == bc.PIVOT_DEG_PER_CYCLE * bc.PIVOT_MAX_CYCLES      # but never more than two cycles
 
 
 def test_standing_five_seconds_then_tilted_means_sagged_legs_even_in_the_standing_flow(monkeypatch):

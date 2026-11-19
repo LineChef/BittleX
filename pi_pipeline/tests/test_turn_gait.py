@@ -104,9 +104,9 @@ def test_the_line_up_turn_uses_both_gaits_the_pivot_only_in_a_band_and_the_switc
         monkeypatch.delenv(k, raising=False)
     arc, piv = ("kwkR", "kwkL"), ("kvtR", "kvtL")
     assert opencat.lineup_tokens() == arc and opencat.lineup_tokens(None) == arc                    # distance unknown: the arc
-    assert opencat.lineup_tokens(20.0) == arc and opencat.lineup_tokens(10.5) == arc                # far: the arc
-    assert opencat.lineup_tokens(10.0) == piv and opencat.lineup_tokens(8.0) == piv and opencat.lineup_tokens(5.0) == piv     # the band: the pivot, a bit away from the ball
-    assert opencat.lineup_tokens(4.9) == arc and opencat.lineup_tokens(3.0) == arc                  # right up against the ball: never the pivot (it pushes him forward a little)
+    assert opencat.lineup_tokens(41.0) == arc and opencat.lineup_tokens(60.0) == arc                # very far: the arc
+    assert opencat.lineup_tokens(40.0) == piv and opencat.lineup_tokens(20.0) == piv and opencat.lineup_tokens(8.0) == piv     # the band, 8 to 40 in (owner, 2026-11-19): the pivot, away from the ball
+    assert opencat.lineup_tokens(7.9) == arc and opencat.lineup_tokens(5.0) == arc and opencat.lineup_tokens(3.0) == arc        # closer than 8 in: the arc (the planner backs up to 8 to 10 in first)
     monkeypatch.setenv("G2_LINEUP_GAIT", "arc")
     assert opencat.lineup_tokens(8.0) == arc
     monkeypatch.setenv("G2_LINEUP_GAIT", "pivot")
@@ -136,12 +136,14 @@ def test_a_line_up_turn_in_the_band_is_whole_pivot_cycles_and_outside_it_the_gyr
             return "ok"
     r = R()
     r.lineup_ball_in = 10.0
-    r.turn(22.0, 1.0, stop_deg=22.0)                                   # one cycle (about 20 deg)
-    assert sent[-1] == ("kvtR", round(0.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 20.0 and r.last_turn_end == "cycles" and r.last_turn_signed == 20.0
-    r.turn(-45.0, 1.0, stop_deg=45.0)                                  # two cycles, never more
-    assert sent[-1] == ("kvtL", round(1.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 40.0 and r.last_turn_signed == -40.0
-    r.turn(14.0, 1.0, stop_deg=14.0)                                   # the smallest turn that is a pivot: one cycle
-    assert sent[-1][0] == "kvtR" and r.last_turn_deg == 20.0
+    r.turn(22.0, 1.0, stop_deg=22.0)                                   # one cycle (about 26 deg)
+    assert sent[-1] == ("kvtR", round(0.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == bc.PIVOT_DEG_PER_CYCLE and r.last_turn_end == "cycles" and r.last_turn_signed == bc.PIVOT_DEG_PER_CYCLE
+    r.turn(-45.0, 1.0, stop_deg=45.0)                                  # two cycles (about 52 deg), never more
+    assert sent[-1] == ("kvtL", round(1.75 * bc.PIVOT_CYCLE_S, 3), None) and r.last_turn_deg == 2 * bc.PIVOT_DEG_PER_CYCLE and r.last_turn_signed == -2 * bc.PIVOT_DEG_PER_CYCLE
+    r.turn(18.0, 1.0, stop_deg=18.0)                                   # the smallest turn that is a pivot (PIVOT_MIN_DEG 18): one cycle
+    assert sent[-1][0] == "kvtR" and r.last_turn_deg == bc.PIVOT_DEG_PER_CYCLE
+    r.turn(14.0, 1.0, stop_deg=14.0)                                   # under 18 deg: one cycle would overshoot, the gyro-stopped arc
+    assert sent[-1][0] == "kwkR"
     r.turn(6.0, 1.0, stop_deg=6.0)                                     # an align pulse is smaller than one pivot cycle: the gyro-stopped arc (2026-11-18 goal run: a pivot turned it 3 to 7 times too far)
     assert sent[-1][0] == "kwkR" and sent[-1][2] == (6.0 if bc.ALIGN_YAW_STOP else None)
     r.turn(-6.0, 1.0, stop_deg=6.0)
@@ -149,8 +151,8 @@ def test_a_line_up_turn_in_the_band_is_whole_pivot_cycles_and_outside_it_the_gyr
     r.lineup_ball_in = 3.0
     r.turn(8.0, 1.0, stop_deg=8.0)                                     # right up against the ball: the arc, stopped on the gyro as before
     assert sent[-1][0] == "kwkR" and sent[-1][2] == (8.0 if bc.ALIGN_YAW_STOP else None)
-    r.lineup_ball_in = 30.0
-    r.turn(-20.0, 1.0, stop_deg=20.0)
+    r.lineup_ball_in = 60.0
+    r.turn(-20.0, 1.0, stop_deg=20.0)                                  # beyond the band (8 to 40 in): the arc
     assert sent[-1][0] == "kwkL"
     r.lineup_ball_in = 10.0
     r.turn(-20.0, 1.0)                                                 # a timed turn (no stop_deg) is not a line-up: its own choice
@@ -164,6 +166,9 @@ def _planner_ask(monkeypatch, ball_in, bearing, **env):
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setattr(bc, "ALIGN_CONFIRM_IN", 0.0)                                   # one picture is enough here
+    monkeypatch.setattr(bc, "LINEUP_BACKUP", False)                                    # (the back-up-first rule has its own tests)
+    if "G2_PIVOT_MIN_IN" not in env:
+        monkeypatch.setenv("G2_PIVOT_MIN_IN", "5")                                     # the band starts at 8 in, outside the nudge range where align pulses happen: widened here to test the sizing
     a = bc.ChasePlanner().decide(reading(ball_in, bearing))
     assert a.kind == "align"
     return a
@@ -171,15 +176,15 @@ def _planner_ask(monkeypatch, ball_in, bearing, **env):
 
 def test_in_the_pivot_band_the_line_up_is_asked_for_the_whole_bearing_up_to_two_cycles(monkeypatch):
     """2026-11-19 goal run: ball 34 deg off at 6 in, the planner asked 6 deg, the pivot starts at 14: it never ran."""
-    assert _planner_ask(monkeypatch, 6.0, 34.0).stop_deg == 34.0                        # a whole bearing: 2 cycles of about 20 deg
+    assert _planner_ask(monkeypatch, 6.0, 34.0).stop_deg == 34.0                        # a whole bearing: one cycle (about 26 deg) and the camera corrects the rest
     assert _planner_ask(monkeypatch, 7.0, -21.0).stop_deg == 21.0                        # 1 cycle (the line-up pulses are for a ball within the nudge range; farther out the plain turn already has the whole bearing)
     assert _planner_ask(monkeypatch, 6.0, 60.0).stop_deg == bc.PIVOT_DEG_PER_CYCLE * bc.PIVOT_MAX_CYCLES      # never more than the cap
     assert bc.PIVOT_MIN_DEG <= 34.0 and opencat.lineup_uses_pivot(6.0)
 
 
 def test_outside_the_band_or_for_a_small_bearing_it_is_still_the_small_arc_pulse(monkeypatch):
-    assert _planner_ask(monkeypatch, 3.0, 34.0).stop_deg <= bc.ALIGN_MAX_DEG            # right against the ball: the arc, small
-    assert _planner_ask(monkeypatch, 6.0, 8.0).stop_deg <= bc.ALIGN_MAX_DEG             # under 10 deg: a pivot cycle would overshoot
+    assert _planner_ask(monkeypatch, 3.0, 34.0, G2_PIVOT_MIN_IN="8").stop_deg <= bc.ALIGN_MAX_DEG            # closer than the band (8 in): the arc, small
+    assert _planner_ask(monkeypatch, 6.0, 15.0).stop_deg <= bc.ALIGN_MAX_DEG            # under 18 deg: a pivot cycle would overshoot
     assert _planner_ask(monkeypatch, 6.0, 34.0, G2_LINEUP_GAIT="arc").stop_deg <= bc.ALIGN_MAX_DEG     # the arc setting keeps the small pulses
 
 
@@ -189,3 +194,22 @@ def test_the_switch_restores_the_small_pulses_and_the_planner_and_the_skill_choi
     import inspect
     assert "opencat.lineup_uses_pivot(" in inspect.getsource(bc.ChasePlanner.decide)                    # one rule for both
     assert "lineup_uses_pivot(ball_in)" in inspect.getsource(opencat.lineup_tokens)
+
+
+def test_a_ball_closer_than_five_inches_that_needs_a_line_up_gets_a_back_up_to_about_nine_inches_first(monkeypatch):
+    """Owner, 2026-11-19: at 2 to 4 in the arcs walked him onto the ball and the bearing swung 25 to 40 deg: room first, then the pivot line-up from 8 to 10 in."""
+    from pi_pipeline.tests.test_ball_chase import reading
+    monkeypatch.setattr(bc, "LINEUP_BACKUP", True)
+    p = bc.ChasePlanner()
+    a = p.decide(reading(3.0, 25.0))
+    assert a.kind == "back" and a.seconds == (bc.LINEUP_BACK_TO_IN - 3.0) / bc.BACK_IN_S and "back up" in a.why and p.lineup_backups == 1
+    assert p.decide(reading(2.0, 25.0)).kind == "back" and p.lineup_backups == 2          # a second try, longer
+    assert p.decide(reading(3.0, 25.0)).kind in ("align", "look")                         # tries used up: the small arc pulses as before
+    q = bc.ChasePlanner()
+    assert q.decide(reading(6.0, 25.0)).kind in ("align", "look")                         # 6 in is not "too close": no back-up
+    assert q.lineup_backups == 0
+    r = bc.ChasePlanner()
+    r.back_s = bc.BACK_BUDGET_S                                                           # no back-up left: the arc pulses
+    assert r.decide(reading(3.0, 25.0)).kind in ("align", "look")
+    monkeypatch.setattr(bc, "LINEUP_BACKUP", False)
+    assert bc.ChasePlanner().decide(reading(3.0, 25.0)).kind in ("align", "look")         # switched off
