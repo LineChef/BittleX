@@ -206,6 +206,8 @@ class SerialLink:
         if command.strip() == "gB" and not self._gyro_allowed():
             command = "gb"                        # the fitted attachment runs with the firmware gyro balance off (attachments.flag "gyro_balance")
         try:
+            if command.strip() == "krest" and self._rest_eased():             # the lie-down from a stand is eased (owner, 2026-11-19: the firmware krest flipped a rolled G2 within a second, four times): it is not sent
+                return ""
             if command.strip() == "kcalib" and self._attention_entry_eased():     # the move into the attention pose is eased (owner, 2026-11-08: it sat hard into it): the firmware kcalib is not sent
                 return ""
             self._ease_transition(command)
@@ -491,6 +493,60 @@ class SerialLink:
             return {"roll": round(med([math.degrees(r[0]) for r in rows]), 1), "pitch": round(med([math.degrees(r[1]) for r in rows]), 1), "n": len(rows)}
         except Exception:  # noqa: BLE001
             return None
+
+    rest_plain_once = False                       # set by a caller that has found him fallen: the next `krest` is the firmware's (an eased skill from a stand pose is wrong for a body that is not standing)
+
+    def _rest_eased(self) -> bool:
+        """The lie-down from a stand, the attention pose or a sit as an eased `K` skill instead of the firmware `krest` (every joint at once at full speed: four lie-downs from a stand rolled 12 to 22 degrees flipped him
+        within a second, 2026-11-18 and 2026-11-19; the eased stand-up and attention-pose entry never did). Waits until the legs read as the rest pose (like the attention entry). True if it handled the command; False means
+        the caller sends `krest` as before: switched off (motion_feel.REST_EASED), a fallen body (`rest_plain_once`), already lying, or a pose it does not know."""
+        try:
+            from pi_pipeline.gait import standup
+            from .. import motion_feel
+            if self.rest_plain_once:
+                self.rest_plain_once = False
+                return False
+            p = standup._poses()
+            if not p or motion_feel.get("REST_EASED") < 1:
+                return False
+            last = (self.last_motion_command or "").strip()
+            if last in ("kbalance", "kup"):
+                start = list(standup.balance_pose())
+            elif last == "kcalib":
+                start = list(standup.ATTENTION_URDF_DEG)
+            elif last == "ksit":
+                start = list(standup.SIT_URDF_DEG)
+            else:
+                return False                                               # already lying, or a pose it does not know: the firmware krest as before
+            from . import kskill
+            goal = list(standup.rest_pose())
+            data = kskill.message(kskill.entry_payload(start, goal, steps=int(motion_feel.get("REST_STEPS")), speed_raw=int(motion_feel.get("REST_SPEED"))))
+            kskill.write_chunked(self._ser.write, data, time.sleep)
+            self._ser.flush()
+            waited, reached, jr, silent = 0.0, False, None, 0
+            limit = motion_feel.get("REST_WAIT_S")
+            while waited < limit:
+                time.sleep(kskill.POLL_S)
+                waited += kskill.POLL_S + 0.25
+                if waited >= kskill.MIN_WAIT_S:
+                    jr = kskill.read_joints(self)
+                    if kskill.legs_reached(jr, goal):
+                        reached = True
+                        break
+                    silent = silent + 1 if jr is None else 0
+                    if silent >= 2:
+                        limit = min(limit, motion_feel.get("REST_SILENT_WAIT_S"))
+            if not reached:
+                log.warning("eased lie-down: the board did not report the rest pose after %.1f s: left to finish", waited)
+            else:
+                log.info("the rest pose was reached after about %.1f s", waited)
+            self.last_motion_command, self._last_motion_t = "krest", time.monotonic()
+            ev = {"outcome": "reached" if reached else "left_to_finish", "from": last, "waited_s": round(waited, 1)}
+            motion_events.write("rest_eased", **ev)
+            return True
+        except Exception as e:  # noqa: BLE001  -- fall back to the firmware krest
+            log.warning("eased lie-down failed (%s): the firmware krest follows", e)
+            return False
 
     def _attention_entry_eased(self) -> bool:
         """Move into the attention pose (legs straight) as an eased `K` skill instead of the firmware `kcalib` (which drives every joint at once at full speed). UNTESTED on G2 until the next session

@@ -47,6 +47,10 @@ def lay_down_deaf_board(link, say, *, halt=None) -> threading.Thread:
             halt()
         except Exception:  # noqa: BLE001
             log.debug("halting for a deaf board failed", exc_info=True)
+    try:
+        link.rest_plain_once = True              # a deaf board cannot confirm anything: the firmware rest at once, not the eased lie-down (link/serial_link.py _rest_eased)
+    except Exception:  # noqa: BLE001
+        pass
     for c in ("gb", "krest"):
         try:
             link.send(c, read_reply=False, settle=0.0)

@@ -751,6 +751,14 @@ def _last_pack_volts() -> float | None:
         return None
 
 
+def _plain_rest_next(robot) -> None:
+    """The next `krest` is the firmware's, not the eased lie-down: he has fallen (a body lying on its side or back is not lowered from a stand pose). Never raises."""
+    try:
+        robot._lk.rest_plain_once = True
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _lie_down_pre(robot):
     """(tilt, pack volts) just before a lie-down, for behavior/liedown_log.py: the last tilt the robot read (`_tilt` remembers it; None when older than 30 s) and the pack read now. (None, None) when the lie-down
     log is off. No new IMU read: the lie-down's own sequence of tilt reads is untouched. Never raises."""
@@ -1200,6 +1208,7 @@ class SerialRobot:
             state = "fell"
         if state == "fell":
             self.posture = "rest"
+            _plain_rest_next(self)
             self._tx("krest")                             # after a fall he is laid in the rest position, never sent a stand (owner, 2026-11-08: always rest after a fall; no stand-up but the eased one)
             _lie_down_trace(self, "fall in a move", before=None if not self.last_fall else (self.last_fall.get("pitch", 0.0), self.last_fall.get("roll", 0.0)))
         else:
@@ -1305,6 +1314,7 @@ class SerialRobot:
         log.warning("the body reads pitch %+.0f roll %+.0f deg before a move: he has fallen (not a sag): laid in rest, no stand-up", tilt[0], tilt[1])
         self.last_fall = {"pitch": round(tilt[0], 1), "roll": round(tilt[1], 1), "way": "found fallen before a move", "posture": self.posture}
         self.posture = "rest"
+        _plain_rest_next(self)
         self._tx("krest")
         _lie_down_trace(self, "found fallen before a move", before=tilt)
         return True

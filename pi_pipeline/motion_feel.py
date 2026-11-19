@@ -38,6 +38,13 @@ ATT_ENTRY_SPEED = 10       # how fast each stage moves. BIGGER = faster. 10 is g
 ATT_ENTRY_WAIT_S = 7.0     # the longest the Pi waits for the legs to read as in the attention pose (3 s was too short: the wait ended with the move still playing).
 ATT_ENTRY_SILENT_WAIT_S = 3.0  # the wait for the attention pose when the board does not answer pose reads (the move normally takes 2 to 5 s): no waiting out ATT_ENTRY_WAIT_S for a reply that never comes.
 
+# 1 the lie-down from a standing pose (the eased skill; owner, 2026-11-19: four lie-downs from a rolled or sagging stand flipped him, within a second of the firmware `krest`, which drops every joint at once at full speed)
+REST_EASED = 1             # 1 = a lie-down from a stand, the attention pose or a sit is an eased K skill. 0 = the firmware `krest` as before. A fallen body always gets the plain rest.
+REST_STEPS = 8             # how many stages the lie-down is cut into. More = smoother but longer.
+REST_SPEED = 8             # how fast each stage moves. BIGGER = faster. The attention-pose entry uses 10 (gentle); the lie-down is gentler.
+REST_WAIT_S = 7.0          # the longest the Pi waits for the legs to read as in the rest pose.
+REST_SILENT_WAIT_S = 3.0   # the wait when the board does not answer pose reads.
+
 # 2 to 4 the claw raise and the swings (the arm's two servos are sent a new position this many times a second)
 CLAW_DEG_S = 60.0          # how fast the claw moves, in degrees a second. SMALLER = SLOWER.
 CLAW_STEPS_PER_S = 100     # position commands a second while the claw moves. More = finer steps (of 60/40, 40/40, 60/100 and 30/60 the owner picked 60 deg/s at 100 a second as smoothest, 2026-11-08).

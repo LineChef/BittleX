@@ -340,3 +340,53 @@ def test_a_stand_up_out_of_the_attention_pose_lies_down_in_rest_first_and_stands
     monkeypatch.setenv("G2_STAND_ATT_VIA_REST", "0")
     lk.last_motion_command = "kcalib"
     assert lk._stand_up_kskill(standup) is True and b"krest" not in [w.strip() for w in wrote]
+
+
+def test_the_lie_down_from_a_stand_is_an_eased_k_skill_and_krest_is_not_sent(monkeypatch):
+    """Owner, 2026-11-19: four lie-downs from a rolled or sagging stand flipped him within a second of the firmware krest."""
+    from pi_pipeline.link.serial_link import SerialLink
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    rest_legs = [int(round(v)) for v in standup.rest_pose()]
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: _legs_joints(standup.rest_pose()))      # the legs read as the rest pose: reached
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    monkeypatch.delenv("G2_REST_EASED", raising=False)
+    lk.last_motion_command = "kbalance"
+    assert lk.send("krest", read_reply=False, settle=0.0) == ""
+    assert not any(w.strip() == b"krest" for w in wrote)                                          # the firmware krest never reached the wire
+    k = _k_message(wrote)
+    assert k[:1] == b"K" and k[-1:] == b"~" and lk.last_motion_command == "krest"
+    n = [b - 256 if b > 127 else b for b in k[1:8]]
+    assert n[0] == -8                                                                            # eight stages
+    assert rest_legs                                                                              # (the last stage is the rest pose: the pose read above)
+
+
+def test_the_eased_lie_down_steps_aside_for_a_fallen_body_a_lying_one_an_unknown_pose_and_the_switch(monkeypatch):
+    from pi_pipeline.link.serial_link import SerialLink
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: _legs_joints(standup.rest_pose()))
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    monkeypatch.delenv("G2_REST_EASED", raising=False)
+    lk.last_motion_command = "kbalance"
+    lk.rest_plain_once = True
+    assert lk._rest_eased() is False and lk.rest_plain_once is False and wrote == []             # he has fallen: the firmware rest, once
+    lk.last_motion_command = "krest"
+    assert lk._rest_eased() is False                                                              # already lying
+    lk.last_motion_command = "kwkF"
+    assert lk._rest_eased() is False                                                              # a pose it does not know
+    monkeypatch.setenv("G2_REST_EASED", "0")
+    lk.last_motion_command = "kbalance"
+    assert lk._rest_eased() is False and wrote == []                                              # switched off in motion_feel
+    monkeypatch.delenv("G2_REST_EASED")
+    lk.last_motion_command = "kcalib"
+    assert lk._rest_eased() is True and _k_message(wrote)[:1] == b"K"                             # from the attention pose too
+
+
+def test_the_callers_that_find_him_fallen_ask_for_the_plain_rest():
+    import inspect
+    from pi_pipeline.behavior import ball_chase as bc
+    from pi_pipeline.gait import body_guards
+    assert "_plain_rest_next(self)" in inspect.getsource(bc.SerialRobot._already_fell)
+    assert "_plain_rest_next(self)" in inspect.getsource(bc.SerialRobot._skill)
+    assert "rest_plain_once" in inspect.getsource(body_guards.lay_down_deaf_board)
