@@ -748,6 +748,29 @@ def _last_pack_volts() -> float | None:
         return None
 
 
+def _lie_down_pre(robot):
+    """(tilt, pack volts) just before a lie-down, for behavior/liedown_log.py: the last tilt the robot read (`_tilt` remembers it; None when older than 30 s) and the pack read now. (None, None) when the lie-down
+    log is off. No new IMU read: the lie-down's own sequence of tilt reads is untouched. Never raises."""
+    try:
+        from . import liedown_log
+        if liedown_log.log_path() is None:
+            return None, None
+        seen = getattr(robot, "_last_tilt_read", None)
+        tilt = seen[1] if seen and robot._clock() - seen[0] <= 30.0 else None
+        return tilt, liedown_log.pack_volts(robot)
+    except Exception:  # noqa: BLE001
+        return None, None
+
+
+def _lie_down_trace(robot, why: str, before=None, volts=None) -> None:
+    """The tilt for the seconds after the rest command just sent (behavior/liedown_log.py). ONE call for every lie-down of the shared robot. Never raises."""
+    try:
+        from . import liedown_log
+        liedown_log.trace(robot, why, before=before, volts=volts)
+    except Exception:  # noqa: BLE001
+        log.debug("lie-down trace failed", exc_info=True)
+
+
 def _yaw_diff(a: float, b: float) -> float:
     """a - b as the short way round (-180..180): the firmware's yaw wraps at 360, and a turn across the wrap read as a 357 deg "spike" that reset the count (2026-11-10)."""
     return (a - b + 180.0) % 360.0 - 180.0
@@ -1175,6 +1198,7 @@ class SerialRobot:
         if state == "fell":
             self.posture = "rest"
             self._tx("krest")                             # after a fall he is laid in the rest position, never sent a stand (owner, 2026-11-08: always rest after a fall; no stand-up but the eased one)
+            _lie_down_trace(self, "fall in a move", before=None if not self.last_fall else (self.last_fall.get("pitch", 0.0), self.last_fall.get("roll", 0.0)))
         else:
             self.posture = "stand"
             self._tx("kbalance")                          # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
@@ -1252,7 +1276,9 @@ class SerialRobot:
                     pitch.append(math.degrees(r[1]))
             self._sleep(0.05)
         self._imu_release()
-        return (statistics.median(pitch), statistics.median(roll)) if pitch else None
+        got = (statistics.median(pitch), statistics.median(roll)) if pitch else None
+        self._last_tilt_read = (self._clock(), got) if got else getattr(self, "_last_tilt_read", None)      # the lie-down log's "tilt before" (behavior/liedown_log.py)
+        return got
 
     def note_picture_tilt(self, reading) -> None:
         """The last picture's roll (vision/picture_tilt.py): a picture that should be level but is rolled is a second sign of sagging legs (owner, 2026-11-10). While one was seen in the last
@@ -1277,6 +1303,7 @@ class SerialRobot:
         self.last_fall = {"pitch": round(tilt[0], 1), "roll": round(tilt[1], 1), "way": "found fallen before a move", "posture": self.posture}
         self.posture = "rest"
         self._tx("krest")
+        _lie_down_trace(self, "found fallen before a move", before=tilt)
         return True
 
     def _sagged(self, tilt) -> bool:
@@ -1363,6 +1390,11 @@ class SerialRobot:
             rec = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "pitch": None if tilt is None else round(tilt[0], 1), "roll": None if tilt is None else round(tilt[1], 1),
                    "since_stand_s": None if self._stood_at is None else round(now - self._stood_at, 1), "since_move_s": None if self._moved_at is None else round(now - self._moved_at, 1),
                    "last_move": self.last_move_token, "gait_s_60": work(60.0), "gait_s_180": work(180.0), "arm": list(self._claw), "posture": self.posture, "pack_v": _last_pack_volts()}
+            try:
+                from . import liedown_log
+                rec["pack_live_v"] = liedown_log.pack_volts(self)       # (2026-11-19) the pack read right now, not the last line the voltage log holds: a sag that coincides with a dip is the sign of a pack that cannot hold the legs
+            except Exception:  # noqa: BLE001
+                rec["pack_live_v"] = None
             try:
                 from ..telemetry.autolog import get_surface
                 rec["floor"] = get_surface()
@@ -1465,8 +1497,10 @@ class SerialRobot:
         side the ball was lost on). "ok" or "fell"."""
         if self.claw_pose(0.0, 0.0) == "fell":
             return "fell"
+        before, volts = _lie_down_pre(self)
         self._tx("krest")
         self.posture = "rest"
+        _lie_down_trace(self, "rest then stand", before=before, volts=volts)           # 1 s and 3 s after krest (G2_LIEDOWN_LOG=0 turns it off and the wait below is as it was)
         wait_for_pose(self._lk, "rest", sleep=self._sleep, clock=self._clock, fallback_s=REST_SETTLE_S)
         self._sleep(0.5)
         if self._already_fell(self._tilt(FINAL_TILT_S)):         # (2026-11-18: the lie-down from a rolled stand flipped him to 178 deg and the stand-up was sent anyway) a fallen body is laid in rest and never sent a stand
