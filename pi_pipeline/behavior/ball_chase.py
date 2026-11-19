@@ -259,6 +259,8 @@ PIVOT_CYCLE_S = 0.86            # one pivot cycle (72 frames), measured on G2 20
 PIVOT_DEG_PER_CYCLE = 20.0      # about how far one pivot cycle turns him, either side (2026-11-18 pictures and eye: 35 to 40 deg in 1.5 s); the camera corrects what is left
 PIVOT_MIN_DEG = 10.0            # a line-up turn smaller than this stays on the gyro-stopped arc: one pivot cycle is 20 deg or more, so the 3 to 6 deg align pulses turned 3 to 7 times too far (2026-11-18 goal run: -15 to +28 deg, "overshot"). Owner, 2026-11-19: 10 (was 14): a ball 10 to 14 deg off gets one whole cycle, about 20 deg, and the next picture corrects what is left
 PIVOT_MAX_CYCLES = 2            # a pivot line-up turn is one or two cycles (about 20 or 40 deg), then a new picture
+SAG_RESEAT = os.environ.get("G2_SAG_RESEAT", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) a sag of SAG_RESEAT_MIN_ROLL_DEG or more is first answered by re-seating the legs WITHOUT lying down (link.reseat_eased: the legs bend part way and straighten); five lie-downs from a rolled stand flipped him. 0 = always the lie-down
+SAG_RESEAT_MIN_ROLL_DEG = 15.0
 PIVOT_FULL_BEARING = os.environ.get("G2_PIVOT_FULL_BEARING", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) where the line-up is a pivot (opencat.lineup_uses_pivot: the ball 5 to 14 in away) and the ball is PIVOT_MIN_DEG or more off, the turn is asked for the whole bearing (up to PIVOT_MAX_CYCLES cycles), not the 6 deg arc pulse that never reached the pivot; 0 = the 6 deg pulses as before
 PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP
 PIVOT_LEAN_DEG = float(os.environ.get("G2_PIVOT_LEAN_DEG", "8"))      # (owner, 2026-11-18) nose-up beyond this many degrees right after a pivot: the legs have let go on the back legs, so he is laid in rest and stood up from rest at once (recover_sag) instead of sitting unstable until the next move; 0 turns it off
@@ -1426,8 +1428,39 @@ class SerialRobot:
         through the attention pose, the move that tipped a rolled G2 over). Used by every flow: the goal sessions before a move (stand_up), the claw look's entry and the voice service's stand guard."""
         log.warning("legs sagged%s: lying down in rest and standing up from rest", "" if tilt is None else f" (pitch {tilt[0]:+.0f} roll {tilt[1]:+.0f} deg)")
         self._log_sag(tilt)
+        if SAG_RESEAT and tilt is not None and abs(tilt[1]) >= SAG_RESEAT_MIN_ROLL_DEG and getattr(self._lk, "reseat_eased", None) is not None and self.posture in ("stand", "unknown"):
+            done = self._reseat_instead_of_lying_down(tilt)
+            if done is not None:
+                return done
         self.posture = "stand"
         return self.rest_then_stand()
+
+    def _reseat_instead_of_lying_down(self, tilt) -> str | None:
+        """A rolled sag (15 degrees or more) is answered by re-seating the legs where he stands, not by lying him down (the lie-down from a rolled stand flipped him five times, 2026-11-18 and 2026-11-19, the eased one too).
+        The claw is centred first. "ok" when he reads level afterwards, "fell" if the body went over, None when it could not run or left him still tilted (the caller lies him down as before)."""
+        if self.claw_pose(0.0, 0.0) == "fell":
+            return "fell"
+        res = self._lk.reseat_eased()
+        if res is None:
+            return None
+        after = self._tilt(FINAL_TILT_S)
+        if self._already_fell(after):
+            return "fell"
+        ev = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "before": [round(tilt[0], 1), round(tilt[1], 1)], "after": None if after is None else [round(after[0], 1), round(after[1], 1)], "peak_deg": res.get("peak_deg")}
+        level = after is not None and max(abs(after[0]), abs(after[1])) <= STAND_LEVEL_DEG
+        log.warning("re-seated the legs without lying down: tilt %s -> %s (%s)", ev["before"], ev["after"], "level" if level else "still tilted: lying down")
+        try:
+            from . import liedown_log
+            path = liedown_log.log_path()
+            if path:
+                with open(path, "a") as fh:
+                    fh.write(json.dumps({**ev, "why": "reseat", "level": level, "trace": res.get("trace")}) + "\n")
+        except Exception:  # noqa: BLE001
+            log.debug("re-seat log failed", exc_info=True)
+        if level:
+            self._stood_at, self._stand_tilt = self._clock(), after
+            return "ok"
+        return None
 
     def imu_alive(self, seconds: float = 1.0) -> bool:
         """Whether IMU frames are arriving (the stream switched on for `seconds`). A silent board makes every guard that reads the tilt do nothing, so the fall drill refuses to run on one."""

@@ -44,6 +44,10 @@ REST_STEPS = 8             # how many stages the lie-down is cut into. More = sm
 REST_SPEED = 8             # how fast each stage moves. BIGGER = faster. The attention-pose entry uses 10 (gentle); the lie-down is gentler.
 REST_WAIT_S = 7.0          # the longest the Pi waits for the legs to read as in the rest pose.
 REST_SILENT_WAIT_S = 3.0   # the wait when the board does not answer pose reads.
+REST_WATCH_S = 3.0         # (2026-11-19) the first seconds of the eased lie-down are spent reading the IMU, not polling the legs (`j` stops the IMU print: the first run had no tilt for the whole move); the trace goes in the motion events and the lie-down log
+RESEAT_STEPS = 10          # a re-seat of the legs without lying down: how many stages
+RESEAT_SPEED = 10          # ... how fast each stage moves (bigger = faster)
+RESEAT_DEPTH = 0.5         # ... how far toward the rest pose the legs go and come back (0.5 = half way)
 
 # 2 to 4 the claw raise and the swings (the arm's two servos are sent a new position this many times a second)
 CLAW_DEG_S = 60.0          # how fast the claw moves, in degrees a second. SMALLER = SLOWER.

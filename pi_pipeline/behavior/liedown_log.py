@@ -81,6 +81,10 @@ def trace(robot, why: str, before=None, volts: float | None = None, long_checkpo
                "after": {f"{m:g}s": _at(frames, m) for m in cps}, "frames": len(frames),
                "peak_deg": None if peak is None else round(peak, 1), "flipped": bool(peak is not None and peak >= fall_deg),
                "pack_v": volts, "arm": list(getattr(robot, "_claw", ()) or ())}
+        during = getattr(getattr(robot, "_lk", None), "last_rest_eased", None)           # the tilt the link read WHILE the eased lie-down ran (link/serial_link.py _rest_eased), then cleared
+        if during:
+            rec["during"] = {"peak_deg": during.get("peak_deg"), "trace": during.get("trace")}
+            robot._lk.last_rest_eased = None
         try:
             from ..telemetry.autolog import get_surface
             rec["floor"] = get_surface()

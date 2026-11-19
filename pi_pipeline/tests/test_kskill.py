@@ -390,3 +390,39 @@ def test_the_callers_that_find_him_fallen_ask_for_the_plain_rest():
     assert "_plain_rest_next(self)" in inspect.getsource(bc.SerialRobot._already_fell)
     assert "_plain_rest_next(self)" in inspect.getsource(bc.SerialRobot._skill)
     assert "rest_plain_once" in inspect.getsource(body_guards.lay_down_deaf_board)
+
+
+def test_the_reseat_is_one_eased_k_skill_that_bends_the_legs_and_comes_back_to_the_stand(monkeypatch):
+    """Owner, 2026-11-19: a rolled sag is answered by re-seating the legs where he stands, not by lying him down."""
+    from pi_pipeline.link.serial_link import SerialLink
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    monkeypatch.setattr(lk, "_watch_tilt", lambda seconds: [(0.0, 1.0, -20.0), (0.6, 1.0, -9.0), (1.2, 0.5, -2.0)])
+    lk.last_motion_command = "kbalance"
+    res = lk.reseat_eased()
+    assert res and res["peak_deg"] == 20.0 and res["trace"][0] == [0.0, 1.0, -20.0]
+    k = _k_message(wrote)
+    assert k[:1] == b"K" and k[-1:] == b"~" and lk.last_motion_command == "kbalance"
+    n = [b - 256 if b > 127 else b for b in k[1:8]]
+    assert n[0] == -10                                                                           # ten stages
+    first = [b - 256 if b > 127 else b for b in k[1 + 7:1 + 7 + 16]]
+    last = [b - 256 if b > 127 else b for b in k[1 + 7 + 9 * 20:1 + 7 + 9 * 20 + 16]]
+    stand = [int(round(v)) for v in standup.balance_pose()]
+    assert [last[kskill.URDF_TO_SERVO[i]] for i in range(8)] == stand                            # the last stage is the stand pose again
+    assert first != last                                                                         # and the middle bends toward rest
+    lk.last_motion_command = "krest"
+    assert lk.reseat_eased() is None                                                             # only from a stand
+
+
+def test_the_eased_lie_down_keeps_the_imu_on_and_records_the_tilt_during_the_move(monkeypatch):
+    from pi_pipeline.link.serial_link import SerialLink
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: _legs_joints(standup.rest_pose()))
+    monkeypatch.setattr(lk, "_watch_tilt", lambda seconds: [(0.0, 1.0, -23.0), (0.6, 1.0, -60.0), (1.2, 0.5, -179.0)])
+    monkeypatch.delenv("G2_REST_EASED", raising=False)
+    lk.last_motion_command = "kbalance"
+    assert lk._rest_eased() is True
+    assert lk.last_rest_eased["peak_deg"] == 179.0 and len(lk.last_rest_eased["trace"]) == 3         # the flip is visible while the move runs

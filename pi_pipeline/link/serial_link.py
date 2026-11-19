@@ -10,6 +10,7 @@ from __future__ import annotations
 import collections
 import logging
 import os
+import math
 import threading
 import time
 
@@ -494,6 +495,67 @@ class SerialLink:
         except Exception:  # noqa: BLE001
             return None
 
+    def _watch_tilt(self, seconds: float) -> list:
+        """(seconds since the call, pitch deg, roll deg) from the IMU print for `seconds` (the print is switched on first). The legs are not polled meanwhile: a `j` read stops the print, which is why the first eased
+        lie-down (2026-11-19) left no tilt for the whole move. Never raises; [] when no frames arrive."""
+        out = []
+        try:
+            from ..gait.imu_parse import parse_imu_line
+            self._ser.write(b"gP\n")
+            t0 = time.monotonic()
+            while time.monotonic() - t0 < seconds:
+                for line in self.poll_imu():
+                    r = parse_imu_line(line)
+                    if r is not None:
+                        out.append((round(time.monotonic() - t0, 2), round(math.degrees(r[1]), 1), round(math.degrees(r[0]), 1)))
+                time.sleep(0.05)
+        except Exception:  # noqa: BLE001
+            log.debug("tilt watch failed", exc_info=True)
+        return out
+
+    @staticmethod
+    def _trace_summary(trace: list) -> dict:
+        """{"trace": about one frame in 0.5 s as [t, pitch, roll], "peak_deg": the largest tilt seen} of a `_watch_tilt` trace."""
+        thin, last = [], None
+        for t, p, r in trace:
+            if last is None or t - last >= 0.5:
+                thin.append([t, p, r])
+                last = t
+        return {"trace": thin, "peak_deg": max((max(abs(p), abs(r)) for _t, p, r in trace), default=None)}
+
+    def reseat_eased(self) -> dict | None:
+        """Re-seat the legs WITHOUT lying down (owner, 2026-11-19: four lie-downs from a rolled stand flipped him, and the eased lie-down did too): one eased `K` skill that bends all four legs part way toward the rest pose
+        (motion_feel.RESEAT_DEPTH) and straightens them back to the stand, played by the board itself while the IMU is read. For a sag of 15 degrees or more (ball_chase.recover_sag). Only from a stand
+        (`kbalance` / `kup`); None when it cannot run (another pose, no poses file, an error: the caller lies him down as before), else {"trace", "peak_deg"} for what the body did."""
+        try:
+            from pi_pipeline.gait import standup
+            from .. import motion_feel
+            from . import kskill
+            if not standup._poses() or (self.last_motion_command or "").strip() not in ("kbalance", "kup"):
+                return None
+            start, rest = list(standup.balance_pose()), list(standup.rest_pose())
+            depth, n = float(motion_feel.get("RESEAT_DEPTH")), int(motion_feel.get("RESEAT_STEPS"))
+            frames = []
+            for k in range(1, n + 1):
+                w = depth * math.sin(math.pi * k / n)                     # 0 -> depth -> 0: back at the stand pose on the last frame
+                f = [0.0] * kskill.DOF
+                for idx in range(8):
+                    f[kskill.URDF_TO_SERVO[idx]] = start[idx] + (rest[idx] - start[idx]) * w
+                frames.append(f)
+            speed = int(motion_feel.get("RESEAT_SPEED"))
+            data = kskill.message(kskill.behavior_payload(frames, [speed] * n, [0] * n))
+            kskill.write_chunked(self._ser.write, data, time.sleep)
+            self._ser.flush()
+            trace = self._watch_tilt(kskill.play_seconds(n * 0.25, n) + 1.0)
+            summary = self._trace_summary(trace)
+            self.last_motion_command, self._last_motion_t = "kbalance", time.monotonic()
+            motion_events.write("reseat", peak_deg=summary["peak_deg"], frames=len(trace))
+            log.info("legs re-seated without lying down (peak tilt %s deg)", summary["peak_deg"])
+            return summary
+        except Exception as e:  # noqa: BLE001
+            log.warning("eased re-seat failed (%s): the caller lies him down as before", e)
+            return None
+
     rest_plain_once = False                       # set by a caller that has found him fallen: the next `krest` is the firmware's (an eased skill from a stand pose is wrong for a body that is not standing)
 
     def _rest_eased(self) -> bool:
@@ -523,7 +585,9 @@ class SerialLink:
             data = kskill.message(kskill.entry_payload(start, goal, steps=int(motion_feel.get("REST_STEPS")), speed_raw=int(motion_feel.get("REST_SPEED"))))
             kskill.write_chunked(self._ser.write, data, time.sleep)
             self._ser.flush()
-            waited, reached, jr, silent = 0.0, False, None, 0
+            watch = float(motion_feel.get("REST_WATCH_S"))
+            trace = self._watch_tilt(watch) if watch > 0 else []              # the first seconds: the tilt, no leg polling (a `j` read stops the IMU print)
+            waited, reached, jr, silent = watch, False, None, 0
             limit = motion_feel.get("REST_WAIT_S")
             while waited < limit:
                 time.sleep(kskill.POLL_S)
@@ -536,12 +600,13 @@ class SerialLink:
                     silent = silent + 1 if jr is None else 0
                     if silent >= 2:
                         limit = min(limit, motion_feel.get("REST_SILENT_WAIT_S"))
+            self.last_rest_eased = self._trace_summary(trace)
             if not reached:
                 log.warning("eased lie-down: the board did not report the rest pose after %.1f s: left to finish", waited)
             else:
                 log.info("the rest pose was reached after about %.1f s", waited)
             self.last_motion_command, self._last_motion_t = "krest", time.monotonic()
-            ev = {"outcome": "reached" if reached else "left_to_finish", "from": last, "waited_s": round(waited, 1)}
+            ev = {"outcome": "reached" if reached else "left_to_finish", "from": last, "waited_s": round(waited, 1), "peak_deg": self.last_rest_eased["peak_deg"], "tilt": self.last_rest_eased["trace"][:8]}
             motion_events.write("rest_eased", **ev)
             return True
         except Exception as e:  # noqa: BLE001  -- fall back to the firmware krest

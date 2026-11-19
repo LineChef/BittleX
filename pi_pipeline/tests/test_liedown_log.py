@@ -124,3 +124,57 @@ def test_the_tilt_before_is_the_last_one_read_and_no_new_read_is_made(tmp_path, 
     r._last_tilt_read = (c.t, (-12.0, 22.0))
     r.rest_then_stand()
     assert _lines(tmp_path)[0]["before"] == [-12.0, 22.0] and len(reads) == 1           # the one read is the check after the lie-down, as before
+
+
+class _SagLink(Link):
+    def __init__(self, clock, reseat):
+        super().__init__(clock, lambda t: 0.0)
+        self._reseat = reseat
+    def reseat_eased(self):
+        self.sent.append("RESEAT")
+        return self._reseat
+
+
+def _sag_robot(tmp_path, monkeypatch, reseat, after_tilt, **env):
+    monkeypatch.setenv("G2_LIEDOWN_LOG", str(tmp_path / "ld.jsonl"))
+    monkeypatch.setenv("G2_SAG_LOG", str(tmp_path / "sag.jsonl"))
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(bc, "wait_for_pose", lambda *a, **k: "rest")
+    c = Clock()
+    r = bc.SerialRobot(_SagLink(c, reseat), sleep=c.sleep, clock=c.now)
+    r.posture = "stand"
+    r.claw_pose = lambda *a, **k: "ok"
+    r._stand_up_from = lambda pose: "ok"
+    ends = iter(after_tilt)
+    r._tilt = lambda s=0.5: next(ends, (0.0, 0.0))
+    return r
+
+
+def test_a_rolled_sag_is_reseated_without_lying_down_when_that_levels_him(tmp_path, monkeypatch):
+    monkeypatch.setattr(bc, "SAG_RESEAT", True)
+    r = _sag_robot(tmp_path, monkeypatch, {"trace": [[0.0, 1.0, -23.0]], "peak_deg": 23.0}, [(0.5, -2.0)])
+    assert r.recover_sag((1.0, -23.0)) == "ok"
+    assert "RESEAT" in r._lk.sent and "krest" not in r._lk.sent                           # no lie-down at all
+    lines = _lines(tmp_path)
+    assert lines and lines[0]["why"] == "reseat" and lines[0]["level"] is True and lines[0]["before"] == [1.0, -23.0]
+
+
+def test_a_reseat_that_leaves_him_tilted_or_cannot_run_falls_back_to_the_lie_down(tmp_path, monkeypatch):
+    monkeypatch.setattr(bc, "SAG_RESEAT", True)
+    r = _sag_robot(tmp_path, monkeypatch, {"trace": [], "peak_deg": 20.0}, [(0.0, -20.0)])
+    assert r.recover_sag((1.0, -23.0)) == "ok" and "RESEAT" in r._lk.sent and "krest" in r._lk.sent    # still tilted: the lie-down as before
+    r2 = _sag_robot(tmp_path, monkeypatch, None, [])
+    assert r2.recover_sag((1.0, -23.0)) == "ok" and "krest" in r2._lk.sent                              # the link could not re-seat
+    r3 = _sag_robot(tmp_path, monkeypatch, {"trace": [], "peak_deg": 5.0}, [])
+    assert r3.recover_sag((1.0, -10.0)) == "ok" and "RESEAT" not in r3._lk.sent                          # under 15 degrees of roll: the lie-down, as before
+    monkeypatch.setattr(bc, "SAG_RESEAT", False)
+    r4 = _sag_robot(tmp_path, monkeypatch, {"trace": [], "peak_deg": 5.0}, [])
+    assert r4.recover_sag((1.0, -23.0)) == "ok" and "RESEAT" not in r4._lk.sent                          # switched off
+
+
+def test_the_lie_down_line_carries_the_tilt_read_during_the_eased_move(tmp_path, monkeypatch):
+    r, _ = _robot(tmp_path, monkeypatch, lambda t: 5.0)
+    r._lk.last_rest_eased = {"peak_deg": 80.0, "trace": [[0.0, 1.0, -23.0], [1.0, 2.0, -80.0]]}
+    rec = LL.trace(r, "eased")
+    assert rec["during"]["peak_deg"] == 80.0 and r._lk.last_rest_eased is None
