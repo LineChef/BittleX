@@ -259,6 +259,7 @@ PIVOT_CYCLE_S = 0.86            # one pivot cycle (72 frames), measured on G2 20
 PIVOT_DEG_PER_CYCLE = 20.0      # about how far one pivot cycle turns him, either side (2026-11-18 pictures and eye: 35 to 40 deg in 1.5 s); the camera corrects what is left
 PIVOT_MIN_DEG = 14.0            # a line-up turn smaller than this stays on the gyro-stopped arc: one pivot cycle is 20 deg or more, so the 3 to 6 deg align pulses turned 3 to 7 times too far (2026-11-18 goal run: -15 to +28 deg, "overshot")
 PIVOT_MAX_CYCLES = 2            # a pivot line-up turn is one or two cycles (about 20 or 40 deg), then a new picture
+PIVOT_FULL_BEARING = os.environ.get("G2_PIVOT_FULL_BEARING", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) where the line-up is a pivot (opencat.lineup_uses_pivot: the ball 5 to 14 in away) and the ball is PIVOT_MIN_DEG or more off, the turn is asked for the whole bearing (up to PIVOT_MAX_CYCLES cycles), not the 6 deg arc pulse that never reached the pivot; 0 = the 6 deg pulses as before
 PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP
 PIVOT_LEAN_DEG = float(os.environ.get("G2_PIVOT_LEAN_DEG", "8"))      # (owner, 2026-11-18) nose-up beyond this many degrees right after a pivot: the legs have let go on the back legs, so he is laid in rest and stood up from rest at once (recover_sag) instead of sitting unstable until the next move; 0 turns it off
 PIVOT_ALIGN_CAP_S = 4.0        # the same cap for the pivot gait (kvtL / kvtR): its slower side needs about 4 s for a 40 degree turn (2026-11-18 turn calibration); the arc turns keep ALIGN_CAP_S
@@ -618,6 +619,8 @@ class ChasePlanner:
                 side = 1 if ball.bearing_deg > 0 else -1
                 gain = ALIGN_GAIN * (ALIGN_CLOSE_GAIN if ball.distance_in <= ALIGN_CLOSE_IN else 1.0)
                 want = max(ALIGN_MIN_DEG, min(gain * abs(ball.bearing_deg), ALIGN_MAX_DEG))
+                if PIVOT_FULL_BEARING and abs(ball.bearing_deg) >= PIVOT_MIN_DEG and opencat.lineup_uses_pivot(ball.distance_in):
+                    want = min(abs(ball.bearing_deg), PIVOT_DEG_PER_CYCLE * PIVOT_MAX_CYCLES)       # a pivot turns in whole cycles of about 20 deg and the camera corrects what is left: asking 6 never reached it (2026-11-19 goal run)
                 rate = self._turn_rate(side, True)
                 floor_s = min(ALIGN_PULSE_MIN_S, max(ALIGN_PULSE_FLOOR_MIN_S, ALIGN_PULSE_FLOOR_DEG / rate))      # per side: the same degrees take longer to the slower side
                 secs = max(floor_s, min(ALIGN_PULSE_MAX_S, want / rate))

@@ -155,3 +155,37 @@ def test_a_line_up_turn_in_the_band_is_whole_pivot_cycles_and_outside_it_the_gyr
     r.lineup_ball_in = 10.0
     r.turn(-20.0, 1.0)                                                 # a timed turn (no stop_deg) is not a line-up: its own choice
     assert sent[-1][0] == "kwkL"
+
+
+def _planner_ask(monkeypatch, ball_in, bearing, **env):
+    from pi_pipeline.tests.test_ball_chase import reading
+    for k in ("G2_LINEUP_GAIT", "G2_PIVOT_MIN_IN", "G2_PIVOT_MAX_IN"):
+        monkeypatch.delenv(k, raising=False)
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(bc, "ALIGN_CONFIRM_IN", 0.0)                                   # one picture is enough here
+    a = bc.ChasePlanner().decide(reading(ball_in, bearing))
+    assert a.kind == "align"
+    return a
+
+
+def test_in_the_pivot_band_the_line_up_is_asked_for_the_whole_bearing_up_to_two_cycles(monkeypatch):
+    """2026-11-19 goal run: ball 34 deg off at 6 in, the planner asked 6 deg, the pivot starts at 14: it never ran."""
+    assert _planner_ask(monkeypatch, 6.0, 34.0).stop_deg == 34.0                        # a whole bearing: 2 cycles of about 20 deg
+    assert _planner_ask(monkeypatch, 7.0, -21.0).stop_deg == 21.0                        # 1 cycle (the line-up pulses are for a ball within the nudge range; farther out the plain turn already has the whole bearing)
+    assert _planner_ask(monkeypatch, 6.0, 60.0).stop_deg == bc.PIVOT_DEG_PER_CYCLE * bc.PIVOT_MAX_CYCLES      # never more than the cap
+    assert bc.PIVOT_MIN_DEG <= 34.0 and opencat.lineup_uses_pivot(6.0)
+
+
+def test_outside_the_band_or_for_a_small_bearing_it_is_still_the_small_arc_pulse(monkeypatch):
+    assert _planner_ask(monkeypatch, 3.0, 34.0).stop_deg <= bc.ALIGN_MAX_DEG            # right against the ball: the arc, small
+    assert _planner_ask(monkeypatch, 6.0, 10.0).stop_deg <= bc.ALIGN_MAX_DEG            # under 14 deg: a pivot cycle would overshoot
+    assert _planner_ask(monkeypatch, 6.0, 34.0, G2_LINEUP_GAIT="arc").stop_deg <= bc.ALIGN_MAX_DEG     # the arc setting keeps the small pulses
+
+
+def test_the_switch_restores_the_small_pulses_and_the_planner_and_the_skill_choice_share_one_rule(monkeypatch):
+    monkeypatch.setattr(bc, "PIVOT_FULL_BEARING", False)
+    assert _planner_ask(monkeypatch, 6.0, 34.0).stop_deg <= bc.ALIGN_MAX_DEG
+    import inspect
+    assert "opencat.lineup_uses_pivot(" in inspect.getsource(bc.ChasePlanner.decide)                    # one rule for both
+    assert "lineup_uses_pivot(ball_in)" in inspect.getsource(opencat.lineup_tokens)
