@@ -884,7 +884,7 @@ def test_a_gyro_turn_that_barely_moves_ends_at_the_cap_and_no_imu_means_the_time
 
 def test_the_line_up_target_is_small_and_inside_its_limits():
     """The arc pulse is at most ALIGN_MAX_DEG. Where the line-up is a pivot (the ball 5 to 14 in away, 14 deg or more off) it is asked for the whole bearing, up to two cycles (owner, 2026-11-19; tests/test_turn_gait.py)."""
-    for bearing, dist in ((75, 3), (13, 4), (10, 6)):
+    for bearing, dist in ((75, 3), (13, 4), (8, 6)):
         a = bc.ChasePlanner().decide(reading(dist, bearing))
         assert a.kind == "align" and bc.ALIGN_MIN_DEG <= a.stop_deg <= bc.ALIGN_MAX_DEG
     for bearing, dist in ((16, 6), (40, 6)):

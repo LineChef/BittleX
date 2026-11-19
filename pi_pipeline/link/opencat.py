@@ -80,7 +80,7 @@ def turn_tokens() -> tuple:
 
 def lineup_tokens(ball_in=None) -> tuple:
     """(right, left) turn skills for the ball goal's gyro-stopped LINE-UP turns (the pulses that point the claw at the ball, and the turns that face it before a walk). Owner, 2026-11-18: use both. `G2_LINEUP_GAIT`
-    is `auto` (default): the in-place pivots `kvtR` / `kvtL` while the ball is between `G2_PIVOT_MIN_IN` (5) and `G2_PIVOT_MAX_IN` (14) inches away (far enough that the pivot's small push forward does not shove
+    is `auto` (default): the in-place pivots `kvtR` / `kvtL` while the ball is between `G2_PIVOT_MIN_IN` (5) and `G2_PIVOT_MAX_IN` (10) inches away (far enough that the pivot's small push forward does not shove
     the ball, near enough that the camera's bearing is good), the arc turns `kwkR` / `kwkL` everywhere else and whenever the distance is unknown; `arc` or `pivot` force one of them. Every other turn uses `turn_tokens()`."""
     return (PIVOT_RIGHT, PIVOT_LEFT) if lineup_uses_pivot(ball_in) else (WALK_RIGHT, WALK_LEFT)
 
@@ -88,16 +88,16 @@ def lineup_tokens(ball_in=None) -> tuple:
 def lineup_uses_pivot(ball_in=None) -> bool:
     """Whether a line-up turn with the ball `ball_in` inches away is a pivot. ONE rule for the skill choice (`lineup_tokens`) and for the planner that sizes the turn (behavior/ball_chase.py: a pivot is asked for the
     whole bearing, an arc pulse for at most ALIGN_MAX_DEG), so the two cannot disagree (2026-11-19: the planner asked 6 degree pulses, the pivot starts at 14, and it never ran). `G2_LINEUP_GAIT`: `pivot` always,
-    `auto` (default) between `G2_PIVOT_MIN_IN` (5) and `G2_PIVOT_MAX_IN` (14) inches, never when the distance is unknown, `arc` or anything else never."""
+    `auto` (default) between `G2_PIVOT_MIN_IN` (5) and `G2_PIVOT_MAX_IN` (10) inches, never when the distance is unknown, `arc` or anything else never."""
     import os
     mode = os.environ.get("G2_LINEUP_GAIT", "auto").strip().lower()
     if mode == "pivot":
         return True
     if mode == "auto" and ball_in is not None:
         try:
-            lo, hi = float(os.environ.get("G2_PIVOT_MIN_IN", "5")), float(os.environ.get("G2_PIVOT_MAX_IN", "14"))
+            lo, hi = float(os.environ.get("G2_PIVOT_MIN_IN", "5")), float(os.environ.get("G2_PIVOT_MAX_IN", "10"))
         except ValueError:
-            lo, hi = 5.0, 14.0
+            lo, hi = 5.0, 10.0
         return lo <= float(ball_in) <= hi
     return False
 

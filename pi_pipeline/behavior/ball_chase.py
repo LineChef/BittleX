@@ -75,12 +75,12 @@ CHASE_WALL_TURN_MAX_DEG = 30.0  # the most a wall turn in the chase turns him (t
 MIN_MOVE_S = 1.2               # a gait started and stopped for less than this does not move him
 CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than this, step closer before the next one (2026-10-25: a punt from 4.5 to 7 in was too far, from 2.6 in it threw the ball 18 in)
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
-BACK_UP_S = 1.0
+BACK_UP_S = 1.5                # (owner, 2026-11-19: "a little too short": was 1.0) one back-up; BACK_IN_S below guesses its pace at 3 in a second, so about 4.5 in
 SAVE_EVERY_S = 2.0
-BACK_BUDGET_S = 3.0            # the most backing up in one attempt (search moves, stuck punts and a vanished ball together): there is no edge detector, so keep it small on a desk (0 = never back up)
+BACK_BUDGET_S = 4.5            # (was 3.0: raised with BACK_UP_S so three back-ups still fit) the most backing up in one attempt (search moves, stuck punts and a vanished ball together): there is no edge detector, so keep it small on a desk (0 = never back up)
 VANISH_AXIS_DEG = 12.0           # a ball that vanishes at close range counts as "at the claw" only if its last bearing was within this of straight (the punt line-up limit, PUNT_ALIGN_DEG); farther off it was pushed or lost, so he looks instead of punting
 WHEN_VANISHED = "punt"         # the ball vanished at close range: "punt" (it is at the claw) or "back_up" (back off a little and look again)
-VANISH_BACK_S = 1.0
+VANISH_BACK_S = 1.5            # (owner, 2026-11-19: with BACK_UP_S, was 1.0) the back-up after a ball vanished at close range
 
 # Searching (goals plan, 2026-10-31): a search is a list of moves. The "once" moves play first, then the "cycle" moves repeat until the ball is seen. Moves: "claw" (look around with the
 # arm: the camera is on the claw), "turn" (a turn step in place), "back" (back up to see more floor). Without the claw (a robot that cannot move it) "claw" is left out.
@@ -257,7 +257,7 @@ ALIGN_CONFIRM_AGREE_DEG = 8.0  # two bearings this close are the same reading; o
 PIVOT_TOKENS = ("kvtL", "kvtR")
 PIVOT_CYCLE_S = 0.86            # one pivot cycle (72 frames), measured on G2 2026-11-18; the measured file (gait_cycles.json) wins when it has it
 PIVOT_DEG_PER_CYCLE = 20.0      # about how far one pivot cycle turns him, either side (2026-11-18 pictures and eye: 35 to 40 deg in 1.5 s); the camera corrects what is left
-PIVOT_MIN_DEG = 14.0            # a line-up turn smaller than this stays on the gyro-stopped arc: one pivot cycle is 20 deg or more, so the 3 to 6 deg align pulses turned 3 to 7 times too far (2026-11-18 goal run: -15 to +28 deg, "overshot")
+PIVOT_MIN_DEG = 10.0            # a line-up turn smaller than this stays on the gyro-stopped arc: one pivot cycle is 20 deg or more, so the 3 to 6 deg align pulses turned 3 to 7 times too far (2026-11-18 goal run: -15 to +28 deg, "overshot"). Owner, 2026-11-19: 10 (was 14): a ball 10 to 14 deg off gets one whole cycle, about 20 deg, and the next picture corrects what is left
 PIVOT_MAX_CYCLES = 2            # a pivot line-up turn is one or two cycles (about 20 or 40 deg), then a new picture
 PIVOT_FULL_BEARING = os.environ.get("G2_PIVOT_FULL_BEARING", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-19) where the line-up is a pivot (opencat.lineup_uses_pivot: the ball 5 to 14 in away) and the ball is PIVOT_MIN_DEG or more off, the turn is asked for the whole bearing (up to PIVOT_MAX_CYCLES cycles), not the 6 deg arc pulse that never reached the pivot; 0 = the 6 deg pulses as before
 PIVOT_CYCLE_STOP = os.environ.get("G2_PIVOT_CYCLE_STOP", "1").strip().lower() in ("1", "on", "true", "yes")      # (owner, 2026-11-18) a timed pivot keeps going to a whole 0.86 s cycle before the stop, so the legs end near the balance stand: in the 20-turn A/B the large nose-up sags (31 to 35 deg) were 3 of 10 turns without it and 0 of 10 with it; the arc turns keep CYCLE_STOP

@@ -104,8 +104,8 @@ def test_the_line_up_turn_uses_both_gaits_the_pivot_only_in_a_band_and_the_switc
         monkeypatch.delenv(k, raising=False)
     arc, piv = ("kwkR", "kwkL"), ("kvtR", "kvtL")
     assert opencat.lineup_tokens() == arc and opencat.lineup_tokens(None) == arc                    # distance unknown: the arc
-    assert opencat.lineup_tokens(20.0) == arc and opencat.lineup_tokens(14.5) == arc                # far: the arc
-    assert opencat.lineup_tokens(14.0) == piv and opencat.lineup_tokens(8.0) == piv and opencat.lineup_tokens(5.0) == piv     # the band: the pivot, a bit away from the ball
+    assert opencat.lineup_tokens(20.0) == arc and opencat.lineup_tokens(10.5) == arc                # far: the arc
+    assert opencat.lineup_tokens(10.0) == piv and opencat.lineup_tokens(8.0) == piv and opencat.lineup_tokens(5.0) == piv     # the band: the pivot, a bit away from the ball
     assert opencat.lineup_tokens(4.9) == arc and opencat.lineup_tokens(3.0) == arc                  # right up against the ball: never the pivot (it pushes him forward a little)
     monkeypatch.setenv("G2_LINEUP_GAIT", "arc")
     assert opencat.lineup_tokens(8.0) == arc
@@ -179,7 +179,7 @@ def test_in_the_pivot_band_the_line_up_is_asked_for_the_whole_bearing_up_to_two_
 
 def test_outside_the_band_or_for_a_small_bearing_it_is_still_the_small_arc_pulse(monkeypatch):
     assert _planner_ask(monkeypatch, 3.0, 34.0).stop_deg <= bc.ALIGN_MAX_DEG            # right against the ball: the arc, small
-    assert _planner_ask(monkeypatch, 6.0, 10.0).stop_deg <= bc.ALIGN_MAX_DEG            # under 14 deg: a pivot cycle would overshoot
+    assert _planner_ask(monkeypatch, 6.0, 8.0).stop_deg <= bc.ALIGN_MAX_DEG             # under 10 deg: a pivot cycle would overshoot
     assert _planner_ask(monkeypatch, 6.0, 34.0, G2_LINEUP_GAIT="arc").stop_deg <= bc.ALIGN_MAX_DEG     # the arc setting keeps the small pulses
 
 
