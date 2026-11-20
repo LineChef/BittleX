@@ -507,6 +507,9 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         if disable_firmware_balance and not in_service:
             _send(lk, "gB")    # restore the firmware default (balance + reflexes on) BEFORE the rest: sent right after `d` it left G2 standing
             time.sleep(0.3)
+        elif disable_firmware_balance and in_service:
+            _send(lk, "gB")    # in the service too (2026-11-20: the firmware default is balance ON everywhere except a learned walk, and the stand guard no longer turns it off at idle); a link whose attachment
+                               # runs with the gyro off turns this `gB` into `gb` (SerialLink.send), so nothing changes for it
         if getattr(stop_event, "rest", True):
             _send(lk, "d")     # rest, last, then a pause so the board has it before the port closes
             time.sleep(0.5)

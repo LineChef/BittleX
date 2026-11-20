@@ -15,6 +15,7 @@ The skill data and the lookup code were read from Petoi's official BiBoard firmw
 - Repository: `https://github.com/PetoiCamp/OpenCatEsp32-Quadruped-Robot` (MIT licence).
 - Pinned commit: `f5aba6b9cb7e4f2062f77365fbcd0c388acf32ef`.
 - Files read, with SHA-256: `src/InstinctBittleESP_arm.h` (cd0a1c7c...00f6, 111431 bytes), `src/skill.h` (a68890f9...03de, 21281 bytes), `src/voice.h` (1b71141a...881b, 13912 bytes), `src/robotArm.h` (72b04bd0...b804e, 819 bytes), `src/OpenCat.h` (5fe49684...b191, 27417 bytes).
+- The skill-abort finding comes from `src/reaction.h` (SHA-256 `6ff5ec5b…ddd0`, 67942 bytes) and `src/io.h` (SHA-256 `0e06a1d8…d264`, 1398 bytes) at the same commit, fetched from `raw.githubusercontent.com` over HTTPS and read as text only; `skill.h` and `OpenCat.h` matched the hashes recorded above. The fetched copies are in `~/g2_data/firmware_src_f5aba6b9` outside the repository.
 - The files are C header text, read as data and never compiled or run. The arm skill arrays are byte-identical to the stock `InstinctBittleESP.h` already kept for the sim reference.
 
 How the firmware finds a skill
@@ -26,6 +27,16 @@ How the firmware finds a skill
 - The same holds for `kpickL` and `kpickR` (both play `pick`) and `kputL` and `kputR` (both play `put`). Only the `F` and `D` variants of pick, put and toss exist as separate arrays.
 - `klaunch` matches the `launch` array exactly. `launch` and `tossD` hold identical data, which agrees with Petoi's note that launch is "toss down".
 - The arm firmware's ten voice-module commands are `kpickF`, `kputD`, `khuntL`, `kshowOff`, `kputL`, `ktossL`, `klaunchL`, `kclapL`, `ktossF` and a calibration. The "Shoot" command (throw forward) is the tenth voice slot, which is `klaunchL`, so shoot plays `launch`.
+
+A behavior skill is aborted by any serial byte
+----------------------------------------------
+
+Behavior skills (`pickF`, `pickD`, `put`, `launch`, `toss`, `hunt`, `showOff`, `clap` and the tricks) are played one frame at a time, and `perform()` in `skill.h` checks the serial port before each frame. If any byte is waiting there (from the wired serial port, the voice module or Bluetooth) the skill prints "Behavior interrupted", stops, and `reaction.h` loads `up` in its place, which is the `up` the board echoes. Gaits and postures are not checked this way.
+
+- The problem: until this was found, every arm skill sent from the Pi was cut off at or before its first frame. The link wrote `gb` straight behind each skill while the arm profile had the gyro balance off, and test tools polled `j` or sent `gP` while a skill played. A bare `kpickF` typed by hand with nothing behind it played in full, and the claw opens and closes on direct `i2` commands, so the skill and the claw were never the fault. The earlier empty-claw runs of `launch`, `toss`, `tossF`, `hunt` and `showOff` were cut short the same way, so they say nothing about what those skills do.
+- The fix: after a behavior skill the link stays silent (`G2_SKILL_QUIET_S`, 10 seconds at most) until the board echoes the completion token `k`; held toggles go out afterwards and reads are dropped. The gyro balance is also back on by default (the firmware default), so the link no longer writes a `gb` behind skills at all. Details are in the link specification.
+- Tools: `g2armskill --joints N` reads the joint angles while a skill plays, which is itself a read and so is dropped during the quiet window; it cannot observe a skill that way.
+- Not yet run on G2: the fix is in the repository and not deployed. It is confirmed on the robot by sending `pickF` with nothing written behind it, once after the eased stand-up and once with a `gb` written 100 milliseconds after (which should cut it), and then through `g2armskill`.
 
 What each skill does to the body
 --------------------------------
@@ -66,7 +77,7 @@ Hardware results
 
 - Empty-claw body test: `launch`, `toss`, `tossF`, `hunt` and `showOff` each scored ok (G2 stayed upright). `tossL` and `tossR` play the same motion as `toss`, as the firmware lookup predicts. The state page records the run.
 - Throw distance: none of `launch`, `toss` or `tossF` was seen to throw an object any distance; the motions look too slow and small for a throw.
-- Loaded-claw pick-up tests: `pickF` and `pickD` were sent after the eased stand-up and did not play (the body stayed within 3 degrees, the commanded joints never changed and the claw never moved), while `launch` played (the body pitched 13 degrees) but did not open or close the claw. Direct `i2` commands do open and close the jaws. A bare `kpickF` typed over serial with G2 at rest worked once. The cause is in what surrounds the skill, not the skill or the claw (see the plan in the state page).
+- Loaded-claw pick-up tests: `pickF` and `pickD` were sent after the eased stand-up and did not play (the body stayed within 3 degrees, the commanded joints never changed and the claw never moved), and `launch` pitched the body 13 degrees but never opened or closed the claw. Direct `i2` commands do open and close the jaws, and a bare `kpickF` typed with nothing behind it played in full. The cause is in the firmware: a behavior skill checks the serial port before every frame and any waiting byte (the link's `gb`, a `gP`, a `j` read) aborts it and the board stands up instead. So every arm skill sent with a byte right behind it is cut off at or before its first frame.
 - Not recorded: the per-run result lines are written on the Pi in `~/g2_runs/arm_skills/` and are not synced to the Mac, so the tilt numbers and timings are not in the repository. No run with an object in the claw is recorded, and no throw distance was measured.
 
 Open questions

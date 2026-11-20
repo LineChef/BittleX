@@ -55,6 +55,15 @@ STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd", "kca
 GYRO_GAIT_GAP_S = float(os.environ.get("G2_GYRO_GAIT_GAP_S", "0.3") or 0.3)
 
 
+# A behavior skill (pickF, launch, toss, ... : the arm's and the tricks) checks the serial port before EVERY frame and any byte waiting there aborts it ("Behavior interrupted", then the board plays `up`):
+# skill.h perform(), OpenCat firmware at commit f5aba6b9 (2026-11-20; docs/hardware/arm-skills.md). So after a behavior token the link stays silent for up to this many seconds, or until the
+# board echoes its completion token `k`: background toggles (gP, gp, gb, gB) wait and go out when it ends, background reads (P, j, ?) are dropped, a motion command goes through at once (it ends the
+# skill on purpose). 0 turns it off (G2_SKILL_QUIET_S=0).
+SKILL_QUIET_S = float(os.environ.get("G2_SKILL_QUIET_S", "10") or 0)
+_QUIET_TOGGLES = ("gP", "gp", "gb", "gB")
+_QUIET_READS = ("P", "j", "?")
+
+
 def gyro_gaits_on() -> bool:
     """`G2_GYRO_GAITS=1`: the firmware gyro balance is switched on just before a scripted gait and stays off otherwise (default off; an experiment, 2026-11-08)."""
     return os.environ.get("G2_GYRO_GAITS", "").strip().lower() in ("1", "on", "true", "yes")
@@ -204,6 +213,8 @@ class SerialLink:
             log.debug("send(%r) dropped -- not connected", command)
             self._failed(command, "not connected")
             return ""
+        if self._quiet_hold(command.strip()):
+            return ""                             # a behavior skill is playing: nothing may be written to the board until it ends (see SKILL_QUIET_S)
         if command.strip() == "gB" and not self._gyro_allowed():
             command = "gb"                        # the fitted attachment runs with the firmware gyro balance off (attachments.flag "gyro_balance")
         try:
@@ -253,6 +264,8 @@ class SerialLink:
             (getattr(self, "_scripted_walks", None) or _NO_WALK_LOG).note(command)    # a scripted gait is one `scripted_walk` auto-log run, ended by the next motion command (telemetry/scripted_walks.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
+            if command[:1] == "k" and SKILL_QUIET_S > 0 and transitions.kind(command.strip()) == "behaviour":
+                self._start_quiet()                         # the skill is playing: stay silent until it ends (any byte waiting aborts it)
             if command[:1] == "k" and transitions.kind(command.strip()) != "gait":      # (never around a gait, before or behind it: any `gb` next to `kwkF` stopped the walk, 2026-10-25 hardware; the gyro is already off from the stand-up or the last posture)
                 self._gyro_off_if_needed()                  # the arm (user, 2026-10-25): a skill turns the gyro assist back on, and with it on the firmware keeps trying its own self-right (`rc`) after a fall,
                                                             # which is what shakes the Pi plug loose; fall recovery is off for it, so the assist goes straight back off
@@ -276,9 +289,64 @@ class SerialLink:
         try:
             from . import opencat
             if self._ser is not None and not self._gyro_allowed():          # (user, 2026-11-08: the arm runs with the gyro balance ON; fall recovery off no longer forces it off after a skill)
+                if self._quiet_hold("gb"):
+                    return                                                   # a behavior skill is playing: the `gb` goes out when it ends
                 self._ser.write(b"gb\n")
         except Exception:  # noqa: BLE001
             pass
+
+    # --- the silence around a behavior skill ------------------------------
+
+    _quiet_until: float = 0.0
+    _quiet_deferred: dict | None = None
+    _quiet_timer = None
+    dropped_in_quiet: int = 0                    # background reads dropped while a behavior skill played (for the logs and the tests)
+
+    def _quiet_active(self) -> bool:
+        return self._quiet_until > time.monotonic()
+
+    def _start_quiet(self) -> None:
+        self._quiet_until = time.monotonic() + SKILL_QUIET_S
+        self._quiet_deferred = {}
+        try:
+            if self._quiet_timer is not None:
+                self._quiet_timer.cancel()
+            self._quiet_timer = threading.Timer(SKILL_QUIET_S + 0.05, self._end_quiet)
+            self._quiet_timer.daemon = True
+            self._quiet_timer.start()
+        except Exception:  # noqa: BLE001
+            self._quiet_timer = None
+
+    def _quiet_hold(self, c: str) -> bool:
+        """True when `c` must not be written now because a behavior skill is playing. Toggles wait for the end of the skill, reads are dropped, anything else goes through and ends the window (it
+        interrupts the skill on purpose: a stop, a rest, the next move)."""
+        if SKILL_QUIET_S <= 0 or not self._quiet_active():
+            return False
+        if c in _QUIET_TOGGLES:
+            if self._quiet_deferred is None:
+                self._quiet_deferred = {}
+            self._quiet_deferred[c[:2].lower()] = c      # gb / gB share a slot, gP / gp share one: the last one wins
+            return True
+        if c in _QUIET_READS:
+            self.dropped_in_quiet += 1
+            return True
+        self._end_quiet(flush=False)
+        return False
+
+    def _end_quiet(self, flush: bool = True) -> None:
+        """The skill is over (its `k` echo, the time limit, or a motion command took over): the waiting toggles go out in the order they came."""
+        self._quiet_until = 0.0
+        pending, self._quiet_deferred = self._quiet_deferred or {}, None
+        if flush and pending and self._ser is not None:
+            for c in pending.values():
+                try:
+                    self._ser.write((c + "\n").encode("ascii"))
+                    if c in ("gP", "gp"):
+                        self.imu_print_on = c == "gP"
+                    elif c in ("gB", "gb"):
+                        self.gyro_state = "on" if c == "gB" else "off"
+                except Exception:  # noqa: BLE001
+                    log.debug("a held %s was not sent", c, exc_info=True)
 
     @staticmethod
     def _gyro_allowed() -> bool:
@@ -945,6 +1013,8 @@ class SerialLink:
             if chunk:
                 self._rx += chunk
         line = raw.decode("utf-8", "replace").strip()
+        if line == "k" and self._quiet_until:
+            self._end_quiet()                                  # the board echoed the end of the skill
         if is_imu_line(line):
             self._imu.append(line)
             return ""

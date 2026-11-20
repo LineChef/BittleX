@@ -200,7 +200,7 @@ class Settings:
     pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "1") not in ("0", "false", "no"))
     # G2's standing wobble (firmware gyro balance going unstable on a 5 Hz IMU, see gait/stand_guard.py): keep balance off while idle
     # (on only around a firmware gait) and run a guard that turns it off if a wobble starts anyway.
-    balance_off_idle: bool = field(default_factory=lambda: _env("G2_BALANCE_OFF_IDLE", "1") not in ("0", "false", "no"))
+    balance_off_idle: bool = field(default_factory=lambda: _env("G2_BALANCE_OFF_IDLE", "0") not in ("0", "false", "no"))
     stand_guard: bool = field(default_factory=lambda: _env("G2_STAND_GUARD", "1") not in ("0", "false", "no"))
     stand_reassert_s: float = field(default_factory=lambda: _env_float("G2_STAND_REASSERT_S", 600.0))   # how often the guard re-sends `gb` while idle (was 60: every `gb` makes the BiBoard tick, measured 2026-10-08); the wobble guard still reacts at once
     # Describe what G2 sees: when the user asks, a picture from G2's camera goes to Claude with that message (never saved or kept).

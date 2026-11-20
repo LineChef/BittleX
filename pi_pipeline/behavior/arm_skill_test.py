@@ -92,7 +92,9 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
                 taken += 1
                 res.setdefault("joints_during", []).append([round(clock() - t0, 2), sample_joints()])
             sleep(0.05)
-        robot._tx("gb")
+        allowed = getattr(robot._lk, "_gyro_allowed", None)
+        if allowed is None or not allowed():
+            robot._tx("gb")                                                                  # only where the gyro runs off (the firmware default is on everywhere but a learned walk)
         sleep(1.0)
         robot._fell()
         after = robot._tilt()

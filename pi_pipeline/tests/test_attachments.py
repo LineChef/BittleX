@@ -192,11 +192,13 @@ def test_switches_are_on_unless_a_profile_says_false():
     assert A.flag("easing", "arm", {"arm": {}}) is True
 
 
-def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_fall_recovery():
+def test_the_shipped_arm_profile_runs_without_easing_gait_switching_or_fall_recovery_and_with_the_gyro_on():
     data = A.load_profiles()["arm"]
     assert data["payload_profile"] == "arm"
-    # (2026-11-08: the gyro balance was on for a few hours and the board started its own `rc` / `up` self-right during a claw look and flipped him: it is off again; G2_GYRO_BALANCE=1 turns it on for one run)
-    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "fall_recovery"))
+    # (2026-11-08 the gyro balance was on for a few hours and the board started its own `rc` / `up` self-right during a claw look and flipped him, so it went off; 2026-11-20 the owner chose the firmware
+    # default again: on everywhere except during a learned walk, G2_GYRO_BALANCE=0 turns it off for one run)
+    assert not any(A.flag(k, "arm") for k in ("easing", "gait_switching", "fall_recovery"))
+    assert A.flag("gyro_balance", "arm") is True
     assert A.flag("skills", "arm")                                              # the claw's voice skills are on (user, 2026-11-02)
 
 
@@ -674,7 +676,7 @@ def test_the_arm_runs_with_the_gyro_balance_on_when_asked_for_one_run(monkeypatc
 def test_an_env_switch_overrides_the_profile_flag_for_one_run(monkeypatch):
     """User, 2026-11-08: G2_GYRO_BALANCE=0 / 1 (any profile flag: G2_<KEY>) decides for a run, so the gyro balance can be A/B tested without editing the profile."""
     monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
-    assert A.flag("gyro_balance", "arm") is False                      # the shipped arm profile
+    assert A.flag("gyro_balance", "arm") is True                       # the shipped arm profile (the firmware default: on)
     monkeypatch.setenv("G2_GYRO_BALANCE", "1")
     assert A.flag("gyro_balance", "arm") is True and A.flag_safe("gyro_balance") in (True, False)
     monkeypatch.setenv("G2_GYRO_BALANCE", "0")
@@ -725,7 +727,7 @@ def test_gyro_gaits_switches_the_gyro_on_just_before_a_gait_and_never_around_pos
     from pi_pipeline.link import serial_link
     from pi_pipeline.link.serial_link import SerialLink
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")                          # the gait-only mode is for a profile that runs with the gyro off
     monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
     monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
 
@@ -754,7 +756,7 @@ def test_gyro_gaits_switches_the_gyro_on_just_before_a_gait_and_never_around_pos
     assert on[on.index("kbalance") - 1] == "kwkR" and "gB" not in on[on.index("kbalance"):on.index("kwkF") - 1]      # not before the stop or the attention pose
 
 
-def test_the_arm_does_not_ask_the_firmware_at_start_but_still_turns_the_gyro_off(monkeypatch):
+def test_the_arm_does_not_ask_the_firmware_at_start_and_leaves_the_gyro_on_unless_the_profile_says_off(monkeypatch):
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     monkeypatch.delenv("G2_FIRMWARE_CHECK", raising=False)
     monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
@@ -765,6 +767,10 @@ def test_the_arm_does_not_ask_the_firmware_at_start_but_still_turns_the_gyro_off
             sent.append(cmd)
             return ""
     assert A.startup_check(Silent()) is True       # the stored attachment is trusted: no `?`, no wait, the skills stay
+    assert "?" not in sent and "gb" not in sent    # the firmware default (gyro balance on) is left alone
+    sent.clear()
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")     # a run with the gyro off turns it off at start, as before
+    assert A.startup_check(Silent()) is True
     assert "?" not in sent and sent[-1] == "gb"
 
 
@@ -779,3 +785,80 @@ def test_the_firmware_check_can_be_forced_on_for_one_run(monkeypatch):
             sent.append(cmd)
             return ""
     assert A.startup_check(Silent()) is False and "?" in sent
+
+
+def _quiet_link(monkeypatch, att="arm"):
+    from pi_pipeline.link import serial_link
+    from pi_pipeline.link.serial_link import SerialLink
+    monkeypatch.setenv("G2_ATTACHMENT", att)
+    monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    monkeypatch.setattr(SerialLink, "_start_quiet", lambda self: setattr(self, "_quiet_until", serial_link.time.monotonic() + 50.0) or setattr(self, "_quiet_deferred", {}))   # no timer thread in the test
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+            self.in_waiting = 0
+
+        def write(self, b):
+            self.out.append(b.decode().strip())
+
+        def flush(self):
+            pass
+
+    lk = SerialLink("/dev/null")
+    lk._ser = FakeSerial()
+    lk._ease_transition = lambda c: None
+    return lk
+
+
+def test_nothing_is_written_while_a_behavior_skill_plays(monkeypatch):
+    """A behavior skill is aborted by any byte waiting on the serial port (firmware skill.h perform): after kpickF the link holds the gyro toggles, drops the reads, and lets a motion command through."""
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")                          # the profile with the gyro off: the link's own `gb` right behind a skill is the case that cut every pick short
+    lk = _quiet_link(monkeypatch)
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    lk.send("kpickF", read_reply=False, settle=0.0)
+    lk.send("gP", read_reply=False, settle=0.0)
+    lk.send("gb", read_reply=False, settle=0.0)
+    assert lk.send("j", read_reply=False, settle=0.0) == "" and lk.send("P", read_reply=False, settle=0.0) == ""
+    assert lk._ser.out == ["kpickF"] and lk.dropped_in_quiet == 2                      # the skill alone is on the wire: no `gb` behind it, no `gP`, no read
+    lk._end_quiet()                                                                     # the board echoed `k` (or the time ran out)
+    assert lk._ser.out == ["kpickF", "gb", "gP"] and not lk._quiet_active()            # the held toggles go out in the order they came (the link's own after-skill `gb` was first), once
+
+
+def test_a_motion_command_goes_through_a_behavior_skill_and_a_gait_or_posture_starts_no_quiet(monkeypatch):
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    lk = _quiet_link(monkeypatch)
+    lk.send("klaunch", read_reply=False, settle=0.0)
+    lk.send("gb", read_reply=False, settle=0.0)
+    lk.send("krest", read_reply=False, settle=0.0)                                      # a stop or the next move is not held: it ends the skill on purpose
+    assert "krest" in lk._ser.out and not lk._quiet_active()
+    lk2 = _quiet_link(monkeypatch)
+    lk2.send("kwkF", read_reply=False, settle=0.0)
+    lk2.send("gb", read_reply=False, settle=0.0)
+    assert "gb" in lk2._ser.out                                                         # a gait is not a behavior: no silence around it
+    lk3 = _quiet_link(monkeypatch)
+    lk3.send("kbalance", read_reply=False, settle=0.0)
+    lk3.send("gP", read_reply=False, settle=0.0)
+    assert "gP" in lk3._ser.out
+
+
+def test_the_k_echo_ends_the_quiet_and_releases_the_held_toggles(monkeypatch):
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    lk = _quiet_link(monkeypatch)
+    lk.send("kpickF", read_reply=False, settle=0.0)
+    lk.send("gb", read_reply=False, settle=0.0)
+    lk._rx = b"k\r\n"
+    lk._next_line(None)
+    assert lk._ser.out == ["kpickF", "gb"] and not lk._quiet_active()
+
+
+def test_the_quiet_can_be_switched_off(monkeypatch):
+    from pi_pipeline.link import serial_link
+    monkeypatch.setattr(serial_link, "SKILL_QUIET_S", 0.0)
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    lk = _quiet_link(monkeypatch)
+    lk.send("kpickF", read_reply=False, settle=0.0)
+    lk.send("gP", read_reply=False, settle=0.0)
+    assert lk._ser.out == ["kpickF", "gb", "gP"]                                        # G2_SKILL_QUIET_S=0: as before, the `gb` right behind the skill and the `gP` at once

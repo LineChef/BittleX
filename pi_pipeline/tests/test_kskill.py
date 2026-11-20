@@ -159,7 +159,8 @@ def _arm_link(monkeypatch, wrote, *, reached=True):
     _legs_reported(monkeypatch, prof, reached=reached)
     monkeypatch.setattr(serial_link.time, "sleep", lambda s: None)
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    for k in ("G2_GYRO_BALANCE", "G2_STAND_VIA", "G2_STAND_GYRO"):
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")        # these tests are of the profile with the gyro off (gB for the rise, gb right after); the default-on case is its own test below
+    for k in ("G2_STAND_VIA", "G2_STAND_GYRO"):
         monkeypatch.delenv(k, raising=False)
 
     class Ser:
@@ -426,3 +427,13 @@ def test_the_eased_lie_down_keeps_the_imu_on_and_records_the_tilt_during_the_mov
     lk.last_motion_command = "kbalance"
     assert lk._rest_eased() is True
     assert lk.last_rest_eased["peak_deg"] == 179.0 and len(lk.last_rest_eased["trace"]) == 3         # the flip is visible while the move runs
+
+
+def test_with_the_gyro_on_by_default_the_rise_does_not_turn_it_off_afterwards(monkeypatch):
+    """2026-11-20: the firmware default (gyro balance on) everywhere except a learned walk: the eased stand-up plays with it on and leaves it on."""
+    wrote = []
+    lk = _arm_link(monkeypatch, wrote)
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    lk.last_motion_command = "krest"
+    assert lk._stand_up_kskill(standup) is True
+    assert b"gb" not in [w.strip() for w in wrote]
