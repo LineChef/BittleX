@@ -529,7 +529,8 @@ g2armskill() {
   [ -n "${1:-}" ] || { echo "usage: g2armskill launch|toss|tossF|tossL|tossR|hunt|showOff"; return 2; }
   local skill="$1"; shift; local rest; rest="$(printf ' %q' "$@")"      # every option after the skill passes through (--object, --object-oz, --floor, --pictures N, --no-prompt, --allow-clap)
   g2stop voice || return 1
-  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_skill_test --skill $skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  local envp=""; [ -n "${G2_REST_RELAX_SETTLE_S:-}" ] && envp="G2_REST_RELAX_SETTLE_S=$G2_REST_RELAX_SETTLE_S "      # a run-only override of the wait before the servos are relaxed at the end (seconds)
+  ssh "$G2_PI" "cd ~/bittleX && ${envp}PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_skill_test --skill $skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
 g2claw() {

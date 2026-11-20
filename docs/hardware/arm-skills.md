@@ -66,6 +66,7 @@ Hardware results
 
 - Empty-claw body test: `launch`, `toss`, `tossF`, `hunt` and `showOff` each scored ok (G2 stayed upright). `tossL` and `tossR` play the same motion as `toss`, as the firmware lookup predicts. The state page records the run.
 - Throw distance: none of `launch`, `toss` or `tossF` was seen to throw an object any distance; the motions look too slow and small for a throw.
+- Loaded-claw pick-up tests: `pickF` and `pickD` were sent after the eased stand-up and did not play (the body stayed within 3 degrees, the commanded joints never changed and the claw never moved), while `launch` played (the body pitched 13 degrees) but did not open or close the claw. Direct `i2` commands do open and close the jaws. A bare `kpickF` typed over serial with G2 at rest worked once. The cause is in what surrounds the skill, not the skill or the claw (see the plan in the state page).
 - Not recorded: the per-run result lines are written on the Pi in `~/g2_runs/arm_skills/` and are not synced to the Mac, so the tilt numbers and timings are not in the repository. No run with an object in the claw is recorded, and no throw distance was measured.
 
 Open questions
