@@ -61,7 +61,7 @@ Each attachment names the BiBoard firmware it needs: the first line of the BiBoa
 - `head`: `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head)
 - `arm`: `Bittle X+Arm`
 
-The arm's skills (15, enabled for voice: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet, so a first run is made with a hand near. What the firmware does with them, how left and right resolve and the test order are in [Arm skills](../hardware/arm-skills.md). `hunt` and `showOff` are names the arm build is only inferred to redefine.
+The arm's skills (15, enabled for voice: `pick_up` / `put_down` also `_below` `_left` `_right`, `toss` also `_left` `_right`, `launch`, `hunt`, `show_off`, `clap`; tokens `pickF/D/L/R`, `putF/D/L/R`, `tossF/L/R`, `launch`, `hunt`, `showOff`, `clap` from Petoi's arm page) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. The empty-claw test has been run on G2 and no held-object run is recorded, so a first run with an object is made with a hand near. What the firmware does with them, how left and right resolve and the test order are in [Arm skills](../hardware/arm-skills.md). `hunt` and `showOff` are names the arm build is only inferred to redefine.
 
 Behaviour switches
 ------------------

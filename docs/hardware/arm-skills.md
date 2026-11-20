@@ -42,10 +42,10 @@ Measured from the frames with the same scores as [Disabled moves](disabled-moves
 What is in the code today
 -------------------------
 
-- The arm's skill table in `pi_pipeline/attachments/__init__.py` offers the tokens to the conversation when the arm is fitted and the board answers "Bittle X+Arm". None of them has been played on G2.
+- The arm's skill table in `pi_pipeline/attachments/__init__.py` offers the tokens to the conversation when the arm is fitted and the board answers "Bittle X+Arm". The empty-claw test has been run on G2 (see Hardware results below); no held-object run is recorded.
 - None of the toss or launch tokens is in `DISABLED_SKILLS`, so a spoken request can run them. They stay enabled for voice; the test below is how they earn that.
 - The left and right names (`toss_left`, `toss_right`, `pick_up_left` and the others) are offered as if they had a direction. They play the generic skill, so their descriptions say so.
-- `python -m pi_pipeline.behavior.arm_skill_test --skill NAME` (`g2armskill NAME`) plays one skill with the body watched and writes a JSON line to `~/g2_runs/arm_skills/`.
+- `python -m pi_pipeline.behavior.arm_skill_test --skill NAME` (`g2armskill NAME`) plays one skill with the body watched and writes a JSON file to `~/g2_runs/arm_skills/` with the verdict, the whole IMU trace (time since the skill was sent, pitch and roll), when the body first moved and when it tilted most, the wall-clock send time (to line up a phone video), the pack percent before and after, the claw joint's angle before and after, the object, and the landing record typed in after the run. Options: `--object NAME`, `--object-oz`, `--object-in`, `--floor LABEL`, `--pictures N` (claw-camera pictures after the swing, off by default because whether the camera stream disturbs the IMU stream is not yet known) and `--no-prompt`.
 
 Test plan for the next hardware session
 ---------------------------------------
@@ -61,9 +61,19 @@ Run after the attentive-bout check, one skill per run, with a person's go before
 7. Watch and record: whether the claw opens or closes at the release (the claw sign differs between `pickF` and `tossF` in the frames), where the throw goes, how far the ball travels, and any servo that stalls.
 8. `clap` is not in the block. It is tested only with `--allow-clap`, on its own, after the others.
 
+Hardware results
+----------------
+
+- Empty-claw body test: `launch`, `toss`, `tossF`, `hunt` and `showOff` each scored ok (G2 stayed upright). `tossL` and `tossR` play the same motion as `toss`, as the firmware lookup predicts. The state page records the run.
+- Throw distance: none of `launch`, `toss` or `tossF` was seen to throw an object any distance; the motions look too slow and small for a throw.
+- Not recorded: the per-run result lines are written on the Pi in `~/g2_runs/arm_skills/` and are not synced to the Mac, so the tilt numbers and timings are not in the repository. No run with an object in the claw is recorded, and no throw distance was measured.
+
 Open questions
 --------------
 
+- How much speed a body lunge can add to the throw. An arm swing alone is estimated to reach about 1 to 2 feet; a lunge that drives the shoulder forward as the arm swings, timed with the release, is the planned way to add launch speed. It is studied in simulation first, then on the floor with the pitch trace watched, since a lunge is also the likeliest way to nose over.
+
+- Whether the skills throw only when the claw holds an object. Nothing read says so: the frames are fixed angles, and nothing read shows the claw sensing a load, so the same motion is inferred to play empty or loaded. Not verified; the held-object runs in step 5 of the test plan would settle it.
 - Whether the claw angle at the release means open or closed in the toss frames (negative values in `tossF` and `hunt`, positive in `pickF`).
 - Whether `toss` throws to the left or the right on G2's claw, since both names play the one motion.
 - Whether the throw clears the pod and the Pi stack, which sit behind the claw.

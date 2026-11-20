@@ -2,7 +2,9 @@
 
 Runs ONLY on the owner's go, G2 on the floor on his feet, hands near, the voice service stopped (`g2armskill`). One skill per run, so the owner decides before each one. It stands him up the
 standard way, reads the tilt, sends the skill token, watches the IMU for `watch_s` seconds, sends `gb` (firmware gyro balance off, after every skill, never next to a firmware gait), reads the tilt
-again, lays him in rest, and writes one JSON line of what the body did to `~/g2_runs/arm_skills/`.
+again, lays him in rest, and writes one JSON file of what the body did to `~/g2_runs/arm_skills/`: the verdict, the whole IMU trace (time since the skill was sent, pitch, roll) with when the body first moved and
+when it tilted most, the wall-clock time the skill was sent, the pack before and after, the claw joint's angle before and after, the object, and (typed in after the run) where the object landed. `--pictures N` takes N
+claw-camera pictures after the swing (off by default: whether the camera stream disturbs the IMU stream is not yet known).
 
 A tilt of `LEAN_DEG` or more from where he stood is a lean, `TIPPED_DEG` or more is a tip (the owner stops the block there), a fall is a fall. Only the arm's skills are accepted; the 20 firmware
 skills that tip G2 on the pod payload stay in `DISABLED_SKILLS` and `clap` needs `--allow-clap` (its left-right leg asymmetry is 97 deg, the wave's was 129 and flipped him).
@@ -35,8 +37,28 @@ def verdict(max_dev_deg: float, fell: bool) -> str:
     return "ok"
 
 
-def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic) -> dict:
-    """Play `token` (no `k`) from a stand and report what the body did. Never raises."""
+ONSET_DEG = 2.0                    # the body counts as moving once pitch or roll is this far from where he stood
+
+
+def trace_summary(times: list, pitches: list, rolls: list, base: tuple) -> dict:
+    """The IMU frames of one skill as numbers: [[seconds since the skill was sent, pitch, roll], ...] (degrees, raw), the frame rate, when the body first moved (ONSET_DEG from where he stood) and when it
+    tilted most (None for each when there were no frames or it never moved)."""
+    n = min(len(times), len(pitches), len(rolls))
+    out = {"imu_trace": [[round(times[i], 3), round(pitches[i], 1), round(rolls[i], 1)] for i in range(n)], "frames": n, "frame_hz": None, "onset_s": None, "peak_s": None}
+    if n >= 2 and times[n - 1] > times[0]:
+        out["frame_hz"] = round((n - 1) / (times[n - 1] - times[0]), 1)
+    devs = [max(abs(pitches[i] - base[0]), abs(rolls[i] - base[1])) for i in range(n)]
+    for i, d in enumerate(devs):
+        if d >= ONSET_DEG:
+            out["onset_s"] = round(times[i], 3)
+            break
+    if devs:
+        out["peak_s"] = round(times[devs.index(max(devs))], 3)
+    return out
+
+
+def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic, wall=time.time, capture=None) -> dict:
+    """Play `token` (no `k`) from a stand and report what the body did. Never raises. `capture`, when given, is called once after the swing (and `gb`) and returns a list of picture records for the log."""
     res = {"skill": token, "verdict": "error", "max_roll_dev": None, "max_pitch_dev": None, "fell": False, "tilt_before": None, "tilt_after": None, "seconds": watch_s}
     try:
         if robot._tilt(1.5) is None:
@@ -53,6 +75,8 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         say(f"sending k{token}: hands near")
         robot._lk.send("k" + token, read_reply=False, settle=0.0)
         t0 = clock()
+        res["sent_at"] = round(wall(), 3)                                                    # wall clock when the token went out: lines the phone video up with the trace
+        res["sent_iso"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(res["sent_at"])) + f".{int((res['sent_at'] % 1) * 1000):03d}"
         fell = False
         while clock() - t0 < watch_s:
             if robot._fell():
@@ -70,6 +94,13 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         res["max_roll_dev"], res["max_pitch_dev"] = round(max(rolls), 1), round(max(pitches), 1)
         res["fell"] = fell
         res["verdict"] = verdict(max(rolls + pitches), fell)
+        stamps = list(getattr(robot, "_imu_t", []))[-len(robot._roll):] if robot._roll else []
+        if len(stamps) != len(robot._roll):                                                  # a robot without frame times: spread the frames evenly over the watch
+            n = len(robot._roll)
+            stamps = [t0 + watch_s * (i + 1) / n for i in range(n)]
+        res.update(trace_summary([t - t0 for t in stamps], list(robot._pitch), list(robot._roll), b))
+        if capture is not None:
+            res["pictures"] = capture()
     except Exception:  # noqa: BLE001
         import logging
         logging.getLogger("g2.arm_skill_test").exception("the arm skill test failed")
@@ -88,6 +119,36 @@ def write_log(res: dict, extra: dict | None = None) -> str | None:
         return None
 
 
+def update_log(path: str, extra: dict) -> bool:
+    """Add fields (the typed landing record) to a log file already written."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        data.update(extra)
+        with open(path, "w") as f:
+            json.dump(data, f, indent=1)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def ask_landing(ask=input) -> dict:
+    """The landing record, typed in after the run (inches; Enter skips a question)."""
+    def num(prompt):
+        try:
+            return float(ask(prompt).strip())
+        except (ValueError, EOFError):
+            return None
+    out = {"landed_in": num("how far did the object land from G2's front, inches (Enter = unknown / did not leave): ")}
+    try:
+        out["direction"] = ask("direction (left / right / straight / other, Enter = skip): ").strip() or None
+        out["left_claw"] = {"y": True, "n": False}.get(ask("did the object leave the claw (y/n, Enter = skip): ").strip().lower()[:1])
+        out["note"] = ask("note (Enter = none): ").strip() or None
+    except EOFError:
+        pass
+    return out
+
+
 def main() -> None:
     import argparse
 
@@ -96,6 +157,12 @@ def main() -> None:
     ap.add_argument("--skill", required=True, help="one of: " + ", ".join(ORDER + EXTRA))
     ap.add_argument("--watch", type=float, default=WATCH_S, help="seconds to watch the IMU after the skill starts")
     ap.add_argument("--allow-clap", action="store_true", help="allow clap (large left-right leg asymmetry)")
+    ap.add_argument("--object", default=None, help="what is in the claw (a name; leave out for an empty claw)")
+    ap.add_argument("--object-oz", type=float, default=None, help="the object's weight in ounces")
+    ap.add_argument("--object-in", type=float, default=None, help="the object's width in inches")
+    ap.add_argument("--floor", default=None, help="the floor label for this run (as set with g2floor)")
+    ap.add_argument("--pictures", type=int, default=0, help="claw-camera pictures to take after the swing (default 0: camera off during the first runs)")
+    ap.add_argument("--no-prompt", action="store_true", help="do not ask for the landing record after the run")
     args = ap.parse_args()
     token = args.skill.strip()
     if token not in ORDER + EXTRA or (token in EXTRA and not args.allow_clap):
@@ -118,16 +185,52 @@ def main() -> None:
         print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was sent.")
         return
     robot = chase.SerialRobot(link)
+    capture, cam = None, None
+    if args.pictures > 0:
+        from ..config import settings
+        from ..vision.snapshot import CameraSnapshotter
+        cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, click=False)
+        outdir = os.path.expanduser(time.strftime("~/g2_runs/arm_skills/pics_%Y%m%d_%H%M%S_") + token)
+
+        def capture():
+            os.makedirs(outdir, exist_ok=True)
+            recs = []
+            for i in range(args.pictures):
+                try:
+                    cam.discard_one()
+                    time.sleep(1.0)
+                    snap = cam.snapshot()
+                except Exception:  # noqa: BLE001
+                    snap = None
+                if snap is None:
+                    recs.append({"n": i + 1, "file": None, "detections": []})
+                    continue
+                fn = os.path.join(outdir, f"pic_{i + 1:02d}.jpg")
+                try:
+                    with open(fn, "wb") as f:
+                        f.write(snap.jpeg)
+                except OSError:
+                    fn = None
+                recs.append({"n": i + 1, "file": fn, "detections": [[d[0], round(float(d[1]), 2), round(float(d[2]), 3), round(float(d[3]), 3), round(float(d[4]), 3), round(float(d[5]), 3)] for d in snap.detections]})
+            return recs
+    path = None
     try:
+        joints_before = chase.read_joints(link)                         # the claw is joint 2: read before he stands, to catch a claw left partly open
         chase._stand_if_lying(link, "kbalance")
-        res = run_skill(robot, token, watch_s=args.watch)
-        path = write_log(res, {"pack_pct": pct})
+        res = run_skill(robot, token, watch_s=args.watch, capture=capture)
+        volts_after = battery.read_voltage(link)
+        meta = {"pack_pct": pct, "pack_v": volts, "pack_pct_after": battery.pack_percent(volts_after) if volts_after else None, "pack_v_after": volts_after, "object": args.object,
+                "object_oz": args.object_oz, "object_in": args.object_in, "floor": args.floor, "claw_joint_before": joints_before[2] if joints_before and len(joints_before) > 2 else None,
+                "joints_before": joints_before}
+        path = write_log(res, meta)
         print(f"RESULT {token}: {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg from where he stood){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
         print("ended")
     finally:
         from .ball_chase import ensure_rest
         ensure_rest(link)                                              # rest confirmed with the board, as at the end of every session
+    if path and not args.no_prompt:
+        update_log(path, {"landing": ask_landing()})
 
 
 if __name__ == "__main__":

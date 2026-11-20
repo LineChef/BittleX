@@ -106,3 +106,32 @@ def test_board_answers_needs_a_parseable_imu_frame(monkeypatch):
     c = Clock()
     ok = L(["ICM:  0.01  0.02  1.00   10.0   0.0   0.0"])
     assert imu_print.board_answers(ok, 1.0, sleep=c.sleep, clock=c) is True and ok.sent == ["gP"]
+
+
+def test_trace_summary_gives_onset_peak_and_rate():
+    s = t.trace_summary([0.0, 0.1, 0.2, 0.3], [0.0, 1.0, 5.0, 3.0], [0.0, 0.0, 2.0, 1.0], (0.0, 0.0))
+    assert s["frames"] == 4 and s["frame_hz"] == 10.0 and s["onset_s"] == 0.2 and s["peak_s"] == 0.2
+    assert s["imu_trace"][2] == [0.2, 5.0, 2.0]
+    quiet = t.trace_summary([0.0, 0.1], [0.5, 0.6], [0.0, 0.1], (0.0, 0.0))
+    assert quiet["onset_s"] is None
+    assert t.trace_summary([], [], [], (0.0, 0.0))["peak_s"] is None
+
+
+def test_run_skill_logs_the_trace_the_send_time_and_the_pictures():
+    c = Clock()
+    r = FakeRobot(rolls=[-1.0, 3.0, 8.0], pitches=[-2.0, 0.0, 10.0])
+    res = t.run_skill(r, "launch", watch_s=1.0, say=lambda *_: None, sleep=c.sleep, clock=c, wall=lambda: 1000.25, capture=lambda: [{"n": 1, "file": None, "detections": []}])
+    assert res["sent_at"] == 1000.25 and res["sent_iso"].endswith(".250")
+    assert res["frames"] == 3 and len(res["imu_trace"]) == 3 and res["peak_s"] is not None
+    assert res["pictures"] == [{"n": 1, "file": None, "detections": []}]
+
+
+def test_the_landing_record_and_update_log(tmp_path):
+    answers = iter(["36", "left", "y", "bounced"])
+    assert t.ask_landing(ask=lambda _p: next(answers)) == {"landed_in": 36.0, "direction": "left", "left_claw": True, "note": "bounced"}
+    skip = t.ask_landing(ask=lambda _p: "")
+    assert skip["landed_in"] is None and skip["left_claw"] is None
+    f = tmp_path / "a.json"
+    f.write_text(json.dumps({"skill": "launch"}))
+    assert t.update_log(str(f), {"landing": {"landed_in": 5.0}}) and json.loads(f.read_text())["landing"]["landed_in"] == 5.0
+    assert not t.update_log(str(tmp_path / "missing.json"), {})
