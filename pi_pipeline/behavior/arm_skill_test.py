@@ -6,7 +6,7 @@ again, lays him in rest, and writes one JSON file of what the body did to `~/g2_
 when it tilted most, the wall-clock time the skill was sent, the pack before and after, the claw joint's angle before and after, the object, and (typed in after the run) where the object landed. `--pictures N` takes N
 claw-camera pictures after the swing (off by default: whether the camera stream disturbs the IMU stream is not yet known).
 
-A tilt of `LEAN_DEG` or more from where he stood is a lean, `TIPPED_DEG` or more is a tip (the owner stops the block there), a fall is a fall. Only the arm's skills are accepted; the 20 firmware
+A body that moved less than `MIN_MOTION_DEG` for a skill that should move it is `no_motion` (the skill probably did not run; `hunt` is exempt). A tilt of `LEAN_DEG` or more from where he stood is a lean, `TIPPED_DEG` or more is a tip (the owner stops the block there), a fall is a fall. Only the arm's skills are accepted; the 20 firmware
 skills that tip G2 on the pod payload stay in `DISABLED_SKILLS` and `clap` needs `--allow-clap` (its left-right leg asymmetry is 97 deg, the wave's was 129 and flipped him).
 
     python -m pi_pipeline.behavior.arm_skill_test --skill launch
@@ -20,6 +20,8 @@ import time
 LEAN_DEG = 30.0
 TIPPED_DEG = 45.0
 WATCH_S = 6.0
+MIN_MOTION_DEG = 3.0               # a skill that lunges or swings the arm moves the body at least this much; less means it did not run (2026-11-20: kpickF was echoed by the board, the body moved 2.6 deg and the claw never moved, and the test said ok)
+QUIET_SKILLS = ("hunt",)           # a claw-only grab: the body may legitimately stay still, so a quiet body is not a failure for it
 # the skill tokens in the order of the test plan, mildest first. tossL and tossR are NOT separate skills in the arm firmware: the lookup matches the first table entry that starts with "toss" (the
 # generic `toss`), so both play the same motion (docs/hardware/arm-skills.md).
 ORDER = ("launch", "toss", "tossF", "tossL", "tossR", "hunt", "showOff")
@@ -28,13 +30,15 @@ EXTRA = ("clap",)
 LOG_DIR = "~/g2_runs/arm_skills"
 
 
-def verdict(max_dev_deg: float, fell: bool) -> str:
+def verdict(max_dev_deg: float, fell: bool, expect_motion: bool = False) -> str:
     if fell:
         return "fell"
     if max_dev_deg >= TIPPED_DEG:
         return "tipped"
     if max_dev_deg >= LEAN_DEG:
         return "lean"
+    if expect_motion and max_dev_deg < MIN_MOTION_DEG:
+        return "no_motion"                 # the skill was sent but the body hardly moved: it probably did not run
     return "ok"
 
 
@@ -94,7 +98,7 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         pitches = [abs(p - b[0]) for p in robot._pitch] or [0.0]
         res["max_roll_dev"], res["max_pitch_dev"] = round(max(rolls), 1), round(max(pitches), 1)
         res["fell"] = fell
-        res["verdict"] = verdict(max(rolls + pitches), fell)
+        res["verdict"] = verdict(max(rolls + pitches), fell, expect_motion=token not in QUIET_SKILLS)
         stamps = list(getattr(robot, "_imu_t", []))[-len(robot._roll):] if robot._roll else []
         if len(stamps) != len(robot._roll):                                                  # a robot without frame times: spread the frames evenly over the watch
             n = len(robot._roll)

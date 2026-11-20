@@ -139,3 +139,14 @@ def test_the_landing_record_and_update_log(tmp_path):
 
 def test_the_pick_skills_are_allowed_and_not_in_the_throw_order():
     assert t.PICKS == ("pickF", "pickD") and not set(t.PICKS) & set(t.ORDER + t.EXTRA)
+
+
+def test_a_quiet_body_is_no_motion_not_ok_except_for_hunt():
+    assert t.verdict(2.6, False, expect_motion=True) == "no_motion" and t.verdict(2.6, False) == "ok"
+    assert t.verdict(t.MIN_MOTION_DEG, False, expect_motion=True) == "ok" and t.verdict(0, True, expect_motion=True) == "fell"
+    c = Clock()
+    still = FakeRobot(rolls=[-2.0, -1.5, -1.2], pitches=[1.0, 1.3, 1.5])
+    assert t.run_skill(still, "launch", watch_s=1.0, say=lambda *_: None, sleep=c.sleep, clock=c)["verdict"] == "no_motion"
+    c2 = Clock()
+    assert t.run_skill(FakeRobot(rolls=[-2.0], pitches=[1.0]), "hunt", watch_s=1.0, say=lambda *_: None, sleep=c2.sleep, clock=c2)["verdict"] == "ok"
+
