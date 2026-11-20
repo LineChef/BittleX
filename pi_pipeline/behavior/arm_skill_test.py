@@ -23,6 +23,7 @@ WATCH_S = 6.0
 # the skill tokens in the order of the test plan, mildest first. tossL and tossR are NOT separate skills in the arm firmware: the lookup matches the first table entry that starts with "toss" (the
 # generic `toss`), so both play the same motion (docs/hardware/arm-skills.md).
 ORDER = ("launch", "toss", "tossF", "tossL", "tossR", "hunt", "showOff")
+PICKS = ("pickF", "pickD")           # the pick skills: run with the object on the floor in front of the claw; the claw joint is read after the run (it stops part-open on an object, closes fully on nothing)
 EXTRA = ("clap",)
 LOG_DIR = "~/g2_runs/arm_skills"
 
@@ -154,7 +155,7 @@ def main() -> None:
 
     from . import ball_chase as chase
     ap = argparse.ArgumentParser(description="Play ONE arm skill on G2 and watch the body. Needs the owner's go; the voice service stopped.")
-    ap.add_argument("--skill", required=True, help="one of: " + ", ".join(ORDER + EXTRA))
+    ap.add_argument("--skill", required=True, help="one of: " + ", ".join(ORDER + PICKS + EXTRA))
     ap.add_argument("--watch", type=float, default=WATCH_S, help="seconds to watch the IMU after the skill starts")
     ap.add_argument("--allow-clap", action="store_true", help="allow clap (large left-right leg asymmetry)")
     ap.add_argument("--object", default=None, help="what is in the claw (a name; leave out for an empty claw)")
@@ -165,8 +166,8 @@ def main() -> None:
     ap.add_argument("--no-prompt", action="store_true", help="do not ask for the landing record after the run")
     args = ap.parse_args()
     token = args.skill.strip()
-    if token not in ORDER + EXTRA or (token in EXTRA and not args.allow_clap):
-        print(f"refused: {token!r} is not an allowed arm skill (allowed: {', '.join(ORDER)}; clap needs --allow-clap)")
+    if token not in ORDER + PICKS + EXTRA or (token in EXTRA and not args.allow_clap):
+        print(f"refused: {token!r} is not an allowed arm skill (allowed: {', '.join(ORDER + PICKS)}; clap needs --allow-clap)")
         return
     from ..link.opencat import DISABLED_SKILLS
     if "k" + token in DISABLED_SKILLS:
@@ -229,8 +230,11 @@ def main() -> None:
     finally:
         from .ball_chase import ensure_rest
         ensure_rest(link)                                              # rest confirmed with the board, as at the end of every session
-    if path and not args.no_prompt:
-        update_log(path, {"landing": ask_landing()})
+    if path:
+        after = chase.read_joints(link)                                 # the claw (joint 2) after the run, G2 in rest: part-open = something held, fully closed = nothing
+        update_log(path, {"claw_joint_after": after[2] if after and len(after) > 2 else None, "joints_after": after})
+        if not args.no_prompt:
+            update_log(path, {"landing": ask_landing()})
 
 
 if __name__ == "__main__":

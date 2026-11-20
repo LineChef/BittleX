@@ -135,3 +135,7 @@ def test_the_landing_record_and_update_log(tmp_path):
     f.write_text(json.dumps({"skill": "launch"}))
     assert t.update_log(str(f), {"landing": {"landed_in": 5.0}}) and json.loads(f.read_text())["landing"]["landed_in"] == 5.0
     assert not t.update_log(str(tmp_path / "missing.json"), {})
+
+
+def test_the_pick_skills_are_allowed_and_not_in_the_throw_order():
+    assert t.PICKS == ("pickF", "pickD") and not set(t.PICKS) & set(t.ORDER + t.EXTRA)
