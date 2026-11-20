@@ -863,6 +863,13 @@ def ensure_rest(link, sleep=time.sleep, tries: int = 3) -> bool:
             break
         log.warning("rest was asked for but the pose reads %s: asking again", classify_pose(j))
     try:
+        from .. import motion_feel
+        settle = motion_feel.get("REST_RELAX_SETTLE_S")      # the pose read is of the commanded angles: the legs may still be arriving, so the servos are not let go the moment it reads rest (2026-11-20)
+        if settle > 0:
+            sleep(settle)
+    except Exception:  # noqa: BLE001
+        log.debug("the rest settle was skipped", exc_info=True)
+    try:
         link.send("d", read_reply=False, settle=0.0)       # servos relaxed
     except Exception:  # noqa: BLE001
         pass

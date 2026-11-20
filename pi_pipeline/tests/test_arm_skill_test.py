@@ -150,3 +150,13 @@ def test_a_quiet_body_is_no_motion_not_ok_except_for_hunt():
     c2 = Clock()
     assert t.run_skill(FakeRobot(rolls=[-2.0], pitches=[1.0]), "hunt", watch_s=1.0, say=lambda *_: None, sleep=c2.sleep, clock=c2)["verdict"] == "ok"
 
+
+
+def test_joint_samples_are_logged_while_the_skill_plays():
+    c = Clock()
+    seen = iter([[0] * 16, [0, 0, 65] + [0] * 13, None])
+    r = FakeRobot(rolls=[-2.0] * 30, pitches=[1.0] * 30)
+    res = t.run_skill(r, "pickF", watch_s=2.0, say=lambda *_: None, sleep=c.sleep, clock=c, sample_joints=lambda: next(seen), joint_samples=3)
+    assert [row[1] for row in res["joints_during"]] == [[0] * 16, [0, 0, 65] + [0] * 13, None] and res["joints_during"][1][0] >= 0.6
+    c2 = Clock()
+    assert "joints_during" not in t.run_skill(FakeRobot(rolls=[1.0], pitches=[1.0]), "launch", watch_s=0.2, say=lambda *_: None, sleep=c2.sleep, clock=c2)

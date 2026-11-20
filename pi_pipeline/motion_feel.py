@@ -45,6 +45,7 @@ REST_SPEED = 8             # how fast each stage moves. BIGGER = faster. The att
 REST_WAIT_S = 7.0          # the longest the Pi waits for the legs to read as in the rest pose.
 REST_SILENT_WAIT_S = 3.0   # the wait when the board does not answer pose reads.
 REST_WATCH_S = 3.0         # (2026-11-19) the first seconds of the eased lie-down are spent reading the IMU, not polling the legs (`j` stops the IMU print: the first run had no tilt for the whole move); the trace goes in the motion events and the lie-down log
+REST_RELAX_SETTLE_S = 2.0  # (2026-11-20) how long every session-end rest waits after the pose reads as rest and before the servos are relaxed (`d`). `j` reports the commanded angles, so the pose reads as rest as soon as the board has been told to go there, while the legs are still arriving: `d` three seconds after `krest` let go of them part-way and they ended in odd places (the owner saw it after every arm skill run, where the lie-down is the firmware's own `krest`). 0 = relax at once, as before.
 RESEAT_STEPS = 10          # a re-seat of the legs without lying down: how many stages
 RESEAT_SPEED = 10          # ... how fast each stage moves (bigger = faster)
 RESEAT_DEPTH = 0.5         # ... how far toward the rest pose the legs go and come back (0.5 = half way)

@@ -90,3 +90,24 @@ def test_a_picture_rolled_from_level_is_a_sag_hint():
     assert abs(level[0]) < 3 and not pt.flagged(level)
     assert 16 <= rolled[0] <= 24 and pt.flagged(rolled)
     assert pt.estimate(None) is None and pt.estimate(b"not a jpeg") is None
+
+
+def test_the_servos_are_relaxed_only_after_the_rest_settle(monkeypatch):
+    """ensure_rest waits REST_RELAX_SETTLE_S after the pose reads rest and before `d` (the pose read is of commanded angles; the legs may still be arriving), for every mode that ends with it."""
+    from pi_pipeline import motion_feel
+    from pi_pipeline.gait import standup
+    from pi_pipeline.link import kskill
+    rest = [0] * 16
+    for k in range(8):
+        rest[kskill.URDF_TO_SERVO[k]] = standup.rest_pose()[k]
+    monkeypatch.setenv("G2_REST_RELAX_SETTLE_S", "2.0")
+    lk, naps = _Link([rest]), []
+    assert bc.ensure_rest(lk, sleep=naps.append) is True and lk.sent[-1] == "d"
+    assert naps[-1] == 2.0 and motion_feel.get("REST_RELAX_SETTLE_S") == 2.0              # the last wait before `d` is the settle
+    monkeypatch.setenv("G2_REST_RELAX_SETTLE_S", "0")                                     # the switch that reverts it: relax at once, as before
+    lk0, naps0 = _Link([rest]), []
+    bc.ensure_rest(lk0, sleep=naps0.append)
+    assert 0 not in naps0 and all(n != 2.0 for n in naps0) and lk0.sent[-1] == "d"
+    lk2, naps2 = _Link([[10] * 16, [10] * 16, [10] * 16]), []                             # the extreme: three tries that never read rest still end with the settle, then `d`
+    monkeypatch.setenv("G2_REST_RELAX_SETTLE_S", "2.0")
+    assert bc.ensure_rest(lk2, sleep=naps2.append, tries=3) is False and naps2[-1] == 2.0 and lk2.sent[-1] == "d"

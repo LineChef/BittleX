@@ -62,8 +62,8 @@ def trace_summary(times: list, pitches: list, rolls: list, base: tuple) -> dict:
     return out
 
 
-def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic, wall=time.time, capture=None) -> dict:
-    """Play `token` (no `k`) from a stand and report what the body did. Never raises. `capture`, when given, is called once after the swing (and `gb`) and returns a list of picture records for the log."""
+def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic, wall=time.time, capture=None, sample_joints=None, joint_samples: int = 0) -> dict:
+    """Play `token` (no `k`) from a stand and report what the body did. Never raises. `sample_joints()` (with `joint_samples` > 0) reads the 16 joint angles about every 0.6 s while the skill plays and logs them as `joints_during` ([seconds, angles]): the board reports commanded angles, so this shows whether the skill commands the claw (joint 2) at all; reading them stops the IMU print, so the trace has gaps. `capture`, when given, is called once after the swing (and `gb`) and returns a list of picture records for the log."""
     res = {"skill": token, "verdict": "error", "max_roll_dev": None, "max_pitch_dev": None, "fell": False, "tilt_before": None, "tilt_after": None, "seconds": watch_s}
     try:
         if robot._tilt(1.5) is None:
@@ -83,10 +83,14 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         res["sent_at"] = round(wall(), 3)                                                    # wall clock when the token went out: lines the phone video up with the trace
         res["sent_iso"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(res["sent_at"])) + f".{int((res['sent_at'] % 1) * 1000):03d}"
         fell = False
+        taken = 0
         while clock() - t0 < watch_s:
             if robot._fell():
                 fell = True
                 break
+            if sample_joints is not None and taken < joint_samples and clock() - t0 >= taken * 0.6:
+                taken += 1
+                res.setdefault("joints_during", []).append([round(clock() - t0, 2), sample_joints()])
             sleep(0.05)
         robot._tx("gb")
         sleep(1.0)
@@ -167,6 +171,7 @@ def main() -> None:
     ap.add_argument("--object-in", type=float, default=None, help="the object's width in inches")
     ap.add_argument("--floor", default=None, help="the floor label for this run (as set with g2floor)")
     ap.add_argument("--pictures", type=int, default=0, help="claw-camera pictures to take after the swing (default 0: camera off during the first runs)")
+    ap.add_argument("--joints", type=int, default=0, help="read the joint angles this many times while the skill plays (about every 0.6 s): shows whether the skill commands the claw; the IMU trace gets gaps")
     ap.add_argument("--no-prompt", action="store_true", help="do not ask for the landing record after the run")
     args = ap.parse_args()
     token = args.skill.strip()
@@ -222,7 +227,7 @@ def main() -> None:
     try:
         joints_before = chase.read_joints(link)                         # the claw is joint 2: read before he stands, to catch a claw left partly open
         chase._stand_if_lying(link, "kbalance")
-        res = run_skill(robot, token, watch_s=args.watch, capture=capture)
+        res = run_skill(robot, token, watch_s=args.watch, capture=capture, sample_joints=(lambda: chase.read_joints(link, timeout_s=0.6)) if args.joints > 0 else None, joint_samples=args.joints)
         volts_after = battery.read_voltage(link)
         meta = {"pack_pct": pct, "pack_v": volts, "pack_pct_after": battery.pack_percent(volts_after) if volts_after else None, "pack_v_after": volts_after, "object": args.object,
                 "object_oz": args.object_oz, "object_in": args.object_in, "floor": args.floor, "claw_joint_before": joints_before[2] if joints_before and len(joints_before) > 2 else None,
