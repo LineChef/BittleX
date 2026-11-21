@@ -134,6 +134,7 @@ CLAW_POSE_S = 2.0              # to settle into the attention pose
 CLAW_LOOK_STANDING = False     # (user, 2026-11-03: tried standing, reverted the same day: the attention pose prevents most of the servo sag) True = the claw look is taken STANDING: no attention pose (CLAW_LOOK_POSE) and no stand-up afterwards; the arm pans over the standing legs. False = the
                                # old look from the attention pose. Not used with BETWEEN_MOVES "attention" (that flow waits in the attention pose by design).
 SIT_STAND_FIRST_S = 2.5        # the stand-up before the sit of a claw look
+STAND_SETTLE_S = 2.0            # the idle stand after the stand-up that `_stand_if_lying` waits out, in every mode that starts from it (owner, 2026-11-21: "I want option 1", every mode, 3 s -> 2 s, to make pickF-then-lob one fluid motion)
 BETWEEN_MOVES = "stand"        # the switch (user, 2026-11-02; the punt setting / goal knob `between_moves`): "stand", the original flow (the default: fluid, and the legs only let go after
                                # 7 to 10 s of standing still), or "attention":
                                # he never waits standing: after every move he goes into the attention pose (CLAW_LOOK_POSE, legs straight) and takes the straight-ahead
@@ -2546,7 +2547,7 @@ def _stand_if_lying(link, token: str = "kbalance") -> bool:
     """At the start of a session: read the pose once (`j`) and stand him up the way it needs: standing, nothing; the attention pose, `token` with the link set up to run the
     back-legs-first stand-up (the plain firmware stand-up out of it flipped him over, 2026-11-02); rest or a sit, `token` (the plain firmware stand-up is `kbalance`; `kup` is the
     firmware's neutral stand, claw_look --stand kup). An unreadable pose counts as lying (a stand-up from standing changes nothing; a missed one leaves him lying while he "searches",
-    2026-11-01). Then a fixed wait, as before 2026-11-02: only the attention flow polls the board until it reads the stand. Never raises. Returns whether the pose could be read."""
+    2026-11-01). Then a fixed wait (`STAND_SETTLE_S`, 2 s since 2026-11-21; 3 s before), as before 2026-11-02: only the attention flow polls the board until it reads the stand. Never raises. Returns whether the pose could be read."""
     import re
     try:
         if callable(getattr(link, "poll_imu", None)) and callable(getattr(link, "pop_other", None)):
@@ -2571,7 +2572,7 @@ def _stand_if_lying(link, token: str = "kbalance") -> bool:
             if got not in ("stand", "unknown"):
                 print(f"stood up, but the board reads {got}")
         else:
-            time.sleep(3.0)
+            time.sleep(STAND_SETTLE_S)
         return j is not None
     except Exception as e:  # noqa: BLE001
         print("could not check the pose:", e)

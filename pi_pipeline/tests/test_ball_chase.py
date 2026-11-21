@@ -666,7 +666,8 @@ def test_the_session_start_reads_the_pose_once_and_waits_a_fixed_time(monkeypatc
     ser = types.SimpleNamespace(in_waiting=len(row), reset_input_buffer=lambda: None, write=lambda b: writes.append(b), read=lambda n: row)
     lk = types.SimpleNamespace(_ser=ser, send=lambda c, **k: sent.append(c), last_motion_command="")
     assert bc._stand_if_lying(lk) is True
-    assert writes == [b"j\n"] and sent == ["kbalance"] and lk.last_motion_command == "krest" and waits == [1.0, 3.0]      # one `j`, one stand-up, a fixed 3 s: no polling loop
+    assert writes == [b"j\n"] and sent == ["kbalance"] and lk.last_motion_command == "krest" and waits == [1.0, bc.STAND_SETTLE_S]      # one `j`, one stand-up, a fixed wait: no polling loop
+    assert bc.STAND_SETTLE_S == 2.0                                                                         # the owner chose 2 s for every mode (2026-11-21)
     sent.clear(); writes.clear(); waits.clear()
     row2 = ",\t".join(str(v) for v in [0] * 16).encode()                                                   # the attention pose: the link must run its back-legs-first stand-up
     ser.read = lambda n: row2
