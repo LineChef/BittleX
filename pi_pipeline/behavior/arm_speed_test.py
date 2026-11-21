@@ -26,7 +26,7 @@ import time
 
 from . import arm_skill_test as ast
 
-SERIES = ("lift", "jaw")
+SERIES = ("lift", "jaw", "both")      # both: the lift and the jaw moves at the same speed byte in one run (owner, 2026-11-21)
 SPEED_STEPS = (4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 127)   # raw speed bytes, one step per run: 4 is about the claw look's 60 deg/s, 127 the int8 limit
 SLOW_BYTE = 6                                              # the positioning and return legs of a run (about 90 deg/s commanded), never the speed under test
 STEP_S = 0.008                                             # the firmware waits (16 - 0) / 2 = 8 ms after each interpolation step (motion.h); the servo write time comes on top and is not known
@@ -64,8 +64,8 @@ def build_plan(series: str, speed: int, base: list, *, lift_lo: float = 0.0, lif
     """The steps of one run, each {"name", "joints": {index: angle}, "speed", "delay", "deg", "nominal_s"}, from the 16 angles the board reports (`base`). Raises ValueError for anything out of range."""
     if series not in SERIES:
         raise ValueError(f"series must be one of {SERIES}")
-    if not isinstance(speed, int) or isinstance(speed, bool) or not 1 <= speed <= 127:
-        raise ValueError("the speed byte is a whole number from 1 to 127")
+    if not isinstance(speed, int) or isinstance(speed, bool) or not 0 <= speed <= 127:
+        raise ValueError("the speed byte is a whole number from 0 to 127 (0 is no interpolation: the servos are sent the target at once)")
     if not base or len(base) < 16:
         raise ValueError("the 16 joint angles are needed to hold the legs where they are")
     if not 0.0 <= lift_lo < lift_hi <= LIFT_MAX_DEG:
@@ -81,8 +81,12 @@ def build_plan(series: str, speed: int, base: list, *, lift_lo: float = 0.0, lif
         if abs(jaw_open) > JAW_MAX_DEG or abs(jaw_closed) > JAW_MAX_DEG or jaw_open == jaw_closed:
             raise ValueError(f"the jaw angles must differ and stay within +-{JAW_MAX_DEG:.0f}")
         jaw0 = float(base[JAW])
-        specs = [("raise", {LIFT: lift_hold}, SLOW_BYTE, 6), ("jaw_open_slow", {JAW: jaw_open}, SLOW_BYTE, 6), ("jaw_close", {JAW: jaw_closed}, speed, HOLD_RAW),
-                 ("jaw_open", {JAW: jaw_open}, speed, HOLD_RAW), ("jaw_back", {JAW: jaw0}, SLOW_BYTE, 4), ("lower", {LIFT: lift_lo}, SLOW_BYTE, 0)]
+        if series == "both":                                       # the lift up and the jaw open, close, open all at the speed under test; short holds, so the stand is short
+            specs = [("to_start", {LIFT: lift_lo}, SLOW_BYTE, 4), ("lift_up", {LIFT: lift_hi}, speed, 6), ("jaw_open", {JAW: jaw_open}, speed, 6), ("jaw_close", {JAW: jaw_closed}, speed, 6),
+                     ("jaw_open_again", {JAW: jaw_open}, speed, 6), ("jaw_back", {JAW: jaw0}, SLOW_BYTE, 4), ("lower", {LIFT: lift_lo}, SLOW_BYTE, 0)]
+        else:
+            specs = [("raise", {LIFT: lift_hold}, SLOW_BYTE, 6), ("jaw_open_slow", {JAW: jaw_open}, SLOW_BYTE, 6), ("jaw_close", {JAW: jaw_closed}, speed, HOLD_RAW),
+                     ("jaw_open", {JAW: jaw_open}, speed, HOLD_RAW), ("jaw_back", {JAW: jaw0}, SLOW_BYTE, 4), ("lower", {LIFT: lift_lo}, SLOW_BYTE, 0)]
     cur = [float(a) for a in base[:16]]
     plan, total = [], 0.0
     for name, joints, sp, delay in specs:
@@ -121,6 +125,8 @@ def last_run(series: str, log_dir: str | None = None) -> dict | None:
 def check_step(speed: int, last: dict | None, allow_jump: bool = False) -> str | None:
     """None when this speed may be run, else why not: the first run of a series is the baseline step, each next one is at most one step above the last, and none goes above a run that stalled, hit something or
     was unsafe, or one whose observation was never recorded. Repeating or lowering a speed is always allowed."""
+    if speed == 0 and not allow_jump:
+        return "speed 0 sends the servos the target at once, faster than any speed byte: it needs --allow-jump, a deliberate choice"
     if allow_jump:
         return None
     if last is None:

@@ -73,7 +73,7 @@ def test_the_jaw_plan_raises_the_arm_first_and_returns_the_jaw():
 
 
 REFUSED = [
-    ({"speed": 0}, "lift"), ({"speed": 128}, "lift"), ({"speed": 4, "lift_hi": 121.0}, "lift"), ({"speed": 4, "lift_lo": 130.0}, "lift"),
+    ({"speed": -1}, "lift"), ({"speed": 128}, "lift"), ({"speed": 0}, "both"), ({"speed": 4, "lift_hi": 121.0}, "lift"), ({"speed": 4, "lift_lo": 130.0}, "lift"),
     ({"speed": 4, "lift_lo": 50.0, "lift_hi": 40.0}, "lift"), ({"speed": 4}, "jaw"), ({"speed": 4, "jaw_open": 60.0, "jaw_closed": 60.0}, "jaw"), ({"speed": 4, "jaw_open": 130.0, "jaw_closed": 0.0}, "jaw")]
 
 
@@ -218,3 +218,11 @@ def test_from_attention_goes_into_the_attention_pose_before_the_legs_are_read_an
     order.clear()
     t.execute_step(Link(), Rb(), "lift", 16, {"lift_lo": 0.0, "lift_hi": 120.0, "lift_hold": 120.0, "jaw_open": None, "jaw_closed": None}, prompt=False, say=lambda *a: None)
     assert order == ["stand", "read", "skill", "rest"]                            # without the option nothing changes
+
+
+def test_speed_zero_is_an_instant_jump_that_needs_a_deliberate_flag_and_the_both_series_moves_lift_and_jaw():
+    assert t.check_step(0, None) is not None and t.check_step(0, None, allow_jump=True) is None
+    plan = t.build_plan("both", 0, BASE, **JAW)
+    assert [p["name"] for p in plan] == ["to_start", "lift_up", "jaw_open", "jaw_close", "jaw_open_again", "jaw_back", "lower"]
+    assert [p["speed"] for p in plan[1:5]] == [0, 0, 0, 0] and plan[0]["speed"] == plan[5]["speed"] == plan[6]["speed"] == t.SLOW_BYTE
+    assert plan[1]["nominal_s"] == 0.3 and plan[2]["frame"][t.LIFT] == 120                          # no interpolation steps at speed 0, only the pause after the frame; the jaw moves with the arm up
