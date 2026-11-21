@@ -117,3 +117,18 @@ def test_the_catapult_launch_script_drops_the_claw_as_the_legs_rise_and_swings_i
 
 def test_a_committed_pose_wins_over_a_pose_saved_on_the_pi():
     assert ss._pose_angles("launch")[1] == 125 and ss._pose_angles("launch")[8:] == [20, 20, 70, 70, 100, 100, -35, -35]
+
+
+def test_the_release_angle_is_set_inside_the_lunge_frame_and_can_be_overridden_per_run():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    script = ss.load_script("catapult_throw")
+    plan = ss.build_plan(script, stand, amount=1.0)
+    assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge", "open", "back_to_stand"]
+    lunge, opened = plan[2], plan[3]
+    assert lunge["frame"][2] == 26 and lunge["frame"][1] == 125 and lunge["speed"] == 127          # the jaw opens a few degrees while the arm swings up
+    assert opened["frame"][2] == 60 and opened["speed"] == 0                                         # then fully open at once
+    plan2 = ss.build_plan(script, stand, amount=1.0, overrides=ss.parse_overrides(["lunge.jaw=34"]))
+    assert plan2[2]["frame"][2] == 34 and plan2[3]["frame"][2] == 60
+    for bad in ("lunge", "lunge.jaw", "lunge.j4=3", "a.b=x"):
+        with pytest.raises(ValueError):
+            ss.parse_overrides([bad])

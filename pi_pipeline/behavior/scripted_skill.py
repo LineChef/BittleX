@@ -52,7 +52,22 @@ def joint_indices(spec: list | None) -> list:
     return sorted(set(out))
 
 
-def build_plan(script: dict, base: list, *, amount: float = 1.0, pose_lookup=_pose_angles) -> list:
+def parse_overrides(items: list | None) -> dict:
+    """`["lunge.jaw=30"]` -> {("lunge", "jaw"): 30.0}. Raises ValueError for anything else."""
+    out = {}
+    for it in items or []:
+        try:
+            key, val = it.split("=")
+            frame, joint = key.split(".")
+            if joint not in NAMES or (joint.startswith("j") and joint != "jaw"):
+                raise ValueError
+            out[(frame.strip(), joint.strip())] = float(val)
+        except ValueError:
+            raise ValueError(f"not an override: {it!r} (FRAME.JOINT=ANGLE, for example lunge.jaw=30)") from None
+    return out
+
+
+def build_plan(script: dict, base: list, *, amount: float = 1.0, pose_lookup=_pose_angles, overrides: dict | None = None) -> list:
     """The frames of one run, each {"name", "frame", "speed", "delay", "deg", "nominal_s"}. Raises ValueError for a script or value out of range."""
     if not base or len(base) < 16:
         raise ValueError("the 16 joint angles are needed")
@@ -86,6 +101,10 @@ def build_plan(script: dict, base: list, *, amount: float = 1.0, pose_lookup=_po
         for i in joint_indices(fr.get("joints")):
             new[i] = start[i] + amount * (target[i] - start[i]) if fr.get("pose") != "start" else target[i]
             new[i] = max(-125.0, min(125.0, new[i]))
+        for jn, val in {**(fr.get("set") or {}), **{k[1]: v for k, v in (overrides or {}).items() if k[0] == name}}.items():
+            if jn not in NAMES:
+                raise ValueError(f"{name}: unknown joint {jn!r} in set")
+            new[NAMES.index(jn)] = max(-125.0, min(125.0, float(val)))          # a joint set outright: not scaled by amount
         new = [int(round(a)) for a in new]
         deg = max(abs(a - b) for a, b in zip(new, cur))
         delay = int(round(delay_s / 0.05))
@@ -112,12 +131,19 @@ def main() -> None:
     ap.add_argument("--list", action="store_true", help="list the scripts and the committed poses, touch nothing")
     ap.add_argument("--amount", type=float, default=0.3)
     ap.add_argument("--attention", action="store_true", help="play from the attention pose")
+    ap.add_argument("--set", action="append", default=None, metavar="FRAME.JOINT=ANGLE", help="override one joint of one frame for this run, for example lunge.jaw=30 (the release time knob of the catapult)")
+    ap.add_argument("--pick", action="store_true", help="play Petoi's pickF first (the object put in front of him) and the script from where it ended")
     ap.add_argument("--from-rest", action="store_true", help="play from the rest pose: no stand-up (a script written from rest with the pose editor's start --from-rest)")
     ap.add_argument("--watch", type=float, default=WATCH_S)
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    try:
+        overrides = parse_overrides(a.set)
+    except ValueError as e:
+        print("refused:", e)
+        return
     if a.list:
         names = sorted(n[:-5] for n in os.listdir(SCRIPT_DIR) if n.endswith(".json"))
         poses = os.path.join(SCRIPT_DIR, "poses")
@@ -135,7 +161,7 @@ def main() -> None:
         return
     if a.dry_run:
         try:
-            plan = build_plan(script, [0] * 8 + [20, 20, 30, 30, 30, 30, 30, 30], amount=a.amount)
+            plan = build_plan(script, [0] * 8 + [20, 20, 30, 30, 30, 30, 30, 30], amount=a.amount, overrides=overrides)
         except (ValueError, OSError) as e:
             print("refused:", e)
             return
@@ -167,19 +193,26 @@ def main() -> None:
             if robot.sit_down() == "fell":
                 print("G2 fell going into the attention pose: stopping")
                 return
+        if a.pick:
+            from .catapult import wait_skill_done
+            print("playing pickF first: the object in front of him")
+            link.send("kpickF", read_reply=False, settle=0.0)
+            if not wait_skill_done(link):
+                print("pickF did not report its end in time: stopping before the script")
+                return
         base = chase.read_joints(link)
         if not base or len(base) < 16:
             print("refused: the joint angles could not be read: nothing was sent.")
             return
         try:
-            plan = build_plan(script, base, amount=a.amount)
+            plan = build_plan(script, base, amount=a.amount, overrides=overrides)
         except (ValueError, OSError) as e:
             print("refused:", e)
             return
         message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
         print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
         res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch, send=lambda: link.play_data_skill(message), expect_motion=False)
-        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
+        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
         print("ended")
