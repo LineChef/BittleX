@@ -1,0 +1,79 @@
+{
+  "name": "catapult_throw_checkpoint3_far",
+  "description": "CHECKPOINT 3, the FARTHER throw: as the arcing checkpoint with the deeper rear crouch (the pose launch_deep: rear shoulders 80 and knees -45), which pitches the body about 6 degrees further nose-up (37 to 38 degrees against 30 to 32). It throws the cylinder farther on a flatter path, 17 to 24 inches (24, 23, 17 and 23, the 17 on a poor grip). Do not edit: the arcing one is catapult_throw_checkpoint3_arc. Git tag: catapult-checkpoint-3.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -6,
+        -6,
+        -10,
+        -10,
+        7,
+        7,
+        72,
+        72
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 30,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch_deep",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.05
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        80,
+        80,
+        100,
+        100,
+        -45,
+        -45
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.1
+    }
+  ]
+}
