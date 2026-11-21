@@ -543,6 +543,16 @@ g2armspeed() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_speed_test$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
 }
+# g2catapult --stage bow|swing|throw [--amount 0.3] [--lift-top 60] [--speed 16] [--jaw-delta 15] [--pick] [--dry-run]  -- ONE run of the backward catapult (the object in the claw thrown over his back): a data skill the board plays itself, stage by stage (bow, swing, throw; each refused until the one before ran ok), scaled by --amount; --pick plays pickF first. Runs ONLY on your go, hands near, soft surface behind him; --dry-run prints the frames and touches nothing. Details: docs/hardware/arm-skills.md.
+g2catapult() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2catapult --stage bow|swing|throw [--amount N] [--lift-top DEG] [--speed N] [--jaw-delta DEG] [--pick] [--dry-run]"; return 2; }
+  local rest ro=0; rest="$(printf ' %q' "$@")"
+  case " $* " in *" --dry-run "*) ro=1 ;; esac
+  [ "$ro" = 1 ] || g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.catapult$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+}
 # g2pickbisect --variant plain|gb|gP|j|link  -- only if g2armskill pickF still does not play in full: stands him up, writes kpickF straight to the port (like a hand-typed printf), then at most ONE extra command 100 ms later (gb, gP or j; `link` uses the link's own send), nothing else for 10 s, and you type what the claw did (log: ~/g2_runs/pick_bisect/). Run `plain` first. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Why: docs/hardware/arm-skills.md.
 g2pickbisect() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

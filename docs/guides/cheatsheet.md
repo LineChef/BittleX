@@ -29,6 +29,7 @@ Most used
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
 - `g2armspeed --series lift --speed 4`: one arm speed step (hands near)
 - `g2armspeed --report`: the speed runs so far and the next step
+- `g2catapult --stage bow --dry-run`: one catapult stage's frames, no move
 - `g2jawrange --to 40`: step the jaw by eye to find its angles (hands near)
 - `g2pickbisect --variant plain`: pick-up bisect, one variant (hands near)
 - `g2ball`: start the ball goal
@@ -336,6 +337,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2cal`: [Data and review](#data-and-review)
 - `g2calauto`: [Data and review](#data-and-review)
 - `g2cam`: [Camera model](#camera-model)
+- `g2catapult`: [Most used](#most-used)
 - `g2chat`: [Voice and mic](#voice-and-mic)
 - `g2check`: [Docs and repo](#docs-and-repo)
 - `g2claw`: [Claw and camera](#claw-and-camera)

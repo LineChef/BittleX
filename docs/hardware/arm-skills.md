@@ -55,6 +55,24 @@ How fast the lift joint and the claw jaw can be driven decides what a throw can 
 - `g2armspeed --report` prints the runs so far (speed byte, result, body tilt, pack) and the next step, and sends nothing. `g2armspeed --session --series lift` runs several steps in one process: G2 is laid in rest between steps, the next speed is offered before each, and the reply is the go for that run (Enter runs it, a number runs that speed if the one-step check allows it, `s` stops).
 - `g2jawrange --to ANGLE` finds the two jaw angles by eye. It stands G2, raises the arm the way the claw look does, steps the jaw from where it is toward ANGLE in steps of at most 15 degrees (within 60 degrees of the start, at most 12 steps) printing each commanded angle, brings it back, lowers the arm and rests him. The angles typed in afterwards (open, closed, where it stopped) become the `g2armspeed` jaw command line. The board reports commanded angles, so the eye is the measurement. Start with a small ANGLE.
 
+Measured on G2 by eye, with the legs held and the body trace as a check on timing:
+- Lift: every step from 4 to 127 followed smoothly, with no lag, no bang at the top and nothing unsafe. 127 is the working maximum. Speed 0 was not faster for the lift.
+- Jaw: 0 degrees is closed and positive angles open it. 0 to 60 degrees works, and the jaw was still opening wider at 60, so the end of its range is not found. Every speed from 4 to 127 followed, and 127 looked faster than the rest but slower than the snap seen in the Petoi calibration tool. Speed 0 was faster still.
+- Speed 0: a frame's speed byte divided by 8 is the ratio passed to `transform()`, and a ratio of 0 means no interpolation steps, so every joint is sent its target at once (`motion.h`, read from the source). `g2armspeed` accepts 0 only with `--allow-jump`. Petoi's own `tossF` uses speed 0 for its release frame.
+- `--from-attention` plays a run from the attention pose (the claw look's own entry, legs straight, which prevents most of the servo sag) with rest sent straight from it. The `both` series plays the lift up and the jaw open, closed and open again at one speed in one short run.
+- Body trace: the roll and pitch stayed within a few degrees in every run from the attention pose. Runs from a stand with the arm raised pitched the body nose-up by about 22 degrees, and one jaw sweep with the arm raised for about 8 seconds fell as the legs sagged.
+
+The backward catapult
+---------------------
+
+`g2catapult` (`python -m pi_pipeline.behavior.catapult`) plays one run of the move as a data skill the board plays itself, built from the legs the board reports.
+- The frames: a bow (Petoi's `buttUp` pose: rump up, front legs bent), then one swing frame in which the legs go to the pose of Petoi's `launch` (front legs tall, rear legs folded, body pitched up), the lift joint swings to the peak given, and the jaw opens a few degrees, then the jaw opens fully at speed 0, then the legs, arm and jaw return slowly.
+- The release time: a frame's joints finish together and ease to a stop at its end, so the jaw is opened inside the swing frame. The object leaves when the jaw has opened past its width: early in the frame for a large `--jaw-delta` and late for a small one. That angle is the knob to tune.
+- Scale: `--amount` (0.1 to 1) is how far the legs go from where they stand toward the bow and the launch pose, and `--lift-top` and `--speed` set the arm. The defaults are small (0.3, 60 degrees, speed 16).
+- Stages: `bow`, then `swing` (the jaw held shut), then `throw` (the release). A stage is refused until the one before it has a logged run with the body ok. `--pick` plays `pickF` first and the move from where it ended.
+- Logs: `~/g2_runs/catapult/` has the plan, the body trace and the typed landing note. `--dry-run` prints the frames and touches nothing.
+- Setup: a soft surface and clear floor behind G2 and a hand near. The arm passes over the pod and Pi stack, and tipping over backward onto the pod is the main risk.
+
 What each skill does to the body
 --------------------------------
 
@@ -118,7 +136,7 @@ Open questions
   - Why backward: the nose-up body pitch tilts the arc up and back, and the object leaves heading upward. A forward throw swings the claw down and forward, so the object would leave heading toward the floor.
   - Evidence so far: Petoi's demo clip pitches the body up about 40 degrees in under 0.2 seconds as the arm snaps up, and its second release sends the object up and toward the rear.
   - First check: the arc passes over the pod and Pi stack, so their clearance comes first.
-  - Status: not built or simulated, and planned only after the claw's speed and release time are measured. The release angle and the claw's opening delay are the two numbers to find.
+  - Status: built as `g2catapult` and not yet run on G2. The lift and jaw speeds are measured (see above). The release angle and the claw's opening delay are the two numbers to find.
 - Whether the skills throw only when the claw holds an object. Nothing read says so: the frames are fixed angles, and nothing read shows the claw sensing a load, so the same motion is inferred to play empty or loaded. Not verified; the held-object runs in step 5 of the test plan would settle it.
 - Whether the claw angle at the release means open or closed in the toss frames (negative values in `tossF` and `hunt`, positive in `pickF`).
 - Whether `toss` throws to the left or the right on G2's claw, since both names play the one motion.

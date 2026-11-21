@@ -1438,10 +1438,11 @@ def test_the_memory_log_is_trimmed_past_its_size_and_off_means_off(tmp_path, mon
 
 # ---------------------------------------------------------------------------------------------- tasks leave nothing behind (user, 2026-11-01)
 
-def test_a_task_puts_back_every_setting_it_changed_even_when_it_fails():
+def test_a_task_puts_back_every_setting_it_changed_even_when_it_fails(monkeypatch):
     from pi_pipeline.behavior import ball_chase as chase
     from pi_pipeline.behavior import punt_settings as ps
     from pi_pipeline.util import task_scope as ts
+    monkeypatch.setattr(ts, "_BASELINE", None)        # the scope puts settings back to the process's first baseline, which an earlier test in the same worker may have taken under other settings: this test's own start is the baseline
     before = ts.capture()
     with pytest.raises(RuntimeError):
         with ts.task_scope("test task"):
