@@ -1,9 +1,0 @@
-{
-  "name": "bow_from_rest",
-  "description": "From the rest pose into the play bow found with the pose editor (front legs squatted with the shoulders 75 and the knees -50, back legs extended with the shoulders 10 and the knees -45, the claw closed and the arm at its rest lift), held for a moment, then back to rest. Played from rest with `g2script bow_from_rest --from-rest --amount 1.0`.",
-  "frames": [
-    {"name": "front_squat", "angles": [0, 0, 0, 0, 0, 0, 0, 0, 75, 75, 0, 0, -50, -50, 0, 0], "joints": ["fsh", "fkn"], "speed": 8, "delay_s": 0.2},
-    {"name": "back_extend", "angles": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 0, 0, -45, -45], "joints": ["rsh", "rkn"], "speed": 8, "delay_s": 0.8},
-    {"name": "back_to_rest", "pose": "start", "speed": 8, "delay_s": 0.0}
-  ]
-}

@@ -1,0 +1,8 @@
+{
+  "name": "bow",
+  "description": "The play bow found with the pose editor, played from the stand: all four legs at once (front legs squatted with the shoulders 75 and the knees -50, back legs extended with the shoulders 10 and the knees -45, the claw closed and the arm down at its stand angle), at the stand-up's pace, held a moment, then back to the stand. Played with `g2script bow --amount 1.0`: the run stands him up from rest with the eased stand-up first and lays him in rest after.",
+  "frames": [
+    {"name": "bow", "angles": [0, 0, 0, 0, 0, 0, 0, 0, 75, 75, 10, 10, -50, -50, -45, -45], "joints": ["legs", "arm"], "speed": 20, "delay_s": 0.8},
+    {"name": "back_to_stand", "pose": "start", "speed": 20, "delay_s": 0.0}
+  ]
+}

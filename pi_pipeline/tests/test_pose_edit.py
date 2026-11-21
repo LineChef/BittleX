@@ -73,10 +73,9 @@ def test_script_values_out_of_range_are_refused_and_the_example_script_is_valid(
     assert [p["name"] for p in plan] == ["crouch", "back"] and plan[1]["frame"] == BASE
 
 
-def test_the_bow_from_rest_script_squats_the_front_then_extends_the_back_and_returns_to_rest():
-    rest = [2, 58, 0, 0, 0, 0, 0, 0, 64, 64, 74, 74, -50, -50, -56, -56]
-    plan = ss.build_plan(ss.load_script("bow_from_rest"), rest, amount=1.0)
-    assert [p["name"] for p in plan] == ["front_squat", "back_extend", "back_to_rest"]
-    assert plan[0]["frame"][8:] == [75, 75, 74, 74, -50, -50, -56, -56]                              # only the front legs moved
-    assert plan[1]["frame"][8:] == [75, 75, 10, 10, -50, -50, -45, -45] and plan[1]["frame"][1] == 58 and plan[1]["frame"][2] == 0     # the back legs extend, the arm and jaw stay
-    assert plan[2]["frame"] == rest
+def test_the_bow_script_moves_all_four_legs_at_once_at_the_stand_up_pace_and_returns_to_the_stand():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    plan = ss.build_plan(ss.load_script("bow"), stand, amount=1.0)
+    assert [p["name"] for p in plan] == ["bow", "back_to_stand"]
+    assert plan[0]["frame"][8:] == [75, 75, 10, 10, -50, -50, -45, -45] and plan[0]["frame"][:8] == stand[:8]       # every leg in one frame, the arm untouched
+    assert plan[0]["speed"] == 20 and plan[1]["frame"] == stand
