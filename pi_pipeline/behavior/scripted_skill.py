@@ -202,12 +202,11 @@ def main() -> None:
                 print("G2 fell going into the attention pose: stopping")
                 return
         if a.pick:
-            from .catapult import wait_skill_done
+            from .catapult import pick_up
             print("playing pickF first: the object in front of him")
             t_pick = time.monotonic()
-            link.send("kpickF", read_reply=False, settle=0.0)
             heard: list = []
-            if not wait_skill_done(link, seen=heard, name="pickF"):
+            if not pick_up(link, seen=heard):
                 print("pickF did not report its end in time: stopping before the script")
                 return
             print(f"pickF reported its end after {time.monotonic() - t_pick:.1f} s; the board sent (seconds after the wait began, line): {heard}")

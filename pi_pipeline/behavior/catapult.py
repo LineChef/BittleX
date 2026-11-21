@@ -144,6 +144,17 @@ def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=ti
     return False
 
 
+def pick_up(link, seen: list | None = None) -> bool:
+    """Play Petoi's `pickF` and wait for its end: the ONE way every tool starts the pick-up (scripted_skill and the catapult tool). The port is read first, so the old lines the board left (the stand-up's `balance` and `k`) are gone
+    before the skill starts: the link ends its silence at the first `k` it reads, and an old one ended it 0.1 s into `pickF`, which flushed the `gb` held for the gyro-off runs and cut the skill off (the board answered `up`, the claw
+    never opened, 2026-11-21). True when the skill reported its own end."""
+    drain = getattr(link, "drain", None)
+    if drain is not None:
+        drain(0.3)
+    link.send("kpickF", read_reply=False, settle=0.0)
+    return wait_skill_done(link, seen=seen, name="pickF")
+
+
 def write_log(res: dict, extra: dict) -> str | None:
     return ast.write_log(res, extra, log_dir=LOG_DIR)
 
@@ -215,8 +226,7 @@ def main() -> None:
         chase._stand_if_lying(link, "kbalance")
         if args.pick:
             print("playing pickF first: the object in front of him")
-            link.send("kpickF", read_reply=False, settle=0.0)
-            if not wait_skill_done(link, name="pickF"):
+            if not pick_up(link):
                 print("pickF did not report its end in time: stopping before the catapult")
                 return
         base = chase.read_joints(link)

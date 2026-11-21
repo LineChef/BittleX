@@ -135,3 +135,19 @@ def test_the_pick_wait_ends_at_the_k_after_the_skills_own_name_not_at_an_old_k_a
     lk = Link()
     assert c.wait_skill_done(lk, 12.0, clock=lambda: now[0], min_s=10.0, seen=heard, name="pickF") is True
     assert now[0] < 1.0 and [ln for _, ln in heard if ln] == ["k", "balance", "k", "pickF", "k"]
+
+
+def test_the_pick_up_reads_the_old_lines_before_pickF_goes_out_so_they_cannot_end_its_silence(monkeypatch):
+    order = []
+
+    class Link:
+        def drain(self, seconds=0.3):
+            order.append("drain")
+            return ""
+
+        def send(self, command, **kw):
+            order.append(command)
+
+    monkeypatch.setattr(c, "wait_skill_done", lambda link, **kw: order.append(("wait", kw.get("name"))) or True)
+    assert c.pick_up(Link()) is True
+    assert order == ["drain", "kpickF", ("wait", "pickF")]                                          # the old `balance` and `k` are read before the skill is sent, then the wait is for pickF's own end
