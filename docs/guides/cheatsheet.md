@@ -31,6 +31,7 @@ Most used
 - `g2armspeed --report`: the speed runs so far and the next step
 - `g2catapult --stage bow --dry-run`: one catapult stage's frames, no move
 - `g2lob --dry-run`: the lob's frames, no move (without the flag it runs)
+- `g2throws summary`: the throw tally on the Mac, per script and grip
 - `g2poseedit start`: begin a pose-editing session (then `set`, `save`, `end`)
 - `g2script NAME --dry-run`: a scripted movement's frames, no move
 - `g2jawrange --to 40`: step the jaw by eye to find its angles (hands near)
@@ -406,6 +407,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2sync`: [Most used](#most-used), [Data and review](#data-and-review)
 - `g2tb`: [Training and policies](#training-and-policies)
 - `g2test`: [Training and policies](#training-and-policies), [Docs and repo](#docs-and-repo)
+- `g2throws`: [Most used](#most-used)
 - `g2train`: [Training and policies](#training-and-policies)
 - `g2traits`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2turn3`: [Claw and camera](#claw-and-camera)

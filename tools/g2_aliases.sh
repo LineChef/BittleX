@@ -582,6 +582,8 @@ g2lob() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lob$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
 }
+# g2throws add SCRIPT INCHES [--side IN] [--grip TEXT] [--note TEXT] | g2throws summary  -- the throw tally on the Mac (~/.local/share/g2/throw_distances.csv, outside the repo): one row per throw with the distance and the sideways offset (inches right of the aim line, negative = left) you measure, and a summary per script and grip. Reads nothing from G2.
+g2throws() { (cd "$G2_ROOT" && "$_G2_PY" -m pi_pipeline.behavior.throw_tally "$@"); }
 # g2poses  -- copy the poses saved with g2poseedit on the Pi (~/g2_runs/pose_edit/poses/) into pi_pipeline/behavior/scripts/poses/ in the repo, so a script that names them deploys; then lists them. Reads the Pi, writes only those repo files (commit them by exact path).
 g2poses() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
