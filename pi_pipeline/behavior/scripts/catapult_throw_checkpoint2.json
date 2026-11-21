@@ -1,0 +1,82 @@
+{
+  "name": "catapult_throw_checkpoint2",
+  "description": "CHECKPOINT 2, a better version than checkpoint 1: the legs go only about 10% of the way to the launch pose in rise_and_drop (shoulders -6 and -10, knees 7 and 72) at speed 30, the lunge and the jaw (8 degrees inside it) as in checkpoint 1. Thrown distances: 15 and 18 inches, against 12 for checkpoint 1 (E, 30% of the way, threw 17 once; B, 70%, threw 4). Do not edit. Git tag: catapult-checkpoint-2.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -6,
+        -6,
+        -10,
+        -10,
+        7,
+        7,
+        72,
+        72
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 30,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "set": {
+        "jaw": 8
+      },
+      "speed": 127,
+      "delay_s": 0.0
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

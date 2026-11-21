@@ -1,0 +1,79 @@
+{
+  "name": "catapult_throw_cf",
+  "description": "Test C on top of checkpoint 2 (variant F's rise_and_drop): the lunge frame sends the legs and the arm to the launch pose at speed 0 (no interpolation: every servo runs flat out for the whole move, with no ease in or out), and the jaw opens in the next frame one pause later (50 ms by default; `--set lunge.delay_s=0.1` moves the release later). Everything else as catapult_throw_checkpoint2.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -6,
+        -6,
+        -10,
+        -10,
+        7,
+        7,
+        72,
+        72
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 30,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.05
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

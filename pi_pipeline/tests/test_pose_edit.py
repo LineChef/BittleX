@@ -160,3 +160,11 @@ def test_variant_f_sends_the_legs_a_tenth_of_the_way_before_the_whip():
     f = ss.build_plan(ss.load_script("catapult_throw_f"), stand, amount=1.0)
     assert f[1]["frame"][8:] == [-6, -6, -10, -10, 7, 7, 72, 72] and f[1]["speed"] == 30 and f[1]["frame"][1] == 0
     assert f[0] == base[0] and f[2] == base[2] and f[3] == base[3]                              # only rise_and_drop differs
+
+
+def test_checkpoint_two_is_variant_f_and_test_c_builds_on_it():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    f = ss.build_plan(ss.load_script("catapult_throw_f"), stand, amount=1.0)
+    assert ss.build_plan(ss.load_script("catapult_throw_checkpoint2"), stand, amount=1.0) == f
+    cf = ss.build_plan(ss.load_script("catapult_throw_cf"), stand, amount=1.0)
+    assert cf[1] == f[1] and cf[2]["speed"] == 0 and cf[2]["delay"] == 1 and cf[3]["speed"] == 0 and cf[3]["frame"][2] == 60       # F's rise, then the speed-0 lunge and the open frame
