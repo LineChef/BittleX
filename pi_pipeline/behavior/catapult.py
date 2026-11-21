@@ -115,12 +115,17 @@ def previous_stage_ok(stage: str, log_dir: str | None = None) -> str | None:
 
 
 def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic) -> bool:
-    """After a behavior skill (`pickF`): wait until the link's silence window ends (the board echoed its `k`), at most `max_s`. True when it ended by itself."""
+    """After a behavior skill (`pickF`): wait until the link's silence window ends (the board echoed its `k`), at most `max_s`. True when it ended by itself. The link only notices the `k` when the port is READ, so the wait reads it
+    (`drain` writes nothing, so it cannot abort the skill); a wait that only slept ran the full 10 s of the silence limit every time (2026-11-21: 10.0 s between `kpickF` and the next command, G2 standing and sagging)."""
     end = clock() + max_s
+    read = getattr(link, "drain", None)
     while clock() < end:
         if not link._quiet_active():
             return True
-        sleep(0.1)
+        if read is not None:
+            read(0.1)
+        else:
+            sleep(0.1)
     return False
 
 

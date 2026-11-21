@@ -90,3 +90,22 @@ def test_the_swing_can_use_the_sit_pose_the_old_look_up_and_an_unknown_pose_is_r
     assert c.build_plan("swing", BASE, amount=1.0)[1]["frame"][8:] == c.LAUNCH_LEGS                 # the default is unchanged
     with pytest.raises(ValueError):
         c.build_plan("swing", BASE, launch_pose="flip")
+
+
+def test_the_pick_wait_reads_the_port_so_the_boards_k_ends_it_at_once_and_writes_nothing():
+    class Link:
+        def __init__(self):
+            self.reads, self.writes, self.quiet = 0, 0, True
+
+        def _quiet_active(self):
+            return self.quiet
+
+        def drain(self, seconds=0.3):
+            self.reads += 1
+            if self.reads == 4:
+                self.quiet = False                                                                  # the `k` echo came in and the link ended the silence
+
+    now = [0.0]
+    lk = Link()
+    assert c.wait_skill_done(lk, 12.0, sleep=lambda s: pytest.fail("it must read the port, not just sleep"), clock=lambda: now[0]) is True
+    assert lk.reads == 4 and lk.writes == 0

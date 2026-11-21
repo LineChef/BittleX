@@ -204,10 +204,12 @@ def main() -> None:
         if a.pick:
             from .catapult import wait_skill_done
             print("playing pickF first: the object in front of him")
+            t_pick = time.monotonic()
             link.send("kpickF", read_reply=False, settle=0.0)
             if not wait_skill_done(link):
                 print("pickF did not report its end in time: stopping before the script")
                 return
+            print(f"pickF reported its end after {time.monotonic() - t_pick:.1f} s")
         base = chase.read_joints(link)
         if not base or len(base) < 16:
             print("refused: the joint angles could not be read: nothing was sent.")
