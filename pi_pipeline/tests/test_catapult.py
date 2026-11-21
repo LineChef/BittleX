@@ -73,3 +73,12 @@ def test_the_pick_wait_ends_when_the_link_goes_quiet_and_gives_up_at_the_limit()
     assert c.wait_skill_done(Link(3), 5.0, sleep=sleep, clock=lambda: now[0]) is True
     now[0] = 0.0
     assert c.wait_skill_done(Link(10 ** 6), 1.0, sleep=sleep, clock=lambda: now[0]) is False
+
+
+def test_the_front_legs_can_have_their_own_amount_so_the_front_feet_stay_down():
+    plan = c.build_plan("bow", BASE, amount=1.0, front_amount=0.5)
+    legs = plan[0]["frame"][8:]
+    assert legs[2:4] == c.BOW_LEGS[2:4] and legs[6:8] == c.BOW_LEGS[6:8]                              # the rear legs go the full way (the rump up)
+    assert legs[0] == c.mix(BASE[8:], c.BOW_LEGS, 0.5)[0] and legs[4] == c.mix(BASE[8:], c.BOW_LEGS, 0.5)[4]      # the front legs half way
+    with pytest.raises(ValueError):
+        c.build_plan("bow", BASE, amount=1.0, front_amount=1.2)

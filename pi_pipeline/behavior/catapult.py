@@ -7,7 +7,7 @@ One run = one data skill (`K`, the board plays it itself, nothing is written to 
            after it: the object leaves when the jaw has opened past its width, early in the frame for a large `--jaw-delta` and late for a small one. That is the knob for the release time.
   open     (throw stage) the jaw opens all the way at speed 0 (no interpolation: the claw's fastest, measured on G2 2026-11-21) so nothing is left in it;
   return   the legs back to where they were, the arm down and the jaw closed, slowly (speed 6).
-Everything is scaled by `--amount` (0 to 1: how far the legs go from the stand toward the bow and the launch pose), so the first runs are small.
+Everything is scaled by `--amount` (0 to 1: how far the legs go from the stand toward the bow and the launch pose), so the first runs are small; `--front-amount` sets the front legs on their own (the full bow, 1.0, lifted the front feet off the floor with the claw and the rear feet taking the weight).
 
 Stages, one after the other (a stage is refused until the one before it has a logged run with the body ok):
   bow    the bow and the return only: does the pose hold him up?
@@ -39,12 +39,15 @@ WATCH_S = 3.0
 PICK_WAIT_S = 12.0                                         # the longest wait for the board to finish `pickF` (it echoes `k` when it does)
 
 
-def mix(a: list, b: list, amount: float) -> list:
-    """The legs `amount` of the way from `a` to `b`, in whole degrees."""
-    return [int(round(x + amount * (y - x))) for x, y in zip(a, b)]
+FRONT = (0, 1, 4, 5)                                       # positions of the front legs' joints in [FLs FRs BRs BLs FLk FRk BRk BLk]
 
 
-def build_plan(stage: str, base: list, *, amount: float = 0.3, lift_top: float = 60.0, speed: int = 16, jaw_delta: float = 15.0, jaw_open: float = JAW_OPEN_DEG) -> list:
+def mix(a: list, b: list, amount: float, front_amount: float | None = None) -> list:
+    """The legs `amount` of the way from `a` to `b`, in whole degrees; the front legs' joints `front_amount` of the way when it is given."""
+    return [int(round(x + (amount if front_amount is None or i not in FRONT else front_amount) * (y - x))) for i, (x, y) in enumerate(zip(a, b))]
+
+
+def build_plan(stage: str, base: list, *, amount: float = 0.3, lift_top: float = 60.0, speed: int = 16, jaw_delta: float = 15.0, jaw_open: float = JAW_OPEN_DEG, front_amount: float | None = None) -> list:
     """The frames of one run, each {"name", "frame", "speed", "delay", "deg", "nominal_s"}, from the 16 angles the board reports (`base`). Raises ValueError for anything out of range."""
     if stage not in STAGES:
         raise ValueError(f"stage must be one of {STAGES}")
@@ -52,6 +55,8 @@ def build_plan(stage: str, base: list, *, amount: float = 0.3, lift_top: float =
         raise ValueError("the 16 joint angles are needed to hold the legs and the arm where they are")
     if not AMOUNT_MIN <= amount <= 1.0:
         raise ValueError(f"amount is {AMOUNT_MIN} to 1.0")
+    if front_amount is not None and not AMOUNT_MIN <= front_amount <= 1.0:
+        raise ValueError(f"front-amount is {AMOUNT_MIN} to 1.0")
     if not isinstance(speed, int) or isinstance(speed, bool) or not 0 <= speed <= 127:
         raise ValueError("the speed byte is a whole number from 0 to 127")
     lift0, jaw0 = float(base[LIFT]), float(base[JAW])
@@ -62,7 +67,7 @@ def build_plan(stage: str, base: list, *, amount: float = 0.3, lift_top: float =
     if not 20.0 <= jaw_open <= 120.0:
         raise ValueError("jaw-open is 20 to 120 degrees")
     legs0 = [int(round(a)) for a in base[8:16]]
-    bow, launch = mix(legs0, BOW_LEGS, amount), mix(legs0, LAUNCH_LEGS, amount)
+    bow, launch = mix(legs0, BOW_LEGS, amount, front_amount), mix(legs0, LAUNCH_LEGS, amount, front_amount)
     cur = [int(round(a)) for a in base[:16]]
     specs = [("bow", bow, lift0, jaw0, SLOW_BYTE, 8)]                                  # 0.4 s in the bow before anything swings
     if stage != "bow":
@@ -132,6 +137,7 @@ def _parse():
     ap = argparse.ArgumentParser(description="One run of the backward catapult on G2: the person's go first; the voice service stopped.")
     ap.add_argument("--stage", choices=STAGES, required=True)
     ap.add_argument("--amount", type=float, default=0.3, help="how far the legs go toward the bow and launch pose, 0.1 to 1 (default 0.3)")
+    ap.add_argument("--front-amount", type=float, default=None, help="the front legs' own amount when it differs (a full bow lifted the front feet off the floor: rear 1.0 with front 0.5 keeps them down)")
     ap.add_argument("--lift-top", type=float, default=60.0, help="the arm's peak, degrees (120 at most; default 60 for the first runs)")
     ap.add_argument("--speed", type=int, default=16, help="the swing's speed byte, 0 to 127 (default 16)")
     ap.add_argument("--jaw-delta", type=float, default=15.0, help="throw stage: degrees the jaw opens during the swing, the release knob (large = earlier)")
@@ -149,7 +155,7 @@ def _parse():
 
 def main() -> None:
     args = _parse()
-    params = {"amount": args.amount, "lift_top": args.lift_top, "speed": args.speed, "jaw_delta": args.jaw_delta, "jaw_open": args.jaw_open}
+    params = {"amount": args.amount, "lift_top": args.lift_top, "speed": args.speed, "jaw_delta": args.jaw_delta, "jaw_open": args.jaw_open, "front_amount": args.front_amount}
     why = None if args.allow_skip else previous_stage_ok(args.stage)
     if args.dry_run:
         stand = [0, 0, 0, 0, 0, 0, 0, 0, 20, 20, 30, 30, 30, 30, 30, 30]                 # pickF's last pose: the legs after a pick
