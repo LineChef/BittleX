@@ -28,7 +28,7 @@ PAN, LIFT, JAW = 0, 1, 2
 NAMES = ["pan", "lift", "jaw", "j3", "j4", "j5", "j6", "j7", "fls", "frs", "brs", "bls", "flk", "frk", "brk", "blk"]
 GROUPS = {"fsh": ["fls", "frs"], "rsh": ["brs", "bls"], "fkn": ["flk", "frk"], "rkn": ["brk", "blk"], "sh": ["fls", "frs", "brs", "bls"], "kn": ["flk", "frk", "brk", "blk"],
           "legs": ["fls", "frs", "brs", "bls", "flk", "frk", "brk", "blk"], "arm": ["pan", "lift", "jaw"]}
-RANGES = {"pan": (-90, 90), "lift": (0, 120), "jaw": (-100, 120)}          # the legs: -125 to 125 (the int8 skill frames clip there)
+RANGES = {"pan": (-90, 90), "lift": (0, 125), "jaw": (-100, 120)}          # the legs: -125 to 125 (the int8 skill frames clip there)
 LEG_RANGE = (-125, 125)
 STEP_MAX_DEG = 70.0
 DEFAULT_SPEED = 12

@@ -24,7 +24,7 @@ def test_angles_are_clipped_to_the_joint_range_and_a_big_jump_is_refused():
     raised = list(BASE)
     raised[1], raised[2] = 60, -50
     new, notes = pe.apply_edits(raised, pe.parse_edits(["lift=130"]))
-    assert new[1] == 120 and "clipped" in notes[0]
+    assert new[1] == 125 and "clipped" in notes[0]
     new, notes = pe.apply_edits(raised, pe.parse_edits(["jaw=-120"]))
     assert new[2] == -100
     with pytest.raises(ValueError, match="at once"):
@@ -73,9 +73,10 @@ def test_script_values_out_of_range_are_refused_and_the_example_script_is_valid(
     assert [p["name"] for p in plan] == ["crouch", "back"] and plan[1]["frame"] == BASE
 
 
-def test_the_bow_script_moves_all_four_legs_at_once_at_the_stand_up_pace_and_returns_to_the_stand():
+def test_the_bow_script_moves_all_four_legs_and_the_arm_in_one_frame_and_returns_to_the_stand():
     stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
     plan = ss.build_plan(ss.load_script("bow"), stand, amount=1.0)
     assert [p["name"] for p in plan] == ["bow", "back_to_stand"]
-    assert plan[0]["frame"][8:] == [75, 75, 10, 10, -50, -50, -45, -45] and plan[0]["frame"][:8] == stand[:8]       # every leg in one frame, the arm untouched
-    assert plan[0]["speed"] == 20 and plan[1]["frame"] == stand
+    assert plan[0]["frame"][8:] == [-9, -9, -19, -19, -3, -3, 84, 84] and plan[0]["speed"] == 20
+    assert plan[0]["frame"][:3] == [1, 125, 0]                                    # the pose records a lift of 135; a data skill carries 125 at most
+    assert plan[1]["frame"] == stand

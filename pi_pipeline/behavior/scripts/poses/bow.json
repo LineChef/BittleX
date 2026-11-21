@@ -1,0 +1,6 @@
+{
+  "name": "bow",
+  "angles": [1, 135, 0, 0, 0, 0, 0, 0, -9, -9, -19, -19, -3, -3, 84, 84],
+  "note": "The first pose of the catapult launch sequence, found with the pose editor (G2 held in the air, instant jumps): front legs squatted (shoulders -9, knees -3), back legs extended (shoulders -19, knees 84), claw closed (jaw 0) with the lift at 135. The lift reaches 135 only by a direct command: a data skill clips every angle at 125.",
+  "time": "2026-11-21"
+}
