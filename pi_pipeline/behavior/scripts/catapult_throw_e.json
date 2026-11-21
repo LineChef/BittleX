@@ -1,0 +1,82 @@
+{
+  "name": "catapult_throw_e",
+  "description": "Tuning variant E of catapult_throw, the opposite of variant B: the legs go only about 30% of the way to the launch pose in rise_and_drop (shoulders 0 and 8, knees 28 and 48) at speed 40, so the whip comes earlier in the body's motion. Everything else as catapult_throw_checkpoint1. (B, with the legs 70% of the way at speed 100, threw 4 inches against the checkpoint's 12.)",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        8,
+        28,
+        28,
+        48,
+        48
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 40,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "set": {
+        "jaw": 8
+      },
+      "speed": 127,
+      "delay_s": 0.0
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

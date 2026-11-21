@@ -144,3 +144,11 @@ def test_the_checkpoint_and_the_tuning_variants_of_the_throw_are_valid_and_diffe
     assert d[2]["frame"][10:12] == [80, 80] and d[2]["frame"][14:16] == [-45, -45] and d[1] == plans["catapult_throw"][1]
     later = ss.build_plan(ss.load_script("catapult_throw_c"), stand, amount=1.0, overrides=ss.parse_overrides(["lunge.delay_s=0.1", "open.speed=0"]))
     assert later[2]["delay"] == 2                                                              # the release moves later by changing the pause after the lunge
+
+
+def test_variant_e_sends_the_legs_less_far_and_slower_before_the_whip_than_the_checkpoint():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    base = ss.build_plan(ss.load_script("catapult_throw_checkpoint1"), stand, amount=1.0)
+    e = ss.build_plan(ss.load_script("catapult_throw_e"), stand, amount=1.0)
+    assert e[1]["frame"][8:12] == [0, 0, 8, 8] and e[1]["speed"] == 40 and e[1]["frame"][1] == 0
+    assert e[0] == base[0] and e[2] == base[2] and e[3] == base[3]                              # only rise_and_drop differs
