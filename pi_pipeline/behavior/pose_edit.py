@@ -3,7 +3,7 @@
 Nothing is released: the servos stay on and every angle is one the editor commanded, so the numbers are exact. (Moving a limb by hand cannot be recorded: the board reports the angles it was last told to hold, not where a joint is.)
 Each command is one short process, because the board keeps the pose between commands. The voice service must be stopped for the whole session (`g2poseedit start` does it, `g2poseedit end` rests G2 and starts it again).
 
-    g2poseedit start [--attention]       stand him up (eased) and read the pose; --attention: into the attention pose (legs straight) first
+    g2poseedit start [--attention]       stand him up (eased) and read the pose; --attention: into the attention pose (legs straight) first; --from-rest: lay him in rest and start there, no stand-up
     g2poseedit set fkn=-15 rsh+=10 ...   change joints and ease to the new pose (a few seconds): absolute `name=angle`, relative `name+=n` / `name-=n`
     g2poseedit show                      the 16 angles (named) and the tilt
     g2poseedit save NAME [--note TEXT]   keep the current pose as a keyframe: ~/g2_runs/pose_edit/poses/NAME.json
@@ -129,11 +129,13 @@ def _read(link, chase):
 
 def _move(link, chase, robot, angles: list, speed: int) -> list | None:
     """Ease to `angles` as one data skill, wait for the board to finish it, then read the pose and the tilt back. Returns the angles read, or None."""
-    from .catapult import wait_skill_done
     message = frame_message(angles, speed, 2)
     link.play_data_skill(message)
-    wait_skill_done(link, max_s=6.0)
-    time.sleep(0.3)
+    time.sleep(1.8 if speed >= 6 else 3.0)                  # the frame's own time (a few hundred ms to about two seconds) and the pause after it
+    try:
+        link._end_quiet()                                    # the link keeps the port silent behind a data skill until its `k` echo or 10 s, and drops `j` reads meanwhile: the move is over, so the read-back may go
+    except Exception:  # noqa: BLE001
+        pass
     return _read(link, chase)
 
 
@@ -143,10 +145,15 @@ def main() -> None:
     ap.add_argument("command", choices=("start", "set", "show", "save", "load", "list", "end"))
     ap.add_argument("args", nargs="*")
     ap.add_argument("--attention", action="store_true")
+    ap.add_argument("--from-rest", action="store_true", help="start: lay him in the rest pose and build the poses from there instead of standing him up first")
     ap.add_argument("--speed", type=int, default=DEFAULT_SPEED)
     ap.add_argument("--allow-instant", action="store_true")
     ap.add_argument("--note", default=None)
+    ap.add_argument("--gyro-on", action="store_true", help="leave the firmware gyro balance on (by default it is off for the session: with it on the board moves the legs to level the body and the angles read are not the angles sent)")
     a = ap.parse_args()
+    if not a.gyro_on:
+        os.environ["G2_GYRO_BALANCE"] = "0"                  # every gB the link would write becomes gb
+        os.environ["G2_STAND_GYRO"] = "0"
     if a.command == "list":
         print("saved poses:", ", ".join(list_poses()) or "none yet")
         return
@@ -155,6 +162,9 @@ def main() -> None:
         return
     link, chase = _connect()
     robot = chase.SerialRobot(link)
+    if not a.gyro_on and a.command != "end":
+        link.send("gb", read_reply=False, settle=0.0)        # the gyro balance off, whatever state the board is in
+        time.sleep(0.2)
     if a.command == "end":
         chase.ensure_rest(link)
         print("G2 laid in rest. The voice service starts again (g2poseedit in the shell does it).")
@@ -169,8 +179,11 @@ def main() -> None:
         if not imu_print.board_answers(link):
             print("refused: no IMU frames from the BiBoard: nothing was sent.")
             return
-        chase._stand_if_lying(link, "kbalance")
-        if a.attention:
+        if a.from_rest:
+            chase.ensure_rest(link)                           # the session starts from the rest pose: no stand-up, no standing time, and the poses are built up from the floor
+        else:
+            chase._stand_if_lying(link, "kbalance")
+        if a.attention and not a.from_rest:
             robot.posture = "stand"
             if robot.sit_down() == "fell":
                 print("G2 fell going into the attention pose: stopping")
