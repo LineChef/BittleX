@@ -1,0 +1,79 @@
+{
+  "name": "catapult_throw_cd",
+  "description": "Test D on top of test C (catapult_throw_cf): the launch pose has a deeper rear crouch (the pose launch_deep: rear shoulders 80 and knees -45, the front legs as in launch), which pitches the body further nose-up and raises the angle the cylinder leaves at; the speed-0 lunge, the release one pause later and checkpoint 2's rise as in catapult_throw_cf. (C threw 22 inches.)",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -6,
+        -6,
+        -10,
+        -10,
+        7,
+        7,
+        72,
+        72
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 30,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch_deep",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.05
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        80,
+        80,
+        100,
+        100,
+        -45,
+        -45
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

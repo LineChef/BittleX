@@ -168,3 +168,12 @@ def test_checkpoint_two_is_variant_f_and_test_c_builds_on_it():
     assert ss.build_plan(ss.load_script("catapult_throw_checkpoint2"), stand, amount=1.0) == f
     cf = ss.build_plan(ss.load_script("catapult_throw_cf"), stand, amount=1.0)
     assert cf[1] == f[1] and cf[2]["speed"] == 0 and cf[2]["delay"] == 1 and cf[3]["speed"] == 0 and cf[3]["frame"][2] == 60       # F's rise, then the speed-0 lunge and the open frame
+
+
+def test_test_d_on_top_of_test_c_has_the_deeper_rear_crouch_and_the_speed_zero_lunge():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    cf = ss.build_plan(ss.load_script("catapult_throw_cf"), stand, amount=1.0)
+    cd = ss.build_plan(ss.load_script("catapult_throw_cd"), stand, amount=1.0)
+    assert cd[0] == cf[0] and cd[1] == cf[1]
+    assert cd[2]["speed"] == 0 and cd[2]["delay"] == 1 and cd[2]["frame"][10:12] == [80, 80] and cd[2]["frame"][14:16] == [-45, -45]
+    assert cd[3]["frame"][10:12] == [80, 80] and cd[3]["frame"][2] == 60
