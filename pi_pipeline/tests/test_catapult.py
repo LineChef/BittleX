@@ -70,9 +70,9 @@ def test_the_pick_wait_ends_when_the_link_goes_quiet_and_gives_up_at_the_limit()
 
     now = [0.0]
     sleep = lambda s: now.__setitem__(0, now[0] + s)                                                # noqa: E731
-    assert c.wait_skill_done(Link(3), 5.0, sleep=sleep, clock=lambda: now[0]) is True
+    assert c.wait_skill_done(Link(3), 5.0, sleep=sleep, clock=lambda: now[0], min_s=0.0) is True
     now[0] = 0.0
-    assert c.wait_skill_done(Link(10 ** 6), 1.0, sleep=sleep, clock=lambda: now[0]) is False
+    assert c.wait_skill_done(Link(10 ** 6), 1.0, sleep=sleep, clock=lambda: now[0], min_s=0.0) is False
 
 
 def test_the_front_legs_can_have_their_own_amount_so_the_front_feet_stay_down():
@@ -92,20 +92,24 @@ def test_the_swing_can_use_the_sit_pose_the_old_look_up_and_an_unknown_pose_is_r
         c.build_plan("swing", BASE, launch_pose="flip")
 
 
-def test_the_pick_wait_reads_the_port_so_the_boards_k_ends_it_at_once_and_writes_nothing():
+def test_the_pick_wait_reads_the_port_but_an_early_k_does_not_end_it_before_the_minimum():
     class Link:
         def __init__(self):
-            self.reads, self.writes, self.quiet = 0, 0, True
+            self.reads, self.quiet = 0, True
 
         def _quiet_active(self):
             return self.quiet
 
         def drain(self, seconds=0.3):
             self.reads += 1
-            if self.reads == 4:
-                self.quiet = False                                                                  # the `k` echo came in and the link ended the silence
+            now[0] += seconds
+            if self.reads == 2:
+                self.quiet = False                                                                  # an old `k` came in and the link ended the silence at 0.2 s
+                return "k"
+            return ""
 
     now = [0.0]
+    heard = []
     lk = Link()
-    assert c.wait_skill_done(lk, 12.0, sleep=lambda s: pytest.fail("it must read the port, not just sleep"), clock=lambda: now[0]) is True
-    assert lk.reads == 4 and lk.writes == 0
+    assert c.wait_skill_done(lk, 12.0, sleep=lambda s: pytest.fail("it must read the port, not just sleep"), clock=lambda: now[0], min_s=5.0, seen=heard) is True
+    assert now[0] >= 5.0 and heard == [(0.2, "k")]                                                  # not before the minimum, and the line is on record

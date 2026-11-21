@@ -38,6 +38,7 @@ JAW_DELTA_MAX = 40.0
 AMOUNT_MIN = 0.1
 LOG_DIR = "~/g2_runs/catapult"
 WATCH_S = 3.0
+PICK_MIN_S = 10.0                                           # the earliest the wait may end: the board's end echo is not trusted before this (an older `k` ended it at 0.5 s); lower it only from the times the wait records
 PICK_WAIT_S = 12.0                                         # the longest wait for the board to finish `pickF` (it echoes `k` when it does)
 
 
@@ -114,16 +115,20 @@ def previous_stage_ok(stage: str, log_dir: str | None = None) -> str | None:
     return f"no logged {before} run with the body ok: run the {before} stage first (--allow-skip skips this check)"
 
 
-def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic) -> bool:
-    """After a behavior skill (`pickF`): wait until the link's silence window ends (the board echoed its `k`), at most `max_s`. True when it ended by itself. The link only notices the `k` when the port is READ, so the wait reads it
-    (`drain` writes nothing, so it cannot abort the skill); a wait that only slept ran the full 10 s of the silence limit every time (2026-11-21: 10.0 s between `kpickF` and the next command, G2 standing and sagging)."""
-    end = clock() + max_s
+def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic, min_s: float = PICK_MIN_S, seen: list | None = None) -> bool:
+    """After a behavior skill (`pickF`): wait until the link's silence window ends (the board echoed its `k`), at most `max_s`, and not before `min_s`. True when it ended by itself. The link only notices the `k` when the port is READ, so the
+    wait reads it (`drain` writes nothing, so it cannot abort the skill). `min_s` because the first read after the skill found an OLD `k` (the stand-up's) and ended the wait 0.5 s in, with pickF still playing: the next command (a joint read)
+    then went out mid-skill (2026-11-21). `seen`, when given, collects (seconds, line) for every line the board sent meanwhile, so the real end echo's time is on record."""
+    t0 = clock()
+    end = t0 + max_s
     read = getattr(link, "drain", None)
     while clock() < end:
-        if not link._quiet_active():
+        if clock() - t0 >= min_s and not link._quiet_active():
             return True
         if read is not None:
-            read(0.1)
+            lines = read(0.1)
+            if lines and seen is not None:
+                seen.extend((round(clock() - t0, 1), ln) for ln in lines.splitlines())
         else:
             sleep(0.1)
     return False
