@@ -111,6 +111,8 @@ _SHUTDOWN = (
 _PRACTICE = ("practise", "practice", "go practise", "go practice", "time to practise", "time to practice", "lets practise", "lets practice", "do some practice", "do some practise")
 
 # One punt attempt ("G2, punt": stand, approach the ball, punch it once, rest). Short on purpose: a heard word inside a sentence must never start it.
+# The lob ("G2, lob": stand, pick the object up from the floor, lob it forward, rest). Short on purpose, like the punt: a heard word inside a sentence must never start it.
+_LOB = ("lob", "lob it", "do a lob", "do the lob", "lob test", "pick it up and lob it", "pick up and lob")
 _PUNT = ("punt", "punt it", "punt the ball", "go punt", "do a punt", "punt test", "do the punt test", "punt attempt")
 
 # Tier 1 roam -- voice-armed only ("G2, go ahead and look around").
@@ -486,7 +488,7 @@ def asks_battery(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"practice"``, ``"goal"``, ``"punt"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"practice"``, ``"goal"``, ``"punt"``, ``"lob"``,
     ``"unexplore"``, ``"end_explore"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
@@ -518,6 +520,8 @@ def match_local_command(text: str) -> str | None:
         return "goal"                                  # "G2, ball goal": before "punt" so "punt goal" starts the goal session, not one punt
     if _hit_short(n, _PUNT, extra_words=1):
         return "punt"
+    if _hit_short(n, _LOB, extra_words=1):
+        return "lob"
     if _hit(n, _END_EXPLORE):
         return "end_explore"                          # before "explore": "end exploration mode" must never arm it
     if _hit(n, _EXPLORE) or _has_verb(n, ("explore",)):

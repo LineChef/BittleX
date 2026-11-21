@@ -33,7 +33,9 @@ EXCEPTIONS = ROOT / "docs" / "specification" / "mode-exceptions.md"
 LOOK_HOME = {"behavior/claw_survey.py", "behavior/ball_chase.py"}
 GUARD_HOME = "gait/body_guards.py"                                             # the only place a StandGuard is built; modes call body_guards.install(...)
 MODE_DIRS = ("behavior/", "voice/", "goals/", "app/")
-MODE_FILES = {"explore_session.py", "punt_launch.py", "goal_launch.py"}
+MODE_FILES = {"explore_session.py", "punt_launch.py", "goal_launch.py", "lob_launch.py"}
+PICK_HOMES = {"behavior/catapult.py", "behavior/pick_bisect.py"}                  # the one pick-up function (catapult.pick_up) and the bisect tool that writes to the port on purpose
+PICK_SEND = re.compile(r"""\bsend\(\s*["']kpickF["']""")
 STANDARD_HOMES = {"behavior/ball_chase.py", "behavior/claw_survey.py"}            # the standard moves live here (SerialRobot: stand_up, sit_down, stand_from_sit, rest)
 FOLLOW_HOMES = {"behavior/active_look.py", "behavior/live_follow.py"}                # the shared active look, and the module that defines the follow loop it uses
 FOLLOW_CALL = re.compile(r"\b(follow_loop|LiveFollower)\(")
@@ -106,6 +108,8 @@ def violations() -> list[dict]:
                 add("R9", n, "a turn skill chosen here: use opencat.turn_tokens() (the one arc or pivot choice every mode shares)", True)
             if is_mode(rel) and rel not in STANDARD_HOMES and SEND_BODY.search(line):
                 add("R4", n, "a mode sends a stand / rest / attention command itself instead of calling the standard move", False)
+            if is_mode(rel) and rel not in PICK_HOMES and PICK_SEND.search(line):
+                add("R10", n, "a mode sends kpickF itself: call catapult.pick_up(link) (the one pick-up: it reads the old lines first and waits for pickF's own end)", True)
         for m in re.finditer(r"\bStandGuard\(", text):
             n = text.count("\n", 0, m.start()) + 1
             if lines[n - 1].lstrip().startswith(("class ", "def ")) or rel in ("gait/stand_guard.py", GUARD_HOME):

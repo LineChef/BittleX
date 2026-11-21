@@ -30,6 +30,7 @@ Most used
 - `g2armspeed --series lift --speed 4`: one arm speed step (hands near)
 - `g2armspeed --report`: the speed runs so far and the next step
 - `g2catapult --stage bow --dry-run`: one catapult stage's frames, no move
+- `g2lob --dry-run`: the lob's frames, no move (without the flag it runs)
 - `g2poseedit start`: begin a pose-editing session (then `set`, `save`, `end`)
 - `g2script NAME --dry-run`: a scripted movement's frames, no move
 - `g2jawrange --to 40`: step the jaw by eye to find its angles (hands near)
@@ -186,7 +187,7 @@ Wake with "gee two". The full list: [`voice-commands.md`](voice-commands.md).
 - "hi step" / "walk normally": switch gait
 - "the floor is tile": set the floor label
 - "what do you see": describe a picture
-- "ball goal" / "punt": start the ball goal / one punt
+- "ball goal" / "punt" / "lob": start the ball goal / one punt / one lob
 - "mic off for 20 minutes": wake word off
 - "go to sleep" / "shut down": sleep / lie down and shut the Pi down (flip the PiSugar switch by hand)
 
@@ -366,6 +367,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2jawrange`: [Most used](#most-used)
 - `g2libstatus`: [Camera model](#camera-model)
 - `g2liftcal`: [Most used](#most-used)
+- `g2lob`: [Most used](#most-used)
 - `g2look`: [Claw and camera](#claw-and-camera)
 - `g2mem`: [Data and review](#data-and-review)
 - `g2membackup`: [Data and review](#data-and-review)

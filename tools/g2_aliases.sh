@@ -573,6 +573,15 @@ g2script() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.scripted_skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
 }
+# g2lob [--dry-run]  -- THE LOB: G2 stands up, picks the object up from the floor in front of him, lobs it forward and rests, as one fluid motion (pi_pipeline/behavior/lob.py: the lob_soft script after Petoi's pickF, a 0.5 s pause between them, the gyro balance off). Runs ONLY on your go, G2 at rest on his feet, the object in front of the claw, a soft clear floor ahead, hands near; it stops the voice service first (g2stop voice) and starts it again after. `--dry-run` prints the frames and touches nothing. The voice command is "G2, lob".
+g2lob() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  local rest ro=0; rest="$(printf ' %q' "$@")"
+  case " $* " in *" --dry-run "*) ro=1 ;; esac
+  [ "$ro" = 1 ] || g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lob$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+}
 # g2poses  -- copy the poses saved with g2poseedit on the Pi (~/g2_runs/pose_edit/poses/) into pi_pipeline/behavior/scripts/poses/ in the repo, so a script that names them deploys; then lists them. Reads the Pi, writes only those repo files (commit them by exact path).
 g2poses() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

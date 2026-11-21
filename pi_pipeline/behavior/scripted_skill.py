@@ -125,7 +125,7 @@ def load_script(name: str) -> dict:
         return json.load(f)
 
 
-def main() -> None:
+def main(argv: list | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Play a scripted skill on G2: the person's go first; the voice service stopped.")
     ap.add_argument("script", nargs="?", help="the script's name (pi_pipeline/behavior/scripts/NAME.json)")
@@ -141,7 +141,7 @@ def main() -> None:
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     try:
         overrides = parse_overrides(a.set)
     except ValueError as e:

@@ -293,6 +293,10 @@ def main() -> None:
                 from ..punt_launch import launch as _punt_launch
                 threading.Timer(0.8, _punt_launch).start()
                 return
+            if kw.get("arm_lob") and args.actuator == "serial":                        # "G2, lob": stand, pick up, lob, rest, as its own unit (stops this service, rests G2, starts it again)
+                from ..lob_launch import launch as _lob_launch
+                threading.Timer(0.8, _lob_launch).start()
+                return
             if kw.get("arm_explore") and settings.explore_handover and args.actuator == "serial":
                 from ..explore_session import inprocess_ready, run_inprocess
                 ok, why = inprocess_ready(lend)
