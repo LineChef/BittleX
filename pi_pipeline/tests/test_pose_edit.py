@@ -177,3 +177,21 @@ def test_test_d_on_top_of_test_c_has_the_deeper_rear_crouch_and_the_speed_zero_l
     assert cd[0] == cf[0] and cd[1] == cf[1]
     assert cd[2]["speed"] == 0 and cd[2]["delay"] == 1 and cd[2]["frame"][10:12] == [80, 80] and cd[2]["frame"][14:16] == [-45, -45]
     assert cd[3]["frame"][10:12] == [80, 80] and cd[3]["frame"][2] == 60
+
+
+def test_a_rest_asked_for_ends_the_links_silence_first():
+    from pi_pipeline.behavior import ball_chase as chase
+
+    class Link:
+        def __init__(self):
+            self.log = []
+
+        def _end_quiet(self):
+            self.log.append("end_quiet")
+
+        def send(self, c, **_k):
+            self.log.append(c)
+            return ""
+    lk = Link()
+    chase.ensure_rest(lk, sleep=lambda s: None, tries=1)
+    assert lk.log[:2] == ["end_quiet", "krest"]                                                  # the silence ends before the rest command goes out

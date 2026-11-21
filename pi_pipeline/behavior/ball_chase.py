@@ -848,6 +848,12 @@ def ensure_rest(link, sleep=time.sleep, tries: int = 3) -> bool:
     """Lay G2 in the rest position and CONFIRM it with the board's pose read, then relax the servos (`d`). The way every session ends (owner, 2026-11-10: an exploration ended with him in the survey bow; the rest command was
     sent while the last survey stop was still playing and the board kept the skill). `krest` again up to `tries` times while the pose does not read as rest. True when it read rest."""
     ok = False
+    end_quiet = getattr(link, "_end_quiet", None)          # a rest asked for ends the link's silence behind a skill (up to 10 s, or a `k` echo that a data skill may not send): the pose reads of the eased lie-down are dropped while it lasts, and a throw was followed by ten seconds of standing before the lie-down began (2026-11-21)
+    if callable(end_quiet):
+        try:
+            end_quiet()
+        except Exception:  # noqa: BLE001
+            pass
     for _ in range(tries):
         try:
             link.send("krest", read_reply=False, settle=0.0)
