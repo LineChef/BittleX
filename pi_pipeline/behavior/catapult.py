@@ -115,20 +115,30 @@ def previous_stage_ok(stage: str, log_dir: str | None = None) -> str | None:
     return f"no logged {before} run with the body ok: run the {before} stage first (--allow-skip skips this check)"
 
 
-def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic, min_s: float = PICK_MIN_S, seen: list | None = None) -> bool:
+def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic, min_s: float = PICK_MIN_S, seen: list | None = None, name: str | None = None) -> bool:
     """After a behavior skill (`pickF`): wait until the link's silence window ends (the board echoed its `k`), at most `max_s`, and not before `min_s`. True when it ended by itself. The link only notices the `k` when the port is READ, so the
     wait reads it (`drain` writes nothing, so it cannot abort the skill). `min_s` because the first read after the skill found an OLD `k` (the stand-up's) and ended the wait 0.5 s in, with pickF still playing: the next command (a joint read)
-    then went out mid-skill (2026-11-21). `seen`, when given, collects (seconds, line) for every line the board sent meanwhile, so the real end echo's time is on record."""
+    then went out mid-skill (2026-11-21). `seen`, when given, collects (seconds, line) for every line the board sent meanwhile, so the real end echo's time is on record.
+    `name` (the skill's own name, "pickF"): the board echoes that name and then a `k` when the skill ends (measured 2026-11-21: pickF's `k` came about 2.6 s in, behind an old `k` and the name), so the wait ends at the first `k` after
+    the name line, without waiting out `min_s`; if the name never shows, `min_s` still decides."""
     t0 = clock()
     end = t0 + max_s
     read = getattr(link, "drain", None)
+    named = False
     while clock() < end:
+        if named is None:
+            return True
         if clock() - t0 >= min_s and not link._quiet_active():
             return True
         if read is not None:
             lines = read(0.1)
-            if lines and seen is not None:
-                seen.extend((round(clock() - t0, 1), ln) for ln in lines.splitlines())
+            for ln in (lines or "").splitlines():
+                if seen is not None:
+                    seen.append((round(clock() - t0, 1), ln))
+                if name and ln.strip() == name:
+                    named = True
+                elif named and ln.strip() == "k":
+                    named = None                                                    # the end echo: the skill is over
         else:
             sleep(0.1)
     return False
@@ -206,7 +216,7 @@ def main() -> None:
         if args.pick:
             print("playing pickF first: the object in front of him")
             link.send("kpickF", read_reply=False, settle=0.0)
-            if not wait_skill_done(link):
+            if not wait_skill_done(link, name="pickF"):
                 print("pickF did not report its end in time: stopping before the catapult")
                 return
         base = chase.read_joints(link)

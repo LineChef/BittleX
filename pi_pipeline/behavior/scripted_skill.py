@@ -207,7 +207,7 @@ def main() -> None:
             t_pick = time.monotonic()
             link.send("kpickF", read_reply=False, settle=0.0)
             heard: list = []
-            if not wait_skill_done(link, seen=heard):
+            if not wait_skill_done(link, seen=heard, name="pickF"):
                 print("pickF did not report its end in time: stopping before the script")
                 return
             print(f"pickF reported its end after {time.monotonic() - t_pick:.1f} s; the board sent (seconds after the wait began, line): {heard}")

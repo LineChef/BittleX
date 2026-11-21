@@ -113,3 +113,25 @@ def test_the_pick_wait_reads_the_port_but_an_early_k_does_not_end_it_before_the_
     lk = Link()
     assert c.wait_skill_done(lk, 12.0, sleep=lambda s: pytest.fail("it must read the port, not just sleep"), clock=lambda: now[0], min_s=5.0, seen=heard) is True
     assert now[0] >= 5.0 and heard == [(0.2, "k")]                                                  # not before the minimum, and the line is on record
+
+
+def test_the_pick_wait_ends_at_the_k_after_the_skills_own_name_not_at_an_old_k_and_not_at_the_minimum():
+    script = ["k", "balance", "k", "pickF", "", "", "k"]                                            # an old k, then the name, then the end k (what the board sent on 2026-11-21)
+
+    class Link:
+        def __init__(self):
+            self.reads = 0
+
+        def _quiet_active(self):
+            return True
+
+        def drain(self, seconds=0.3):
+            now[0] += seconds
+            self.reads += 1
+            return script.pop(0) if script else ""
+
+    now = [0.0]
+    heard = []
+    lk = Link()
+    assert c.wait_skill_done(lk, 12.0, clock=lambda: now[0], min_s=10.0, seen=heard, name="pickF") is True
+    assert now[0] < 1.0 and [ln for _, ln in heard if ln] == ["k", "balance", "k", "pickF", "k"]
