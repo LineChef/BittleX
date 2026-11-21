@@ -131,6 +131,7 @@ def main() -> None:
     ap.add_argument("script", nargs="?", help="the script's name (pi_pipeline/behavior/scripts/NAME.json)")
     ap.add_argument("--list", action="store_true", help="list the scripts and the committed poses, touch nothing")
     ap.add_argument("--amount", type=float, default=0.3)
+    ap.add_argument("--pick-gap", type=float, default=0.0, metavar="SECONDS", help="with --pick: wait this long after pickF reports its end before the script is read and sent (0 to 3; tests whether the board needs a moment before it takes the script)")
     ap.add_argument("--attention", action="store_true", help="play from the attention pose")
     ap.add_argument("--set", action="append", default=None, metavar="FRAME.JOINT=ANGLE", help="override one joint of one frame for this run, for example lunge.jaw=30 (the release time knob of the catapult)")
     ap.add_argument("--pick", action="store_true", help="play Petoi's pickF first (the object put in front of him) and the script from where it ended")
@@ -210,6 +211,9 @@ def main() -> None:
                 print("pickF did not report its end in time: stopping before the script")
                 return
             print(f"pickF reported its end after {time.monotonic() - t_pick:.1f} s; the board sent (seconds after the wait began, line): {heard}")
+            if a.pick_gap > 0:
+                print(f"waiting {a.pick_gap:.1f} s before the script")
+                time.sleep(min(a.pick_gap, 3.0))
         base = chase.read_joints(link)
         if not base or len(base) < 16:
             print("refused: the joint angles could not be read: nothing was sent.")
@@ -221,8 +225,16 @@ def main() -> None:
             return
         message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
         print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
-        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch if a.watch is not None else round(sum(p["nominal_s"] - p["delay"] * 0.05 for p in plan) * 2.6 + sum(p["delay"] * 0.05 for p in plan) + 0.6, 1), send=lambda: link.play_data_skill(message), expect_motion=False, pre_checks=False)
-        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
+        echoes: list = []
+
+        def _send():
+            link.pop_other()                                  # only what the board says after the script went out
+            link.play_data_skill(message)
+
+        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch if a.watch is not None else round(sum(p["nominal_s"] - p["delay"] * 0.05 for p in plan) * 2.6 + sum(p["delay"] * 0.05 for p in plan) + 0.6, 1), send=_send, expect_motion=False, pre_checks=False)
+        echoes.extend(link.pop_other()[:40])
+        print("the board said after the script was sent:", echoes or "nothing (no K echo: the script may not have been taken)")
+        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
         print("ended")
