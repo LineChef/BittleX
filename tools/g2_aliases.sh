@@ -573,6 +573,11 @@ g2script() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.scripted_skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
 }
+# g2poses  -- copy the poses saved with g2poseedit on the Pi (~/g2_runs/pose_edit/poses/) into pi_pipeline/behavior/scripts/poses/ in the repo, so a script that names them deploys; then lists them. Reads the Pi, writes only those repo files (commit them by exact path).
+g2poses() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  rsync -a "$G2_PI:g2_runs/pose_edit/poses/" "$G2_ROOT/pi_pipeline/behavior/scripts/poses/" && ls "$G2_ROOT/pi_pipeline/behavior/scripts/poses/"
+}
 # g2pickbisect --variant plain|gb|gP|j|link  -- only if g2armskill pickF still does not play in full: stands him up, writes kpickF straight to the port (like a hand-typed printf), then at most ONE extra command 100 ms later (gb, gP or j; `link` uses the link's own send), nothing else for 10 s, and you type what the claw did (log: ~/g2_runs/pick_bisect/). Run `plain` first. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Why: docs/hardware/arm-skills.md.
 g2pickbisect() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

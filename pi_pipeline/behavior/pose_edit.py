@@ -5,10 +5,12 @@ Each command is one short process, because the board keeps the pose between comm
 
     g2poseedit start [--attention]       stand him up (eased) and read the pose; --attention: into the attention pose (legs straight) first; --from-rest: lay him in rest and start there, no stand-up
     g2poseedit set fkn=-15 rsh+=10 ...   change joints and ease to the new pose (a few seconds): absolute `name=angle`, relative `name+=n` / `name-=n`
+    g2poseedit step fsh -15 [--count N]  keep stepping a joint 15 degrees a tick in one run (the person says stop, or the joint reaches its range)
     g2poseedit show                      the 16 angles (named) and the tilt
     g2poseedit save NAME [--note TEXT]   keep the current pose as a keyframe: ~/g2_runs/pose_edit/poses/NAME.json
     g2poseedit load NAME                 ease to a saved pose
     g2poseedit list                      the saved poses
+    g2poseedit diff A B                  the joints that differ between two saved poses (no hardware)
     g2poseedit end                       lay him in rest (the alias then starts the voice service)
 
 Joint names (servo order): pan lift jaw (arm), then the legs fls frs brs bls (shoulders: front left, front right, back right, back left) and flk frk brk blk (the knees). Groups: fsh rsh (front and rear shoulders),
@@ -28,7 +30,8 @@ PAN, LIFT, JAW = 0, 1, 2
 NAMES = ["pan", "lift", "jaw", "j3", "j4", "j5", "j6", "j7", "fls", "frs", "brs", "bls", "flk", "frk", "brk", "blk"]
 GROUPS = {"fsh": ["fls", "frs"], "rsh": ["brs", "bls"], "fkn": ["flk", "frk"], "rkn": ["brk", "blk"], "sh": ["fls", "frs", "brs", "bls"], "kn": ["flk", "frk", "brk", "blk"],
           "legs": ["fls", "frs", "brs", "bls", "flk", "frk", "brk", "blk"], "arm": ["pan", "lift", "jaw"]}
-RANGES = {"pan": (-90, 90), "lift": (0, 125), "jaw": (-100, 120)}          # the legs: -125 to 125 (the int8 skill frames clip there)
+RANGES = {"pan": (-90, 90), "lift": (0, 135), "jaw": (-100, 120)}          # the legs: -125 to 125 (the int8 skill frames clip there); the lift reached 135 by direct command (arm skills page)
+SKILL_LIFT_MAX = 125                                                       # a data skill frame carries 125 at most: a lift above it is set by a direct `i1` command after the move
 LEG_RANGE = (-125, 125)
 STEP_MAX_DEG = 70.0
 DEFAULT_SPEED = 12
@@ -104,6 +107,22 @@ def list_poses(store: str = STORE) -> list:
         return []
 
 
+def diff_poses(a: str, b: str, store: str = STORE) -> list:
+    """The joints that differ between two saved poses: [(name, angle in a, angle in b), ...]."""
+    pa, pb = load_pose(a, store), load_pose(b, store)
+    return [(NAMES[i], pa[i], pb[i]) for i in range(16) if pa[i] != pb[i] and not NAMES[i].startswith("j") or (NAMES[i] == "jaw" and pa[i] != pb[i])]
+
+
+def session_age(store: str = STORE) -> str:
+    """How long the session has been going (the legs can sag after about ten seconds of standing, so this is on every reply)."""
+    try:
+        with open(os.path.join(os.path.expanduser(store), "session.json")) as f:
+            started = json.load(f)["started"]
+        return f"session open {int(time.time() - started)} s"
+    except (OSError, ValueError, KeyError):
+        return "no session started"
+
+
 def table(angles: list) -> str:
     arm = "  ".join(f"{n} {angles[i]:4d}" for i, n in enumerate(NAMES[:3]))
     legs = "  ".join(f"{n} {angles[8 + k]:4d}" for k, n in enumerate(NAMES[8:]))
@@ -131,24 +150,56 @@ def _move(link, chase, robot, angles: list, speed: int) -> list | None:
     """Ease to `angles` as one data skill, wait for the board to finish it, then read the pose and the tilt back. Returns the angles read, or None."""
     message = frame_message(angles, speed, 2)
     link.play_data_skill(message)
-    time.sleep(1.8 if speed >= 6 else 3.0)                  # the frame's own time (a few hundred ms to about two seconds) and the pause after it
+    time.sleep(0.8 if speed == 0 else 1.8 if speed >= 6 else 3.0)       # the frame's own time (a few hundred ms to about two seconds) and the pause after it
     try:
         link._end_quiet()                                    # the link keeps the port silent behind a data skill until its `k` echo or 10 s, and drops `j` reads meanwhile: the move is over, so the read-back may go
     except Exception:  # noqa: BLE001
         pass
+    if angles[LIFT] > SKILL_LIFT_MAX:                        # the frame lowered the claw to 125: set it where it was asked to be
+        link.send(f"i1 {int(round(angles[LIFT]))}", read_reply=False, settle=0.0)
+        time.sleep(0.5)
     return _read(link, chase)
+
+
+def state_path(store: str = STORE) -> str:
+    return os.path.join(os.path.expanduser(store), "state.json")
+
+
+def write_state(angles: list, store: str = STORE) -> None:
+    """The angles the editor last commanded: `save` falls back to them when the board cannot be read."""
+    try:
+        os.makedirs(os.path.expanduser(store), exist_ok=True)
+        with open(state_path(store), "w") as f:
+            json.dump({"angles": [int(round(a)) for a in angles[:16]], "time": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+    except OSError:
+        pass
+
+
+def read_state(store: str = STORE) -> list | None:
+    try:
+        with open(state_path(store)) as f:
+            return json.load(f)["angles"]
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def step_edits(name: str, delta: float) -> list:
+    """The edits of one tick of `name` (a joint or a group) by `delta` degrees."""
+    return parse_edits([f"{name}{'+=' if delta >= 0 else '-='}{abs(delta):g}"])
 
 
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Pose editor: one command per run; the voice service stopped for the session (g2poseedit start).")
-    ap.add_argument("command", choices=("start", "set", "show", "save", "load", "list", "end"))
+    ap.add_argument("command", choices=("start", "set", "step", "show", "save", "load", "list", "diff", "end"))
     ap.add_argument("args", nargs="*")
     ap.add_argument("--attention", action="store_true")
     ap.add_argument("--from-rest", action="store_true", help="start: lay him in the rest pose and build the poses from there instead of standing him up first")
     ap.add_argument("--speed", type=int, default=DEFAULT_SPEED)
     ap.add_argument("--allow-instant", action="store_true")
     ap.add_argument("--note", default=None)
+    ap.add_argument("--count", type=int, default=12, help="step: the most ticks (the person says stop, or the joint reaches its range)")
+    ap.add_argument("--pause", type=float, default=0.6, help="step: seconds between ticks")
     ap.add_argument("--gyro-on", action="store_true", help="leave the firmware gyro balance on (by default it is off for the session: with it on the board moves the legs to level the body and the angles read are not the angles sent)")
     a = ap.parse_args()
     if not a.gyro_on:
@@ -156,6 +207,17 @@ def main() -> None:
         os.environ["G2_STAND_GYRO"] = "0"
     if a.command == "list":
         print("saved poses:", ", ".join(list_poses()) or "none yet")
+        return
+    if a.command == "diff":
+        if len(a.args) != 2:
+            print("refused: diff needs two pose names")
+            return
+        try:
+            d = diff_poses(a.args[0], a.args[1])
+        except (OSError, ValueError) as e:
+            print("refused:", e)
+            return
+        print("\n".join(f"{n:5s} {x:4d} -> {y:4d}  ({y - x:+d})" for n, x, y in d) or "the poses are the same")
         return
     if not 0 <= a.speed <= 127 or (a.speed == 0 and not a.allow_instant):
         print("refused: --speed is 1 to 127 (0, an instant jump, needs --allow-instant)")
@@ -190,17 +252,56 @@ def main() -> None:
                 chase.ensure_rest(link)
                 return
         j = _read(link, chase)
+        try:
+            os.makedirs(os.path.expanduser(STORE), exist_ok=True)
+            with open(os.path.join(os.path.expanduser(STORE), "session.json"), "w") as f:
+                json.dump({"started": time.time()}, f)
+        except OSError:
+            pass
         print("session started: hands near, keep each pose short (the legs can sag after about ten seconds)")
         print(table(j) if j else "the pose could not be read")
         return
     j = _read(link, chase)
+    if j is None and a.command == "save":
+        j = read_state()                                      # the board did not answer: the angles the editor last commanded
+        if j:
+            print("note: the board could not be read, saving the angles the editor last commanded")
     if j is None:
         print("refused: the joint angles could not be read: nothing was sent.")
+        return
+    if a.command == "step":
+        if len(a.args) != 2:
+            print("refused: step needs a joint and a delta, for example: step fsh -15")
+            return
+        try:
+            delta = float(a.args[1])
+            edits = step_edits(a.args[0], delta)
+        except ValueError as e:
+            print("refused:", e)
+            return
+        for k in range(1, max(1, a.count) + 1):
+            try:
+                new, notes = apply_edits(j, edits)
+            except ValueError as e:
+                print("refused:", e)
+                return
+            got = _move(link, chase, robot, new, a.speed) or new
+            write_state(got)
+            t = robot._tilt(0.4)
+            changed = ", ".join(f"{NAMES[i]} {got[i]}" for i in sorted({e[0] for e in edits}))
+            print(f"tick {k}: {changed}" + (f"   tilt {t[0]:+.0f}/{t[1]:+.0f}" if t else "") + ("   (at the joint's range: stopping)" if notes else ""), flush=True)
+            if (t and max(abs(t[0]), abs(t[1])) > FELL_DEG) or notes:
+                if not notes:
+                    print("FELL: lay him in rest (g2poseedit end)")
+                break
+            j = got
+            time.sleep(a.pause)
+        print(table(j))
         return
     if a.command == "show":
         t = robot._tilt(0.5)
         print(table(j))
-        print(f"tilt: pitch {t[0]:+.0f} roll {t[1]:+.0f}" if t else "tilt: no IMU frames")
+        print((f"tilt: pitch {t[0]:+.0f} roll {t[1]:+.0f}" if t else "tilt: no IMU frames") + "   " + session_age())
         return
     if a.command == "save":
         if not a.args:
@@ -224,10 +325,12 @@ def main() -> None:
     for n in notes:
         print("note:", n)
     got = _move(link, chase, robot, new, a.speed)
+    write_state(got or new)
     t = robot._tilt(0.5)
     print(table(got or new))
     if t:
         print(f"tilt: pitch {t[0]:+.0f} roll {t[1]:+.0f}" + ("  FELL: lay him in rest (g2poseedit end)" if max(abs(t[0]), abs(t[1])) > FELL_DEG else ""))
+    print(session_age())
     if got is None:
         print("could not read the pose back after the move")
 

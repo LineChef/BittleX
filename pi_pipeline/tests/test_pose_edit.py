@@ -22,9 +22,11 @@ def test_an_edit_it_does_not_know_is_refused():
 
 def test_angles_are_clipped_to_the_joint_range_and_a_big_jump_is_refused():
     raised = list(BASE)
-    raised[1], raised[2] = 60, -50
+    raised[1], raised[2] = 100, -50
+    new, notes = pe.apply_edits(raised, pe.parse_edits(["lift=140"]))
+    assert new[1] == 135 and "clipped" in notes[0]
     new, notes = pe.apply_edits(raised, pe.parse_edits(["lift=130"]))
-    assert new[1] == 125 and "clipped" in notes[0]
+    assert new[1] == 130 and notes == []                                                     # above the 125 a skill frame carries: set by a direct command after the move
     new, notes = pe.apply_edits(raised, pe.parse_edits(["jaw=-120"]))
     assert new[2] == -100
     with pytest.raises(ValueError, match="at once"):
@@ -80,3 +82,23 @@ def test_the_bow_script_moves_all_four_legs_and_the_arm_in_one_frame_and_returns
     assert plan[0]["frame"][8:] == [-9, -9, -19, -19, -3, -3, 84, 84] and plan[0]["speed"] == 20
     assert plan[0]["frame"][:3] == [1, 125, 0]                                    # the pose records a lift of 135; a data skill carries 125 at most
     assert plan[1]["frame"] == stand
+
+
+def test_the_last_commanded_pose_is_kept_for_a_save_when_the_board_cannot_be_read_and_a_tick_is_one_joint_step(tmp_path):
+    store = str(tmp_path)
+    assert pe.read_state(store) is None
+    pe.write_state(list(range(16)), store)
+    assert pe.read_state(store) == list(range(16))
+    assert pe.step_edits("fsh", -15) == [(8, "-=", 15.0), (9, "-=", 15.0)]
+    assert pe.step_edits("rkn", 15) == [(14, "+=", 15.0), (15, "+=", 15.0)]
+
+
+def test_two_saved_poses_are_compared_joint_by_joint(tmp_path):
+    store = str(tmp_path)
+    a, b = [0] * 16, [0] * 16
+    b[8], b[14] = 20, -45
+    pe.save_pose("a", a, None, store)
+    pe.save_pose("b", b, None, store)
+    d = pe.diff_poses("a", "b", store)
+    assert d == [("fls", 0, 20), ("brk", 0, -45)]
+    assert pe.diff_poses("a", "a", store) == []

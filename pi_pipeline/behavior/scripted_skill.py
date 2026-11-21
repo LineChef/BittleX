@@ -107,7 +107,8 @@ def load_script(name: str) -> dict:
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Play a scripted skill on G2: the person's go first; the voice service stopped.")
-    ap.add_argument("script")
+    ap.add_argument("script", nargs="?", help="the script's name (pi_pipeline/behavior/scripts/NAME.json)")
+    ap.add_argument("--list", action="store_true", help="list the scripts and the committed poses, touch nothing")
     ap.add_argument("--amount", type=float, default=0.3)
     ap.add_argument("--attention", action="store_true", help="play from the attention pose")
     ap.add_argument("--from-rest", action="store_true", help="play from the rest pose: no stand-up (a script written from rest with the pose editor's start --from-rest)")
@@ -116,6 +117,16 @@ def main() -> None:
     ap.add_argument("--no-prompt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    if a.list:
+        names = sorted(n[:-5] for n in os.listdir(SCRIPT_DIR) if n.endswith(".json"))
+        poses = os.path.join(SCRIPT_DIR, "poses")
+        saved = sorted(n[:-5] for n in os.listdir(poses) if n.endswith(".json")) if os.path.isdir(poses) else []
+        print("scripts:", ", ".join(names) or "none")
+        print("poses:", ", ".join(saved) or "none")
+        return
+    if not a.script:
+        print("refused: a script name is needed (--list shows them)")
+        return
     try:
         script = load_script(a.script)
     except (OSError, ValueError) as e:
