@@ -191,3 +191,30 @@ def test_a_session_stops_when_a_step_does_not_run_or_the_series_is_finished(tmp_
     out = []
     assert t.session(None, None, "lift", {}, lambda s: "x", ask=lambda _p: "", say=lambda *a: out.append(" ".join(map(str, a))), log_dir=str(tmp_path)) == 0
     assert any("hit" in line for line in out)
+
+
+def test_from_attention_goes_into_the_attention_pose_before_the_legs_are_read_and_rests_after(monkeypatch, tmp_path):
+    from pi_pipeline.behavior import ball_chase as chase
+    from pi_pipeline.link import imu_print
+    from pi_pipeline.power import battery
+    order = []
+    monkeypatch.setattr(battery, "motion_gate", lambda link: (True, 90, 8.2))
+    monkeypatch.setattr(battery, "read_voltage", lambda link, *a, **k: 8.2)
+    monkeypatch.setattr(imu_print, "board_answers", lambda link: True)
+    monkeypatch.setattr(chase, "_stand_if_lying", lambda link, token="kbalance": order.append("stand") or True)
+    monkeypatch.setattr(chase, "read_joints", lambda link, *a, **k: order.append("read") or list(BASE))
+    monkeypatch.setattr(chase, "ensure_rest", lambda link, *a, **k: order.append("rest") or True)
+    monkeypatch.setattr(t, "LOG_DIR", str(tmp_path))
+    monkeypatch.setattr(t, "run_step", lambda *a, **k: (order.append("skill") or {"verdict": "ok", "max_roll_dev": 0.0, "max_pitch_dev": 0.0, "skill": "x", "variant": "x"}, [{"nominal_s": 1.0}]))
+
+    class Rb(Robot):
+        posture = "unknown"
+
+        def sit_down(self):
+            order.append("attention:" + self.posture)
+            return "ok"
+    t.execute_step(Link(), Rb(), "lift", 16, {"lift_lo": 0.0, "lift_hi": 120.0, "lift_hold": 120.0, "jaw_open": None, "jaw_closed": None}, prompt=False, from_attention=True, say=lambda *a: None)
+    assert order == ["stand", "attention:stand", "read", "skill", "rest"]       # the legs are read in the attention pose, and rest is sent straight from it
+    order.clear()
+    t.execute_step(Link(), Rb(), "lift", 16, {"lift_lo": 0.0, "lift_hi": 120.0, "lift_hold": 120.0, "jaw_open": None, "jaw_closed": None}, prompt=False, say=lambda *a: None)
+    assert order == ["stand", "read", "skill", "rest"]                            # without the option nothing changes

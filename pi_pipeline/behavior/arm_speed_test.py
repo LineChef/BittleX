@@ -200,8 +200,10 @@ def report(series: str | None = None, log_dir: str | None = None) -> list:
     return lines
 
 
-def execute_step(link, robot, series: str, speed: int, params: dict, *, watch_s: float = WATCH_S, obj: dict | None = None, prompt: bool = True, say=print, ask=input) -> str | None:
-    """One full run on the hardware: the pack gate, the eased stand-up, the joint read, the data skill, the log, rest, and the typed observation. Returns the log path (None when nothing was logged). Always leaves G2 at rest."""
+def execute_step(link, robot, series: str, speed: int, params: dict, *, watch_s: float = WATCH_S, obj: dict | None = None, prompt: bool = True, from_attention: bool = False, say=print, ask=input) -> str | None:
+    """One full run on the hardware: the pack gate, the eased stand-up, the joint read, the data skill, the log, rest, and the typed observation. Returns the log path (None when nothing was logged). Always leaves G2 at rest.
+    `from_attention`: after the eased stand-up he goes into the attention pose (the claw look's own entry, `robot.sit_down()`: legs straight, which prevents most of the servo sag) and the skill plays from there with the legs held
+    at the attention angles; rest is sent straight from it (owner, 2026-11-21)."""
     from . import ball_chase as chase
     from ..link import imu_print
     from ..power import battery
@@ -215,6 +217,12 @@ def execute_step(link, robot, series: str, speed: int, params: dict, *, watch_s:
     path = None
     try:
         chase._stand_if_lying(link, "kbalance")
+        if from_attention:
+            robot.posture = "stand"                                # just stood up: the entry sends the attention pose without a second stand-up
+            if robot.sit_down() == "fell":
+                say("G2 fell going into the attention pose: stopping")
+                return None
+            say("in the attention pose")
         base = chase.read_joints(link)
         if not base or len(base) < 16:
             say("refused: the joint angles could not be read, so the legs cannot be held: nothing was sent.")
@@ -229,7 +237,7 @@ def execute_step(link, robot, series: str, speed: int, params: dict, *, watch_s:
         res, plan = run_step(robot, link, series, speed, base, watch_s=watch_s, **params)
         volts_after = battery.read_voltage(link)
         meta = {"series": series, "speed_byte": speed, "speed_ratio": ratio(speed), "upper_deg_s": round(upper_deg_s(speed), 1), "plan": plan, "nominal_total_s": round(sum(p["nominal_s"] for p in plan), 2),
-                "params": params, "base_joints": base, "pack_pct": pct, "pack_v": volts, "pack_pct_after": battery.pack_percent(volts_after) if volts_after else None, **(obj or {})}
+                "params": params, "from_attention": from_attention, "base_joints": base, "pack_pct": pct, "pack_v": volts, "pack_pct_after": battery.pack_percent(volts_after) if volts_after else None, **(obj or {})}
         path = ast.write_log(res, meta, log_dir=LOG_DIR)
         say(f"RESULT {series} speed {speed}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
@@ -290,6 +298,7 @@ def _parse() -> "argparse.Namespace":  # noqa: F821
     ap.add_argument("--object-oz", type=float, default=None)
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
+    ap.add_argument("--from-attention", action="store_true", help="play the skill from the attention pose (legs straight, less servo sag) instead of from a stand; rest is sent straight from it")
     ap.add_argument("--allow-jump", action="store_true", help="skip the one-step-at-a-time check (a deliberate jump only)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and the check, touch nothing")
     ap.add_argument("--report", action="store_true", help="print the runs so far and the next step, touch nothing (--series limits it to one series)")
@@ -338,7 +347,7 @@ def main() -> None:
     obj = {"object": args.object, "object_oz": args.object_oz, "floor": args.floor}
 
     def execute(speed):
-        return execute_step(link, robot, args.series, speed, params, watch_s=args.watch, obj=obj, prompt=not args.no_prompt)
+        return execute_step(link, robot, args.series, speed, params, watch_s=args.watch, obj=obj, prompt=not args.no_prompt, from_attention=args.from_attention)
     if args.session:
         n = session(link, robot, args.series, params, execute)
         print(f"session over: {n} step(s) run")
