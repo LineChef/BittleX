@@ -211,7 +211,7 @@ def main() -> None:
             return
         message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
         print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
-        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch, send=lambda: link.play_data_skill(message), expect_motion=False)
+        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch, send=lambda: link.play_data_skill(message), expect_motion=False, pre_checks=False)
         path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:

@@ -2,7 +2,7 @@
   "name": "catapult_launch",
   "description": "The catapult's launch sequence so far: from the stand into the bow (front legs squatted, back legs extended, claw closed and down on the floor), then the transition into the launch pose (front legs straight and tall, back legs crouched, claw at 125, jaw closed). The claw is already on the floor in the bow, so it cannot drop while the legs hold it: it swings down as the legs begin to rise (frame rise_and_drop: the legs about halfway, the lift to 0) and back up fast as they finish (frame lunge: the legs in the launch pose, the lift to 125 at the top speed), all within the time the front legs take to stand up. Played with `g2script catapult_launch --amount 1.0`: the run stands him up from rest first and lays him in rest after. A data skill carries the lift at 125 at most.",
   "frames": [
-    {"name": "bow", "pose": "bow", "joints": ["legs", "arm"], "speed": 20, "delay_s": 0.8},
+    {"name": "bow", "pose": "bow", "joints": ["legs", "arm"], "speed": 20, "delay_s": 0.3},
     {"name": "rise_and_drop", "angles": [2, 0, 0, 0, 0, 0, 0, 0, 6, 6, 26, 26, 49, 49, 25, 25], "joints": ["legs", "arm"], "speed": 60, "delay_s": 0.0},
     {"name": "lunge", "pose": "launch", "joints": ["legs", "arm"], "speed": 127, "delay_s": 1.0},
     {"name": "back_to_stand", "pose": "start", "speed": 12, "delay_s": 0.0}

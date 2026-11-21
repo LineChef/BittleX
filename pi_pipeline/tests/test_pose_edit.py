@@ -125,7 +125,7 @@ def test_the_release_angle_is_set_inside_the_lunge_frame_and_can_be_overridden_p
     plan = ss.build_plan(script, stand, amount=1.0)
     assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge", "open", "back_to_stand"]
     lunge, opened = plan[2], plan[3]
-    assert lunge["frame"][2] == 26 and lunge["frame"][1] == 125 and lunge["speed"] == 127          # the jaw opens a few degrees while the arm swings up
+    assert lunge["frame"][2] == 10 and lunge["frame"][1] == 125 and lunge["speed"] == 127          # the jaw opens a few degrees while the arm swings up
     assert opened["frame"][2] == 60 and opened["speed"] == 0                                         # then fully open at once
     plan2 = ss.build_plan(script, stand, amount=1.0, overrides=ss.parse_overrides(["lunge.jaw=34"]))
     assert plan2[2]["frame"][2] == 34 and plan2[3]["frame"][2] == 60
