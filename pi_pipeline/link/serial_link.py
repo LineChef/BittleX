@@ -591,6 +591,17 @@ class SerialLink:
                 last = t
         return {"trace": thin, "peak_deg": max((max(abs(p), abs(r)) for _t, p, r in trace), default=None)}
 
+    def play_data_skill(self, message: bytes) -> None:
+        """Write a ready `K` message (kskill.message) in short pieces and leave the port silent behind it until the board echoes its `k` or SKILL_QUIET_S passes (a behavior skill is aborted by any byte waiting on the port,
+        docs/hardware/arm-skills.md). For the arm speed series (behavior/arm_speed_test.py); the caller watches the IMU and writes nothing meanwhile. Raises RuntimeError when the port is not open."""
+        from . import kskill
+        if self._ser is None:
+            raise RuntimeError("the serial port is not open")
+        self._end_quiet(flush=False)
+        kskill.write_chunked(self._ser.write, message, time.sleep)
+        self._ser.flush()
+        self._start_quiet()
+
     def reseat_eased(self) -> dict | None:
         """Re-seat the legs WITHOUT lying down (owner, 2026-11-19: four lie-downs from a rolled stand flipped him, and the eased lie-down did too): one eased `K` skill that bends all four legs part way toward the rest pose
         (motion_feel.RESEAT_DEPTH) and straightens them back to the stand, played by the board itself while the IMU is read. For a sag of 15 degrees or more (ball_chase.recover_sag). Only from a stand

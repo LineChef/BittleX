@@ -27,6 +27,7 @@ Most used
 - `g2punttest dry`: watch a hand-rolled ball with the claw (no punt)
 - `g2punttest`: punt, watch it roll, acquire it, go on (hands near)
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
+- `g2armspeed --series lift --speed 4`: one arm speed step (hands near)
 - `g2ball`: start the ball goal
 - `g2ballstop`: stop the ball goal
 - `g2explore start`: start exploring
@@ -318,6 +319,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2api`: [Data and review](#data-and-review)
 - `g2app`: [Stop and safety](#stop-and-safety), [Bring-up and hardware](#bring-up-and-hardware)
 - `g2armskill`: [Most used](#most-used)
+- `g2armspeed`: [Most used](#most-used)
 - `g2attach`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2attend`: [Most used](#most-used)
 - `g2audio`: [Voice and mic](#voice-and-mic)

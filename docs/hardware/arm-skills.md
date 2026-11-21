@@ -16,6 +16,10 @@ The skill data and the lookup code were read from Petoi's official BiBoard firmw
 - Pinned commit: `f5aba6b9cb7e4f2062f77365fbcd0c388acf32ef`.
 - Files read, with SHA-256: `src/InstinctBittleESP_arm.h` (cd0a1c7c...00f6, 111431 bytes), `src/skill.h` (a68890f9...03de, 21281 bytes), `src/voice.h` (1b71141a...881b, 13912 bytes), `src/robotArm.h` (72b04bd0...b804e, 819 bytes), `src/OpenCat.h` (5fe49684...b191, 27417 bytes).
 - The skill-abort finding comes from `src/reaction.h` (SHA-256 `6ff5ec5b…ddd0`, 67942 bytes) and `src/io.h` (SHA-256 `0e06a1d8…d264`, 1398 bytes) at the same commit, fetched from `raw.githubusercontent.com` over HTTPS and read as text only; `skill.h` and `OpenCat.h` matched the hashes recorded above. The fetched copies are in `~/g2_data/firmware_src_f5aba6b9` outside the repository.
+- The speed findings come from two more files at the same commit, fetched from `raw.githubusercontent.com` over HTTPS and read as text only.
+  - `src/espServo.h`: SHA-256 `23545a21…7584`, 14000 bytes, the servo driver setup, with no speed control in it.
+  - `src/motion.h`: SHA-256 `5cac3e28…5375`, 32863 bytes, holds `transform()`.
+  - Each is kept in its own folder under `~/g2_data/` outside the repository.
 - The files are C header text, read as data and never compiled or run. The arm skill arrays are byte-identical to the stock `InstinctBittleESP.h` already kept for the sim reference.
 
 How the firmware finds a skill
@@ -37,6 +41,17 @@ Behavior skills (`pickF`, `pickD`, `put`, `launch`, `toss`, `hunt`, `showOff`, `
 - The fix: after a behavior skill the link stays silent (`G2_SKILL_QUIET_S`, 10 seconds at most) until the board echoes the completion token `k`; held toggles go out afterwards and reads are dropped. The gyro balance is also back on by default (the firmware default), so the link no longer writes a `gb` behind skills at all. Details are in the link specification.
 - Tools: `g2armskill --joints N` reads the joint angles while a skill plays, which is itself a read and so is dropped during the quiet window; it cannot observe a skill that way.
 - Not yet run on G2: the fix is in the repository and not deployed. It is confirmed on the robot by sending `pickF` with nothing written behind it, once after the eased stand-up and once with a `gb` written 100 milliseconds after (which should cut it), and then through `g2armskill`.
+
+Arm speed series
+----------------
+
+How fast the lift joint and the claw jaw can be driven decides what a throw can do, and nothing recorded gives it. `transform()` in `motion.h` moves every joint of a frame together and finishes them together: it takes the largest joint change in degrees divided by the frame's speed (the speed byte over 8) in steps, each step an eased interpolation followed by a fixed 8 millisecond wait, so the speed byte sets the duration and the servo write time comes on top. A direct `i` command uses a global speed (default 2), and the byte in a skill frame is an int8, so 127 is the most a frame can ask. The commanded rate is about 125 degrees a second per unit of speed ratio at most; the servo's own limit is what the series looks for. This is read from the source and not yet measured on the board.
+
+- The claw look moves the arm at 60 degrees a second by sending one position at a time from the Pi, which cannot go much faster (a run dropped a byte above about 1 KB a second). The series therefore plays a data skill (`K`) that the board steps itself, with nothing written to the port while it plays.
+- `g2armspeed --series lift --speed N` (`python -m pi_pipeline.behavior.arm_speed_test`) runs one step: the legs stay at the angles the board reports, the lift goes to its start, up to 120 degrees at speed N, holds half a second and comes back down slowly. The jaw series (`--series jaw --jaw-open A --jaw-closed B`) raises the arm slowly first, opens the jaw, closes it at speed N, opens it at speed N, returns it and lowers the arm. The two jaw angles have no defaults because their sign and range differ between the arm skills.
+- Steps are 4, 6, 8, 12, 16, 24, 32, 48, 64, 96 and 127, the first about the claw look's pace. The tool refuses a step more than one above the last logged run of the series, a step above a run that stalled, hit something or was unsafe, and a step above a run with no recorded observation. `--dry-run` prints the plan and touches nothing; `--allow-jump` skips the check and is for a deliberate jump only.
+- Logged in `~/g2_runs/arm_speed/`: the send time, the body's IMU trace, the pack percent, the plan with each step's nominal time and upper rate, and the typed observation (followed, lagged, stalled, hit or unsafe, with the sound and a note). The real arm position is not available, so the observation is the main data.
+- Before the first run the arm is moved by hand through its whole range to check its clearance over the pod and Pi stack.
 
 What each skill does to the body
 --------------------------------

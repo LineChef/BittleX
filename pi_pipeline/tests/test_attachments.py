@@ -862,3 +862,21 @@ def test_the_quiet_can_be_switched_off(monkeypatch):
     lk.send("kpickF", read_reply=False, settle=0.0)
     lk.send("gP", read_reply=False, settle=0.0)
     assert lk._ser.out == ["kpickF", "gb", "gP"]                                        # G2_SKILL_QUIET_S=0: as before, the `gb` right behind the skill and the `gP` at once
+
+
+def test_a_data_skill_goes_out_in_pieces_and_silences_the_port_behind_it(monkeypatch):
+    """The arm speed series plays a `K` data skill: the message is written whole (in short pieces), then the link holds the gyro toggles and drops reads until the board echoes `k`."""
+    from pi_pipeline.link import kskill
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    lk = _quiet_link(monkeypatch)
+    written = []
+    lk._ser.write = lambda b: written.append(bytes(b))
+    msg = kskill.message(kskill.behavior_payload([[0] * 16, [5] * 16], [8, 8], [0, 0]))
+    lk.play_data_skill(msg)
+    assert b"".join(written) == msg and len(written) == -(-len(msg) // kskill.CHUNK_BYTES) and lk._quiet_active()
+    assert lk.send("j", read_reply=False, settle=0.0) == "" and lk.dropped_in_quiet == 1
+    lk._end_quiet()
+    assert not lk._quiet_active()
+    lk._ser = None
+    with pytest.raises(RuntimeError):
+        lk.play_data_skill(msg)

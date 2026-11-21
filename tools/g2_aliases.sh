@@ -533,6 +533,15 @@ g2armskill() {
   ssh "$G2_PI" "cd ~/bittleX && ${envp}PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_skill_test --skill $skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
+# g2armspeed --series lift|jaw --speed N [OPTIONS]  -- ONE step of the arm speed series: the lift (or the jaw) moves at speed byte N (steps 4 6 8 12 16 24 32 48 64 96 127; 4 is about the claw look's pace), played by the board as one data skill with the legs held, the body watched, then you type what the arm did (followed / lagged / stalled / hit / unsafe). One step at a time: a step more than one above the last run, or above a stalled / hit / unsafe run, is refused. The jaw series needs --jaw-open and --jaw-closed (measured, no defaults). `--dry-run` prints the plan and touches nothing. Runs ONLY on your go, G2 on the floor on his feet, hands near: it stops the voice service first (g2stop voice) and starts it again after. Log: ~/g2_runs/arm_speed/. Why and how: docs/hardware/arm-skills.md.
+g2armspeed() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2armspeed --series lift|jaw --speed N [--dry-run] [--jaw-open A --jaw-closed B] [--object NAME] [--floor LABEL]"; return 2; }
+  local rest; rest="$(printf ' %q' "$@")"
+  case " $* " in *" --dry-run "*) ;; *) g2stop voice || return 1 ;; esac
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_speed_test$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  case " $* " in *" --dry-run "*) ;; *) ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again" ;; esac
+}
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac

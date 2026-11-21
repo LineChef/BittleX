@@ -62,8 +62,8 @@ def trace_summary(times: list, pitches: list, rolls: list, base: tuple) -> dict:
     return out
 
 
-def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic, wall=time.time, capture=None, sample_joints=None, joint_samples: int = 0) -> dict:
-    """Play `token` (no `k`) from a stand and report what the body did. Never raises. `sample_joints()` (with `joint_samples` > 0) reads the 16 joint angles about every 0.6 s while the skill plays and logs them as `joints_during` ([seconds, angles]): the board reports commanded angles, so this shows whether the skill commands the claw (joint 2) at all; reading them stops the IMU print, so the trace has gaps. `capture`, when given, is called once after the swing (and `gb`) and returns a list of picture records for the log."""
+def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic, wall=time.time, capture=None, sample_joints=None, joint_samples: int = 0, send=None, expect_motion=None) -> dict:
+    """Play `token` (no `k`) from a stand and report what the body did. Never raises. `sample_joints()` (with `joint_samples` > 0) reads the 16 joint angles about every 0.6 s while the skill plays and logs them as `joints_during` ([seconds, angles]): the board reports commanded angles, so this shows whether the skill commands the claw (joint 2) at all; reading them stops the IMU print, so the trace has gaps. `capture`, when given, is called once after the swing (and `gb`) and returns a list of picture records for the log. `send`, when given, is called instead of sending `k<token>` (the speed series plays a data skill this way; `token` is then only the label); `expect_motion` overrides whether a quiet body counts as `no_motion` (default: every skill but `QUIET_SKILLS`)."""
     res = {"skill": token, "verdict": "error", "max_roll_dev": None, "max_pitch_dev": None, "fell": False, "tilt_before": None, "tilt_after": None, "seconds": watch_s}
     try:
         if robot._tilt(1.5) is None:
@@ -78,7 +78,10 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         robot._tx("gP")
         robot._pitch, robot._roll = [], []
         say(f"sending k{token}: hands near")
-        robot._lk.send("k" + token, read_reply=False, settle=0.0)
+        if send is not None:
+            send()
+        else:
+            robot._lk.send("k" + token, read_reply=False, settle=0.0)
         t0 = clock()
         res["sent_at"] = round(wall(), 3)                                                    # wall clock when the token went out: lines the phone video up with the trace
         res["sent_iso"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(res["sent_at"])) + f".{int((res['sent_at'] % 1) * 1000):03d}"
@@ -104,7 +107,7 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         pitches = [abs(p - b[0]) for p in robot._pitch] or [0.0]
         res["max_roll_dev"], res["max_pitch_dev"] = round(max(rolls), 1), round(max(pitches), 1)
         res["fell"] = fell
-        res["verdict"] = verdict(max(rolls + pitches), fell, expect_motion=token not in QUIET_SKILLS)
+        res["verdict"] = verdict(max(rolls + pitches), fell, expect_motion=(token not in QUIET_SKILLS) if expect_motion is None else expect_motion)
         stamps = list(getattr(robot, "_imu_t", []))[-len(robot._roll):] if robot._roll else []
         if len(stamps) != len(robot._roll):                                                  # a robot without frame times: spread the frames evenly over the watch
             n = len(robot._roll)
@@ -118,9 +121,9 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
     return res
 
 
-def write_log(res: dict, extra: dict | None = None) -> str | None:
+def write_log(res: dict, extra: dict | None = None, log_dir: str | None = None) -> str | None:
     try:
-        d = os.path.expanduser(LOG_DIR)
+        d = os.path.expanduser(log_dir or LOG_DIR)
         os.makedirs(d, exist_ok=True)
         path = os.path.join(d, time.strftime("%Y%m%d_%H%M%S") + "_" + res["skill"] + ".json")
         with open(path, "w") as f:
