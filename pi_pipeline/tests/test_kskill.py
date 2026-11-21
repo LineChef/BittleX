@@ -437,3 +437,37 @@ def test_with_the_gyro_on_by_default_the_rise_does_not_turn_it_off_afterwards(mo
     lk.last_motion_command = "krest"
     assert lk._stand_up_kskill(standup) is True
     assert b"gb" not in [w.strip() for w in wrote]
+
+
+def _legs_at(urdf):
+    j = [0] * 16
+    for k in range(8):
+        j[kskill.URDF_TO_SERVO[k]] = urdf[k]
+    return j
+
+
+def test_a_stand_up_out_of_the_attention_pose_waits_for_the_board_to_read_rest_before_it_rises(monkeypatch):
+    """Owner, 2026-11-21: attention straight to stand-up is a known failure; the lie-down comes first and the rise starts only when the board reads the rest pose (a fixed 3 s was shorter than the lie-down took)."""
+    wrote, reads = [], []
+    lk = _arm_link(monkeypatch, wrote)
+    prof = standup._poses()
+    attention, rest, stand = _legs_at([0.0] * 8), _legs_at(prof["rest_urdf_deg"]), _legs_at(prof["balance_urdf_deg"])
+
+    def read(link, **kw):
+        started = any(w[:1] == b"K" for w in wrote)
+        reads.append("K" if started else "pre")
+        if started:
+            return list(stand)
+        return list(attention) if reads.count("pre") <= 4 else list(rest)           # the pose read at the start, then three polls still showing the legs straight, then rest
+    monkeypatch.setattr(kskill, "read_joints", read)
+    lk.last_motion_command = "kcalib"
+    assert lk._stand_up_kskill(standup) is True
+    first_k = next(i for i, w in enumerate(wrote) if w[:1] == b"K")
+    assert any(w.strip() == b"krest" for w in wrote[:first_k])                       # rest is sent before any rise
+    assert reads.count("pre") >= 5                                                    # and the rise waited for the polls until rest read
+    wrote.clear()
+    reads.clear()
+    monkeypatch.setattr(kskill, "read_joints", lambda link, **kw: list(attention) if not any(w[:1] == b"K" for w in wrote) else list(stand))
+    lk.last_motion_command = "kcalib"
+    assert lk._stand_up_kskill(standup) is True                                       # rest never reads: the wait ends at its cap and the rise goes ahead, it never hangs
+    assert any(w[:1] == b"K" for w in wrote)

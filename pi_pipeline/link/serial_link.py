@@ -47,6 +47,8 @@ POSE_READ_TRIES = 3             # reads of the board's pose before a stand-up (t
 LEG_OFF_DEG = 8.0               # a leg joint this far from the pose it was sent to is logged as a warning (and in the motion events log)
 TRUST_POSE_S = 20.0             # a pose the Pi itself commanded this recently stands in for a pose read the board does not answer
 REST_FIRST_S = 3.0              # after the rest command that comes first when the pose is unknown: the time the board takes to lie down
+REST_READ_MAX_S = 8.0           # a stand-up out of the attention pose waits this long at most, after the rest command, for the board to read the rest pose (the 3 s above is the least)
+REST_POLL_S = 0.5               # between those pose reads
 LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit", "kcalib")      # kcalib: the attention pose (legs straight); a move out of it stands him up back legs first (user, 2026-11-02)
 # Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
 STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd", "kcalib"})
@@ -807,6 +809,16 @@ class SerialLink:
                 log.info("stand-up out of the attention pose: lying down in rest first, then the stand-up from rest")
                 self._write_pose("krest")
                 time.sleep(REST_FIRST_S)
+                waited = REST_FIRST_S
+                while waited < REST_READ_MAX_S:                   # (owner, 2026-11-21) the stand-up out of the attention pose never starts before the board reads the rest pose: a fixed 3 s was shorter than the lie-down took in today's runs
+                    jr = kskill.read_joints(self)
+                    if jr and len(jr) >= 16 and kskill.classify_start(jr, standup) == "rest":
+                        break
+                    time.sleep(REST_POLL_S)
+                    waited += REST_POLL_S + 0.25
+                else:
+                    log.warning("stand-up out of the attention pose: the board did not read the rest pose after %.1f s: standing up anyway", waited)
+                ev["rest_wait_s"] = round(waited, 1)
                 self._write_pose("gb")
                 self.last_motion_command, self._last_motion_t = "krest", time.monotonic()
                 ev["via_rest"], pose = True, "rest"
