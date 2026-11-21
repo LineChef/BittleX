@@ -1,0 +1,105 @@
+{
+  "name": "lob_soft",
+  "description": "The lob with a softer end to the lunge (option 1 of the 2026-11-21 proposal): the first 0.1 s is the lob's (the arm and jaw frames are unchanged and the legs go at speed 0 toward the launch pose, but only 85% of the way from the rise: shoulders 16, 58 and knees 86, -19), and then the legs finish the last 15% at speed 40 so the front legs and rear feet land on the floor more gently. Meant to throw as far as the lob (24 to 25 inches with the claw fully cradling the object) with a quieter thump at the end of the lunge (judged by the sound in a filmed clip: the lob's peaks were 5168 and 6775 at the lunge's end in the first clip). Not yet run on G2. The lob script is unchanged.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -6,
+        -6,
+        -10,
+        -10,
+        7,
+        7,
+        72,
+        72
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 30,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.05,
+      "angles": [
+        2,
+        125,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        16,
+        16,
+        58,
+        58,
+        86,
+        86,
+        -19,
+        -19
+      ]
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.05
+    },
+    {
+      "name": "settle",
+      "pose": "launch",
+      "joints": [
+        "legs"
+      ],
+      "speed": 40,
+      "delay_s": 0.1
+    }
+  ]
+}

@@ -202,3 +202,17 @@ def test_the_lob_and_the_line_drive_match_tests_c_and_d():
     plan = lambda n: ss.build_plan(ss.load_script(n), stand, amount=1.0)                  # noqa: E731
     assert plan("lob") == plan("catapult_throw_cf")
     assert plan("line_drive") == plan("catapult_throw_cd")
+
+
+def test_lob_soft_is_the_lob_for_its_first_tenth_of_a_second_and_then_settles_the_legs_slowly():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    lob = ss.build_plan(ss.load_script("lob"), stand, amount=1.0)
+    soft = ss.build_plan(ss.load_script("lob_soft"), stand, amount=1.0)
+    assert [p["name"] for p in soft] == ["bow", "rise_and_drop", "lunge", "open", "settle"]
+    assert soft[0] == lob[0] and soft[1] == lob[1]                                              # the rise is the lob's
+    assert soft[2]["frame"][:8] == lob[2]["frame"][:8] and soft[2]["speed"] == 0 and soft[2]["delay"] == lob[2]["delay"]   # the arm goes as in the lob, at speed 0, the same pause
+    legs = lambda p: p["frame"][8:]                                                             # noqa: E731
+    rise, launch = legs(soft[1]), legs(lob[2])
+    assert all(abs(a - (r + 0.85 * (b - r))) <= 0.6 for a, r, b in zip(legs(soft[2]), rise, launch))   # the legs 85% of the way
+    assert soft[3]["frame"][:8] == lob[3]["frame"][:8] and soft[3]["speed"] == 0 and soft[3]["delay"] == 1       # the jaw opens as in the lob, 50 ms later
+    assert legs(soft[4]) == launch and soft[4]["frame"][:8] == soft[3]["frame"][:8] and soft[4]["speed"] == 40   # the last 15% of the leg travel, slowly, the arm and the open jaw as they were
