@@ -82,3 +82,11 @@ def test_the_front_legs_can_have_their_own_amount_so_the_front_feet_stay_down():
     assert legs[0] == c.mix(BASE[8:], c.BOW_LEGS, 0.5)[0] and legs[4] == c.mix(BASE[8:], c.BOW_LEGS, 0.5)[4]      # the front legs half way
     with pytest.raises(ValueError):
         c.build_plan("bow", BASE, amount=1.0, front_amount=1.2)
+
+
+def test_the_swing_can_use_the_sit_pose_the_old_look_up_and_an_unknown_pose_is_refused():
+    plan = c.build_plan("swing", BASE, amount=1.0, launch_pose="sit")
+    assert plan[1]["frame"][8:] == c.SIT_LEGS
+    assert c.build_plan("swing", BASE, amount=1.0)[1]["frame"][8:] == c.LAUNCH_LEGS                 # the default is unchanged
+    with pytest.raises(ValueError):
+        c.build_plan("swing", BASE, launch_pose="flip")
