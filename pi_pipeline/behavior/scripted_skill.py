@@ -133,6 +133,7 @@ def main() -> None:
     ap.add_argument("--attention", action="store_true", help="play from the attention pose")
     ap.add_argument("--set", action="append", default=None, metavar="FRAME.JOINT=ANGLE", help="override one joint of one frame for this run, for example lunge.jaw=30 (the release time knob of the catapult)")
     ap.add_argument("--pick", action="store_true", help="play Petoi's pickF first (the object put in front of him) and the script from where it ended")
+    ap.add_argument("--gyro-off", action="store_true", help="switch the firmware gyro balance off for this run (the stand-up and the script play without it)")
     ap.add_argument("--from-rest", action="store_true", help="play from the rest pose: no stand-up (a script written from rest with the pose editor's start --from-rest)")
     ap.add_argument("--watch", type=float, default=WATCH_S)
     ap.add_argument("--floor", default=None)
@@ -168,12 +169,18 @@ def main() -> None:
         for p in plan:
             print(f"  {p['name']:10s} lift {p['frame'][1]:4d} jaw {p['frame'][2]:4d} legs {p['frame'][8:]} speed {p['speed']:3d} delay {p['delay'] * 0.05:.2f} s  about {p['nominal_s']:.2f} s")
         return
+    if a.gyro_off:
+        os.environ["G2_GYRO_BALANCE"] = "0"                  # every gB the link would write becomes gb, and the stand-up does not turn it on for the rise
+        os.environ["G2_STAND_GYRO"] = "0"
     from . import ball_chase as chase
     from ..link import imu_print
     from ..link.serial_link import SerialLink
     from ..power import battery
     link = SerialLink("/dev/serial0")
     link.connect()
+    if a.gyro_off:
+        link.send("gb", read_reply=False, settle=0.0)        # the gyro balance off, whatever state the board is in
+        time.sleep(0.2)
     ok, pct, volts = battery.motion_gate(link)
     print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
     if not ok:
@@ -212,7 +219,7 @@ def main() -> None:
         message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
         print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
         res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch, send=lambda: link.play_data_skill(message), expect_motion=False, pre_checks=False)
-        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
+        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
         print("ended")

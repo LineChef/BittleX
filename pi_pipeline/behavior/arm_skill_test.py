@@ -65,6 +65,7 @@ def trace_summary(times: list, pitches: list, rolls: list, base: tuple) -> dict:
 def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=time.sleep, clock=time.monotonic, wall=time.time, capture=None, sample_joints=None, joint_samples: int = 0, send=None, expect_motion=None, pre_checks: bool = True) -> dict:
     """Play `token` (no `k`) from a stand and report what the body did. Never raises. `sample_joints()` (with `joint_samples` > 0) reads the 16 joint angles about every 0.6 s while the skill plays and logs them as `joints_during` ([seconds, angles]): the board reports commanded angles, so this shows whether the skill commands the claw (joint 2) at all; reading them stops the IMU print, so the trace has gaps. `capture`, when given, is called once after the swing (and `gb`) and returns a list of picture records for the log. `send`, when given, is called instead of sending `k<token>` (the speed series plays a data skill this way; `token` is then only the label); `expect_motion` overrides whether a quiet body counts as `no_motion` (default: every skill but `QUIET_SKILLS`). `pre_checks` False skips the tilt reads and the stand check before the send (about 2.5 s of standing), for a scripted movement that follows the stand-up straight away."""
     res = {"skill": token, "verdict": "error", "max_roll_dev": None, "max_pitch_dev": None, "fell": False, "tilt_before": None, "tilt_after": None, "seconds": watch_s}
+    base = None
     try:
         if pre_checks:
             if robot._tilt(1.5) is None:

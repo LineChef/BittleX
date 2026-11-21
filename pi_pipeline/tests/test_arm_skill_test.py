@@ -126,6 +126,14 @@ def test_run_skill_logs_the_trace_the_send_time_and_the_pictures():
     assert res["pictures"] == [{"n": 1, "file": None, "detections": []}]
 
 
+def test_run_skill_without_the_pre_checks_still_sends_and_reports_the_body():
+    c = Clock()
+    r = FakeRobot(rolls=[-1.0, 3.0, 8.0], pitches=[-2.0, 0.0, 10.0])
+    sent = []
+    res = t.run_skill(r, "script_x", watch_s=1.0, say=lambda *_: None, sleep=c.sleep, clock=c, wall=lambda: 5.0, send=lambda: sent.append(1), expect_motion=False, pre_checks=False)
+    assert sent == [1] and res["verdict"] != "error" and res["max_roll_dev"] is not None            # no tilt read before the send, and no unbound baseline after it
+
+
 def test_the_landing_record_and_update_log(tmp_path):
     answers = iter(["36", "left", "y", "bounced"])
     assert t.ask_landing(ask=lambda _p: next(answers)) == {"landed_in": 36.0, "direction": "left", "left_claw": True, "note": "bounced"}
