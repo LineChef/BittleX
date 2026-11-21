@@ -107,12 +107,11 @@ def test_two_saved_poses_are_compared_joint_by_joint(tmp_path):
 def test_the_catapult_launch_script_drops_the_claw_as_the_legs_rise_and_swings_it_back_up_as_they_finish():
     stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
     plan = ss.build_plan(ss.load_script("catapult_launch"), stand, amount=1.0)
-    assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge", "back_to_stand"]
-    bow, drop, lunge, back = plan
+    assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge"]                  # no return to the stand: the rest command follows the last frame
+    bow, drop, lunge = plan
     assert bow["frame"][1] == 125 and drop["frame"][1] == 0 and lunge["frame"][1] == 125            # down to the lowest in the middle of the rise, up to 125 at the end
     assert lunge["frame"][8:] == [20, 20, 70, 70, 100, 100, -35, -35] and lunge["speed"] == 127
     assert drop["frame"][8:12] == [6, 6, 26, 26]                                                      # the front and back shoulders about halfway between the bow and the launch pose
-    assert back["frame"] == stand
 
 
 def test_a_committed_pose_wins_over_a_pose_saved_on_the_pi():
@@ -123,7 +122,7 @@ def test_the_release_angle_is_set_inside_the_lunge_frame_and_can_be_overridden_p
     stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
     script = ss.load_script("catapult_throw")
     plan = ss.build_plan(script, stand, amount=1.0)
-    assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge", "open", "back_to_stand"]
+    assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge", "open"]
     lunge, opened = plan[2], plan[3]
     assert lunge["frame"][2] == 10 and lunge["frame"][1] == 125 and lunge["speed"] == 127          # the jaw opens a few degrees while the arm swings up
     assert opened["frame"][2] == 60 and opened["speed"] == 0                                         # then fully open at once

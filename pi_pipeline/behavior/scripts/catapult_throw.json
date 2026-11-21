@@ -2,10 +2,81 @@
   "name": "catapult_throw",
   "description": "The catapult launch sequence with the release: the bow, rise_and_drop and lunge of catapult_launch, with the jaw opening a few degrees INSIDE the lunge frame (set jaw 10: the object leaves once the jaw has opened past its width, late in the swing for a small angle and early for a large one, so that angle is the release-time knob: `--set lunge.jaw=30`), then the jaw fully open at speed 0 and back to the stand. The claw swings down as the legs begin to rise and back up fast as they finish. Played with `g2script catapult_throw --amount 1.0` (add `--pick` to play pickF first).",
   "frames": [
-    {"name": "bow", "pose": "bow", "joints": ["legs", "arm"], "speed": 20, "delay_s": 0.3},
-    {"name": "rise_and_drop", "angles": [2, 0, 0, 0, 0, 0, 0, 0, 6, 6, 26, 26, 49, 49, 25, 25], "joints": ["legs", "arm"], "speed": 60, "delay_s": 0.0},
-    {"name": "lunge", "pose": "launch", "joints": ["legs", "arm"], "set": {"jaw": 10}, "speed": 127, "delay_s": 0.0},
-    {"name": "open", "angles": [2, 125, 60, 0, 0, 0, 0, 0, 20, 20, 70, 70, 100, 100, -35, -35], "joints": ["arm"], "speed": 0, "delay_s": 0.6},
-    {"name": "back_to_stand", "pose": "start", "speed": 12, "delay_s": 0.0}
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        6,
+        6,
+        26,
+        26,
+        49,
+        49,
+        25,
+        25
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 60,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "set": {
+        "jaw": 10
+      },
+      "speed": 127,
+      "delay_s": 0.0
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
   ]
 }

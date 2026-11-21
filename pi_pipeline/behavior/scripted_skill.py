@@ -135,7 +135,7 @@ def main() -> None:
     ap.add_argument("--pick", action="store_true", help="play Petoi's pickF first (the object put in front of him) and the script from where it ended")
     ap.add_argument("--gyro-off", action="store_true", help="switch the firmware gyro balance off for this run (the stand-up and the script play without it)")
     ap.add_argument("--from-rest", action="store_true", help="play from the rest pose: no stand-up (a script written from rest with the pose editor's start --from-rest)")
-    ap.add_argument("--watch", type=float, default=WATCH_S)
+    ap.add_argument("--watch", type=float, default=None, help="seconds the body is watched after the send (default: the script's own time times 1.4 plus 0.5 s (the stepping time leaves out the servo write time), so the rest command follows at once and never cuts the movement off)")
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
@@ -218,7 +218,7 @@ def main() -> None:
             return
         message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
         print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
-        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch, send=lambda: link.play_data_skill(message), expect_motion=False, pre_checks=False)
+        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch if a.watch is not None else round(sum(p["nominal_s"] for p in plan) * 1.4 + 0.5, 1), send=lambda: link.play_data_skill(message), expect_motion=False, pre_checks=False)
         path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:

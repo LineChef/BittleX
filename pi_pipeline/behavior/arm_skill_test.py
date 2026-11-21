@@ -100,9 +100,9 @@ def run_skill(robot, token: str, *, watch_s: float = WATCH_S, say=print, sleep=t
         allowed = getattr(robot._lk, "_gyro_allowed", None)
         if allowed is None or not allowed():
             robot._tx("gb")                                                                  # only where the gyro runs off (the firmware default is on everywhere but a learned walk)
-        sleep(1.0)
+        sleep(1.0 if pre_checks else 0.2)                       # (a scripted movement is followed by the rest command at once: no second of standing, no tilt read)
         robot._fell()
-        after = robot._tilt()
+        after = robot._tilt() if pre_checks else None
         res["tilt_after"] = after
         b = base or (0.0, 0.0)
         rolls = [abs(r - b[1]) for r in robot._roll] or [0.0]
