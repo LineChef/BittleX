@@ -85,6 +85,12 @@ Open questions
 
 - How much speed a body lunge can add to the throw. An arm swing alone is estimated to reach about 1 to 2 feet; a lunge that drives the shoulder forward as the arm swings, timed with the release, is the planned way to add launch speed. It is studied in simulation first, then on the floor with the pitch trace watched, since a lunge is also the likeliest way to nose over.
 
+- Whether a backward catapult motion works.
+  - The motion: from a play bow with the object in the claw, the lift joint swings to about 120 degrees while the rear legs fold and the front legs extend, and the claw opens before the top of the arc so the object lands behind G2.
+  - Why backward: the nose-up body pitch tilts the arc up and back, and the object leaves heading upward. A forward throw swings the claw down and forward, so the object would leave heading toward the floor.
+  - Evidence so far: Petoi's demo clip pitches the body up about 40 degrees in under 0.2 seconds as the arm snaps up, and its second release sends the object up and toward the rear.
+  - First check: the arc passes over the pod and Pi stack, so their clearance comes first.
+  - Status: not built or simulated, and planned only after the claw's speed and release time are measured. The release angle and the claw's opening delay are the two numbers to find.
 - Whether the skills throw only when the claw holds an object. Nothing read says so: the frames are fixed angles, and nothing read shows the claw sensing a load, so the same motion is inferred to play empty or loaded. Not verified; the held-object runs in step 5 of the test plan would settle it.
 - Whether the claw angle at the release means open or closed in the toss frames (negative values in `tossF` and `hunt`, positive in `pickF`).
 - Whether `toss` throws to the left or the right on G2's claw, since both names play the one motion.
