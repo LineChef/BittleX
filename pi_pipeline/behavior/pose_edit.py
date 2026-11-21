@@ -262,10 +262,11 @@ def main() -> None:
         print(table(j) if j else "the pose could not be read")
         return
     j = _read(link, chase)
-    if j is None and a.command == "save":
-        j = read_state()                                      # the board did not answer: the angles the editor last commanded
-        if j:
-            print("note: the board could not be read, saving the angles the editor last commanded")
+    if a.command == "save":
+        last = read_state()                                   # the angles the editor last commanded: the board's own moves (its voice module starts `up` and `rest` by itself) can change what a read shows
+        if last and (j is None or max(abs(last[i] - j[i]) for i in range(16)) > 8):
+            print("note: the board reads differently from the last commanded pose, saving the angles the editor last commanded")
+            j = last
     if j is None:
         print("refused: the joint angles could not be read: nothing was sent.")
         return

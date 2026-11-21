@@ -1,0 +1,6 @@
+{
+  "name": "launch",
+  "angles": [2, 125, 0, 0, 0, 0, 0, 0, 20, 20, 70, 70, 100, 100, -35, -35],
+  "note": "The second pose of the catapult launch sequence, found with the pose editor (G2 held in the air, instant jumps) from the owner's pictures: front legs straight and tall (shoulders 20, knees 100), rear legs crouched (shoulders 70, knees -35), claw at 125 with the jaw closed. The editor's own save read the stand pose because the board started its own `up` just before it, so these are the angles the editor commanded.",
+  "time": "2026-11-21"
+}

@@ -31,11 +31,12 @@ AMOUNT_MIN = 0.1
 
 
 def _pose_angles(name: str) -> list:
+    """A committed pose (`scripts/poses/`) wins over one saved on the Pi, so a script plays what was reviewed and committed."""
     try:
-        return load_pose(name)
-    except OSError:
         with open(os.path.join(SCRIPT_DIR, "poses", name + ".json")) as f:
             return json.load(f)["angles"]
+    except OSError:
+        return load_pose(name)
 
 
 def joint_indices(spec: list | None) -> list:
