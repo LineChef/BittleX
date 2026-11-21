@@ -1,0 +1,82 @@
+{
+  "name": "catapult_throw_f",
+  "description": "Tuning variant F of catapult_throw, a step further than E: the legs go only about 10% of the way to the launch pose in rise_and_drop (shoulders -6 and -10, knees 7 and 72) at speed 30, so almost all the leg motion happens in the lunge. Everything else as catapult_throw_checkpoint1. (B, 70% at speed 100, threw 4 inches; the checkpoint, 50% at speed 60, 12 inches; E, 30% at speed 40, 15 inches.)",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -6,
+        -6,
+        -10,
+        -10,
+        7,
+        7,
+        72,
+        72
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 30,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "set": {
+        "jaw": 8
+      },
+      "speed": 127,
+      "delay_s": 0.0
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

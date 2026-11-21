@@ -152,3 +152,11 @@ def test_variant_e_sends_the_legs_less_far_and_slower_before_the_whip_than_the_c
     e = ss.build_plan(ss.load_script("catapult_throw_e"), stand, amount=1.0)
     assert e[1]["frame"][8:12] == [0, 0, 8, 8] and e[1]["speed"] == 40 and e[1]["frame"][1] == 0
     assert e[0] == base[0] and e[2] == base[2] and e[3] == base[3]                              # only rise_and_drop differs
+
+
+def test_variant_f_sends_the_legs_a_tenth_of_the_way_before_the_whip():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    base = ss.build_plan(ss.load_script("catapult_throw_checkpoint1"), stand, amount=1.0)
+    f = ss.build_plan(ss.load_script("catapult_throw_f"), stand, amount=1.0)
+    assert f[1]["frame"][8:] == [-6, -6, -10, -10, 7, 7, 72, 72] and f[1]["speed"] == 30 and f[1]["frame"][1] == 0
+    assert f[0] == base[0] and f[2] == base[2] and f[3] == base[3]                              # only rise_and_drop differs
