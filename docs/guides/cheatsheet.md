@@ -32,6 +32,8 @@ Most used
 - `g2catapult --stage bow --dry-run`: one catapult stage's frames, no move
 - `g2lob --dry-run`: the lob's frames, no move (without the flag it runs)
 - `g2throws summary`: the throw tally on the Mac, per script and grip
+- `g2lastrun`: what the newest run did, and whether the board took a script
+- `g2video sheet CLIP`: contact sheet of a clip's frames (Mac only, no download)
 - `g2poseedit start`: begin a pose-editing session (then `set`, `save`, `end`)
 - `g2script NAME --dry-run`: a scripted movement's frames, no move
 - `g2jawrange --to 40`: step the jaw by eye to find its angles (hands near)
@@ -366,6 +368,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)
 - `g2jawrange`: [Most used](#most-used)
+- `g2lastrun`: [Most used](#most-used)
 - `g2libstatus`: [Camera model](#camera-model)
 - `g2liftcal`: [Most used](#most-used)
 - `g2lob`: [Most used](#most-used)
@@ -412,6 +415,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2traits`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2turn3`: [Claw and camera](#claw-and-camera)
 - `g2turns`: [Walk tests](#walk-tests)
+- `g2video`: [Most used](#most-used)
 - `g2vision`: [Claw and camera](#claw-and-camera)
 - `g2voice`: [Voice and mic](#voice-and-mic)
 - `g2walk`: [Walk tests](#walk-tests)

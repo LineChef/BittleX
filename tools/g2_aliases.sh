@@ -23,6 +23,11 @@ fi
 # single-class face flow needs `export G2_CAP_ROOT=~/Desktop/G2Memory/g2_face_capture`.
 export G2_CAP_ROOT="${G2_CAP_ROOT:-$HOME/Desktop/G2Memory/g2_capture_raw}"
 _G2_PY="$G2_ROOT/pi_pipeline/.venv/bin/python"            # companion-pipeline venv
+# The ONE place a one-shot test tool brings the voice service back after its run. G2_KEEP_VOICE_OFF=1 keeps it off for a series of runs (set it for the series, unset it after; the tools rest G2 at the end of every run, so he is never left standing with the service off).
+_g2_voice_back() {
+  if [ -n "${G2_KEEP_VOICE_OFF:-}" ]; then echo "the voice service stays off (G2_KEEP_VOICE_OFF is set; g2reset brings it back)"; return 0; fi
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
 
 # run a python module/script from the repo, pipeline venv, WITHOUT moving the caller
 _g2py() { ( cd "$G2_ROOT" && "$_G2_PY" "$@" ); }
@@ -318,7 +323,7 @@ g2wallpic() {
 g2look() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   case "${1:-}" in
-    done) ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; return ;;
+    done) _g2_voice_back; return ;;
     list) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures list | tail -${2:-12}"; return ;;
     -*) echo "usage: g2look [LABEL] [INCHES] [ANGLE] | g2look list [N] | g2look done"; return 2 ;;
   esac
@@ -396,7 +401,7 @@ if skill:
     print('send gb ->', repr(l.send('gb', read_reply=True)))
 print('voltage', b.read_voltage(l))
 PYEOF
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2attend [MINUTES [TARGET [live [stream]]]]  -- (SWITCHED OFF 2026-11-15: refuses unless G2_ATTENTIVE_BOUT=1) one supervised attentive bout (default 2 min): G2 holds the attention pose with the claw up and turns the camera toward what the camera model detects (largest first; with TARGET, a named object from the object gallery as well), looks around now and then, then puts the claw down and stands up the standard way. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. g2attendstop ends a bout at once.
 g2attend() {
@@ -410,7 +415,7 @@ g2attend() {
     local dest="$HOME/Desktop/G2Memory/g2_pictures/bout/$(basename "$dir")"; mkdir -p "$dest"
     scp -q "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null; scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null; echo "bout files copied to $dest"
   fi
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2attendstop  -- end an attentive bout now (the claw goes down and he stands up the standard way).
 # g2seen [TARGET] [PICTURES]  -- camera only, G2 does not move: takes pictures (default 5) and prints what the camera's detector and the object gallery each see (TARGET: only gallery names containing it, e.g. a toy's name). It rests G2 and stops the voice service first (g2stop voice) and starts it again after; the pictures are copied to the Mac.
@@ -425,7 +430,7 @@ g2seen() {
     local dest="$HOME/Desktop/G2Memory/g2_pictures/seen/$(basename "$dir")"; mkdir -p "$dest"
     scp -q "$G2_PI:$dir/*.jpg" "$dest/" && echo "pictures copied to $dest"
   fi
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2stream [SECONDS [--compare | --sensor-opt N | --lock-ae]]  -- (options added 2026-11-16: --compare runs every picture size and prints the rates; --lock-ae freezes the sensor's auto exposure after 2 s and compares the brightness before and after) camera only, G2 does not move: asks the camera module for a continuous stream of pictures (AT+INVOKE=-1,0,0) and prints how many pictures a second arrive and how far apart (default 6 s). Rests G2 and stops the voice service first (g2stop voice) and starts it again after; the first frames are copied to the Mac.
 g2stream() {
@@ -439,7 +444,7 @@ g2stream() {
     local dest="$HOME/Desktop/G2Memory/g2_pictures/stream/$(basename "$dir")"; mkdir -p "$dest"
     scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null && echo "frames copied to $dest"
   fi
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2liftcal [up]  -- lift calibration (`up`: from the home position up to 120 in 15 deg steps): with a ball fixed in view and the pan at 0, steps the claw lift down from 120 (120, 105, 90, 75, 60), takes pictures and reads the body tilt at each, stops at the first 6 deg of tilt or a lost ball, then puts the claw down and stands him up. Runs ONLY on your go, G2 on the floor, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after.
 g2liftcal() {
@@ -453,7 +458,7 @@ g2liftcal() {
     local dest="$HOME/Desktop/G2Memory/g2_pictures/liftcal/$(basename "$dir")"; mkdir -p "$dest"
     scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null && echo "pictures copied to $dest"
   fi
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2stepcal [small|long|all] [REPEATS]  -- step calibration (default all, 3 repeats): with a ball about 30 in straight ahead, G2 takes timed small steps (0.4, 0.6, 0.9, 1.2 s) and long walks (1.5, 2.0, 3.0 s), the camera measures the forward inches each one covered (backing up when the ball gets close), and the summary gives inches per second, the start delay and the spread, with suggested constants. Numbers only, except that up to 6 pictures where the ball was NOT found are kept and copied to ~/Desktop/G2Memory/g2_pictures/stepcal. Stops the voice service first (`g2stop voice`), brings it back after; `g2stepcalstop` ends it early.
 g2stepcal() {
@@ -467,7 +472,7 @@ g2stepcal() {
     local dest="$HOME/Desktop/G2Memory/g2_pictures/stepcal/$(basename "$dir")"; mkdir -p "$dest"
     scp "$G2_PI:$dir/*.jpg" "$dest/" 2>&1 | tail -2; echo "pictures where the ball was missed: $dest ($(ls "$dest" | wc -l | tr -d " ") files)"
   fi
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2stepcalstop  -- end a step calibration after the current step (he is laid in rest).
 g2stepcalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/stepcal_stop" && echo "stop sent: the calibration ends after the current step"; }
@@ -476,7 +481,7 @@ g2followcal() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.follow_cal --steps ${1:-10,20,30} --repeats ${2:-2} ${@:3} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2followcalstop  -- end a follow calibration after the current step (he is laid in rest).
 g2followcalstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/followcal_stop" && echo "stop sent: the calibration ends after the current step"; }
@@ -485,7 +490,7 @@ g2turncal() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.turn_cal --asks ${1:-6,10,20} --repeats ${2:-2} ${@:3} 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2pose [--suspended|--at-rest] [--poses kbalance,kcalib]  -- read G2's joint angles over USB with the BiBoard plugged into the Mac (Pi off) and compare left and right per leg pair (tools/g2_pose_read.py). Refuses unless you say where he is (--suspended or --at-rest) and refuses when another program holds the port (the Petoi calibrator, a serial monitor). Reads what the board last COMMANDED (all zeros before any pose); with --poses it commands each pose, reads, and ends with rest.
 g2pose() { (cd "$G2_ROOT" && PYTHONPATH=. pi_pipeline/.venv/bin/python tools/g2_pose_read.py "$@"); }
@@ -520,7 +525,7 @@ g2punttest() {
     local dest="$HOME/Desktop/G2Memory/g2_pictures/watch/$(basename "$dir")"; mkdir -p "$dest"
     scp -q "$G2_PI:$dir/*.json" "$dest/" 2>/dev/null; scp -q "$G2_PI:$dir/*.jpg" "$dest/" 2>/dev/null; echo "watch log copied to $dest"
   fi
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 g2attendstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/attentive_stop" && echo "stop sent: the bout ends within a second"; }
 # g2armskill SKILL [OPTIONS]  -- play ONE arm skill (launch, toss, tossF, tossL, tossR, hunt, showOff, pickF, pickD; clap needs `g2armskill clap --allow-clap`; options: --object NAME --object-oz N --object-in N --floor LABEL --pictures N --no-prompt) with the body watched: stands him up, sends it, watches the IMU 6 s, sends gb, rests him, and prints ok / lean / tipped / fell (log: ~/g2_runs/arm_skills/). Runs ONLY on your go, G2 on the floor on his feet, hands near: it rests him and stops the voice service first (g2stop voice) and starts it again after. Test order and why: docs/hardware/arm-skills.md.
@@ -531,7 +536,7 @@ g2armskill() {
   g2stop voice || return 1
   local envp=""; [ -n "${G2_REST_RELAX_SETTLE_S:-}" ] && envp="G2_REST_RELAX_SETTLE_S=$G2_REST_RELAX_SETTLE_S "      # a run-only override of the wait before the servos are relaxed at the end (seconds)
   ssh "$G2_PI" "cd ~/bittleX && ${envp}PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_skill_test --skill $skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2armspeed --series lift|jaw --speed N [OPTIONS]  -- ONE step of the arm speed series: the lift (or the jaw) moves at speed byte N (steps 4 6 8 12 16 24 32 48 64 96 127; 4 is about the claw look's pace), played by the board as one data skill with the legs held, the body watched, then you type what the arm did (followed / lagged / stalled / hit / unsafe). One step at a time: a step more than one above the last run, or above a stalled / hit / unsafe run, is refused. The jaw series needs --jaw-open and --jaw-closed (measured, no defaults). `--dry-run` prints the plan and touches nothing. Runs ONLY on your go, G2 on the floor on his feet, hands near: it stops the voice service first (g2stop voice) and starts it again after. `--report` prints the runs so far and the next step (read-only); `--session --series lift` runs several steps in one process, G2 in rest between them, offering the next speed before each (Enter = your go). Log: ~/g2_runs/arm_speed/. Why and how: docs/hardware/arm-skills.md.
 g2armspeed() {
@@ -541,7 +546,7 @@ g2armspeed() {
   case " $* " in *" --dry-run "*|*" --report "*) ro=1 ;; esac
   [ "$ro" = 1 ] || g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_speed_test$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+  [ "$ro" = 1 ] || { _g2_voice_back; }
 }
 # g2catapult --stage bow|swing|throw [--amount 0.3] [--lift-top 60] [--speed 16] [--jaw-delta 15] [--pick] [--dry-run]  -- ONE run of the backward catapult (the object in the claw thrown over his back): a data skill the board plays itself, stage by stage (bow, swing, throw; each refused until the one before ran ok), scaled by --amount; --pick plays pickF first. Runs ONLY on your go, hands near, soft surface behind him; --dry-run prints the frames and touches nothing. Details: docs/hardware/arm-skills.md.
 g2catapult() {
@@ -551,7 +556,7 @@ g2catapult() {
   case " $* " in *" --dry-run "*) ro=1 ;; esac
   [ "$ro" = 1 ] || g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.catapult$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+  [ "$ro" = 1 ] || { _g2_voice_back; }
 }
 # g2poseedit start|set|show|save|load|list|end  -- the pose editor for authoring a scripted movement: `g2poseedit start [--attention]` stops the voice service and stands him up, `g2poseedit set fkn=-15 rsh+=10` eases him into the changed pose (joints: pan lift jaw fls frs brs bls flk frk brk blk; groups fsh rsh fkn rkn sh kn legs arm), `g2poseedit save NAME` keeps the pose, `g2poseedit end` lays him in rest and starts the voice service again. Hands near, short poses (the legs can sag). Details: docs/hardware/arm-skills.md.
 g2poseedit() {
@@ -560,7 +565,7 @@ g2poseedit() {
   local rest; rest="$(printf ' %q' "$@")"
   [ "$1" = start ] && { g2stop voice || return 1; }
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.pose_edit$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  [ "$1" = end ] && { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+  [ "$1" = end ] && { _g2_voice_back; }
   return 0
 }
 # g2script NAME [--amount 0.3] [--attention] [--dry-run]  -- play a scripted movement (pi_pipeline/behavior/scripts/NAME.json, keyframes from g2pose) as one data skill the board plays itself, scaled by --amount, the body watched, then rest. Runs ONLY on your go, hands near; --dry-run prints the frames and touches nothing. Details: docs/hardware/arm-skills.md.
@@ -571,7 +576,7 @@ g2script() {
   case " $* " in *" --dry-run "*) ro=1 ;; esac
   [ "$ro" = 1 ] || g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.scripted_skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+  [ "$ro" = 1 ] || { _g2_voice_back; }
 }
 # g2lob [--dry-run]  -- THE LOB: G2 stands up, picks the object up from the floor in front of him, lobs it forward and rests, as one fluid motion (pi_pipeline/behavior/lob.py: the lob_soft script after Petoi's pickF, a 0.5 s pause between them, the gyro balance off). Runs ONLY on your go, G2 at rest on his feet, the object in front of the claw, a soft clear floor ahead, hands near; it stops the voice service first (g2stop voice) and starts it again after. `--dry-run` prints the frames and touches nothing. The voice command is "G2, lob".
 g2lob() {
@@ -580,10 +585,19 @@ g2lob() {
   case " $* " in *" --dry-run "*) ro=1 ;; esac
   [ "$ro" = 1 ] || g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lob$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+  [ "$ro" = 1 ] || { _g2_voice_back; }
 }
 # g2throws add SCRIPT INCHES [--side IN] [--grip TEXT] [--note TEXT] | g2throws summary  -- the throw tally on the Mac (~/.local/share/g2/throw_distances.csv, outside the repo): one row per throw with the distance and the sideways offset (inches right of the aim line, negative = left) you measure, and a summary per script and grip. Reads nothing from G2.
 g2throws() { (cd "$G2_ROOT" && "$_G2_PY" -m pi_pipeline.behavior.throw_tally "$@"); }
+# g2lastrun [N]  -- what the newest N (default 1) scripted, arm-skill or catapult runs on the Pi did, in one read-only look: the verdict, tilt, pack, and for a script whether the board took it (the K echo) or not; then what the Pi sent and the board did on its own (the quiet lines left out). Use it after any run, also one you started yourself.
+g2lastrun() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.diag.last_run ${1:-1}" 2>&1
+  echo "--- what the Pi sent and the board did (newest run):"
+  g2cmds 2>&1 | grep -v -E " BOARD [igGj=]$" | tail -25
+}
+# g2video sheet FILE [--from S] [--to S] [--step S] | g2video audio FILE [--from S] [--to S]  -- a slow-motion or ordinary clip on the Mac, read with macOS's own video framework (no download): `sheet` writes a contact sheet of frames at the times asked (default the whole clip every 0.5 s) and prints its path; `audio` prints the loud moments (peak per 40 ms). The pictures are written to a new temp folder (they show the home: delete the folder when done, never commit them).
+g2video() { "$G2_ROOT/tools/video_tool/g2video.sh" "$@"; }
 # g2poses  -- copy the poses saved with g2poseedit on the Pi (~/g2_runs/pose_edit/poses/) into pi_pipeline/behavior/scripts/poses/ in the repo, so a script that names them deploys; then lists them. Reads the Pi, writes only those repo files (commit them by exact path).
 g2poses() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
@@ -596,7 +610,7 @@ g2pickbisect() {
   local rest; rest="$(printf ' %q' "$@")"
   g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.pick_bisect$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 # g2jawrange --to ANGLE [--step N]  -- find the jaw angles for the speed series by eye: stands him up, raises the arm like the claw look (the claw is clear of the floor), steps the jaw from where it is toward ANGLE in small steps (within 60 degrees of the start, at most 12 steps) printing each commanded angle, brings it back, lowers the arm and rests him; then you type which angle looked fully open, fully closed and where it stopped, and it prints the g2armspeed jaw command. Start with a small --to. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Log: ~/g2_runs/jaw_range/.
 g2jawrange() {
@@ -605,7 +619,7 @@ g2jawrange() {
   local rest; rest="$(printf ' %q' "$@")"
   g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.jaw_range$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+  _g2_voice_back
 }
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
