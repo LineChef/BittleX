@@ -533,14 +533,33 @@ g2armskill() {
   ssh "$G2_PI" "cd ~/bittleX && ${envp}PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_skill_test --skill $skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
-# g2armspeed --series lift|jaw --speed N [OPTIONS]  -- ONE step of the arm speed series: the lift (or the jaw) moves at speed byte N (steps 4 6 8 12 16 24 32 48 64 96 127; 4 is about the claw look's pace), played by the board as one data skill with the legs held, the body watched, then you type what the arm did (followed / lagged / stalled / hit / unsafe). One step at a time: a step more than one above the last run, or above a stalled / hit / unsafe run, is refused. The jaw series needs --jaw-open and --jaw-closed (measured, no defaults). `--dry-run` prints the plan and touches nothing. Runs ONLY on your go, G2 on the floor on his feet, hands near: it stops the voice service first (g2stop voice) and starts it again after. Log: ~/g2_runs/arm_speed/. Why and how: docs/hardware/arm-skills.md.
+# g2armspeed --series lift|jaw --speed N [OPTIONS]  -- ONE step of the arm speed series: the lift (or the jaw) moves at speed byte N (steps 4 6 8 12 16 24 32 48 64 96 127; 4 is about the claw look's pace), played by the board as one data skill with the legs held, the body watched, then you type what the arm did (followed / lagged / stalled / hit / unsafe). One step at a time: a step more than one above the last run, or above a stalled / hit / unsafe run, is refused. The jaw series needs --jaw-open and --jaw-closed (measured, no defaults). `--dry-run` prints the plan and touches nothing. Runs ONLY on your go, G2 on the floor on his feet, hands near: it stops the voice service first (g2stop voice) and starts it again after. `--report` prints the runs so far and the next step (read-only); `--session --series lift` runs several steps in one process, G2 in rest between them, offering the next speed before each (Enter = your go). Log: ~/g2_runs/arm_speed/. Why and how: docs/hardware/arm-skills.md.
 g2armspeed() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
-  [ -n "${1:-}" ] || { echo "usage: g2armspeed --series lift|jaw --speed N [--dry-run] [--jaw-open A --jaw-closed B] [--object NAME] [--floor LABEL]"; return 2; }
-  local rest; rest="$(printf ' %q' "$@")"
-  case " $* " in *" --dry-run "*) ;; *) g2stop voice || return 1 ;; esac
+  [ -n "${1:-}" ] || { echo "usage: g2armspeed --series lift|jaw --speed N [--dry-run] [--report] [--session] [--jaw-open A --jaw-closed B] [--object NAME] [--floor LABEL]"; return 2; }
+  local rest ro=0; rest="$(printf ' %q' "$@")"
+  case " $* " in *" --dry-run "*|*" --report "*) ro=1 ;; esac
+  [ "$ro" = 1 ] || g2stop voice || return 1
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.arm_speed_test$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
-  case " $* " in *" --dry-run "*) ;; *) ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again" ;; esac
+  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+}
+# g2pickbisect --variant plain|gb|gP|j|link  -- only if g2armskill pickF still does not play in full: stands him up, writes kpickF straight to the port (like a hand-typed printf), then at most ONE extra command 100 ms later (gb, gP or j; `link` uses the link's own send), nothing else for 10 s, and you type what the claw did (log: ~/g2_runs/pick_bisect/). Run `plain` first. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Why: docs/hardware/arm-skills.md.
+g2pickbisect() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2pickbisect --variant plain|gb|gP|j|link [--object NAME] [--floor LABEL]"; return 2; }
+  local rest; rest="$(printf ' %q' "$@")"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.pick_bisect$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
+# g2jawrange --to ANGLE [--step N]  -- find the jaw angles for the speed series by eye: stands him up, raises the arm like the claw look (the claw is clear of the floor), steps the jaw from where it is toward ANGLE in small steps (within 60 degrees of the start, at most 12 steps) printing each commanded angle, brings it back, lowers the arm and rests him; then you type which angle looked fully open, fully closed and where it stopped, and it prints the g2armspeed jaw command. Start with a small --to. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Log: ~/g2_runs/jaw_range/.
+g2jawrange() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2jawrange --to ANGLE [--step N]"; return 2; }
+  local rest; rest="$(printf ' %q' "$@")"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.jaw_range$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
 }
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

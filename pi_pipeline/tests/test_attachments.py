@@ -880,3 +880,14 @@ def test_a_data_skill_goes_out_in_pieces_and_silences_the_port_behind_it(monkeyp
     lk._ser = None
     with pytest.raises(RuntimeError):
         lk.play_data_skill(msg)
+
+
+def test_write_raw_goes_straight_to_the_port_and_starts_no_silence(monkeypatch):
+    """The pick-up bisect writes exactly what a hand-typed printf would: no quiet window, no gyro handling."""
+    monkeypatch.setenv("G2_GYRO_BALANCE", "0")
+    lk = _quiet_link(monkeypatch)
+    lk.write_raw(b"kpickF\n")
+    assert lk._ser.out == ["kpickF"] and not lk._quiet_active()
+    lk._ser = None
+    with pytest.raises(RuntimeError):
+        lk.write_raw(b"x")

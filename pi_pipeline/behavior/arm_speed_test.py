@@ -161,11 +161,125 @@ def run_step(robot, link, series: str, speed: int, base: list, *, watch_s: float
     return res, plan
 
 
+def next_speed(last: dict | None) -> tuple:
+    """(the next speed byte to run, why not): the baseline step after no run, else the step above the last run; None with the reason when the series should stop (the last run stalled, hit something, was unsafe, has no
+    observation, or was the top step)."""
+    if last is None:
+        return SPEED_STEPS[0], None
+    prev = int(last["speed_byte"])
+    result = (last.get("observation") or {}).get("result")
+    if result is None:
+        return None, f"the last run (speed {prev}) has no recorded observation"
+    if result in STOP_RESULTS:
+        return None, f"the last run (speed {prev}) was {result}"
+    above = [s for s in SPEED_STEPS if s > prev]
+    return (above[0], None) if above else (None, f"speed {prev} was the top step")
+
+
+def report(series: str | None = None, log_dir: str | None = None) -> list:
+    """The runs so far, oldest first, as plain lines: speed byte, the typed result, the body's peak tilt and when it moved, the pack, and at the end the next step. Read-only: nothing is sent."""
+    d = os.path.expanduser(log_dir or LOG_DIR)
+    lines = []
+    for ser in ([series] if series else list(SERIES)):
+        runs = []
+        for path in sorted(glob.glob(os.path.join(d, f"*_{ser}_s*.json"))):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if isinstance(data.get("speed_byte"), int):
+                    runs.append(data)
+            except (OSError, ValueError):
+                continue
+        lines.append(f"{ser} series: {len(runs)} run(s)")
+        for r in runs:
+            obs = r.get("observation") or {}
+            lines.append(f"  speed {r['speed_byte']:3d}  {obs.get('result') or 'no observation':14s} body roll {r.get('max_roll_dev')} pitch {r.get('max_pitch_dev')} deg, first moved {r.get('onset_s')} s, "
+                         f"pack {r.get('pack_pct')}%  {r.get('time', '')}" + (f"  sound: {obs['sound']}" if obs.get("sound") else "") + (f"  note: {obs['note']}" if obs.get("note") else ""))
+        nxt, why = next_speed(runs[-1] if runs else None)
+        lines.append(f"  next: speed {nxt}" if nxt else f"  next: none ({why})")
+    return lines
+
+
+def execute_step(link, robot, series: str, speed: int, params: dict, *, watch_s: float = WATCH_S, obj: dict | None = None, prompt: bool = True, say=print, ask=input) -> str | None:
+    """One full run on the hardware: the pack gate, the eased stand-up, the joint read, the data skill, the log, rest, and the typed observation. Returns the log path (None when nothing was logged). Always leaves G2 at rest."""
+    from . import ball_chase as chase
+    from ..link import imu_print
+    from ..power import battery
+    ok, pct, volts = battery.motion_gate(link)
+    say("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
+    if not ok:
+        return None
+    if not imu_print.board_answers(link):
+        say("refused: no IMU frames from the BiBoard: is it powered on? Nothing was sent.")
+        return None
+    path = None
+    try:
+        chase._stand_if_lying(link, "kbalance")
+        base = chase.read_joints(link)
+        if not base or len(base) < 16:
+            say("refused: the joint angles could not be read, so the legs cannot be held: nothing was sent.")
+            return None
+        say(f"joints before: lift {base[LIFT]} jaw {base[JAW]}")
+        try:
+            plan = build_plan(series, speed, base, **params)
+        except ValueError as e:
+            say("refused:", e)
+            return None
+        say(f"speed {speed}: the longest leg takes about {max(p['nominal_s'] for p in plan):.2f} s by the firmware's stepping; hands near")
+        res, plan = run_step(robot, link, series, speed, base, watch_s=watch_s, **params)
+        volts_after = battery.read_voltage(link)
+        meta = {"series": series, "speed_byte": speed, "speed_ratio": ratio(speed), "upper_deg_s": round(upper_deg_s(speed), 1), "plan": plan, "nominal_total_s": round(sum(p["nominal_s"] for p in plan), 2),
+                "params": params, "base_joints": base, "pack_pct": pct, "pack_v": volts, "pack_pct_after": battery.pack_percent(volts_after) if volts_after else None, **(obj or {})}
+        path = ast.write_log(res, meta, log_dir=LOG_DIR)
+        say(f"RESULT {series} speed {speed}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
+    except KeyboardInterrupt:
+        say("ended")
+    finally:
+        from .ball_chase import ensure_rest
+        ensure_rest(link)
+    if path and prompt:
+        ast.update_log(path, {"observation": ask_observation(ask)})
+    return path
+
+
+def session(link, robot, series: str, params: dict, execute, *, ask=input, say=print, log_dir: str | None = None) -> int:
+    """Several steps in one process, G2 laid in rest between them. Before each step: the next speed is offered (Enter runs it, a number runs that speed if the one-step check allows it, s stops); the person's reply is the
+    go for that run. `execute(speed)` runs one step and returns its log path. Returns how many steps ran."""
+    ran = 0
+    while True:
+        last = last_run(series, log_dir)
+        nxt, why = next_speed(last)
+        if nxt is None:
+            say(f"stopping the series: {why}")
+            return ran
+        try:
+            reply = ask(f"next: {series} speed {nxt}. Enter = go (G2 in position, hands near), a number = that speed instead, s = stop: ").strip().lower()
+        except EOFError:
+            return ran
+        if reply in ("s", "stop", "q"):
+            return ran
+        speed = nxt
+        if reply:
+            try:
+                speed = int(reply)
+            except ValueError:
+                say("not a speed byte; try again")
+                continue
+        refusal = check_step(speed, last)
+        if refusal:
+            say("refused:", refusal)
+            continue
+        if execute(speed) is None:
+            say("that step did not run: stopping the session")
+            return ran
+        ran += 1
+
+
 def _parse() -> "argparse.Namespace":  # noqa: F821
     import argparse
-    ap = argparse.ArgumentParser(description="One step of the arm speed series on G2: the owner's go before each run; the voice service stopped.")
-    ap.add_argument("--series", required=True, choices=SERIES)
-    ap.add_argument("--speed", type=int, required=True, help="the speed byte under test, steps: " + ", ".join(str(s) for s in SPEED_STEPS))
+    ap = argparse.ArgumentParser(description="One step (or a session of steps) of the arm speed series on G2: the person's go before each run; the voice service stopped.")
+    ap.add_argument("--series", choices=SERIES, default=None)
+    ap.add_argument("--speed", type=int, default=None, help="the speed byte under test, steps: " + ", ".join(str(s) for s in SPEED_STEPS))
     ap.add_argument("--lift-lo", type=float, default=0.0)
     ap.add_argument("--lift-hi", type=float, default=LIFT_MAX_DEG, help="lift series: the top of the swing (120 at most)")
     ap.add_argument("--lift-hold", type=float, default=LIFT_MAX_DEG, help="jaw series: the height the arm is raised to first")
@@ -176,70 +290,60 @@ def _parse() -> "argparse.Namespace":  # noqa: F821
     ap.add_argument("--object-oz", type=float, default=None)
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
-    ap.add_argument("--allow-jump", action="store_true", help="the owner's call: skip the one-step-at-a-time check")
+    ap.add_argument("--allow-jump", action="store_true", help="skip the one-step-at-a-time check (a deliberate jump only)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and the check, touch nothing")
+    ap.add_argument("--report", action="store_true", help="print the runs so far and the next step, touch nothing (--series limits it to one series)")
+    ap.add_argument("--session", action="store_true", help="several steps in one process: offers the next speed before each run, G2 in rest between runs (needs --series)")
     return ap.parse_args()
 
 
 def main() -> None:
     args = _parse()
-    params = {"lift_lo": args.lift_lo, "lift_hi": args.lift_hi, "lift_hold": args.lift_hold, "jaw_open": args.jaw_open, "jaw_closed": args.jaw_closed}
-    why = check_step(args.speed, last_run(args.series), args.allow_jump)
-    if why:
-        print("refused:", why)
+    if args.report:
+        print("\n".join(report(args.series)))
         return
-    if args.dry_run:
+    if args.series is None:
+        print("refused: --series lift or jaw is needed")
+        return
+    params = {"lift_lo": args.lift_lo, "lift_hi": args.lift_hi, "lift_hold": args.lift_hold, "jaw_open": args.jaw_open, "jaw_closed": args.jaw_closed}
+    if args.speed is None and not args.session:
+        print("refused: --speed N is needed (or --session)")
+        return
+    if args.session:
         try:
-            plan = build_plan(args.series, args.speed, [0] * 16, **params)
+            build_plan(args.series, SPEED_STEPS[0], [0] * 16, **params)             # the ranges and the jaw angles are checked before anything connects
         except ValueError as e:
             print("refused:", e)
             return
-        for p in plan:
-            print(f"  {p['name']:14s} joints {p['joints']} speed {p['speed']:3d} delay {p['delay'] * 0.05:.2f} s  {p['deg']:5.1f} deg  about {p['nominal_s']:.2f} s")
-        print(f"speed {args.speed}: at most {upper_deg_s(args.speed):.0f} deg/s commanded by the firmware's stepping (the servo write time lowers it)")
-        return
+    else:
+        why = check_step(args.speed, last_run(args.series), args.allow_jump)
+        if why:
+            print("refused:", why)
+            return
+        if args.dry_run:
+            try:
+                plan = build_plan(args.series, args.speed, [0] * 16, **params)
+            except ValueError as e:
+                print("refused:", e)
+                return
+            for p in plan:
+                print(f"  {p['name']:14s} joints {p['joints']} speed {p['speed']:3d} delay {p['delay'] * 0.05:.2f} s  {p['deg']:5.1f} deg  about {p['nominal_s']:.2f} s")
+            print(f"speed {args.speed}: at most {upper_deg_s(args.speed):.0f} deg/s commanded by the firmware's stepping (the servo write time lowers it)")
+            return
     from . import ball_chase as chase
-    from ..link import imu_print
     from ..link.serial_link import SerialLink
-    from ..power import battery
     link = SerialLink("/dev/serial0")
     link.connect()
-    ok, pct, volts = battery.motion_gate(link)
-    print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
-    if not ok:
-        return
-    if not imu_print.board_answers(link):
-        print("refused: no IMU frames from the BiBoard: is it powered on? Nothing was sent.")
-        return
     robot = chase.SerialRobot(link)
-    path = None
-    try:
-        chase._stand_if_lying(link, "kbalance")
-        base = chase.read_joints(link)
-        if not base or len(base) < 16:
-            print("refused: the joint angles could not be read, so the legs cannot be held: nothing was sent.")
-            return
-        print(f"joints before: lift {base[LIFT]} jaw {base[JAW]}")
-        try:
-            plan = build_plan(args.series, args.speed, base, **params)
-        except ValueError as e:
-            print("refused:", e)
-            return
-        print(f"speed {args.speed}: the lift leg takes about {max(p['nominal_s'] for p in plan):.2f} s by the firmware's stepping; hands near")
-        res, plan = run_step(robot, link, args.series, args.speed, base, watch_s=args.watch, **params)
-        volts_after = battery.read_voltage(link)
-        meta = {"series": args.series, "speed_byte": args.speed, "speed_ratio": ratio(args.speed), "upper_deg_s": round(upper_deg_s(args.speed), 1), "plan": plan,
-                "nominal_total_s": round(sum(p["nominal_s"] for p in plan), 2), "params": params, "base_joints": base, "pack_pct": pct, "pack_v": volts, "pack_pct_after": battery.pack_percent(volts_after) if volts_after else None,
-                "object": args.object, "object_oz": args.object_oz, "floor": args.floor}
-        path = ast.write_log(res, meta, log_dir=LOG_DIR)
-        print(f"RESULT {args.series} speed {args.speed}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
-    except KeyboardInterrupt:
-        print("ended")
-    finally:
-        from .ball_chase import ensure_rest
-        ensure_rest(link)
-    if path and not args.no_prompt:
-        ast.update_log(path, {"observation": ask_observation()})
+    obj = {"object": args.object, "object_oz": args.object_oz, "floor": args.floor}
+
+    def execute(speed):
+        return execute_step(link, robot, args.series, speed, params, watch_s=args.watch, obj=obj, prompt=not args.no_prompt)
+    if args.session:
+        n = session(link, robot, args.series, params, execute)
+        print(f"session over: {n} step(s) run")
+    else:
+        execute(args.speed)
 
 
 if __name__ == "__main__":

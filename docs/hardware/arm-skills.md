@@ -52,6 +52,8 @@ How fast the lift joint and the claw jaw can be driven decides what a throw can 
 - Steps are 4, 6, 8, 12, 16, 24, 32, 48, 64, 96 and 127, the first about the claw look's pace. The tool refuses a step more than one above the last logged run of the series, a step above a run that stalled, hit something or was unsafe, and a step above a run with no recorded observation. `--dry-run` prints the plan and touches nothing; `--allow-jump` skips the check and is for a deliberate jump only.
 - Logged in `~/g2_runs/arm_speed/`: the send time, the body's IMU trace, the pack percent, the plan with each step's nominal time and upper rate, and the typed observation (followed, lagged, stalled, hit or unsafe, with the sound and a note). The real arm position is not available, so the observation is the main data.
 - Before the first run the arm is moved by hand through its whole range to check its clearance over the pod and Pi stack.
+- `g2armspeed --report` prints the runs so far (speed byte, result, body tilt, pack) and the next step, and sends nothing. `g2armspeed --session --series lift` runs several steps in one process: G2 is laid in rest between steps, the next speed is offered before each, and the reply is the go for that run (Enter runs it, a number runs that speed if the one-step check allows it, `s` stops).
+- `g2jawrange --to ANGLE` finds the two jaw angles by eye. It stands G2, raises the arm the way the claw look does, steps the jaw from where it is toward ANGLE in steps of at most 15 degrees (within 60 degrees of the start, at most 12 steps) printing each commanded angle, brings it back, lowers the arm and rests him. The angles typed in afterwards (open, closed, where it stopped) become the `g2armspeed` jaw command line. The board reports commanded angles, so the eye is the measurement. Start with a small ANGLE.
 
 What each skill does to the body
 --------------------------------
@@ -72,6 +74,17 @@ What is in the code today
 - None of the toss or launch tokens is in `DISABLED_SKILLS`, so a spoken request can run them. They stay enabled for voice; the test below is how they earn that.
 - The left and right names (`toss_left`, `toss_right`, `pick_up_left` and the others) are offered as if they had a direction. They play the generic skill, so their descriptions say so.
 - `python -m pi_pipeline.behavior.arm_skill_test --skill NAME` (`g2armskill NAME`) plays one skill with the body watched and writes a JSON file to `~/g2_runs/arm_skills/` with the verdict, the whole IMU trace (time since the skill was sent, pitch and roll), when the body first moved and when it tilted most, the wall-clock send time (to line up a phone video), the pack percent before and after, the claw joint's angle before and after, the object, and the landing record typed in after the run. Options: `--object NAME`, `--object-oz`, `--object-in`, `--floor LABEL`, `--pictures N` (claw-camera pictures after the swing, off by default because whether the camera stream disturbs the IMU stream is not yet known) `--joints N` (read the joint angles N times, about every 0.6 seconds, while the skill plays and log them as `joints_during`: the board reports commanded angles, so this shows whether the skill commands the claw joint at all; reading them stops the IMU print, so the trace has gaps) and `--no-prompt`. A skill that should move the body but moves it under 3 degrees is reported as `no_motion`, not `ok` (`hunt` is exempt). The pick skills `pickF` and `pickD` are accepted too: run with the object on the floor in front of the claw, the claw joint's angle is read after the run (part-open means an object is held, fully closed means nothing).
+
+Pick-up bisect
+--------------
+
+If `g2armskill pickF` still does not play in full after the link's silence fix, `g2pickbisect --variant plain|gb|gP|j|link` (`python -m pi_pipeline.behavior.pick_bisect`) separates the skill from what the Pi writes around it. Each run stands G2 up the eased way, writes `kpickF` straight to the port (like a hand-typed `printf`, bypassing the link), writes at most one extra command 100 milliseconds later and nothing else for 10 seconds, while the IMU is only read. The person typed in what the claw did.
+
+- `plain`: nothing extra. The reference, expected to play in full. Run it first.
+- `gb`, `gP`, `j`: one extra byte pair written behind the token, expected to cut the skill short (the old link wrote `gb`, the older test tools `gP` and `j`).
+- `link`: the token goes through the link's own `send`, the fixed path `g2armskill` uses, expected to play in full.
+- If `plain` plays and the others cut it, the cause is confirmed. If `plain` does not play, the stand-up path or the board is the next place to look.
+- Logged in `~/g2_runs/pick_bisect/` with the body trace and the typed result.
 
 Test plan for the next hardware session
 ---------------------------------------

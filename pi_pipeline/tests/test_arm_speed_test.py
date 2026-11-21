@@ -146,3 +146,48 @@ def test_a_run_writes_only_the_data_skill_and_logs_the_trace_and_the_label():
     assert res["skill"] == "lift_s008" and res["sent_at"] == 5.5 and res["frames"] > 0
     assert res["verdict"] == "ok"                                                                       # a quiet body is not a failure here: only the arm moves
     assert len(plan) == 3
+
+
+def test_next_speed_follows_the_steps_and_stops_where_it_should():
+    assert t.next_speed(None) == (4, None)
+    assert t.next_speed({"speed_byte": 4, "observation": {"result": "followed"}}) == (6, None)
+    assert t.next_speed({"speed_byte": 12, "observation": {"result": "lagged"}}) == (16, None)
+    for bad in t.STOP_RESULTS:
+        nxt, why = t.next_speed({"speed_byte": 8, "observation": {"result": bad}})
+        assert nxt is None and bad in why
+    assert t.next_speed({"speed_byte": 8}) [0] is None                                                  # no observation recorded yet
+    assert t.next_speed({"speed_byte": 127, "observation": {"result": "followed"}})[0] is None         # the top step
+
+
+def test_the_report_lists_the_runs_and_the_next_step(tmp_path):
+    (tmp_path / "20261120_100000_lift_s004.json").write_text(json.dumps({"speed_byte": 4, "max_roll_dev": 1.2, "max_pitch_dev": 2.0, "onset_s": 0.3, "pack_pct": 88, "time": "t1",
+                                                                         "observation": {"result": "followed", "sound": None, "note": "smooth"}}))
+    (tmp_path / "20261120_101000_lift_s006.json").write_text(json.dumps({"speed_byte": 6, "observation": {"result": "stalled", "sound": "squeal"}}))
+    lines = t.report("lift", str(tmp_path))
+    assert lines[0] == "lift series: 2 run(s)" and "followed" in lines[1] and "note: smooth" in lines[1]
+    assert "stalled" in lines[2] and "sound: squeal" in lines[2]
+    assert lines[-1].startswith("  next: none") and "stalled" in lines[-1]
+    both = t.report(None, str(tmp_path))
+    assert any(ln.startswith("jaw series: 0 run(s)") for ln in both) and both[-1] == "  next: speed 4"
+
+
+def test_a_session_offers_the_next_step_and_one_step_at_a_time(tmp_path):
+    ran, replies = [], iter(["", "", "12", "s"])
+    logs = tmp_path
+
+    def execute(speed):
+        ran.append(speed)
+        (logs / f"20261120_1{len(ran):05d}_lift_s{speed:03d}.json").write_text(json.dumps({"speed_byte": speed, "observation": {"result": "followed"}}))
+        return str(logs)
+    out = []
+    n = t.session(None, None, "lift", {}, execute, ask=lambda _p: next(replies), say=lambda *a: out.append(" ".join(str(x) for x in a)), log_dir=str(tmp_path))
+    assert ran == [4, 6] and n == 2                                                                     # Enter twice: the baseline, then the next step
+    assert any("one step" in line for line in out)                                                     # 12 after 6 is refused (the next step is 8), then s stops
+
+
+def test_a_session_stops_when_a_step_does_not_run_or_the_series_is_finished(tmp_path):
+    assert t.session(None, None, "lift", {}, lambda s: None, ask=lambda _p: "", say=lambda *a: None, log_dir=str(tmp_path)) == 0
+    (tmp_path / "20261120_100000_lift_s008.json").write_text(json.dumps({"speed_byte": 8, "observation": {"result": "hit"}}))
+    out = []
+    assert t.session(None, None, "lift", {}, lambda s: "x", ask=lambda _p: "", say=lambda *a: out.append(" ".join(map(str, a))), log_dir=str(tmp_path)) == 0
+    assert any("hit" in line for line in out)

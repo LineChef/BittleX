@@ -28,6 +28,9 @@ Most used
 - `g2punttest`: punt, watch it roll, acquire it, go on (hands near)
 - `g2armskill launch`: play one arm skill with the body watched (hands near)
 - `g2armspeed --series lift --speed 4`: one arm speed step (hands near)
+- `g2armspeed --report`: the speed runs so far and the next step
+- `g2jawrange --to 40`: step the jaw by eye to find its angles (hands near)
+- `g2pickbisect --variant plain`: pick-up bisect, one variant (hands near)
 - `g2ball`: start the ball goal
 - `g2ballstop`: stop the ball goal
 - `g2explore start`: start exploring
@@ -356,6 +359,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2groom`: [Data and review](#data-and-review)
 - `g2help`: [Setup](#setup)
 - `g2imu`: [Walk tests](#walk-tests)
+- `g2jawrange`: [Most used](#most-used)
 - `g2libstatus`: [Camera model](#camera-model)
 - `g2liftcal`: [Most used](#most-used)
 - `g2look`: [Claw and camera](#claw-and-camera)
@@ -366,6 +370,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2micon`: [Voice and mic](#voice-and-mic)
 - `g2pcam`: [Camera model](#camera-model)
 - `g2pcam-pull`: [Camera model](#camera-model)
+- `g2pickbisect`: [Most used](#most-used)
 - `g2pics`: [Most used](#most-used), [Data and review](#data-and-review)
 - `g2picscurate`: [Data and review](#data-and-review)
 - `g2pimem`: [Data and review](#data-and-review)

@@ -591,6 +591,14 @@ class SerialLink:
                 last = t
         return {"trace": thin, "peak_deg": max((max(abs(p), abs(r)) for _t, p, r in trace), default=None)}
 
+    def write_raw(self, data: bytes) -> None:
+        """Diagnostics only (behavior/pick_bisect.py): bytes straight to the port, bypassing the quiet window, the gyro handling, the stand guard and the command log, so a test can write exactly what a person typing
+        `printf` would. Raises RuntimeError when the port is not open."""
+        if self._ser is None:
+            raise RuntimeError("the serial port is not open")
+        self._ser.write(data)
+        self._ser.flush()
+
     def play_data_skill(self, message: bytes) -> None:
         """Write a ready `K` message (kskill.message) in short pieces and leave the port silent behind it until the board echoes its `k` or SKILL_QUIET_S passes (a behavior skill is aborted by any byte waiting on the port,
         docs/hardware/arm-skills.md). For the arm speed series (behavior/arm_speed_test.py); the caller watches the IMU and writes nothing meanwhile. Raises RuntimeError when the port is not open."""
