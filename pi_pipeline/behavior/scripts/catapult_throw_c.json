@@ -1,0 +1,79 @@
+{
+  "name": "catapult_throw_c",
+  "description": "Tuning variant C of catapult_throw: the lunge frame sends the legs and the arm to the launch pose at speed 0 (no interpolation: every servo runs flat out for the whole move, with no ease in or out), and the jaw opens in the next frame one pause later (50 ms by default; `--set lunge.delay_s=0.1` moves the release later). Everything else as catapult_throw.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        6,
+        6,
+        26,
+        26,
+        49,
+        49,
+        25,
+        25
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 60,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.05
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "name": "catapult_throw_checkpoint1",
+  "description": "CHECKPOINT 1, the version known to work: the forward lob that the slow-motion video showed leaving the claw at about 60% of the lunge, 35 degrees above horizontal, with the jaw opening 8 degrees inside the lunge frame (the owner found 8 better than 10, 12, 16 and 26). Do not edit: the tuning variants are catapult_throw_b (more body motion before the whip), _c (the legs and arm jump at speed 0 with the release a frame later) and _d (a deeper rear crouch). Play it with `g2script catapult_throw_checkpoint1 --amount 1.0`. Git tag: catapult-checkpoint-1.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        6,
+        6,
+        26,
+        26,
+        49,
+        49,
+        25,
+        25
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 60,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "set": {
+        "jaw": 8
+      },
+      "speed": 127,
+      "delay_s": 0.0
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

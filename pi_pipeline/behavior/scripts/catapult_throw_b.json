@@ -1,0 +1,82 @@
+{
+  "name": "catapult_throw_b",
+  "description": "Tuning variant B of catapult_throw: the legs go about 70% of the way to the launch pose in rise_and_drop (shoulders 11 and 43, knees 69 and 1) at speed 100, so the body is already rotating when the arm whips. Everything else as catapult_throw.",
+  "frames": [
+    {
+      "name": "bow",
+      "pose": "bow",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 20,
+      "delay_s": 0.3
+    },
+    {
+      "name": "rise_and_drop",
+      "angles": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        11,
+        11,
+        43,
+        43,
+        69,
+        69,
+        1,
+        1
+      ],
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "speed": 100,
+      "delay_s": 0.0
+    },
+    {
+      "name": "lunge",
+      "pose": "launch",
+      "joints": [
+        "legs",
+        "arm"
+      ],
+      "set": {
+        "jaw": 8
+      },
+      "speed": 127,
+      "delay_s": 0.0
+    },
+    {
+      "name": "open",
+      "angles": [
+        2,
+        125,
+        60,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20,
+        20,
+        70,
+        70,
+        100,
+        100,
+        -35,
+        -35
+      ],
+      "joints": [
+        "arm"
+      ],
+      "speed": 0,
+      "delay_s": 0.6
+    }
+  ]
+}

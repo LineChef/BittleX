@@ -59,7 +59,7 @@ def parse_overrides(items: list | None) -> dict:
         try:
             key, val = it.split("=")
             frame, joint = key.split(".")
-            if joint not in NAMES or (joint.startswith("j") and joint != "jaw"):
+            if joint not in ("speed", "delay_s") and (joint not in NAMES or (joint.startswith("j") and joint != "jaw")):
                 raise ValueError
             out[(frame.strip(), joint.strip())] = float(val)
         except ValueError:
@@ -81,10 +81,11 @@ def build_plan(script: dict, base: list, *, amount: float = 1.0, pose_lookup=_po
     plan, total = [], 0.0
     for k, fr in enumerate(frames):
         name = str(fr.get("name") or f"frame{k + 1}")
-        speed = fr.get("speed", 12)
+        ov = {k[1]: v for k, v in (overrides or {}).items() if k[0] == str(fr.get("name"))}
+        speed = int(ov["speed"]) if "speed" in ov else fr.get("speed", 12)
         if not isinstance(speed, int) or isinstance(speed, bool) or not 0 <= speed <= 127:
             raise ValueError(f"{name}: speed is a whole number from 0 to 127")
-        delay_s = float(fr.get("delay_s", 0.0))
+        delay_s = float(ov["delay_s"]) if "delay_s" in ov else float(fr.get("delay_s", 0.0))
         if not 0.0 <= delay_s <= 5.0:
             raise ValueError(f"{name}: delay_s is 0 to 5")
         if "angles" in fr:
@@ -101,7 +102,7 @@ def build_plan(script: dict, base: list, *, amount: float = 1.0, pose_lookup=_po
         for i in joint_indices(fr.get("joints")):
             new[i] = start[i] + amount * (target[i] - start[i]) if fr.get("pose") != "start" else target[i]
             new[i] = max(-125.0, min(125.0, new[i]))
-        for jn, val in {**(fr.get("set") or {}), **{k[1]: v for k, v in (overrides or {}).items() if k[0] == name}}.items():
+        for jn, val in {**(fr.get("set") or {}), **{k: v for k, v in ov.items() if k not in ("speed", "delay_s")}}.items():
             if jn not in NAMES:
                 raise ValueError(f"{name}: unknown joint {jn!r} in set")
             new[NAMES.index(jn)] = max(-125.0, min(125.0, float(val)))          # a joint set outright: not scaled by amount

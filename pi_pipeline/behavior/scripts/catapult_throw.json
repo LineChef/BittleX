@@ -1,6 +1,6 @@
 {
   "name": "catapult_throw",
-  "description": "The catapult launch sequence with the release: the bow, rise_and_drop and lunge of catapult_launch, with the jaw opening a few degrees INSIDE the lunge frame (set jaw 10: the object leaves once the jaw has opened past its width, late in the swing for a small angle and early for a large one, so that angle is the release-time knob: `--set lunge.jaw=30`), then the jaw fully open at speed 0 and back to the stand. The claw swings down as the legs begin to rise and back up fast as they finish. Played with `g2script catapult_throw --amount 1.0` (add `--pick` to play pickF first).",
+  "description": "The catapult launch sequence with the release: the bow, rise_and_drop and lunge of catapult_launch, with the jaw opening a few degrees INSIDE the lunge frame (set jaw 8: the object leaves once the jaw has opened past its width, late in the swing for a small angle and early for a large one, so that angle is the release-time knob: `--set lunge.jaw=30`), then the jaw fully open at speed 0 and back to the stand. The claw swings down as the legs begin to rise and back up fast as they finish. Played with `g2script catapult_throw --amount 1.0` (add `--pick` to play pickF first).",
   "frames": [
     {
       "name": "bow",
@@ -47,7 +47,7 @@
         "arm"
       ],
       "set": {
-        "jaw": 10
+        "jaw": 8
       },
       "speed": 127,
       "delay_s": 0.0

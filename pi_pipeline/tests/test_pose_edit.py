@@ -124,10 +124,23 @@ def test_the_release_angle_is_set_inside_the_lunge_frame_and_can_be_overridden_p
     plan = ss.build_plan(script, stand, amount=1.0)
     assert [p["name"] for p in plan] == ["bow", "rise_and_drop", "lunge", "open"]
     lunge, opened = plan[2], plan[3]
-    assert lunge["frame"][2] == 10 and lunge["frame"][1] == 125 and lunge["speed"] == 127          # the jaw opens a few degrees while the arm swings up
+    assert lunge["frame"][2] == 8 and lunge["frame"][1] == 125 and lunge["speed"] == 127          # the jaw opens a few degrees while the arm swings up
     assert opened["frame"][2] == 60 and opened["speed"] == 0                                         # then fully open at once
     plan2 = ss.build_plan(script, stand, amount=1.0, overrides=ss.parse_overrides(["lunge.jaw=34"]))
     assert plan2[2]["frame"][2] == 34 and plan2[3]["frame"][2] == 60
     for bad in ("lunge", "lunge.jaw", "lunge.j4=3", "a.b=x"):
         with pytest.raises(ValueError):
             ss.parse_overrides([bad])
+
+
+def test_the_checkpoint_and_the_tuning_variants_of_the_throw_are_valid_and_differ_only_where_they_say():
+    stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
+    plans = {n: ss.build_plan(ss.load_script(n), stand, amount=1.0) for n in ("catapult_throw", "catapult_throw_checkpoint1", "catapult_throw_b", "catapult_throw_c", "catapult_throw_d")}
+    assert plans["catapult_throw"] == plans["catapult_throw_checkpoint1"]                      # the checkpoint is the working version
+    assert plans["catapult_throw_checkpoint1"][2]["frame"][2] == 8                              # the jaw opens 8 degrees inside the lunge
+    b, c, d = plans["catapult_throw_b"], plans["catapult_throw_c"], plans["catapult_throw_d"]
+    assert b[1]["frame"][8:12] == [11, 11, 43, 43] and b[1]["speed"] == 100 and b[2] == plans["catapult_throw"][2]
+    assert c[2]["speed"] == 0 and c[2]["delay"] == 1 and c[3]["speed"] == 0 and c[3]["frame"][2] == 60 and c[1] == plans["catapult_throw"][1]
+    assert d[2]["frame"][10:12] == [80, 80] and d[2]["frame"][14:16] == [-45, -45] and d[1] == plans["catapult_throw"][1]
+    later = ss.build_plan(ss.load_script("catapult_throw_c"), stand, amount=1.0, overrides=ss.parse_overrides(["lunge.delay_s=0.1", "open.speed=0"]))
+    assert later[2]["delay"] == 2                                                              # the release moves later by changing the pause after the lunge
