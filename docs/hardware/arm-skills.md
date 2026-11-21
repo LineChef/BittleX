@@ -73,6 +73,16 @@ The backward catapult
 - Logs: `~/g2_runs/catapult/` has the plan, the body trace and the typed landing note. `--dry-run` prints the frames and touches nothing.
 - Setup: a soft surface and clear floor behind G2 and a hand near. The arm passes over the pod and Pi stack, and tipping over backward onto the pod is the main risk.
 
+Authoring a scripted movement
+-----------------------------
+
+A new movement is written as keyframes and played by the board as one data skill. Two tools do it: the pose editor finds each pose by eye, and the player strings the poses into a script.
+- The pose editor (`g2poseedit`): `g2poseedit start [--attention]` stops the voice service and stands G2 up, `g2poseedit set fkn=-15 rsh+=10` eases him into the changed pose, `g2poseedit show` prints the 16 angles and the tilt, `g2poseedit save NAME` keeps the pose and `g2poseedit end` lays him in rest and starts the voice service again. Nothing is released and every angle is one the editor commanded; a limb moved by hand cannot be recorded, because the board reports the angles it was last told to hold.
+- Joint names: `pan`, `lift`, `jaw` for the arm, `fls frs brs bls` for the shoulders and `flk frk brk blk` for the knees (front left, front right, back right, back left). Groups: `fsh rsh fkn rkn sh kn legs arm`. A change is `name=angle`, `name+=n` or `name-=n`. Every angle is clipped to its joint's range and one command moves a joint 70 degrees at most.
+- The player (`g2script NAME`): a script is `pi_pipeline/behavior/scripts/NAME.json`, a list of frames, each with a pose (saved, or `start`, or inline `angles`), the joints it takes from it, a speed byte and a pause. `--amount` scales every pose from the starting angles, `--attention` plays from the attention pose, and `--dry-run` prints the frames. The run is logged in `~/g2_runs/scripts/` with the body trace.
+- Poses are kept on the Pi in `~/g2_runs/pose_edit/poses/`. A finished movement's poses are copied into `pi_pipeline/behavior/scripts/poses/` and its script committed, so it deploys.
+- The workflow is the `author-movement` skill: pose by pose with the person watching, short stands (the legs can sag after about ten seconds), then the script played small first and raised in steps.
+
 What each skill does to the body
 --------------------------------
 

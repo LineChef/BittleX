@@ -30,6 +30,8 @@ Most used
 - `g2armspeed --series lift --speed 4`: one arm speed step (hands near)
 - `g2armspeed --report`: the speed runs so far and the next step
 - `g2catapult --stage bow --dry-run`: one catapult stage's frames, no move
+- `g2poseedit start`: begin a pose-editing session (then `set`, `save`, `end`)
+- `g2script NAME --dry-run`: a scripted movement's frames, no move
 - `g2jawrange --to 40`: step the jaw by eye to find its angles (hands near)
 - `g2pickbisect --variant plain`: pick-up bisect, one variant (hands near)
 - `g2ball`: start the ball goal
@@ -377,6 +379,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2picscurate`: [Data and review](#data-and-review)
 - `g2pimem`: [Data and review](#data-and-review)
 - `g2policy`: [Training and policies](#training-and-policies)
+- `g2poseedit`: [Most used](#most-used)
 - `g2power`: [Pi power and network](#pi-power-and-network)
 - `g2preflight`: [Training and policies](#training-and-policies)
 - `g2promote`: [Camera model](#camera-model)
@@ -388,6 +391,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2rest`: [Most used](#most-used), [Stop and safety](#stop-and-safety)
 - `g2rl`: [Setup](#setup)
 - `g2rltest`: [Training and policies](#training-and-policies)
+- `g2script`: [Most used](#most-used)
 - `g2see`: [Claw and camera](#claw-and-camera)
 - `g2seen`: [Most used](#most-used)
 - `g2send`: [Claw and camera](#claw-and-camera)

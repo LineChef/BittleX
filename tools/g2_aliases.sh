@@ -553,6 +553,26 @@ g2catapult() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.catapult$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
 }
+# g2poseedit start|set|show|save|load|list|end  -- the pose editor for authoring a scripted movement: `g2poseedit start [--attention]` stops the voice service and stands him up, `g2poseedit set fkn=-15 rsh+=10` eases him into the changed pose (joints: pan lift jaw fls frs brs bls flk frk brk blk; groups fsh rsh fkn rkn sh kn legs arm), `g2poseedit save NAME` keeps the pose, `g2poseedit end` lays him in rest and starts the voice service again. Hands near, short poses (the legs can sag). Details: docs/hardware/arm-skills.md.
+g2poseedit() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2poseedit start|set|show|save|load|list|end [ARGS]"; return 2; }
+  local rest; rest="$(printf ' %q' "$@")"
+  [ "$1" = start ] && { g2stop voice || return 1; }
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.pose_edit$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  [ "$1" = end ] && { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+  return 0
+}
+# g2script NAME [--amount 0.3] [--attention] [--dry-run]  -- play a scripted movement (pi_pipeline/behavior/scripts/NAME.json, keyframes from g2pose) as one data skill the board plays itself, scaled by --amount, the body watched, then rest. Runs ONLY on your go, hands near; --dry-run prints the frames and touches nothing. Details: docs/hardware/arm-skills.md.
+g2script() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ -n "${1:-}" ] || { echo "usage: g2script NAME [--amount N] [--attention] [--dry-run]"; return 2; }
+  local rest ro=0; rest="$(printf ' %q' "$@")"
+  case " $* " in *" --dry-run "*) ro=1 ;; esac
+  [ "$ro" = 1 ] || g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.scripted_skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  [ "$ro" = 1 ] || { ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; }
+}
 # g2pickbisect --variant plain|gb|gP|j|link  -- only if g2armskill pickF still does not play in full: stands him up, writes kpickF straight to the port (like a hand-typed printf), then at most ONE extra command 100 ms later (gb, gP or j; `link` uses the link's own send), nothing else for 10 s, and you type what the claw did (log: ~/g2_runs/pick_bisect/). Run `plain` first. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Why: docs/hardware/arm-skills.md.
 g2pickbisect() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
