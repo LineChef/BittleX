@@ -1,6 +1,6 @@
 {
-  "name": "catapult_throw_checkpoint3_arc",
-  "description": "CHECKPOINT 3, the ARCING throw: checkpoint 2's rise (the legs 10% of the way, speed 30), the speed-0 lunge to the launch pose and the jaw opening 50 ms later, then a 0.1 s pause. It throws the cylinder higher in a more arched path, 18 to 22 inches in the measured runs (22, 21, 18). Do not edit: the farther, flatter one is catapult_throw_checkpoint3_far. Git tag: catapult-checkpoint-3.",
+  "name": "lob",
+  "description": "The LOB (checkpoint 3, test C), the higher, more arched throw for putting the cylinder onto a target: checkpoint 2's rise (the legs 10% of the way, speed 30), the speed-0 lunge to the launch pose and the jaw opening 50 ms later, then a 0.1 s pause. It throws the cylinder higher in a more arched path, 18 to 22 inches in the measured runs (22, 21, 18). Do not edit: the flatter, farther one is line_drive. Git tag: catapult-checkpoint-3.",
   "frames": [
     {
       "name": "bow",

@@ -197,8 +197,8 @@ def test_a_rest_asked_for_ends_the_links_silence_first():
     assert lk.log[:2] == ["end_quiet", "krest"]                                                  # the silence ends before the rest command goes out
 
 
-def test_checkpoint_three_has_an_arcing_throw_and_a_farther_one_matching_tests_c_and_d():
+def test_the_lob_and_the_line_drive_match_tests_c_and_d():
     stand = [0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 20, 20, 56, 56, 50, 50]
     plan = lambda n: ss.build_plan(ss.load_script(n), stand, amount=1.0)                  # noqa: E731
-    assert plan("catapult_throw_checkpoint3_arc") == plan("catapult_throw_cf")
-    assert plan("catapult_throw_checkpoint3_far") == plan("catapult_throw_cd")
+    assert plan("lob") == plan("catapult_throw_cf")
+    assert plan("line_drive") == plan("catapult_throw_cd")

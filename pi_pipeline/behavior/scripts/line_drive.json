@@ -1,6 +1,6 @@
 {
-  "name": "catapult_throw_checkpoint3_far",
-  "description": "CHECKPOINT 3, the FARTHER throw: as the arcing checkpoint with the deeper rear crouch (the pose launch_deep: rear shoulders 80 and knees -45), which pitches the body about 6 degrees further nose-up (37 to 38 degrees against 30 to 32). It throws the cylinder farther on a flatter path, 17 to 24 inches (24, 23, 17 and 23, the 17 on a poor grip). Do not edit: the arcing one is catapult_throw_checkpoint3_arc. Git tag: catapult-checkpoint-3.",
+  "name": "line_drive",
+  "description": "The LINE DRIVE (checkpoint 3, test D), the flatter, farther throw: as the lob with the deeper rear crouch (the pose launch_deep: rear shoulders 80 and knees -45), which pitches the body about 6 degrees further nose-up (37 to 38 degrees against 30 to 32). It throws the cylinder farther on a flatter path, 17 to 24 inches (24, 23, 17 and 23, the 17 on a poor grip). Do not edit: the arching one is lob. Git tag: catapult-checkpoint-3.",
   "frames": [
     {
       "name": "bow",
