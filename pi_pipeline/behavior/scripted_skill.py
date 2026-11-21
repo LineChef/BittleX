@@ -110,6 +110,7 @@ def main() -> None:
     ap.add_argument("script")
     ap.add_argument("--amount", type=float, default=0.3)
     ap.add_argument("--attention", action="store_true", help="play from the attention pose")
+    ap.add_argument("--from-rest", action="store_true", help="play from the rest pose: no stand-up (a script written from rest with the pose editor's start --from-rest)")
     ap.add_argument("--watch", type=float, default=WATCH_S)
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
@@ -145,8 +146,11 @@ def main() -> None:
     robot = chase.SerialRobot(link)
     path = None
     try:
-        chase._stand_if_lying(link, "kbalance")
-        if a.attention:
+        if a.from_rest:
+            chase.ensure_rest(link)
+        else:
+            chase._stand_if_lying(link, "kbalance")
+        if a.attention and not a.from_rest:
             robot.posture = "stand"
             if robot.sit_down() == "fell":
                 print("G2 fell going into the attention pose: stopping")
