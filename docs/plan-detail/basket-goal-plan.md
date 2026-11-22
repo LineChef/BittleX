@@ -56,3 +56,17 @@ Session C: steps 3 and 4 together once the finders pass.
 - The basket or bag: size, colour, shallow or deep. Its width in inches goes into its `ObjectSpec`.
 - The cylinder: its length and the colours of its bands (red, yellow and green bands were noted earlier).
 - The standoff the throw uses (measured in step 1) and how wide the opening must be.
+
+## Where we left off (2026-11-22, session cut short)
+
+The Pi's own battery ran flat in the middle of the bad-grab pictures (about 3.3 hours after its boot at 8:54 AM; the Pi runs from a separate battery from G2's servo pack, so the pack gauge never showed it). G2 was left in an unknown pose with the servos sagging; nothing was lost on the Mac. The recognition pictures are on the Pi's card (`recog` set, shots 051 to 081) and have not been pulled to the Mac.
+
+Done: the pick-up reach grid, the 20 lobs, two basket blocks (6 of 10 at 16 inches), the recognition picture set (see the results page, 31 pictures), and the finding that a held cylinder is visible at the bottom centre at claw lifts 0, 60 and 120.
+
+Approved but not built (owner, 2026-11-22; the throw always goes ahead whatever the look says, so it is logging only):
+1. A grip-look function: read the bottom centre of the picture for a large block of the cylinder's colours (provisional rule from the good grips: at least 1,000 saturated pixels in the bottom region, centred near row 205 or lower and column 95 to 175), reporting held or not with the numbers; tested on pictures made up in code.
+2. One picture right after `pickF` in the shared lift sequence (`scripted_skill` after `catapult.pick_up`, switched on by `lob.py`): the camera opened and warmed up during the stand-up, the picture saved on the Pi with the run, the result in the run log; a camera failure is logged and the throw goes ahead. It adds about 1.5 to 3 seconds before the throw and ships behind a switch to watch on a first run.
+3. The grab quality in the tally (`g2throws add ... --grab good|marginal|bad`), shown next to the automatic look in `g2lastrun`, to compare them.
+4. A calibration set of about 10 deliberate poor grabs and 10 good ones to set the threshold.
+
+First steps when the Pi is back: check it is up and its battery, pull the pictures to the Mac (`sync-data`), check the picture labels are intact, end any open pose session and lay G2 down (confirm his posture by eye), then the bad-grab pictures from the attention pose at lift 0 and 120 (the cylinder placed by hand), then build items 1 to 3. Also proposed: read the Pi's battery estimate at the start of a session and hourly.

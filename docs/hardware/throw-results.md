@@ -102,6 +102,22 @@ Ten throws with the basket's centre 16 inches out, centred:
 
 Result: 6 of 10 made, with four in a row at the end. Ten throws is a small sample, so the difference from 18 inches is encouraging but not settled. 16 inches is the best distance found so far.
 
+Recognition pictures
+--------------------
+
+Claw-camera pictures (240 by 240 pixels) for the cylinder and basket finders, 31 in all, kept in the `recog` picture set on the Pi and never in the repository.
+- Conditions: attention pose with the claw raised to 120 degrees (the standing camera view), hardwood floor, the camera held still while the objects were moved. Distances are measured from the claw tip; the lens sits 2 inches behind the tip, so add 2 inches for the distance from the lens. The basket distance is to its centre. The cylinder's "face" labels (A to D) are approximate quarter turns, meant as a sample of how it looks from all around.
+- Cylinder flat on the floor, face A, centred: 6, 9, 12, 15, 18 and 24 inches. Faces B, C and D at 18 inches. Face A at 12 inches, 3 inches to the left and to the right.
+- Cylinder on its side, centred: angles A to D at 12 inches, and angle A at 18 inches.
+- Basket, centred: 12, 18, 24, 30 and 36 inches; at 24 inches, 6 inches to the left and to the right.
+- The throw setup (basket centre 16 inches, cylinder touching the claw): at claw lift 0 (one frame came out grey and blurry and was retaken) and at lift 120.
+- Cylinder held in the claw after a real pick-up: resting, then standing at lift 0, 60 and 120. One more held with a deliberately bad grab, standing at lift 0.
+- Findings on size: the cylinder is about 20 pixels across at 6 inches from the claw tip, 14 to 15 at 9, 10 to 12 at 12, and only a 4 to 5 pixel speck at 18 inches, so it can be found by colour only within about 15 inches of the claw tip. The basket is about 40 pixels wide at 12 inches from the claw tip, close to the 39 pixels the width model predicts for a 5 inch object 14 inches from the lens (110 pixels per inch at one inch).
+- Findings on colour: the basket is a pale orange cup that stands out from the grey hardwood and wall. The cylinder shows green, red or orange and white, and the pair visible changes with its rotation, so the finder needs a palette of all its colours and a size check.
+- Findings on the held cylinder: at lift 0, 60 and 120 the held cylinder fills the bottom centre between the jaws as a large rounded block of colour, so a good grip can be recognised from that block. Measured on the three good-grip pictures: about 1,700 to 1,860 saturated pixels in the bottom region (rows 120 to 240, columns 40 to 200), centred near column 135 and row 222. A cylinder on the floor touching the claw at lift 0 is centred higher (row about 177), and at lift 120 only a small sliver shows. These come from three pictures, so any threshold is provisional until poor grips are measured.
+- Exposure: the first twelve pictures had a mean brightness of 116 to 139 (the camera's target is 85 to 140). It rose to 156 as the daylight changed and fell again after the robot was turned; 4 to 7 percent of pixels were blown out on the later pictures, mostly the bright window behind the objects.
+- Not finished: the bad-grab pictures from the attention pose at lift 0 and 120 (one standing at lift 0 was taken before the legs sagged and the session ended), the colour sampling, and the grip check inside the lift sequence.
+
 Runs that were not throws
 -------------------------
 
