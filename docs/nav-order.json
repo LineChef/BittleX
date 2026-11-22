@@ -97,7 +97,8 @@
     "hardware/diagnostics",
     "hardware/self-righting",
     "hardware/disabled-moves",
-    "hardware/arm-skills"
+    "hardware/arm-skills",
+    "hardware/throw-results"
    ]
   ],
   [
