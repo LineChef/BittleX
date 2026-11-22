@@ -8,7 +8,7 @@ def test_an_older_file_gets_the_sideways_and_note_columns_and_keeps_its_rows(tmp
     tt.add("lob", 25, side_in=-2, grip="full cradle", p=p, now="t2")
     rows = tt.read(p)
     assert [r["inches"] for r in rows] == ["21", "25"] and rows[0]["side_in"] == "" and rows[1]["side_in"] == "-2" and rows[1]["grip"] == "full cradle"
-    assert open(p).readline().strip().split(",")[-2:] == ["side_in", "note"]
+    assert open(p).readline().strip().split(",")[-3:] == ["side_in", "note", "grab"]
 
 
 def test_the_summary_groups_by_script_and_grip_and_reports_the_sideways_spread(tmp_path):
@@ -21,3 +21,11 @@ def test_the_summary_groups_by_script_and_grip_and_reports_the_sideways_spread(t
     full = s[("lob", "full cradle")]
     assert full["n"] == 3 and full["mean"] == 25.0 and (full["low"], full["high"]) == (24, 26) and full["side_n"] == 2 and full["side_max"] == 3 and full["side_mean"] == 1.0
     assert s[("lob", "claw tips")]["n"] == 1 and s[("lob", "claw tips")]["side_mean"] is None
+
+
+def test_the_grab_verdict_is_kept_and_the_summary_splits_the_distance_by_grab(tmp_path):
+    p = str(tmp_path / "t.csv")
+    for inches, grab in ((24, "good"), (26, "good"), (14, "bad"), (20, "")):
+        tt.add("lob", inches, grip="full cradle", grab=grab, p=p)
+    s = tt.summary(tt.read(p))[0]
+    assert s["grabs"] == {"good": 2, "marginal": 0, "bad": 1} and s["by_grab"] == {"good": 25.0, "bad": 14.0}

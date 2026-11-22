@@ -578,7 +578,7 @@ g2script() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.scripted_skill$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { _g2_voice_back; }
 }
-# g2lob [--dry-run]  -- THE LOB: G2 stands up, picks the object up from the floor in front of him, lobs it forward and rests, as one fluid motion (pi_pipeline/behavior/lob.py: the lob_soft script after Petoi's pickF, a 0.5 s pause between them, the gyro balance off). Runs ONLY on your go, G2 at rest on his feet, the object in front of the claw, a soft clear floor ahead, hands near; it stops the voice service first (g2stop voice) and starts it again after. `--dry-run` prints the frames and touches nothing. The voice command is "G2, lob".
+# g2lob [--dry-run] [--grip-look]  -- THE LOB: G2 stands up, picks the object up from the floor in front of him, lobs it forward and rests, as one fluid motion (pi_pipeline/behavior/lob.py: the lob_soft script after Petoi's pickF, a 0.5 s pause between them, the gyro balance off). Runs ONLY on your go, G2 at rest on his feet, the object in front of the claw, a soft clear floor ahead, hands near; it stops the voice service first (g2stop voice) and starts it again after. `--dry-run` prints the frames and touches nothing; `--grip-look` takes one claw-camera picture right after the pick-up and logs whether the cylinder looks held (log only; the throw always goes ahead; see `g2lastrun`). The voice command is "G2, lob".
 g2lob() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local rest ro=0; rest="$(printf ' %q' "$@")"
@@ -587,7 +587,7 @@ g2lob() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lob$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { _g2_voice_back; }
 }
-# g2throws add SCRIPT INCHES [--side IN] [--grip TEXT] [--note TEXT] | g2throws summary  -- the throw tally on the Mac (~/.local/share/g2/throw_distances.csv, outside the repo): one row per throw with the distance and the sideways offset (inches right of the aim line, negative = left) you measure, and a summary per script and grip. Reads nothing from G2.
+# g2throws add SCRIPT INCHES [--side IN] [--grip TEXT] [--grab good|marginal|bad] [--note TEXT] | g2throws summary  -- the throw tally on the Mac (~/.local/share/g2/throw_distances.csv, outside the repo): one row per throw with the distance and the sideways offset (inches right of the aim line, negative = left) you measure, and a summary per script and grip. Reads nothing from G2.
 g2throws() { (cd "$G2_ROOT" && "$_G2_PY" -m pi_pipeline.behavior.throw_tally "$@"); }
 # g2lastrun [N]  -- what the newest N (default 1) scripted, arm-skill or catapult runs on the Pi did, in one read-only look: the verdict, tilt, pack, and for a script whether the board took it (the K echo) or not; then what the Pi sent and the board did on its own (the quiet lines left out). Use it after any run, also one you started yourself.
 g2lastrun() {

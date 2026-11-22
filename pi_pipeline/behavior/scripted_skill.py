@@ -152,6 +152,7 @@ def main(argv: list | None = None) -> None:
     ap.add_argument("--list", action="store_true", help="list the scripts and the committed poses, touch nothing")
     ap.add_argument("--amount", type=float, default=0.3)
     ap.add_argument("--pick-gap", type=float, default=0.0, metavar="SECONDS", help="with --pick: wait this long after pickF reports its end before the script is read and sent (0 to 3; tests whether the board needs a moment before it takes the script)")
+    ap.add_argument("--grip-look", action="store_true", help="with --pick: take one claw-camera picture right after the pick-up and log whether the cylinder looks held (log only: the throw always goes ahead)")
     ap.add_argument("--attention", action="store_true", help="play from the attention pose")
     ap.add_argument("--set", action="append", default=None, metavar="FRAME.JOINT=ANGLE", help="override one joint of one frame for this run, for example lunge.jaw=30 (the release time knob of the catapult)")
     ap.add_argument("--pick", action="store_true", help="play Petoi's pickF first (the object put in front of him) and the script from where it ended")
@@ -212,6 +213,11 @@ def main(argv: list | None = None) -> None:
         return
     robot = chase.SerialRobot(link)
     path = None
+    looker, grip = None, None
+    if a.grip_look and a.pick:
+        from .grip_look import GripLooker
+        looker = GripLooker()
+        looker.warm()                                      # the camera opens and meters the light while he stands up
     try:
         if a.from_rest:
             chase.ensure_rest(link)
@@ -234,6 +240,9 @@ def main(argv: list | None = None) -> None:
             if a.pick_gap > 0:
                 print(f"waiting {a.pick_gap:.1f} s before the script")
                 time.sleep(min(a.pick_gap, 3.0))
+            if looker is not None:
+                from .grip_look import take_grip_look
+                grip = take_grip_look(looker, a.script, since=time.monotonic())
         base = chase.read_joints(link)
         if not base or len(base) < 16:
             print("refused: the joint angles could not be read: nothing was sent.")
@@ -257,11 +266,13 @@ def main(argv: list | None = None) -> None:
 
         res, echoes, retried = play_with_retry(_play)
         print("the board said after the script was sent:", echoes or "nothing (no K echo: the script may not have been taken)")
-        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "retried_after_not_taken": retried, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
+        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "retried_after_not_taken": retried, "grip_look": grip, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
         print("ended")
     finally:
+        if looker is not None:
+            looker.close()
         try:
             link._end_quiet()                              # the link stays silent behind a data skill until a `k` echo that may not come (or 10 s) and drops the pose reads the eased lie-down makes: the movement is over, so rest starts at once (a throw was followed by ten seconds of standing before the lie-down began, and the legs sagged)
         except Exception:  # noqa: BLE001

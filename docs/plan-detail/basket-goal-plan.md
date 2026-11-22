@@ -47,9 +47,7 @@ Written 2026-11-21. Goal (owner): a new goal for G2. He picks the cylinder up, t
 
 ## Hardware sessions
 
-Session A (first, no recognition needed): start with the guided steps of `hw-session`; step 1's 20 lobs and the pick-up grid; a ruler or mat on the hardwood, a soft clear floor ahead, the pack above 70 percent, voice service off between runs (`g2stop voice`), each throw's distance and sideways offset reported and entered with `g2throws`. Stop on any fall and analyse it before the next run.
-Session B: step 2's pictures (the owner's basket and the cylinder at the five distances), then the finder tuning on the Mac with the saved pictures.
-Session C: steps 3 and 4 together once the finders pass.
+The ordered hardware plan is the numbered list "What happens next" in `docs/STATUS.md`, so it lives in one place. Session A (throw data, pick-up reach, two basket blocks) and the recognition pictures of session B are done. The first thing next session is finishing the bad claw grab calibration, then the grip check in the lift sequence, the walking paces and a backward walk, more basket pictures for the distance reading, the after-throw look, the line-up alone, and a full attempt; the goal wrapper comes last.
 
 ## Open decisions (owner)
 
@@ -88,4 +86,18 @@ Approved but not built (owner, 2026-11-22; the throw always goes ahead whatever 
 3. The grab quality in the tally (`g2throws add ... --grab good|marginal|bad`), shown next to the automatic look in `g2lastrun`, to compare them.
 4. A calibration set of about 10 deliberate poor grabs and 10 good ones to set the threshold.
 
-First steps when the Pi is back: check it is up and its battery, pull the pictures to the Mac (`sync-data`), check the picture labels are intact, end any open pose session and lay G2 down (confirm his posture by eye), then the bad-grab pictures from the attention pose at lift 0 and 120 (the cylinder placed by hand), then build items 1 to 3. Also proposed: read the Pi's battery estimate at the start of a session and hourly.
+First steps next session: deploy what is waiting (`bash tools/g2_deploy_safe.sh`), check the Pi is up and its battery, pull the data (`sync-data`), confirm G2's posture by eye, then the list in `docs/STATUS.md`.
+
+## The goal stage: brainstorm notes (a loose outline, to be changed by the hardware findings)
+
+Kept so the goal does not have to be rethought from nothing. Nothing here is built. Each part says what could change it.
+- Framework (verified): a goal is a `Goal` entry (attempts per session, minutes, minimum pack percent, start phrases, the attachment it needs) plus an approach class registered in `goals/` that brings its knobs, one attempt, a scorer, a table of which knob to change after which kind of failure, and which stage judges each knob. The shared session loop gates each attempt on the battery, journals it and lets the judge change one knob at a time; knobs marked "ask" are only suggested to the person. The punt goal (`goals/ball_punt.py`) is the template. No API call anywhere in a goal.
+- Id and name: `basket_throw`, "Throw into the basket"; start by a `g2basket` shell command first, a spoken phrase ("basket goal") and a place in "G2, practise" only once it is wired; `needs_attachment` arm; 5 attempts per run; minutes about 15; the servo pack gate about 40 percent plus a new Pi battery gate in the approach's battery check (the Pi ran flat once).
+- An attempt: one throw (5 per run), with the retrieval folded into the start of the next attempt. Could change if retrieval does not work (then a run is attempts with the cylinder returned by hand) or if a full cycle takes too long for the Pi's battery.
+- Stages: pick-up, line-up, throw. A bad grip is blamed on the pick-up stage and not on the shot distance (a bad pick-up means a bad throw). Could change with the grip check's reliability.
+- Knobs: the shot distance (16 inches from the claw tip; 12 to 20) and a heading offset (0 degrees; plus or minus 6), both "ask" at first; the alignment tolerances; the 6 inch buffer fixed; the throw script variant. The shot distance step must be larger than the basket finder's distance error (about plus or minus 3 inches now), so its step depends on the distance calibration.
+- Outcome codes: made; missed short; missed long; front rim; back rim; missed to a side; not seen (a make or a lost cylinder: counted as a make provisionally, with a confirm step at the end of the run, and the run stops for a reset); pick-up failed (claw missed, dropped, grip check says nothing held); basket not found; could not align; cylinder lost; fell; battery. Which of these can be told apart depends on the after-throw look test (the cylinder is only findable out to about 15 inches from the claw tip).
+- Conditions: the basket's size (5 inches) joins the attachment, floor and hardware epoch, so changing the basket never mixes results.
+- Success: a make is 1; an unconfirmed make counts until it is corrected.
+- Stages of the build: 1, the goal and scoring with a hand-fed attempt (the lift sequence, then the person types the result and the grab quality) so runs are tracked; 2, the grip look and the after-throw look give the result automatically; 3, the line-up and retrieval; 4, learning and the voice start. Version 1 is only worth building once the tests in the status list have answered the questions above.
+- Later: dump the basket with the claw after a make; a better way to tell a make from a lost cylinder; handling a lost cylinder; fully autonomous retrieval.

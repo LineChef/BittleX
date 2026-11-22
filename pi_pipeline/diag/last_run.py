@@ -47,6 +47,9 @@ def describe(path: str, now: float | None = None) -> list:
             out.append(f"  the board took the script (it answered K): {d['board_after_send']}")
         else:
             out.append(f"  NO K from the board after the send ({d['board_after_send'] or 'nothing'}): the script was probably NOT taken, whatever the verdict says")
+    g = d.get("grip_look")
+    if g:
+        out.append("  grip look: " + (f"no picture ({g['error']})" if "error" in g else f"{g['verdict']} (colour block {g['n']} px, centre column {g['cx']} row {g['cy']}), picture {g.get('file', 'not saved')}"))
     if d.get("claw_joint_after") is not None:
         out.append(f"  claw reading before {d.get('claw_joint_before')} and after {d.get('claw_joint_after')} (part-open can mean an object is held; the board reports commanded angles)")
     if d.get("note") or d.get("landing"):
