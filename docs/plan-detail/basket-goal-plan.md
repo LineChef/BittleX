@@ -29,6 +29,13 @@ Written 2026-11-21. Goal (owner): a new goal for G2. He picks the cylinder up, t
 
 `pickF` takes the cylinder only from a very small area: 0 to 0.5 inch out in front of the claw and up to 0.5 inch either side. At 1 inch out and at 2 inches out, centred, it missed (the owner judged 1 inch barely beyond reach); at 0.5 inch out centred and 0.5 inch to the left it picked it up, at the limit (the owner: best grip with the cylinder right in front of the claw, and the same limit to the right, so no further grid runs). The window is about 1 inch wide and half an inch deep. Consequence for the plan: the retry loop's approach has to stop within half an inch of the cylinder in both directions, far tighter than the ball goal's approach (about 5 inches) and the camera's distance reading (about 1 inch). Options to decide before step 5: a fine approach in small nudges, or a pick-up with more reach authored with the pose editor. Steps 1's 20 lobs are unaffected (the cylinder is placed by hand).
 
+## Measurement conventions (owner, 2026-11-22)
+
+- Distances are measured along a ruler with its zero at the claw tip, and at the start of every pick-up the claw was touching the cylinder.
+- The basket is circular, 5 inches across, and its centre was at the stated distance (16 inches is the best so far; 18 inches was too far). Its opening spans about 2.5 inches either side of that centre.
+- A bad pick-up means a bad throw, so the pick-up has to be right every time: the grab quality (good, marginal, bad) is worth recording with each throw.
+- A bounce-out counts as a miss.
+
 ## Result of the 20 lobs and the first basket block (2026-11-22, session A, `g2lob`: stand, `pickF`, `lob_soft`, full cradle, hardwood)
 
 - 20 lobs from one start, each starting with the pick-up: landing distance mean 17.8 inches, median 18.5, spread 3.4, range 11 to 23. Sideways: mean 0.6 inch right, spread 0.8, never over 2.5 inches, 16 of 20 within 1 inch. No fade over the series (first 10 averaged 16.5, last 10 19.1). Yesterday's hand-placed throws went 24 to 26 inches, so the grip after `pickF` is probably the cause of the shorter, more variable throws; the owner noted that the claw nearly has to touch the cylinder for a good grip. A control block of hand-placed throws would show it.
