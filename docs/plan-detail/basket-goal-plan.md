@@ -57,6 +57,18 @@ Session C: steps 3 and 4 together once the finders pass.
 - The cylinder: its length and the colours of its bands (red, yellow and green bands were noted earlier).
 - The standoff the throw uses (measured in step 1) and how wide the opening must be.
 
+## The full sequence (owner's description and decisions, 2026-11-22)
+
+Start: G2 at rest, the cylinder in front of the claw, the basket straight ahead with its centre 16 inches from the claw tip. One attempt:
+1. Stand up, pick the cylinder up, take the grip picture (log only; the throw always goes ahead).
+2. Throw.
+3. Look with the claw at 120 degrees for the cylinder on the floor, found by its bright colours. Seen anywhere: a miss. Not seen: counted as a make, or lost, and the run stops for a reset (the owner returns the cylinder). How to tell these apart is for later.
+4. After a miss: walk to the cylinder, fine approach, pick it up (grip check), find the basket, get to 16 inches from it facing it, align, check the alignment by picture, shoot again.
+
+Rules: 5 attempts per run. The owner returns the cylinder only after a make or when it goes out of view, at first. If G2 cannot align he keeps trying until he can. He must never bump the basket (a minimum approach distance). The cylinder gets no marker.
+
+Later: use the claw to dump the basket out after a successful shot; a better way to tell a make from a lost cylinder; a different way to handle a lost cylinder; making the retrieval fully autonomous.
+
 ## Where we left off (2026-11-22, session cut short)
 
 The Pi's own battery ran flat in the middle of the bad-grab pictures (about 3.3 hours after its boot at 8:54 AM; the Pi runs from a separate battery from G2's servo pack, so the pack gauge never showed it). G2 was left in an unknown pose with the servos sagging; nothing was lost on the Mac. The recognition pictures are on the Pi's card (`recog` set, shots 051 to 081) and have not been pulled to the Mac.
