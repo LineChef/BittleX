@@ -125,6 +125,26 @@ def load_script(name: str) -> dict:
         return json.load(f)
 
 
+NOT_TAKEN_PITCH_DEG = 8.0            # a throw pitches the body about 28 degrees; a script the board never took leaves it within about 5 (2026-11-22: 3 of 20 pick-up then throw runs)
+
+
+def not_taken(res: dict, echoes: list) -> bool:
+    """True when the board never took the script: no `K` echo after the send AND the body did not move (so nothing played and a second send cannot double the throw). A fall or any real tilt means it played."""
+    return "K" not in (echoes or []) and not res.get("fell") and (res.get("max_pitch_dev") or 0.0) < NOT_TAKEN_PITCH_DEG
+
+
+def play_with_retry(play, say=print):
+    """Play the script once; if the board did not take it (`not_taken`), send it ONCE more and return that run. `play()` returns (res, echoes). Returns (res, echoes, retried) where `retried` is None or what the first
+    attempt showed. Cause unknown: after a pick-up the board sometimes ignores the next data skill (about 15% of runs, no `K`, no motion); a second send takes."""
+    res, echoes = play()
+    if not not_taken(res, echoes):
+        return res, echoes, None
+    first = {"board_after_send": list(echoes), "max_pitch_dev": res.get("max_pitch_dev")}
+    say("the board did not take the script (no K) and the body did not move: sending it once more")
+    res, echoes = play()
+    return res, echoes, first
+
+
 def main(argv: list | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Play a scripted skill on G2: the person's go first; the voice service stopped.")
@@ -225,16 +245,19 @@ def main(argv: list | None = None) -> None:
             return
         message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
         print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
-        echoes: list = []
+        watch = a.watch if a.watch is not None else round(sum(p["nominal_s"] - p["delay"] * 0.05 for p in plan) * 2.6 + sum(p["delay"] * 0.05 for p in plan) + 0.6, 1)
 
         def _send():
             link.pop_other()                                  # only what the board says after the script went out
             link.play_data_skill(message)
 
-        res = ast.run_skill(robot, "script_" + a.script, watch_s=a.watch if a.watch is not None else round(sum(p["nominal_s"] - p["delay"] * 0.05 for p in plan) * 2.6 + sum(p["delay"] * 0.05 for p in plan) + 0.6, 1), send=_send, expect_motion=False, pre_checks=False)
-        echoes.extend(link.pop_other()[:40])
+        def _play():
+            r = ast.run_skill(robot, "script_" + a.script, watch_s=watch, send=_send, expect_motion=False, pre_checks=False)
+            return r, list(link.pop_other()[:40])
+
+        res, echoes, retried = play_with_retry(_play)
         print("the board said after the script was sent:", echoes or "nothing (no K echo: the script may not have been taken)")
-        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
+        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "retried_after_not_taken": retried, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
         print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
     except KeyboardInterrupt:
         print("ended")

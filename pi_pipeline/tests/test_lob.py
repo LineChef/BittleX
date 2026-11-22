@@ -52,3 +52,25 @@ def test_launch_skips_off_a_pi_and_when_a_lob_is_already_running():
         def __init__(self, rc):
             self.returncode = rc
     assert launch(platform="linux", run=lambda *a, **k: R(0)) is False                               # is-active succeeded: already running
+
+
+def test_a_script_is_not_taken_only_when_there_is_no_K_and_the_body_did_not_move():
+    nt = scripted_skill.not_taken
+    assert nt({"max_pitch_dev": 4.1, "fell": False}, ["g", "g"]) is True                          # what 3 of 20 runs looked like on 2026-11-22
+    assert nt({"max_pitch_dev": 27.7, "fell": False}, ["g", "g", "K", "K"]) is False                # a normal throw
+    assert nt({"max_pitch_dev": 4.1}, ["K"]) is False                                              # the board answered: it was taken
+    assert nt({"max_pitch_dev": 20.0}, ["g"]) is False                                             # no K echo read, but the body moved: it played, never send it twice
+    assert nt({"max_pitch_dev": 3.0, "fell": True}, []) is False
+
+
+def test_the_script_is_sent_once_more_when_not_taken_and_never_more_than_once():
+    calls, said = [], []
+    runs = iter([({"max_pitch_dev": 4.0}, ["g"]), ({"max_pitch_dev": 27.0}, ["g", "K"])])
+    res, echoes, retried = scripted_skill.play_with_retry(lambda: calls.append(1) or next(runs), say=said.append)
+    assert len(calls) == 2 and res["max_pitch_dev"] == 27.0 and "K" in echoes and retried == {"board_after_send": ["g"], "max_pitch_dev": 4.0} and said
+    calls.clear()
+    res, echoes, retried = scripted_skill.play_with_retry(lambda: calls.append(1) or ({"max_pitch_dev": 27.0}, ["K"]), say=said.append)
+    assert len(calls) == 1 and retried is None                                                     # taken the first time: no second send
+    calls.clear()
+    res, echoes, retried = scripted_skill.play_with_retry(lambda: calls.append(1) or ({"max_pitch_dev": 4.0}, []), say=said.append)
+    assert len(calls) == 2 and retried is not None                                                 # still not taken: stops after the one retry
