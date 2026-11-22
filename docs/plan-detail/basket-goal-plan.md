@@ -25,6 +25,10 @@ Written 2026-11-21. Goal (owner): a new goal for G2. He picks the cylinder up, t
 6. The goal wrapper. A `basket` approach in `goals/` (knobs: standoff inches, heading offset, and later the range setting; scorer codes: made, missed, cylinder never found, basket not found, could not line up, fell); the journal and report are shared; a voice start phrase and a place in "G2, practise". No API call anywhere in it.
 7. Variable distance, after a reliable basket test case exists: a table of throw setting to distance with the full cradle (two or three strengths first), then a choice by the basket's measured distance, learned per distance band by the judge.
 
+## Result of the pick-up grid (2026-11-22, session A, full cradle, hardwood)
+
+`pickF` takes the cylinder only from a very small area: 0 to 0.5 inch out in front of the claw and up to 0.5 inch either side. At 1 inch out and at 2 inches out, centred, it missed (the owner judged 1 inch barely beyond reach); at 0.5 inch out centred and 0.5 inch to the left it picked it up, at the limit (the owner: best grip with the cylinder right in front of the claw, and the same limit to the right, so no further grid runs). The window is about 1 inch wide and half an inch deep. Consequence for the plan: the retry loop's approach has to stop within half an inch of the cylinder in both directions, far tighter than the ball goal's approach (about 5 inches) and the camera's distance reading (about 1 inch). Options to decide before step 5: a fine approach in small nudges, or a pick-up with more reach authored with the pose editor. Steps 1's 20 lobs are unaffected (the cylinder is placed by hand).
+
 ## Hardware sessions
 
 Session A (first, no recognition needed): start with the guided steps of `hw-session`; step 1's 20 lobs and the pick-up grid; a ruler or mat on the hardwood, a soft clear floor ahead, the pack above 70 percent, voice service off between runs (`g2stop voice`), each throw's distance and sideways offset reported and entered with `g2throws`. Stop on any fall and analyse it before the next run.
