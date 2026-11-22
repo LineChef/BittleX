@@ -81,9 +81,66 @@ def _read_json(p: Path) -> dict:
         return {}
 
 
+RECOG_GROUPS = (                                       # (label starts with, object, group title): the first match wins, so the specific names come first
+    ("cylinder_basket_setup", "Cylinder", "Throw setup (cylinder and basket)"),
+    ("cylinder_A_left", "Cylinder", "Bearing check (3 in left and right)"),
+    ("cylinder_A_right", "Cylinder", "Bearing check (3 in left and right)"),
+    ("cylinder_side", "Cylinder", "On its side"),
+    ("cylinder_B", "Cylinder", "Other faces (B, C, D at 18 in)"),
+    ("cylinder_C", "Cylinder", "Other faces (B, C, D at 18 in)"),
+    ("cylinder_D", "Cylinder", "Other faces (B, C, D at 18 in)"),
+    ("cylinder_A", "Cylinder", "Flat on the floor, face A (distance series)"),
+    ("held_good", "Cylinder", "Held in the claw, good grip"),
+    ("bad_grab", "Cylinder", "Held in the claw, bad grip"),
+    ("basket_left", "Basket", "Bearing check (6 in left and right)"),
+    ("basket_right", "Basket", "Bearing check (6 in left and right)"),
+    ("basket", "Basket", "Distance series (centre, 12 to 36 in)"),
+)
+BALL_DIRS = ("greenball", "greenball-noball")           # under explore/named: only the hand-taken session_*.jpg pictures are calibration; the auto-saved chase and claw pictures are not
+BALL_FILE = re.compile(r"session_\d+_greenball[^/]*\.jpg")
+
+
+def _recog_split(items: list, root_key: str, kind: str, note: str) -> list:
+    """Split one recognition set into groups by what the picture shows (the label), each under the object it is about, so the cylinder and the basket are never lumped together."""
+    groups: dict = {}
+    for it in items:
+        for prefix, obj, title in RECOG_GROUPS:
+            if str(it.get("label", "")).startswith(prefix):
+                groups.setdefault((obj, title), []).append(it)
+                break
+        else:
+            groups.setdefault(("Cylinder", "Other pictures"), []).append(it)
+    return [{"key": root_key + "#" + title, "object": obj, "kind": kind, "title": title, "note": note, "protected": True, "items": its} for (obj, title), its in groups.items()]
+
+
+def _ball_sets(root: Path) -> list:
+    sets = []
+    for d in BALL_DIRS:
+        folder = root / "explore" / "named" / d
+        if not folder.is_dir():
+            continue
+        by_session: dict = {}
+        for f in sorted(folder.glob("session_*.jpg")):
+            m = re.match(r"session_(\d+)_greenball", f.name)
+            if not m:
+                continue
+            q = re.search(r"_(\d+)in_([clr])", f.name)
+            label = f.stem
+            dist = None
+            if q:
+                dist = float(q.group(1))
+                label = f"ball at {q.group(1)} in, " + {"c": "centred", "l": "left", "r": "right"}[q.group(2)]
+            by_session.setdefault(m.group(1), []).append({"file": f.name, "path": str(f.relative_to(root)), "label": label, "distance_in": dist, "angle_deg": None, "note": "", "exposure": None})
+        for sn, its in sorted(by_session.items()):
+            noball = d.endswith("noball")
+            sets.append({"key": f"explore/named/{d}#session_{sn}", "object": "Ball", "kind": "Ball", "title": ("No ball (negative examples), session " if noball else "Ball calibration session ") + sn,
+                         "note": "Hand-taken pictures at known distances (the file name gives the distance in inches and centre, left or right). Hand-named, so the clean-up never touches them.", "protected": True, "items": its})
+    return sets
+
+
 def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -> list:
-    """The Calibration tab: every picture set that exists to calibrate or recognise something, read-only. Each set is {key, kind, title, note, protected, items}. Sets come from the hash-checked recognition sets
-    (`recognition_sets/<set>`), the protected wall calibration sets, the original wall distance shots and the second wall set, and the claw sessions. Ordinary look pictures stay on the Walls tab."""
+    """The Calibration tab: every picture set that exists to calibrate or recognise something, read-only. Each set is {key, object, kind, title, note, protected, items}: the object (Cylinder, Basket, Ball, Wall, Claw) is the first dropdown,
+    the set the second. Ordinary look pictures stay on the Walls tab; the auto-saved ball chase pictures stay with the object pictures."""
     root = Path(root) if root else PICS_ROOT
     wall = Path(wall_cache) if wall_cache else root / "wall"
     sets = []
@@ -92,40 +149,50 @@ def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -
     if rec.is_dir():
         for d in sorted(p for p in rec.iterdir() if p.is_dir() and not p.name.startswith("_")):
             have_recog = True
-            sets.append({"key": "recognition_sets/" + d.name, "kind": "Recognition (hash-checked, read-only)", "title": d.name, "note": CAL_NOTES["recog"] if "cylinder" in d.name or "basket" in d.name else "",
-                         "protected": True, "items": _cal_items(d, root, _read_json(d / "labels.json"))})
+            sets += _recog_split(_cal_items(d, root, _read_json(d / "labels.json")), "recognition_sets/" + d.name, "Recognition (hash-checked, read-only)", CAL_NOTES["recog"])
     wcal = root / "wall_calibration"
     if wcal.is_dir():
         for d in sorted(p for p in wcal.iterdir() if p.is_dir() and not p.name.startswith("_")):
-            sets.append({"key": "wall_calibration/" + d.name, "kind": "Wall calibration (hash-checked, read-only)", "title": d.name, "note": CAL_NOTES["wall"], "protected": True,
+            sets.append({"key": "wall_calibration/" + d.name, "object": "Wall", "kind": "Wall calibration (hash-checked, read-only)", "title": d.name, "note": CAL_NOTES["wall"], "protected": True,
                          "items": _cal_items(d, root, _read_json(d / "labels.json"))})
     labels = _read_json(wall / "labels.json")
     groups: dict = {}
     for f in sorted(wall.glob("shot_*.jpg")) if wall.is_dir() else []:
-        s = (labels.get(f.stem) or {}).get("set")
-        if s is None or (s == "recog" and not have_recog):
-            groups.setdefault(s, []).append(f)
-    for s, files in groups.items():
-        sets.append({"key": "wall/" + str(s), "kind": "Wall distance shots" if s is None else "Recognition",
-                     "title": "Wall distance shots (the original recognition shots)" if s is None else "recog (not yet a hash-checked set)",
-                     "note": CAL_NOTES["wall" if s is None else "recog"], "protected": True, "items": [_cal_item(f, root, labels.get(f.stem)) for f in files]})
+        s_ = (labels.get(f.stem) or {}).get("set")
+        if s_ == "looks" or (s_ == "recog" and have_recog):                       # throwaway look pictures stay on the Walls tab; the recognition set is shown from its hash-checked copy
+            continue
+        groups.setdefault(s_, []).append(f)
+    for s_, files in groups.items():
+        items = [_cal_item(f, root, labels.get(f.stem)) for f in files]
+        if s_ is None:
+            sets.append({"key": "wall/None", "object": "Wall", "kind": "Wall distance shots", "title": "Wall distance shots (the original recognition shots)", "note": CAL_NOTES["wall"], "protected": True, "items": items})
+        elif s_ == "recog":
+            sets += _recog_split(items, "wall/recog", "Recognition (not yet a hash-checked set)", CAL_NOTES["recog"])
+        else:
+            sets.append({"key": "wall/" + str(s_), "object": "Wall", "kind": "Wall distance shots", "title": "Wall shots, set " + str(s_), "note": CAL_NOTES["wall"], "protected": True, "items": items})
     w1 = root / "wall_new1"
     if w1.is_dir() and any(w1.glob("*.jpg")):
-        sets.append({"key": "wall_new1", "kind": "Wall distance shots", "title": "wall_new1 (a second wall set)", "note": CAL_NOTES["wall"], "protected": True, "items": _cal_items(w1, root, _read_json(w1 / "labels.json"))})
+        sets.append({"key": "wall_new1", "object": "Wall", "kind": "Wall distance shots", "title": "wall_new1 (a second wall set)", "note": CAL_NOTES["wall"], "protected": True, "items": _cal_items(w1, root, _read_json(w1 / "labels.json"))})
+    sets += _ball_sets(root)
     claw = root / "claw"
     if claw.is_dir():
         for d in sorted(p for p in claw.iterdir() if p.is_dir()):
             if any(d.glob("*.jpg")):
-                sets.append({"key": "claw/" + d.name, "kind": "Claw", "title": "claw " + d.name, "note": "", "protected": True, "items": _cal_items(d, root)})
+                sets.append({"key": "claw/" + d.name, "object": "Claw", "kind": "Claw", "title": "claw " + d.name, "note": "", "protected": True, "items": _cal_items(d, root)})
     return sets
 
 
 def cal_image_ok(rel: str, root: Path | None = None) -> Path | None:
-    """The file for a Calibration-tab picture, or None: only a .jpg inside the folders of CAL_ROOTS under the pictures root (no `..`, no other folder)."""
+    """The file for a Calibration-tab picture, or None: only a .jpg inside the folders of CAL_ROOTS under the pictures root, or a hand-taken ball session picture under explore/named/greenball* (no `..`, no other folder)."""
     root = Path(root) if root else PICS_ROOT
     f = (root / rel).resolve()
-    top = rel.split("/")[0] if rel else ""
-    if top not in CAL_ROOTS or f.suffix.lower() != ".jpg" or not f.is_file():
+    if not rel or f.suffix.lower() != ".jpg" or not f.is_file():
+        return None
+    parts = rel.split("/")
+    if len(parts) == 4 and parts[0] == "explore" and parts[1] == "named" and parts[2] in BALL_DIRS and BALL_FILE.fullmatch(parts[3]):
+        return f if str(f).startswith(str((root / "explore" / "named" / parts[2]).resolve()) + os.sep) else None
+    top = parts[0]
+    if top not in CAL_ROOTS:
         return None
     return f if str(f).startswith(str((root / top).resolve()) + os.sep) else None
 
@@ -1351,11 +1418,14 @@ function renderWalls(list,f){if(window.picSelect)picSelect.begin(true,"walls");c
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));if(p.src==="roam"&&window.picSelect)picSelect.attach(c,p,items.filter(q=>q.src==="roam"));grid.append(c)}list.append(grid);if(window.picSelect)picSelect.end()}
 function renderCalibration(list,f){if(window.picSelect)picSelect.leave();if(!data.length){list.append(el("div","empty","No calibration or recognition pictures on this Mac yet."));return}
- let cur=data.find(s=>s.key===window.calSet)||data[0];window.calSet=cur.key;
- const bar=el("div","labelsum");bar.append(el("b","","Calibration set: "));const sel=el("select");const kinds={};for(const s of data)(kinds[s.kind]=kinds[s.kind]||[]).push(s);
- for(const k of Object.keys(kinds)){const og=el("optgroup");og.label=k;for(const s of kinds[k]){const o=el("option","",s.title+" ("+s.items.length+")");o.value=s.key;if(s.key===cur.key)o.selected=true;og.append(o)}sel.append(og)}
+ const order=["Cylinder","Basket","Ball","Wall","Claw"];const objs=[...new Set(data.map(s=>s.object))].sort((a,b)=>(order.indexOf(a)<0?99:order.indexOf(a))-(order.indexOf(b)<0?99:order.indexOf(b)));
+ if(!objs.includes(window.calObj))window.calObj=objs[0];const mine=data.filter(s=>s.object===window.calObj);
+ let cur=mine.find(s=>s.key===window.calSet)||mine[0];window.calSet=cur.key;
+ const bar=el("div","labelsum");bar.append(el("b","","Object: "));const so=el("select");for(const o of objs){const n=data.filter(s=>s.object===o).reduce((a,s)=>a+s.items.length,0);const op=el("option","",o+" ("+n+")");op.value=o;if(o===window.calObj)op.selected=true;so.append(op)}
+ so.onchange=()=>{window.calObj=so.value;window.calSet=null;render()};bar.append(so,document.createTextNode("  "),el("b","","Set: "));
+ const sel=el("select");for(const s of mine){const o=el("option","",s.title+" ("+s.items.length+")");o.value=s.key;if(s.key===cur.key)o.selected=true;sel.append(o)}
  sel.onchange=()=>{window.calSet=sel.value;render()};bar.append(sel);list.append(bar);
- const info=el("div","labelsum");info.append(el("b","",cur.title+": "),document.createTextNode(cur.items.length+" pictures. Read-only: these are calibration data, so they cannot be moved, relabelled or deleted here, and the clean-up never touches them."+(cur.note?" "+cur.note:"")));list.append(info);
+ const info=el("div","labelsum");info.append(el("b","",cur.title+": "),document.createTextNode(cur.items.length+" pictures ("+cur.kind+"). Read-only: these are calibration data, so they cannot be moved, relabelled or deleted here, and the clean-up never touches them."+(cur.note?" "+cur.note:"")));list.append(info);
  const items=cur.items.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures match."));return}
  const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/cimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
   const cap=p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.exposure!=null?" \u00b7 brightness "+p.exposure:"");

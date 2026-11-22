@@ -48,6 +48,8 @@ def is_calibration(path: str, root: str) -> bool:
         return True
     folder = os.path.dirname(path)
     name = os.path.splitext(os.path.basename(path))[0]
+    if name.startswith("session_"):                                                  # the hand-taken calibration sessions (a ball at a known distance, the no-ball examples): never groomed
+        return True
     for f in os.listdir(folder):
         low = f.lower()
         if low.endswith(".json") and ("label" in low or "cal" in low):
