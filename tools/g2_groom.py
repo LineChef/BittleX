@@ -29,7 +29,7 @@ from pi_pipeline.vision import picture_score as ps  # noqa: E402
 ROOT = "~/Desktop/G2Memory/g2_pictures"
 CAP_CLASSES = ("explore/named",)                                              # each class folder under these is capped
 NEAR_DUP_FOLDERS = ("bout", "watch", "stream", "seen", "contact", "explore/survey")
-CAL_WORDS = ("cal", "wall", "ring", "localizer", "labels", "claw", "calib")      # a folder or file with any of these is calibration or recognition data: refused
+CAL_WORDS = ("cal", "wall", "ring", "localizer", "labels", "claw", "calib", "recog")      # a folder or file with any of these is calibration or recognition data: refused
 AUTO_NAMED_BY = ("ball_chase",)                                               # only pictures the robot saved by itself in a named class are groomed; a hand or voice name protects a picture
 PURGE_DAYS = 14
 APPLY_MAP = {"explore": "pi_pipeline.vision.exploration_pictures", "bout": "pi_pipeline.vision.claw_pictures", "watch": "pi_pipeline.vision.claw_pictures",

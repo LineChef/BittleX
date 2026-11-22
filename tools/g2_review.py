@@ -3,11 +3,11 @@
 
     g2pimem            # opens this page on the Facts tab (g2pimem <subcommand> still prints text: log 20, search ..., usage)
     g2pics             # opens this page on the Pictures tab (g2pics status / pull still print or copy)
-    python3 tools/g2_review.py [--tab facts|exchanges|observations|pictures|looks|walls|trash] [--no-open] [--stop]
+    python3 tools/g2_review.py [--tab facts|exchanges|observations|pictures|looks|walls|calibration|trash] [--no-open] [--stop]
 
 The page runs as a background server (so your terminal is free): the first call starts it, later calls just open the browser. `--stop` ends it. Log: ~/g2_logs/review_server.log.
 
-Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Looks (throwaway left / right look pictures), Walls, Trash. The X moves a record to the Trash
+Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Looks (throwaway left / right look pictures), Walls, Calibration (every picture set that exists to calibrate or recognise something, one dropdown per set, read-only), Trash. The X moves a record to the Trash
 (you get an Undo for a few seconds, and the Trash tab restores anything later); only "Empty trash" deletes for good, and it asks twice. A safe copy of the
 memory database is made before the first delete of each session. The tabs read the copy of G2's data on this Mac (the newest memory snapshot in ~/Desktop/G2Memory/memory-backups,
 the pictures in ~/Desktop/G2Memory/g2_pictures), so they work with the Pi off; "Sync now" refreshes the copy. An edit is applied to the copy at once and queued for the Pi
@@ -53,6 +53,81 @@ def read_people_marks() -> set:
 
 
 PROMOTED = Path(__file__).resolve().parents[1] / "training_data" / "exploration" / "promoted"      # labelled pictures you promoted: the training data (gitignored; never in the repo)
+
+
+PICS_ROOT = Path(os.path.expanduser("~/Desktop/G2Memory/g2_pictures"))
+RECOG_ROOT = PICS_ROOT / "recognition_sets"          # hash-checked, read-only sets of recognition pictures (tools/g2_cal_verify.py --root); never synced over
+CAL_ROOTS = ("wall", "wall_calibration", "wall_new1", "claw", "recognition_sets")     # the only folders the Calibration tab shows and serves (nothing else under g2_pictures, people pictures included)
+CAL_NOTES = {"recog": "Attention pose with the claw raised to 120 degrees (the standing camera view). Distances are in inches from the claw tip (the lens is 2 in behind it, so add 2 in); the basket distance is to its centre. Cylinder faces A to D are approximate quarter turns.",
+             "wall": "Distances are in inches from the camera lens to the base of the wall."}
+
+
+def _cal_item(f: Path, root: Path, info: dict | None) -> dict:
+    info = info or {}
+    e = info.get("exposure") or {}
+    return {"file": f.name, "path": str(f.relative_to(root)), "label": info.get("label") or f.stem, "distance_in": info.get("distance_in"),
+            "angle_deg": info.get("angle_deg"), "note": info.get("note") or "", "exposure": e.get("mean")}
+
+
+def _cal_items(folder: Path, root: Path, labels: dict | None = None) -> list:
+    return [_cal_item(f, root, (labels or {}).get(f.stem)) for f in sorted(folder.glob("*.jpg"))]
+
+
+def _read_json(p: Path) -> dict:
+    try:
+        d = json.loads(p.read_text())
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -> list:
+    """The Calibration tab: every picture set that exists to calibrate or recognise something, read-only. Each set is {key, kind, title, note, protected, items}. Sets come from the hash-checked recognition sets
+    (`recognition_sets/<set>`), the protected wall calibration sets, the original wall distance shots and the second wall set, and the claw sessions. Ordinary look pictures stay on the Walls tab."""
+    root = Path(root) if root else PICS_ROOT
+    wall = Path(wall_cache) if wall_cache else root / "wall"
+    sets = []
+    rec = root / "recognition_sets"
+    have_recog = False
+    if rec.is_dir():
+        for d in sorted(p for p in rec.iterdir() if p.is_dir() and not p.name.startswith("_")):
+            have_recog = True
+            sets.append({"key": "recognition_sets/" + d.name, "kind": "Recognition (hash-checked, read-only)", "title": d.name, "note": CAL_NOTES["recog"] if "cylinder" in d.name or "basket" in d.name else "",
+                         "protected": True, "items": _cal_items(d, root, _read_json(d / "labels.json"))})
+    wcal = root / "wall_calibration"
+    if wcal.is_dir():
+        for d in sorted(p for p in wcal.iterdir() if p.is_dir() and not p.name.startswith("_")):
+            sets.append({"key": "wall_calibration/" + d.name, "kind": "Wall calibration (hash-checked, read-only)", "title": d.name, "note": CAL_NOTES["wall"], "protected": True,
+                         "items": _cal_items(d, root, _read_json(d / "labels.json"))})
+    labels = _read_json(wall / "labels.json")
+    groups: dict = {}
+    for f in sorted(wall.glob("shot_*.jpg")) if wall.is_dir() else []:
+        s = (labels.get(f.stem) or {}).get("set")
+        if s is None or (s == "recog" and not have_recog):
+            groups.setdefault(s, []).append(f)
+    for s, files in groups.items():
+        sets.append({"key": "wall/" + str(s), "kind": "Wall distance shots" if s is None else "Recognition",
+                     "title": "Wall distance shots (the original recognition shots)" if s is None else "recog (not yet a hash-checked set)",
+                     "note": CAL_NOTES["wall" if s is None else "recog"], "protected": True, "items": [_cal_item(f, root, labels.get(f.stem)) for f in files]})
+    w1 = root / "wall_new1"
+    if w1.is_dir() and any(w1.glob("*.jpg")):
+        sets.append({"key": "wall_new1", "kind": "Wall distance shots", "title": "wall_new1 (a second wall set)", "note": CAL_NOTES["wall"], "protected": True, "items": _cal_items(w1, root, _read_json(w1 / "labels.json"))})
+    claw = root / "claw"
+    if claw.is_dir():
+        for d in sorted(p for p in claw.iterdir() if p.is_dir()):
+            if any(d.glob("*.jpg")):
+                sets.append({"key": "claw/" + d.name, "kind": "Claw", "title": "claw " + d.name, "note": "", "protected": True, "items": _cal_items(d, root)})
+    return sets
+
+
+def cal_image_ok(rel: str, root: Path | None = None) -> Path | None:
+    """The file for a Calibration-tab picture, or None: only a .jpg inside the folders of CAL_ROOTS under the pictures root (no `..`, no other folder)."""
+    root = Path(root) if root else PICS_ROOT
+    f = (root / rel).resolve()
+    top = rel.split("/")[0] if rel else ""
+    if top not in CAL_ROOTS or f.suffix.lower() != ".jpg" or not f.is_file():
+        return None
+    return f if str(f).startswith(str((root / top).resolve()) + os.sep) else None
 
 
 def read_roam_labels() -> dict:
@@ -1067,6 +1142,11 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._send(200, f.read_bytes(), "image/jpeg") if ok else self._send(404, b"missing", "text/plain")
                 if u.path == "/api/walls":
                     return self._json(app.walls())
+                if u.path == "/api/calibration":
+                    return self._json(calibration_sets())
+                if u.path.startswith("/cimg/"):
+                    f = cal_image_ok(urllib.parse.unquote(u.path[6:]))
+                    return self._send(200, f.read_bytes(), "image/jpeg") if f else self._send(404, b"missing", "text/plain")
                 if u.path == "/api/trash":
                     return self._json(app.trash())
                 return self._send(404, b"not found", "text/plain")
@@ -1185,7 +1265,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
-const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["goals","Goals"],["rooms","Rooms"],["sync","Waiting to sync"],["trash","Trash"]];
+const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["calibration","Calibration"],["goals","Goals"],["rooms","Rooms"],["sync","Waiting to sync"],["trash","Trash"]];
 let data=[],undoFn=null,timer=null,confirmAt=0;      // declared: confirmAt was read before it was ever set, so the Empty trash button threw and did nothing
 let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts";
 const $=s=>document.querySelector(s);
@@ -1246,6 +1326,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
  try{
   if(tab==="pictures"||tab==="looks"){data=await api("/api/pictures")}
   else if(tab==="walls"){data=await api("/api/walls")}
+  else if(tab==="calibration"){data=await api("/api/calibration")}
   else if(tab==="goals"){data=await api("/api/goals")}
   else if(tab==="trash"){data=await api("/api/trash")}
   else if(tab==="sync"){data=await api("/api/waiting")}
@@ -1269,9 +1350,20 @@ function renderWalls(list,f){if(window.picSelect)picSelect.begin(true,"walls");c
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:"")+(p.estimate?" \u00b7 the estimator read "+(p.estimate.nearest_in!=null?p.estimate.nearest_in+" in":"clear")+" ("+p.estimate.state+")":""));if(p.src==="roam"){const lb2=el("button","pbtn",p.labelled?"Relabel":"Label");lb2.title="Say what this picture shows (wall, door, corner, chair, ...) and, if you know it, the real distance in inches";lb2.onclick=async(ev)=>{ev.stopPropagation();const l=prompt("What does this show? (wall, door, corner, chair, box, nothing, ...)",p.labelled?p.label:"wall");if(l===null)return;const d=l.trim()?prompt("Real distance to it in inches (leave blank if you do not know)",p.distance_in!=null?String(p.distance_in):""):"";if(d===null)return;try{await api("/api/walls/label",{path:p.path,label:l,distance_in:d===""?null:d});load();toast(l.trim()?"Labelled: "+l.trim():"Label cleared")}catch(e){toast("Failed: "+e.message)}};c.append(lb2)}
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));if(p.src==="roam"&&window.picSelect)picSelect.attach(c,p,items.filter(q=>q.src==="roam"));grid.append(c)}list.append(grid);if(window.picSelect)picSelect.end()}
+function renderCalibration(list,f){if(window.picSelect)picSelect.leave();if(!data.length){list.append(el("div","empty","No calibration or recognition pictures on this Mac yet."));return}
+ let cur=data.find(s=>s.key===window.calSet)||data[0];window.calSet=cur.key;
+ const bar=el("div","labelsum");bar.append(el("b","","Calibration set: "));const sel=el("select");const kinds={};for(const s of data)(kinds[s.kind]=kinds[s.kind]||[]).push(s);
+ for(const k of Object.keys(kinds)){const og=el("optgroup");og.label=k;for(const s of kinds[k]){const o=el("option","",s.title+" ("+s.items.length+")");o.value=s.key;if(s.key===cur.key)o.selected=true;og.append(o)}sel.append(og)}
+ sel.onchange=()=>{window.calSet=sel.value;render()};bar.append(sel);list.append(bar);
+ const info=el("div","labelsum");info.append(el("b","",cur.title+": "),document.createTextNode(cur.items.length+" pictures. Read-only: these are calibration data, so they cannot be moved, relabelled or deleted here, and the clean-up never touches them."+(cur.note?" "+cur.note:"")));list.append(info);
+ const items=cur.items.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures match."));return}
+ const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/cimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
+  const cap=p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.exposure!=null?" \u00b7 brightness "+p.exposure:"");
+  im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=cap+(p.note?" \u00b7 "+p.note:"");lb.style.display="flex"};
+  c.append(im,el("div","meta",cap));if(p.note)c.append(el("div","meta",p.note));grid.append(c)}list.append(grid)}
 function foldLoad(){try{const s=JSON.parse(localStorage.getItem("g2fold_"+tab)||"{}");window.closedSections=s.c||{};window.openGroups=s.o||{}}catch(e){window.closedSections={};window.openGroups={}}window.foldTab=tab}       // each tab keeps its own open / closed sections and groups across reloads (user, 2026-11-17)
 function foldSave(){try{localStorage.setItem("g2fold_"+tab,JSON.stringify({c:window.closedSections||{},o:window.openGroups||{}}))}catch(e){}}
-function render(){if(window.foldTab!==tab)foldLoad();const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(window.picSelect&&tab!=="pictures"&&tab!=="looks"&&tab!=="walls")picSelect.leave();if(tab!=="goals"&&tab!=="sync"&&tab!=="rooms"&&window.reviewPanel)window.reviewPanel(list);if(tab==="walls"){renderWalls(list,f);return}if(tab==="sync"){window.renderSync(list);return}if(tab==="rooms"){window.renderRooms(list,f);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="exchanges"){window.renderExchanges(list,f);return}if(tab==="observations")window.observationsPanel(list);if(tab==="pictures")window.curatePanel(list);if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
+function render(){if(window.foldTab!==tab)foldLoad();const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(window.picSelect&&tab!=="pictures"&&tab!=="looks"&&tab!=="walls")picSelect.leave();if(tab!=="goals"&&tab!=="sync"&&tab!=="rooms"&&window.reviewPanel)window.reviewPanel(list);if(tab==="calibration"){renderCalibration(list,f);return}if(tab==="walls"){renderWalls(list,f);return}if(tab==="sync"){window.renderSync(list);return}if(tab==="rooms"){window.renderRooms(list,f);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="exchanges"){window.renderExchanges(list,f);return}if(tab==="observations")window.observationsPanel(list);if(tab==="pictures")window.curatePanel(list);if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"||tab==="looks"){if(window.picSelect)picSelect.begin(true,tab);if(counts.pictures_mb!==undefined){const sl=el("div","group","Storage: "+counts.pictures_mb+" MB of "+counts.pictures_budget_mb+" MB budget"+(counts.pictures_mb>counts.pictures_budget_mb?" (OVER)":"")+" \u00b7 "+(counts.pictures||0)+" pictures");sl.id="picstorage";list.append(sl)}const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb);
   const bad=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)),keepNamed=filteredOut-bad.length;      // user, 2026-11-01: flagged pictures are deleted, not kept hidden; ones you named stay
   if(bad.length){const db=el("button","btn danger","Delete the "+bad.length+" filtered pictures");db.style.marginLeft="8px";db.title="Moves them to the Trash (Undo brings them back; the Trash empties for good with Empty trash)"+(keepNamed?". The "+keepNamed+" you have named are kept.":"");db.onclick=async()=>{const ps=bad.map(q=>q.path);try{await api("/api/pictures/trash",{paths:ps});data=data.filter(d=>!ps.includes(d.path));render();toast(ps.length+" filtered pictures moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:ps});load()})}catch(e){toast("Failed: "+e.message)}};list.append(db)}}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Tick the box on several pictures (Shift-click a second one for a range) and set their room in the bar at the bottom, use Room on one picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}

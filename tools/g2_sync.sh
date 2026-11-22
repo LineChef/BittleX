@@ -105,6 +105,7 @@ do_task() {
       mkdir -p "$MEM/g2_pictures/wall_calibration"            # the calibration sets: their own folder, copied without --delete, pinned and locked read-only (tools/g2_cal_verify.py)
       rsync -a "$G2_PI:g2_wall_calibration/" "$MEM/g2_pictures/wall_calibration/" 2>/dev/null
       python3 "$ROOT/tools/g2_cal_verify.py" --quiet || say "WALL CALIBRATION SET DIFFERS from its pinned copy: run python3 tools/g2_cal_verify.py"
+      python3 "$ROOT/tools/g2_cal_verify.py" --quiet --root "$MEM/g2_pictures/recognition_sets" || say "A RECOGNITION SET DIFFERS from its pinned copy: run python3 tools/g2_cal_verify.py --root ~/Desktop/G2Memory/g2_pictures/recognition_sets"
       true ;;
     memorydb) G2_PI="$G2_PI" bash "$ROOT/tools/g2_memory_backup.sh" && prune_memorydb ;;
     logs)

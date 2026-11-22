@@ -52,6 +52,8 @@ The galleries are kept from growing without end by one routine, `g2groom`, which
 
 What it never touches:
 
+- Recognition sets: `~/Desktop/G2Memory/g2_pictures/recognition_sets/<set>/` on the Mac only (the cylinder and basket pictures for the finders are the first, `cylinder_basket`): a copy of the pictures with their labels, hash-checked against a pinned manifest and made read-only like the wall calibration sets (`python3 tools/g2_cal_verify.py --root ~/Desktop/G2Memory/g2_pictures/recognition_sets`; the sync and the session preflight run it). The Pi keeps its own originals. The clean-up refuses any folder with "recog" in its name.
+- The Calibration tab of the review page (`g2pics`): one dropdown of every picture set that exists to calibrate or recognise something (the recognition sets, the wall calibration sets, the wall distance shots, the second wall set and the claw sessions), read-only: no delete, no relabel. Ordinary look pictures stay on the Walls tab. The lift, step and localizer calibration folders are to be added.
 - Calibration and recognition pictures: the wall shots and the wall ring, the lift, step and claw calibration, `wall_new1`, the localizer check, and anything beside a labels file. The groom works from an allowlist of folders, so a new folder is never groomed until it is added on purpose.
 - People pictures (the vision library, the person captures) and hand-named or promoted pictures.
 
