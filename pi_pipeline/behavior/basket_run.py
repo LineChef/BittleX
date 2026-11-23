@@ -318,6 +318,7 @@ class RealEnv:
         if r.sit_down() == "fell":                                       # the standard attention entry
             raise Fell()
         t_pose = time.monotonic()
+        r._tx("gb")                                                      # the gyro assist OFF, as the pose editor does before every command: the link's eased stand-up inside sit_down() switches it back on, and with it on the lowering claw makes the balance push the back legs up and flip him (owner's observation, 2026-11-23)
         if r.claw_pose(0.0, LOOK_LIFT_DEG) == "fell":
             raise Fell()
         time.sleep(chase.CLAW_SETTLE_S)
@@ -325,6 +326,7 @@ class RealEnv:
         cam.refresh_exposure()
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
+        r._tx("gb")
         if r.claw_pose(0.0, 0.0) == "fell":
             raise Fell()
         self.attention_hold_s = round(time.monotonic() - t_pose, 1)

@@ -283,8 +283,8 @@ def test_after_the_throw_the_owners_sequence_with_the_standard_attention_entry(m
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert order == ["expect_lob_end", "sit_down", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0", "rest"]       # the standard entry, then the owner's steps
-    assert not any(c in order for c in ("kcalib", "gb", "kbalance")) and env.robot.posture == "rest" and env.picture_ok is True        # no raw kcalib and no extra writes of mine
+    assert order == ["expect_lob_end", "sit_down", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "gb", "claw 0.0", "rest"]       # the standard entry, gyro assist off before each claw move, then the owner's steps
+    assert not any(c in order for c in ("kcalib", "kbalance")) and env.robot.posture == "rest" and env.picture_ok is True        # no raw kcalib and no extra writes of mine
     assert basket.claw_in == 16.0 and puck.claw_in == 12.0 and env.attention_hold_s is not None
 
 
