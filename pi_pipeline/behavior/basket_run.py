@@ -32,6 +32,7 @@ GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the 
 LOG_DIR = "~/g2_runs/basket_run"
 BURST_S = 10.0                       # the picture burst after the throw is sent: the throw (about 1.2 s), the move into the attention pose, the flight, the landing, the bounce and the settle
 THROW_WATCH_S = 2.3                  # the body is watched this long after the throw is sent (the animation ends at about 2.2 s by the IMU trace; the default watch was about 3.1 s): the attention pose follows at once
+ATTENTION_POSE_WAIT_S = 7.0          # the most we wait for the board to say the attention pose is done (about 5 s after the send)
 KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
 
@@ -340,22 +341,35 @@ class RealEnv:
         r.expect_lob_end()
         r._pitch, r._roll = [], []
         r._tx("gP")
-        r._tx(chase.CLAW_LOOK_POSE)
+        r._tx(chase.CLAW_LOOK_POSE)                                          # MODE-SPECIFIC(basket_run.py, 2026-11-23): the attention pose sent straight from the throw, with no tilt read and no settle sleep (mode-exceptions.md)
         r._claw = (0.0, lob_end_lift())
         r.posture = "attention"
         r._posed_at = r._clock()
 
+    def _wait_for_attention_pose(self, timeout_s: float = ATTENTION_POSE_WAIT_S) -> bool:
+        """Wait for the board to say the attention pose is done (it prints `calib` when the skill ends, about 5 s after the send from the lob's end pose). Nothing is written to the board meanwhile (a byte over a playing skill cuts it short)."""
+        end = time.monotonic() + timeout_s
+        while time.monotonic() < end:
+            if any(str(line).strip().startswith("calib") for line in self.link.pop_other()):
+                return True
+            time.sleep(0.1)
+        return False
+
     def after_throw(self):
-        """One picture from the attention pose (owner, 2026-11-23: no burst), read by the basket and puck finders, then the claw down and laid in rest: he stands again only if the puck was seen on the floor. The picture is never saved on the Pi;
+        """One picture from the attention pose (owner, 2026-11-23: no burst), read by the basket and puck finders, then straight into rest: he stands again only if the puck was seen on the floor. The claw is not moved (the attention pose has already lowered it) and nothing is
+        read or written before `krest`: the board stands him up by itself about 8 s after the pose is sent (2026-11-23: it printed `up` at +8 s every time and he fell), so the picture is taken the moment the pose ends and rest follows at once. The picture is never saved on the Pi;
         with show_picture it is printed (base64, one line) for the person running it."""
         from . import ball_chase as chase
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
         r = self.robot
-        time.sleep(chase.CLAW_POSE_S + chase.CLAW_SETTLE_S)                  # the pose skill plays by itself (a write over it cuts it short), then the arm and body settle
+        self._wait_for_attention_pose()
+        time.sleep(chase.CLAW_SETTLE_S)                                          # the arm and body settle a moment
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
+        chase.ensure_rest(self.link)                                             # the standard lie-down: `krest` goes out first, then the pose is confirmed (and asked again if the board did not take it)
+        r.posture, r._claw = "rest", (0.0, 0.0)
         basket = puck = None
         if jpeg:
             basket = bf.find_basket(jpeg)
@@ -363,10 +377,6 @@ class RealEnv:
             if self.show_picture:
                 import base64
                 print(f"AFTER_PICTURE {self.attempt} {base64.b64encode(jpeg).decode()}", flush=True)
-        if r.claw_pose(0.0, 0.0) == "fell":                                   # the claw down before lying down, as every look does
-            raise Fell()
-        chase.ensure_rest(self.link)
-        r.posture = "rest"
         return basket, puck
 
     def _ready_to_move(self) -> None:
@@ -376,7 +386,7 @@ class RealEnv:
             if self.robot.rest_then_stand() == "fell":
                 raise Fell()
         elif posture == "rest":
-            if self.robot.stand_up() == "fell":                                 # the eased stand-up from rest
+            if self.robot.stand_up_from_rest() == "fell":                       # the eased stand-up from rest (stand_up() sends nothing in the standing flow)
                 raise Fell()
 
     def _quick(self, by: str):

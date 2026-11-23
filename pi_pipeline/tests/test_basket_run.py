@@ -323,13 +323,13 @@ def test_the_attention_pose_is_sent_at_once_with_no_read_and_no_arm_move():
     assert env.robot.posture == "attention" and env.robot._claw == (0.0, 125.0)
 
 
-def test_after_the_throw_one_attention_picture_is_read_then_the_claw_goes_down_and_he_lies_in_rest(monkeypatch):
+def test_after_the_throw_one_attention_picture_is_taken_when_the_pose_ends_then_the_standard_lie_down_at_once_with_no_claw_move(monkeypatch):
     from pi_pipeline.behavior import ball_chase as chase
     from pi_pipeline.vision import basket_finder as bf
     from pi_pipeline.vision import puck_finder as pf
     order = []
     monkeypatch.setattr(br.time, "sleep", lambda s: order.append("sleep"))
-    monkeypatch.setattr(chase, "ensure_rest", lambda link: order.append("rest"))
+    monkeypatch.setattr(chase, "ensure_rest", lambda link: order.append("confirm_rest"))
     monkeypatch.setattr(bf, "find_basket", lambda j: B(16.0, 0.0))
     monkeypatch.setattr(pf, "find_puck", lambda j, b=None, by="row": P(12.0, 3.0))
 
@@ -341,18 +341,31 @@ def test_after_the_throw_one_attention_picture_is_read_then_the_claw_goes_down_a
             order.append("picture")
             return b"jpeg"
 
+    class Link:
+        def __init__(self):
+            self.polls = [[], [], ["K"], ["calib"]]
+
+        def pop_other(self):
+            order.append("poll")
+            return self.polls.pop(0) if self.polls else []
+
     class Robot:
         posture = "attention"
+        _claw = (0.0, 125.0)
 
-        def claw_pose(self, pan, lift):
-            order.append(f"claw {lift}")
-            return "ok"
+        def _tx(self, c):
+            order.append(c)
+
+        def claw_pose(self, *a):
+            order.append("claw_pose")
 
     env = br.RealEnv.__new__(br.RealEnv)
-    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
+    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), Link(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert order == ["sleep", "meter", "picture", "claw 0.0", "rest"]                                       # one picture, then the claw down, then rest
-    assert env.robot.posture == "rest" and basket.claw_in == 16.0 and puck.claw_in == 12.0
+    assert "claw_pose" not in order and "j" not in order                                                    # the claw is not moved and nothing is read first
+    assert order.index("picture") < order.index("confirm_rest")                                              # picture, then the standard lie-down at once
+    assert order.count("poll") == 4 and order.index("meter") > max(i for i, o in enumerate(order) if o == "poll")      # it waited for the pose's end echo before the picture
+    assert env.robot.posture == "rest" and env.robot._claw == (0.0, 0.0) and basket.claw_in == 16.0 and puck.claw_in == 12.0
 
 
 def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
@@ -361,9 +374,13 @@ def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
     class Robot:
         posture = "rest"
 
+        def stand_up_from_rest(self):
+            calls.append("stand_up_from_rest")
+            self.posture = "stand"
+            return "ok"
+
         def stand_up(self):
             calls.append("stand_up")
-            self.posture = "stand"
             return "ok"
 
         def rest_then_stand(self):
@@ -373,6 +390,6 @@ def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot = Robot()
     env._ready_to_move()
-    assert calls == ["stand_up"]                                                                           # the eased stand-up from rest, never from the attention pose
+    assert calls == ["stand_up_from_rest"]                                                                 # the eased stand-up from rest, never from the attention pose
     env._ready_to_move()
-    assert calls == ["stand_up"]
+    assert calls == ["stand_up_from_rest"]
