@@ -145,7 +145,107 @@ def play_with_retry(play, say=print):
     return res, echoes, first
 
 
-def main(argv: list | None = None) -> None:
+def play(a, script: dict, overrides: dict, link=None, robot=None, looker=None, rest_after: bool = True) -> dict:
+    """Play one scripted skill (the body of `main`). With no `link` it opens the serial port itself and lays him in rest at the end, as `main` always did. A caller that runs several stages on one connection
+    (the basket run) passes its own open `link` (and `robot`, and a warmed `looker` for the grip look) and `rest_after=False`. Returns {"ok", "res", "path", "grip", "pack_pct", "fell"}; "ok" is False when nothing was sent."""
+    out: dict = {"ok": False}
+    if a.gyro_off:
+        os.environ["G2_GYRO_BALANCE"] = "0"                  # every gB the link would write becomes gb, and the stand-up does not turn it on for the rise
+        os.environ["G2_STAND_GYRO"] = "0"
+    from . import ball_chase as chase
+    from ..link import imu_print
+    from ..link.serial_link import SerialLink
+    from ..power import battery
+    own_link = link is None
+    if own_link:
+        link = SerialLink("/dev/serial0")
+        link.connect()
+    if a.gyro_off:
+        link.send("gb", read_reply=False, settle=0.0)        # the gyro balance off, whatever state the board is in
+        time.sleep(0.2)
+    ok, pct, volts = battery.motion_gate(link)
+    print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
+    if not ok:
+        return out
+    if not imu_print.board_answers(link):
+        print("refused: no IMU frames from the BiBoard: nothing was sent.")
+        return out
+    robot = robot or chase.SerialRobot(link)
+    path = None
+    own_looker = False
+    grip = None
+    if looker is None and a.grip_look and a.pick:
+        from .grip_look import GripLooker
+        looker = GripLooker()
+        looker.warm()                                      # the camera opens and meters the light while he stands up
+        own_looker = True
+    try:
+        if a.from_rest:
+            chase.ensure_rest(link)
+        else:
+            chase._stand_if_lying(link, "kbalance")
+        if a.attention and not a.from_rest:
+            robot.posture = "stand"
+            if robot.sit_down() == "fell":
+                print("G2 fell going into the attention pose: stopping")
+                out["fell"] = True
+                return out
+        if a.pick:
+            from .catapult import pick_up
+            print("playing pickF first: the object in front of him")
+            t_pick = time.monotonic()
+            heard: list = []
+            if not pick_up(link, seen=heard):
+                print("pickF did not report its end in time: stopping before the script")
+                return out
+            print(f"pickF reported its end after {time.monotonic() - t_pick:.1f} s; the board sent (seconds after the wait began, line): {heard}")
+            if a.pick_gap > 0:
+                print(f"waiting {a.pick_gap:.1f} s before the script")
+                time.sleep(min(a.pick_gap, 3.0))
+            if looker is not None:
+                from .grip_look import take_grip_look
+                grip = take_grip_look(looker, a.script, since=time.monotonic())
+        base = chase.read_joints(link)
+        if not base or len(base) < 16:
+            print("refused: the joint angles could not be read: nothing was sent.")
+            return out
+        try:
+            plan = build_plan(script, base, amount=a.amount, overrides=overrides)
+        except (ValueError, OSError) as e:
+            print("refused:", e)
+            return out
+        message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
+        print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
+        watch = a.watch if a.watch is not None else round(sum(p["nominal_s"] - p["delay"] * 0.05 for p in plan) * 2.6 + sum(p["delay"] * 0.05 for p in plan) + 0.6, 1)
+
+        def _send():
+            link.pop_other()                                  # only what the board says after the script went out
+            link.play_data_skill(message)
+
+        def _play():
+            r = ast.run_skill(robot, "script_" + a.script, watch_s=watch, send=_send, expect_motion=False, pre_checks=False)
+            return r, list(link.pop_other()[:40])
+
+        res, echoes, retried = play_with_retry(_play)
+        print("the board said after the script was sent:", echoes or "nothing (no K echo: the script may not have been taken)")
+        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "retried_after_not_taken": retried, "grip_look": grip, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
+        print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
+        out.update({"ok": True, "res": res, "path": path, "grip": grip, "pack_pct": pct})
+    except KeyboardInterrupt:
+        print("ended")
+    finally:
+        if looker is not None and own_looker:
+            looker.close()
+        try:
+            link._end_quiet()                              # the link stays silent behind a data skill until a `k` echo that may not come (or 10 s) and drops the pose reads the eased lie-down makes: the movement is over, so rest starts at once (a throw was followed by ten seconds of standing before the lie-down began, and the legs sagged)
+        except Exception:  # noqa: BLE001
+            pass
+        if rest_after:
+            chase.ensure_rest(link)
+    return out
+
+
+def parser():
     import argparse
     ap = argparse.ArgumentParser(description="Play a scripted skill on G2: the person's go first; the voice service stopped.")
     ap.add_argument("script", nargs="?", help="the script's name (pi_pipeline/behavior/scripts/NAME.json)")
@@ -162,6 +262,11 @@ def main(argv: list | None = None) -> None:
     ap.add_argument("--floor", default=None)
     ap.add_argument("--no-prompt", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    return ap
+
+
+def main(argv: list | None = None) -> None:
+    ap = parser()
     a = ap.parse_args(argv)
     try:
         overrides = parse_overrides(a.set)
@@ -192,92 +297,8 @@ def main(argv: list | None = None) -> None:
         for p in plan:
             print(f"  {p['name']:10s} lift {p['frame'][1]:4d} jaw {p['frame'][2]:4d} legs {p['frame'][8:]} speed {p['speed']:3d} delay {p['delay'] * 0.05:.2f} s  about {p['nominal_s']:.2f} s")
         return
-    if a.gyro_off:
-        os.environ["G2_GYRO_BALANCE"] = "0"                  # every gB the link would write becomes gb, and the stand-up does not turn it on for the rise
-        os.environ["G2_STAND_GYRO"] = "0"
-    from . import ball_chase as chase
-    from ..link import imu_print
-    from ..link.serial_link import SerialLink
-    from ..power import battery
-    link = SerialLink("/dev/serial0")
-    link.connect()
-    if a.gyro_off:
-        link.send("gb", read_reply=False, settle=0.0)        # the gyro balance off, whatever state the board is in
-        time.sleep(0.2)
-    ok, pct, volts = battery.motion_gate(link)
-    print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
-    if not ok:
-        return
-    if not imu_print.board_answers(link):
-        print("refused: no IMU frames from the BiBoard: nothing was sent.")
-        return
-    robot = chase.SerialRobot(link)
-    path = None
-    looker, grip = None, None
-    if a.grip_look and a.pick:
-        from .grip_look import GripLooker
-        looker = GripLooker()
-        looker.warm()                                      # the camera opens and meters the light while he stands up
-    try:
-        if a.from_rest:
-            chase.ensure_rest(link)
-        else:
-            chase._stand_if_lying(link, "kbalance")
-        if a.attention and not a.from_rest:
-            robot.posture = "stand"
-            if robot.sit_down() == "fell":
-                print("G2 fell going into the attention pose: stopping")
-                return
-        if a.pick:
-            from .catapult import pick_up
-            print("playing pickF first: the object in front of him")
-            t_pick = time.monotonic()
-            heard: list = []
-            if not pick_up(link, seen=heard):
-                print("pickF did not report its end in time: stopping before the script")
-                return
-            print(f"pickF reported its end after {time.monotonic() - t_pick:.1f} s; the board sent (seconds after the wait began, line): {heard}")
-            if a.pick_gap > 0:
-                print(f"waiting {a.pick_gap:.1f} s before the script")
-                time.sleep(min(a.pick_gap, 3.0))
-            if looker is not None:
-                from .grip_look import take_grip_look
-                grip = take_grip_look(looker, a.script, since=time.monotonic())
-        base = chase.read_joints(link)
-        if not base or len(base) < 16:
-            print("refused: the joint angles could not be read: nothing was sent.")
-            return
-        try:
-            plan = build_plan(script, base, amount=a.amount, overrides=overrides)
-        except (ValueError, OSError) as e:
-            print("refused:", e)
-            return
-        message = payload_message([{"frame": p["frame"], "speed": p["speed"], "delay": p["delay"]} for p in plan])
-        print(f"{script.get('name', a.script)}: {len(plan)} frames, about {sum(p['nominal_s'] for p in plan):.1f} s at amount {a.amount}; hands near")
-        watch = a.watch if a.watch is not None else round(sum(p["nominal_s"] - p["delay"] * 0.05 for p in plan) * 2.6 + sum(p["delay"] * 0.05 for p in plan) + 0.6, 1)
-
-        def _send():
-            link.pop_other()                                  # only what the board says after the script went out
-            link.play_data_skill(message)
-
-        def _play():
-            r = ast.run_skill(robot, "script_" + a.script, watch_s=watch, send=_send, expect_motion=False, pre_checks=False)
-            return r, list(link.pop_other()[:40])
-
-        res, echoes, retried = play_with_retry(_play)
-        print("the board said after the script was sent:", echoes or "nothing (no K echo: the script may not have been taken)")
-        path = ast.write_log(res, {"script": a.script, "amount": a.amount, "plan": plan, "base_joints": base, "attention": a.attention, "overrides": {f"{k[0]}.{k[1]}": v for k, v in overrides.items()}, "picked_first": a.pick, "pick_gap_s": a.pick_gap, "board_after_send": echoes, "retried_after_not_taken": retried, "grip_look": grip, "gyro_off": a.gyro_off, "pack_pct": pct, "pack_v": volts, "floor": a.floor}, log_dir=LOG_DIR)
-        print(f"RESULT {a.script}: body {res['verdict']} (roll {res['max_roll_dev']} pitch {res['max_pitch_dev']} deg){'; logged ' + path if path else ''}")
-    except KeyboardInterrupt:
-        print("ended")
-    finally:
-        if looker is not None:
-            looker.close()
-        try:
-            link._end_quiet()                              # the link stays silent behind a data skill until a `k` echo that may not come (or 10 s) and drops the pose reads the eased lie-down makes: the movement is over, so rest starts at once (a throw was followed by ten seconds of standing before the lie-down began, and the legs sagged)
-        except Exception:  # noqa: BLE001
-            pass
-        chase.ensure_rest(link)
+    out = play(a, script, overrides)
+    path = out.get("path")
     if path and not a.no_prompt:
         try:
             ast.update_log(path, {"observed": {"note": input("what did it do (Enter = skip): ").strip() or None, "time": time.strftime("%H:%M:%S")}})

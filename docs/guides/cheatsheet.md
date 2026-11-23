@@ -31,6 +31,7 @@ Most used
 - `g2armspeed --report`: the speed runs so far and the next step
 - `g2catapult --stage bow --dry-run`: one catapult stage's frames, no move
 - `g2lob --dry-run`: the lob's frames, no move (without the flag it runs)
+- `g2basket`: the full basket sequence (pick up, throw, look, retrieve, line up)
 - `g2throws summary`: the throw tally on the Mac, per script and grip
 - `g2lastrun`: what the newest run did, and whether the board took a script
 - `g2video sheet CLIP`: contact sheet of a clip's frames (Mac only, no download)
@@ -338,6 +339,7 @@ Every command on this page (generated; `python tools/gen_cheatsheet_index.py` re
 - `g2ball`: [Most used](#most-used), [Ball goal and punts](#ball-goal-and-punts)
 - `g2ballstop`: [Most used](#most-used), [Ball goal and punts](#ball-goal-and-punts)
 - `g2baseline`: [Walk tests](#walk-tests)
+- `g2basket`: [Most used](#most-used)
 - `g2bg`: [Data and review](#data-and-review)
 - `g2bringup`: [Bring-up and hardware](#bring-up-and-hardware)
 - `g2cal`: [Data and review](#data-and-review)

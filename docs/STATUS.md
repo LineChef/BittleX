@@ -105,7 +105,7 @@ Tested on the real robot
 
 ### Not yet run on G2
 
-The colour matching, the lead and the jump check in the active look, the proportional small steps, the exposure-lock and picture-size experiments (`g2stream --lock-ae`, `--compare`), the finder's pale-ball rules in a clean run, the step calibration (it stopped at trial 1: the ball was not seen), the arm skills, the walls goal, "G2, practise", the spoken goal suggestions and operator overrides, the policy walk toward a ball with self-measured pace, vision reflexes while walking, the full application over a long period, the teach tool, the recognition labelling pictures, the per-leg wall look, conversation mode as a hardware test, G2 asking to explore, the sag check while walking, and the wall-loop handover.
+The full basket sequence (`g2basket`: pick up, throw, look, search for the puck after a miss, pick it up, line up, throw again), the colour matching, the lead and the jump check in the active look, the proportional small steps, the exposure-lock and picture-size experiments (`g2stream --lock-ae`, `--compare`), the finder's pale-ball rules in a clean run, the step calibration (it stopped at trial 1: the ball was not seen), the arm skills, the walls goal, "G2, practise", the spoken goal suggestions and operator overrides, the policy walk toward a ball with self-measured pace, vision reflexes while walking, the full application over a long period, the teach tool, the recognition labelling pictures, the per-leg wall look, conversation mode as a hardware test, G2 asking to explore, the sag check while walking, and the wall-loop handover.
 
 Known limitations
 -----------------

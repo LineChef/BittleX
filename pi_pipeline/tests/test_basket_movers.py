@@ -2,6 +2,7 @@
 from pi_pipeline.behavior import ball_chase as chase
 from pi_pipeline.behavior import basket_lineup as bl
 from pi_pipeline.behavior import basket_movers as bm
+from pi_pipeline.behavior import chase_pace
 
 
 class FakeRobot:
@@ -43,17 +44,17 @@ def test_the_movers_send_the_walks_and_turns_the_ball_goal_uses():
     m = bm.BasketMover(r)
     assert m.back(6.0) == "ok" and r.calls[-1][0] == "back" and abs(r.calls[-1][1][0] - bm.back_seconds(6.0)) < 1e-9
     m.forward(6.0)
-    assert r.calls[-1][0] == "walk_scripted" and abs(r.calls[-1][1][0] - 2.0) < 1e-9
+    assert r.calls[-1][0] == "walk_scripted" and abs(r.calls[-1][1][0] - bm.forward_seconds(6.0)) < 1e-9
     m.forward(0.5)
-    assert r.calls[-1][1][0] == bm.FWD_MIN_S
+    assert r.calls[-1][1][0] == chase.MIN_MOVE_S
     m.pivot(27.0)
     name, (deg, secs), kw = r.calls[-1]
-    assert name == "turn" and deg == 27.0 and kw["stop_deg"] == 27.0 and secs == max(chase.MIN_MOVE_S, 27.0 / bm.TURN_DEG_S)
+    assert name == "turn" and deg == 27.0 and kw["stop_deg"] == 27.0 and secs == max(chase.MIN_MOVE_S, 27.0 / chase_pace.DEFAULTS["turn_deg_s"])
     m.pivot(-54.0)
     assert r.calls[-1][1][0] == -54.0
     m.nudge(6.0)
     name, (deg, secs), kw = r.calls[-1]
-    assert deg == 6.0 and secs == max(chase.MIN_MOVE_S, 6.0 / bm.PULSE_DEG_S) and kw["stop_deg"] == 6.0       # a pulse never runs shorter than a gait that moves him
+    assert deg == 6.0 and secs == max(chase.MIN_MOVE_S, 6.0 / chase_pace.DEFAULTS["pulse_deg_s"]) and kw["stop_deg"] == 6.0       # a pulse never runs shorter than a gait that moves him
     m.scan(27.0)
     assert r.calls[-1][1][0] == 27.0
     n = len(r.calls)
@@ -94,6 +95,28 @@ def test_a_fall_in_a_move_is_reported_and_ends_the_line_up():
 
 def test_the_largest_and_smallest_line_up_steps_stay_inside_the_measured_paces():
     assert bm.back_seconds(bl.BACK_STEP_MAX_IN) <= 3.0 and bm.back_seconds(bl.MIN_STEP_IN) >= bm.BACK_MIN_S      # the line-up's back-up steps (1.5 to 6 inches) sit inside the measured 1 to 3 s
-    assert bm.forward_seconds(bl.FAR_STEP_MAX_IN) <= 4.0 and bm.forward_seconds(bl.MIN_STEP_IN) >= bm.FWD_MIN_S
+    assert bm.forward_seconds(bl.FAR_STEP_MAX_IN) <= 4.0 and bm.forward_seconds(bl.MIN_STEP_IN) >= chase.MIN_MOVE_S
     for deg in (3.0, 6.0, 17.0, 27.0, 54.0):
-        assert chase.MIN_MOVE_S <= max(chase.MIN_MOVE_S, deg / bm.PULSE_DEG_S) <= 4.0
+        assert chase.MIN_MOVE_S <= max(chase.MIN_MOVE_S, deg / chase_pace.DEFAULTS["pulse_deg_s"]) <= 4.0
+
+
+def test_a_pace_book_sets_the_walk_and_turn_times_and_the_measured_start_run_is_reproduced():
+    class Book:
+        def walk_in_s(self):
+            return 9.164
+
+        def turn_deg_s(self, side, short):
+            return (10.0 if short else 20.0) * (1 if side > 0 else 0.5)
+
+    assert abs(bm.forward_seconds(6.0, 9.164) - (chase_pace.WALK_START_S + 6.0 / 9.164)) < 1e-9
+    assert bm.forward_seconds(10.0, 9.164) > 2.0 > bm.forward_seconds(6.0, 9.164)                 # 2026-11-23: a 2 s walk moved about 10 inches
+    r = FakeRobot()
+    m = bm.BasketMover(r, book=Book())
+    m.forward(9.164)
+    assert abs(r.calls[-1][1][0] - 2.0) < 1e-9                                                    # start 1 s + 1 s of walking
+    m.pivot(40.0)
+    assert r.calls[-1][1][1] == 40.0 / 20.0                                                       # right, long turn rate
+    m.pivot(-40.0)
+    assert r.calls[-1][1][1] == 40.0 / 10.0                                                       # left side is slower in this book
+    m.nudge(10.0)
+    assert r.calls[-1][1][1] == max(chase.MIN_MOVE_S, 10.0 / 10.0)                                # a pulse uses the pulse rate

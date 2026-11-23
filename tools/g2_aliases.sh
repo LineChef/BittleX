@@ -587,6 +587,14 @@ g2lob() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lob$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { _g2_voice_back; }
 }
+# g2basket [--max-attempts N]  -- THE FULL BASKET SEQUENCE (UNPROVEN, owner watches the first runs): G2 at rest, the puck touching the claw tip, the basket centre 16 inches from the claw tip. Per attempt: stand, pick up, grip picture, lob, then a claw look; a miss (the puck seen on the floor) is searched for, walked to, picked up and lined up on the basket again before the next throw; a puck not seen anywhere is a make or a lost one and the run stops for your reset. Up to 5 attempts, stops on a fall; every stage is logged on the Pi in ~/g2_runs/basket_run/. Stops the voice service first (`G2_KEEP_VOICE_OFF=1` keeps it off after).
+g2basket() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  local rest; rest="$(printf ' %q' "$@")"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.basket_run$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  _g2_voice_back
+}
 # g2throws add SCRIPT INCHES [--side IN] [--grip TEXT] [--grab good|marginal|bad] [--note TEXT] | g2throws summary  -- the throw tally on the Mac (~/.local/share/g2/throw_distances.csv, outside the repo): one row per throw with the distance and the sideways offset (inches right of the aim line, negative = left) you measure, and a summary per script and grip. Reads nothing from G2.
 g2throws() { (cd "$G2_ROOT" && "$_G2_PY" -m pi_pipeline.behavior.throw_tally "$@"); }
 # g2lastrun [N]  -- what the newest N (default 1) scripted, arm-skill or catapult runs on the Pi did, in one read-only look: the verdict, tilt, pack, and for a script whether the board took it (the K echo) or not; then what the Pi sent and the board did on its own (the quiet lines left out). Use it after any run, also one you started yourself.

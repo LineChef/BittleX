@@ -49,6 +49,10 @@ Written 2026-11-21. Goal (owner): a new goal for G2. He picks the cylinder up, t
 
 The ordered hardware plan is the numbered list "What happens next" in `docs/STATUS.md`, so it lives in one place. Session A (throw data, pick-up reach, two basket blocks) and the recognition pictures of session B are done. The first thing next session is finishing the bad claw grab calibration, then the grip check in the lift sequence, the walking paces and a backward walk, more basket pictures for the distance reading, the after-throw look, the line-up alone, and a full attempt; the goal wrapper comes last.
 
+## The full sequence as one process (built 2026-11-23, not run on G2)
+
+`behavior/basket_run.py` (`g2basket`): per attempt the lob (through `scripted_skill.play`, which now takes an open link), the claw look, the outcome (`goals/basket_outcome`), and after a miss the retrieval: pivot scan for the puck (`vision/puck_finder.py`: the saturated blob on the grey floor, distance from its row, 14 of 16 recognition pictures, no false hits on the basket pictures), the movers walk to it, a last walk stopping 0.5 inch short of the finder's distance, `pickF`, a look to confirm the puck is gone from the floor, the line-up on the basket with quick claw-down pictures, and the next throw without a pick-up. Not seen anywhere: a make or a lost puck, the run stops for the owner's reset. Unknown until run: whether the last walk lands the puck inside the pick-up window (about 1 inch wide and half an inch deep) and how often the puck is seen after a throw (it is a 4 to 8 pixel speck past 15 inches).
+
 ## Open decisions (owner)
 
 - The basket or bag: size, colour, shallow or deep. Its width in inches goes into its `ObjectSpec`.
