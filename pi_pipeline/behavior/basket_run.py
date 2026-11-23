@@ -212,7 +212,7 @@ def retrieve(env, say=print, on_step=None) -> dict:
 
 
 def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) -> dict:
-    """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made_or_lost" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed",
+    """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed",
     "basket_not_found", "could_not_align", "puck_not_found", "could_not_reach_puck", "too_near_the_basket", "pick_failed"."""
     attempts: list = []
     holding = False
@@ -251,7 +251,9 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         say(f"after the throw: {code}: {words}")
         persist()
         if code != bo.MISSED:
-            outcome = "made_or_lost" if code in (bo.NOT_SEEN, bo.MADE) else code
+            outcome = "made" if code in (bo.NOT_SEEN, bo.MADE) else code            # owner, 2026-11-23: not seen by the end of the attention pose means it went in
+            if code == bo.NOT_SEEN:
+                say("the puck was not seen by the end of the attention pose: counted as a make")
             break
         def on_step(log, rec=rec):
             rec["retrieval"] = {"outcome": "running", "steps": list(log)}
@@ -324,9 +326,7 @@ class RealEnv:
         res = out.get("res") or {}
         out["fell"] = bool(out.get("fell")) or res.get("verdict") == "fell"
         if out["ok"] and not out["fell"]:
-            self.robot.expect_lob_end()                                     # the lob's end pose is not a sag for the gate (owner, 2026-11-23)
-            if self.robot.sit_down() == "fell" or self.robot.claw_pose(0.0, chase.CLAW_LIFT_DEG) == "fell":
-                out["fell"] = True
+            self._attention_now()
         self._burst_rec = rec
         if rec is not None:
             out["burst"] = {"frames": len(rec.join())}
@@ -336,6 +336,19 @@ class RealEnv:
                     import base64
                     print(f"BURST_SHEET {self.attempt} {base64.b64encode(png).decode()}", flush=True)       # to the person running it, over the connection: nothing is written to the Pi's disk
         return out
+
+    def _attention_now(self) -> None:
+        """The attention pose, sent the moment the throw's watch ends (owner, 2026-11-23: 0.0 s after the throw). No tilt read and no settle sleep in front of it (the lob's end pose is known), and the arm is not moved: it already stands at the lob's last lift (125 degrees), close to the look height,
+        and a write to the board while the pose skill plays would cut it short. The burst keeps recording through the settle."""
+        from . import ball_chase as chase
+        r = self.robot
+        r.expect_lob_end()
+        r._pitch, r._roll = [], []
+        r._tx("gP")
+        r._tx(chase.CLAW_LOOK_POSE)
+        r._claw = (0.0, lob_end_lift())
+        r.posture = "attention"
+        r._posed_at = r._clock()
 
     def after_throw(self):
         """The basket and the puck as the burst's last frames show them (taken from the attention pose with the claw at 120, where the puck finder is fitted); a quick picture if the burst gave nothing."""

@@ -117,16 +117,16 @@ def ok(**k):
     return {"ok": True, **k}
 
 
-def test_a_throw_that_is_not_seen_afterwards_stops_for_the_owners_reset():
+def test_a_throw_that_is_not_seen_afterwards_counts_as_a_make_and_stops_for_the_owners_reset():
     env = Env([ok()], puck_after=[None])
     r = br.run_sequence(env, say=lambda s: None)
-    assert r["outcome"] == "made_or_lost" and len(r["attempts"]) == 1 and env.thrown == [False]
+    assert r["outcome"] == "made" and len(r["attempts"]) == 1 and env.thrown == [False]
 
 
 def test_a_miss_is_searched_picked_up_lined_up_and_thrown_again_without_a_pick_up():
     env = Env([ok(), ok()], puck_after=[(24.0, 25.0), None])
     r = br.run_sequence(env, say=lambda s: None)
-    assert r["outcome"] == "made_or_lost" and len(r["attempts"]) == 2
+    assert r["outcome"] == "made" and len(r["attempts"]) == 2
     assert env.thrown == [False, True]                                                           # the second throw is from a puck already held
     a1 = r["attempts"][0]
     assert a1["after"]["code"] == bo.MISSED and a1["retrieval"]["outcome"] == "retrieved" and a1["lineup"]["outcome"] == "aligned"
@@ -289,3 +289,35 @@ def test_the_retrieval_never_stands_straight_up_from_the_attention_pose():
 def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_watch_is_short():
     assert br.lob_end_lift() == 125.0                                                                         # the lob's last frame: the arm stays up at the throw's lift
     assert br.THROW_WATCH_S < 3.0                                                                              # the attention pose follows the animation, not the long default watch
+
+
+def test_the_attention_pose_is_sent_at_once_with_no_read_and_no_arm_move():
+    sent = []
+
+    class Robot:
+        posture = "stand"
+        _claw = (0.0, 0.0)
+
+        def __init__(self):
+            self._pitch = self._roll = None
+
+        def _clock(self):
+            return 5.0
+
+        def expect_lob_end(self):
+            sent.append("expect")
+
+        def _tx(self, c):
+            sent.append(c)
+
+        def claw_pose(self, *a):
+            sent.append("claw_pose")
+
+        def sit_down(self):
+            sent.append("sit_down")
+
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot = Robot()
+    env._attention_now()
+    assert sent == ["expect", "gP", "kcalib"]                                                              # the pose and nothing else: no tilt read, no settle sleep, no claw move over the playing skill
+    assert env.robot.posture == "attention" and env.robot._claw == (0.0, 125.0)
