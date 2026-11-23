@@ -1,11 +1,12 @@
 """The full basket sequence, as one process on one serial connection (the basket goal, docs/plan-detail/basket-goal-plan.md, steps 3 to 5; owner, 2026-11-23).
 
-Per attempt: stand, pick the puck up, take the grip picture, throw (the lob: `behavior/lob.py` through `scripted_skill.play`); then LOOK (the shared claw look, from the attention pose, one picture read by the basket and puck finders) and classify the throw
-(`goals/basket_outcome.classify_throw`). The puck seen on the floor outside the basket is a miss: he searches for it (pivot scan), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a look that it is gone from the floor,
-lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up (he already holds it). The puck not seen anywhere is a make or a lost puck and the run stops for the owner to reset it, as the plan says.
-Stops: 5 attempts, a fall, a battery gate that fails, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` for the report.
+Per attempt: stand, pick the puck up, take the grip picture, throw (the lob: `behavior/lob.py` through `scripted_skill.play`); then ONE picture of the floor (the claw lowered from the throw's 125 degrees to AFTER_THROW_LIFT_DEG so the camera is level, read by the basket and puck finders) and straight into rest by the standard lie-down,
+and the throw is classified (`goals/basket_outcome.classify_throw`). No attention pose: after `kcalib` the first byte the Pi sends makes the board start its own back-legs-first `up` and he falls (five runs, and a silence test on 2026-11-23: 14 s of silence and nothing, the next write and he stood up).
+The puck seen on the floor outside the basket is a miss: he stands up from rest (the eased stand-up), searches for it (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor,
+lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up (he already holds it). The puck not seen: counted as a make (owner, 2026-11-23) and the run stops for the owner's reset.
+Stops: 5 attempts, a fall, a battery gate that fails, a camera that does not answer (checked before anything moves), no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
 
-`next_retrieval_action` and `run_sequence` are pure (the robot, the camera and the throw are handed in as an `Env`), tested on a simulated floor; `RealEnv` wires them to G2 and is only used by `main`. UNPROVEN on G2: the first run is watched by the owner (a separate process, `g2basket`).
+`next_retrieval_action` and `run_sequence` are pure (the robot, the camera and the throw are handed in as an `Env`), tested on a simulated floor; `RealEnv` wires them to G2 and is only used by `main`. UNPROVEN on G2: the first runs are watched by the owner (a separate process, `g2basket`).
 """
 from __future__ import annotations
 
@@ -30,10 +31,10 @@ PICK_UNDERSHOOT_IN = 0.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
-BURST_S = 10.0                       # the picture burst after the throw is sent: the throw (about 1.2 s), the move into the attention pose, the flight, the landing, the bounce and the settle
+BURST_S = 10.0                       # the picture burst (off by default; the arm stays up after the throw so it never saw the landing)
 THROW_WATCH_S = 2.3                  # the body is watched this long after the throw is sent (the animation ends at about 2.2 s by the IMU trace; the default watch was about 3.1 s): the attention pose follows at once
 AFTER_PICTURE_TIMEOUT_S = 2.5          # the camera's wait for one picture during the run
-ATTENTION_POSE_WAIT_S = 7.0          # the most we wait for the board to say the attention pose is done (about 5 s after the send)
+AFTER_THROW_LIFT_DEG = 76.0          # the claw angle that brings the camera level in the lob's end pose (125 deg minus the 49 deg the basket's row 210 against row 90 shows); to be checked on the first picture
 KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
 
@@ -337,7 +338,7 @@ class RealEnv:
         return bool(self.robot.battery_ok())
 
     def throw(self, holding: bool) -> dict:
-        """The lob (a pick-up first unless he already holds the puck), then at once the attention pose with the claw at the look height, while the picture burst that began when the throw was sent keeps recording the move and the floor."""
+        """The lob (a pick-up first unless he already holds the puck)."""
         from . import ball_chase as chase
         from . import lob, scripted_skill
         argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt", "--watch", str(THROW_WATCH_S)]
@@ -350,53 +351,29 @@ class RealEnv:
             rec = BurstRecorder(self.looker._cam)
         out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False, on_send=rec.start if rec else None)
         self.robot.posture = "stand"
-        self.robot._claw = (0.0, lob_end_lift())                            # the arm is where the throw's last frame left it (125 deg), not at 0: the raise to the look height is a short move
+        self.robot._claw = (0.0, lob_end_lift())                            # the arm is where the throw's last frame left it (125 deg), not at 0: the move to the look angle starts from there
         res = out.get("res") or {}
         out["fell"] = bool(out.get("fell")) or res.get("verdict") == "fell"
-        if out["ok"] and not out["fell"]:
-            self._attention_now()
         self._burst_rec = rec
         if rec is not None:
             out["burst"] = {"frames": len(rec.join())}
         return out
 
-    def _attention_now(self) -> None:
-        """The attention pose, sent the moment the throw's watch ends (owner, 2026-11-23: 0.0 s after the throw). No tilt read and no settle sleep in front of it (the lob's end pose is known), and the arm is not moved: it already stands at the lob's last lift (125 degrees), close to the look height,
-        and a write to the board while the pose skill plays would cut it short. The burst keeps recording through the settle."""
-        from . import ball_chase as chase
-        r = self.robot
-        r.expect_lob_end()
-        r._pitch, r._roll = [], []
-        r._tx("gP")
-        r._tx(chase.CLAW_LOOK_POSE)                                          # MODE-SPECIFIC(basket_run.py, 2026-11-23): the attention pose sent straight from the throw, with no tilt read and no settle sleep (mode-exceptions.md)
-        r._claw = (0.0, lob_end_lift())
-        r.posture = "attention"
-        r._posed_at = r._clock()
-
-    def _wait_for_attention_pose(self, timeout_s: float = ATTENTION_POSE_WAIT_S) -> bool:
-        """Wait for the board to say the attention pose is done (it prints `calib` when the skill ends, about 5 s after the send from the lob's end pose). Nothing is written to the board meanwhile (a byte over a playing skill cuts it short)."""
-        end = time.monotonic() + timeout_s
-        while time.monotonic() < end:
-            if any(str(line).strip().startswith("calib") for line in self.link.pop_other()):
-                return True
-            time.sleep(0.1)
-        return False
-
     def after_throw(self):
-        """One picture from the attention pose (owner, 2026-11-23: no burst), read by the basket and puck finders, then straight into rest: he stands again only if the puck was seen on the floor. The claw is not moved (the attention pose has already lowered it) and nothing is
-        read or written before `krest`: the board stands him up by itself about 8 s after the pose is sent (2026-11-23: it printed `up` at +8 s every time and he fell), so the picture is taken the moment the pose ends and rest follows at once. The picture is never saved on the Pi;
-        with show_picture it is printed (base64, one line) for the person running it."""
+        """One picture of the floor after the throw, then rest (owner, 2026-11-23). NO attention pose: in five runs the first byte the Pi sent after `kcalib` made the board start its own back-legs-first `up` and he fell. The lob's end pose leaves the camera looking about 49 degrees
+        too high (the basket at row 210 instead of 90), so the claw is lowered from the throw's 125 degrees to AFTER_THROW_LIFT_DEG, the picture is taken and the standard lie-down (the one every lob ends with) follows at once. The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
         from . import ball_chase as chase
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
         r = self.robot
-        self._wait_for_attention_pose()
-        time.sleep(chase.CLAW_SETTLE_S)                                          # the arm and body settle a moment
+        if r.claw_pose(0.0, AFTER_THROW_LIFT_DEG) == "fell":
+            raise Fell()
+        time.sleep(chase.CLAW_SETTLE_S)
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
-        chase.ensure_rest(self.link)                                             # the standard lie-down: `krest` goes out first, then the pose is confirmed (and asked again if the board did not take it)
+        chase.ensure_rest(self.link)
         r.posture, r._claw = "rest", (0.0, 0.0)
         basket = puck = None
         if jpeg:
@@ -461,7 +438,7 @@ def main(argv: list | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(description="The full basket sequence on G2 (hands near, the voice service stopped, G2 at rest with the puck touching the claw tip and the basket 16 inches out).")
     ap.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS)
-    ap.add_argument("--show-picture", action="store_true", help="after each throw print the attention-pose picture (JPEG, base64, one line) for the person running it; never saved on the Pi")
+    ap.add_argument("--show-picture", action="store_true", help="after each throw print the picture of the floor (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
     from . import ball_chase as chase
     from . import chase_pace
