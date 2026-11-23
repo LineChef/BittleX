@@ -1,10 +1,10 @@
 """The full basket sequence, as one process on one serial connection (the basket goal, docs/plan-detail/basket-goal-plan.md, steps 3 to 5; owner, 2026-11-23).
 
-THE STEPS THE OWNER WANTS TO SEE, in this order, every attempt (2026-11-23): stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), go into the attention pose, lift the claw to 120, take ONE picture, put the claw down, then rest (attention to rest, never a stand-up from attention),
-and decide: the puck seen on the floor outside the basket is a miss and he stands up from rest with the eased stand-up; the puck not seen counts as a make and he stays in rest and the run ends for the owner's reset (`goals/basket_outcome.classify_throw` calls the throw).
-The attention pose is entered by the standard `sit_down()` (stand first, then the eased entry): the raw firmware `kcalib` from the lob's end pose made the board stand him up by itself 8 to 13 s later in every run (2026-11-23).
+THE STEPS, every attempt: stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), then THE BALL GOAL'S OWN CLAW LOOK (`claw_survey.run_claw_look`: the attention pose, the claw up in two steps, a settle, the pictures, the claw down, its eased stand-up), read by the basket and puck finders
+(`goals/basket_outcome.classify_throw` calls the throw). The puck not seen: counted as a make (owner, 2026-11-23): he lies down and the run ends for the owner's reset. The puck seen on the floor outside the basket is a miss: he is already standing (the look's own stand-up) and goes on with the retrieval.
+Everything I had rebuilt in place of that look (raw `kcalib`, `gb` writes, a fast claw, a legs-holding lowering frame, a lie-down before the stand-up) was followed by the board's own `up` and a flip in 10 runs; see the real walk log, "The board's own stand-up after the claw lowers".
 A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
-Stops: 5 attempts, a fall, a battery gate that fails, no picture after the throw (and none before the attention pose: the camera is only opened at the start, never used), a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
+Stops: 5 attempts, a fall, no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. The camera is warmed up with two silent pictures at the start, before anything moves. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
 
 `next_retrieval_action` and `run_sequence` are pure (the robot, the camera and the throw are handed in as an `Env`), tested on a simulated floor; `RealEnv` wires them to G2 and is only used by `main`. UNPROVEN on G2: the first runs are watched by the owner (a separate process, `g2basket`).
 """
@@ -32,8 +32,6 @@ BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
-LOWER_SPEED, LOWER_WAIT_S = 6, 1.8       # the pose editor's own speed and wait for one eased frame (behavior/pose_edit.py)
-LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 
 
 @dataclass
@@ -168,14 +166,17 @@ def merge_looks(seen: dict, offsets: dict):
     return basket, puck
 
 
-def retrieve(env, say=print, on_step=None) -> dict:
+def retrieve(env, say=print, on_step=None, first=None) -> dict:
     """Search for the puck, walk to it and pick it up. Returns {"outcome": "retrieved" | a give-up reason | "fell", "steps": [...]}."""
     st = RState()
     while True:
-        try:
-            basket, puck = env.look()
-        except Fell:
-            return {"outcome": "fell", "steps": st.log}
+        if first is not None:                      # the first step uses what the look after the throw just saw: no picture, no pause (owner, 2026-11-23)
+            (basket, puck), first = first, None
+        else:
+            try:
+                basket, puck = env.look()
+            except Fell:
+                return {"outcome": "fell", "steps": st.log}
         act = next_retrieval_action(puck, basket, st)
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                        "basket_in": None if basket is None else round(basket.claw_in, 1)})
@@ -252,6 +253,8 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                         "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
         rec["after"]["attention_hold_s"] = getattr(env, "attention_hold_s", None)
+        if code != bo.MISSED and hasattr(env, "lie_down"):
+            env.lie_down()                                                       # no pause between the claw coming down and the lie-down (owner, 2026-11-23)
         say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
         persist()
         if code != bo.MISSED:
@@ -262,7 +265,7 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         def on_step(log, rec=rec):
             rec["retrieval"] = {"outcome": "running", "steps": list(log)}
             persist()
-        r = retrieve(env, say=say, on_step=on_step)
+        r = retrieve(env, say=say, on_step=on_step, first=(basket, puck))
         rec["retrieval"] = r
         persist()
         if r["outcome"] != "retrieved":
@@ -333,60 +336,42 @@ class RealEnv:
         return out
 
     def after_throw(self):
-        """The owner's sequence after the throw (2026-11-23): into the attention pose, the claw up to LOOK_LIFT_DEG, ONE picture, the claw down, then rest (attention to rest, never a stand-up from attention); a puck seen on the floor sends him up with the eased stand-up from rest (`_ready_to_move`), not seen counts as a make.
-        The attention pose is entered the STANDARD way, `sit_down()`: `kbalance` first, then the eased move into the pose (the pose editor and every claw look do it, and 20 pictures were taken that way). The first versions of this step sent the raw firmware `kcalib` straight from the lob's pitched end pose
-        (no stand first, no eased entry) and the board stood him up by itself 8 to 13 s later in every run; the claw look's move gate would lay him down and stand him up first because of that pitch, so `expect_lob_end()` tells it the lob's end pose is not a sag (the owner approved that exception).
-        The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
+        """The ball goal's own claw look, unchanged (`claw_survey.run_claw_look`: `sit_down`, the claw up in two steps, a settle, the pictures left, right and centre, the claw down, then its own eased back-legs-first stand-up), read by the basket and puck finders and merged into one reading each.
+        Everything I rebuilt for this step (the raw `kcalib`, the `gb` writes, the fast claw, the legs-holding lowering frame, the lie-down before the stand-up) was followed by the board's own `up` and a flip; the ball goal does this exact look without one (owner, 2026-11-23): it never leaves him idle in the attention
+        pose with the claw down, because the eased stand-up follows the lowering at once. `expect_lob_end()` tells the look's move gate that the lob's pitched end pose is not a sag (the owner approved that exception). He ends the look STANDING; the caller lies him down when the puck was not seen
+        (a make) and the retrieval simply goes on standing when it was. With show_picture the centre picture is printed (base64, one line), never saved on the Pi."""
         from . import ball_chase as chase
+        from . import claw_survey
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
-        r = self.robot
-        r.expect_lob_end()
-        if r.sit_down() == "fell":                                       # the standard attention entry
-            raise Fell()
-        t_pose = time.monotonic()
-        r._tx("gb")                                                      # the gyro assist OFF, as the pose editor does before every command: the link's eased stand-up inside sit_down() switches it back on, and with it on the lowering claw makes the balance push the back legs up and flip him (owner's observation, 2026-11-23)
-        if r.claw_pose(0.0, LOOK_LIFT_DEG) == "fell":
-            raise Fell()
-        time.sleep(chase.CLAW_SETTLE_S)
-        cam = self._camera()
-        cam.refresh_exposure()
-        jpeg = cam.look()
-        self.picture_ok = jpeg is not None
-        r._tx("gb")
-        if not self._lower_claw_holding_the_legs():                      # the pose editor's own move; the plain claw_pose only if the pose cannot be read
-            if r.claw_pose(0.0, 0.0) == "fell":
-                raise Fell()
-        self.attention_hold_s = round(time.monotonic() - t_pose, 1)
-        chase.ensure_rest(self.link)                                     # attention to rest
-        r.posture, r._claw = "rest", (0.0, 0.0)
-        basket = puck = None
-        if jpeg:
-            basket = bf.find_basket(jpeg)
-            puck = pf.find_puck(jpeg, basket)
-            if self.show_picture:
-                import base64
-                print(f"AFTER_PICTURE {self.attempt} {base64.b64encode(jpeg).decode()}", flush=True)
-        return basket, puck
+        cam, seen = self._camera(), {}
+        left = chase.CLAW_PAN_DEG if chase.CLAW_PAN_SIGN == "left" else -chase.CLAW_PAN_DEG
+        self.picture_ok = False
 
-    def _lower_claw_holding_the_legs(self) -> bool:
-        """Lower the claw the way the pose editor moves the arm (owner, 2026-11-23: the back legs pushed up as soon as the claw came down and flipped him every time; the pose editor never did): ONE data skill carrying all 16 joints, the arm at pan 0 and lift 0 and the legs at the
-        angles just read from the board, so the legs are held while the arm's weight shifts back. False when the pose could not be read (the caller uses the plain claw move)."""
+        def snapshot(label):
+            jpeg = cam.look()
+            if jpeg:
+                basket = bf.find_basket(jpeg)
+                seen[label] = (basket, pf.find_puck(jpeg, basket))
+                if label == "centre":
+                    self.picture_ok = True
+                    if self.show_picture:
+                        import base64
+                        print(f"AFTER_PICTURE {self.attempt} {base64.b64encode(jpeg).decode()}", flush=True)
+            return jpeg
+        self.robot.expect_lob_end()
+        t0 = time.monotonic()
+        state = claw_survey.run_claw_look(self.link, snapshot, "centre", robot=self.robot)
+        self.attention_hold_s = round(time.monotonic() - t0, 1)
+        if state != "ok" and getattr(self.robot, "last_fall", None):
+            raise Fell()
+        return merge_looks(seen, {"look_left": -abs(left), "look_right": abs(left), "centre": 0.0})
+
+    def lie_down(self) -> None:
+        """The standard lie-down, at once (a make: nothing else to do)."""
         from . import ball_chase as chase
-        from .pose_edit import LIFT, frame_message
-        j = chase.read_joints(self.link)
-        if not j or len(j) < 16:
-            return False
-        angles = [int(a) for a in j[:16]]
-        angles[0], angles[LIFT] = 0, 0
-        self.link.play_data_skill(frame_message(angles, LOWER_SPEED, 2))
-        time.sleep(LOWER_WAIT_S)
-        try:
-            self.link._end_quiet()                                       # the link keeps the port silent behind a data skill until its `k` echo or 10 s: the move is over
-        except Exception:  # noqa: BLE001
-            pass
-        self.robot._claw = (0.0, 0.0)
-        return True
+        chase.ensure_rest(self.link)
+        self.robot.posture, self.robot._claw = "rest", (0.0, 0.0)
 
     def _ready_to_move(self) -> None:
         """From the attention pose with the claw up: the claw down, laid in rest, then the eased stand-up from rest (owner, 2026-11-23: a stand-up straight from the attention pose is a fall every time). Standing already: nothing."""
@@ -404,8 +389,7 @@ class RealEnv:
         from ..vision import puck_finder as pf
         self._ready_to_move()
         cam = self._camera()
-        cam.refresh_exposure()
-        jpeg = cam.look()
+        jpeg = cam.look()                                                # no forced re-metering: the warm-up metered the light
         if not jpeg:
             return None, None
         basket = bf.find_basket(jpeg)

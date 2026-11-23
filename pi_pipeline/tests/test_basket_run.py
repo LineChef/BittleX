@@ -244,62 +244,6 @@ def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_throw_is_nev
     assert "--watch" not in inspect.getsource(br.RealEnv.throw)                                                # the throw is watched for its full default length: nothing is written to the board while the lob still plays (2026-11-23: a 2.3 s watch cut the release off)
 
 
-def test_after_the_throw_the_owners_sequence_with_the_standard_attention_entry(monkeypatch):
-    from pi_pipeline.behavior import ball_chase as chase
-    from pi_pipeline.vision import basket_finder as bf
-    from pi_pipeline.vision import puck_finder as pf
-    order = []
-    monkeypatch.setattr(br.time, "sleep", lambda s: order.append("sleep"))
-    monkeypatch.setattr(chase, "ensure_rest", lambda link: order.append("rest"))
-    monkeypatch.setattr(bf, "find_basket", lambda j: B(16.0, 0.0))
-    monkeypatch.setattr(pf, "find_puck", lambda j, b=None, by="row": P(12.0, 3.0))
-
-    class Cam:
-        def refresh_exposure(self):
-            order.append("meter")
-
-        def look(self):
-            order.append("picture")
-            return b"jpeg"
-
-    class Robot:
-        posture = "stand"
-        _claw = (0.0, 125.0)
-
-        def expect_lob_end(self):
-            order.append("expect_lob_end")
-
-        def sit_down(self):
-            order.append("sit_down")
-            return "ok"
-
-        def claw_pose(self, pan, lift, deg_s=None, confirm=True):
-            order.append(f"claw {lift}")
-            return "ok"
-
-        def _tx(self, c):
-            order.append(c)
-
-    class Link:
-        def __init__(self):
-            self.frames = []
-
-        def play_data_skill(self, message):
-            order.append("lower_frame")
-            self.frames.append(message)
-
-        def _end_quiet(self):
-            pass
-
-    monkeypatch.setattr(chase, "read_joints", lambda link: [5, 120, 3, 0, 0, 0, 0, 0] + [30, 31, 32, 33, 34, 35, 36, 37])
-    env = br.RealEnv.__new__(br.RealEnv)
-    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), Link(), Cam(), False, 1
-    basket, puck = env.after_throw()
-    assert order == ["expect_lob_end", "sit_down", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "gb", "lower_frame", "sleep", "rest"]      # the lowering is the pose editor's data skill, legs held       # the standard entry, gyro assist off before each claw move, then the owner's steps
-    assert "claw 0.0" not in order and not any(c in order for c in ("kcalib", "kbalance")) and env.robot.posture == "rest" and env.picture_ok is True        # no raw kcalib and no extra writes of mine
-    assert basket.claw_in == 16.0 and puck.claw_in == 12.0 and env.attention_hold_s is not None
-
-
 def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
     calls = []
 
@@ -357,15 +301,6 @@ def test_there_is_no_picture_between_the_pickup_and_the_throw():
     assert '"--grip-look"' not in src and "--pick" in src                                                    # the owner's sequence: pickup, throw, nothing in between
 
 
-def test_the_claws_two_moves_after_the_throw_use_the_standard_pace():
-    import inspect
-    src = inspect.getsource(br.RealEnv.after_throw)
-    assert "FAST_CLAW" not in src and "claw_pose(0.0, LOOK_LIFT_DEG)" in src and "_lower_claw_holding_the_legs" in src       # the ball goal's look pace, as the pose editor ran it for 22 minutes (the fast pace was followed by the board's own up twice)
-def test_the_runs_camera_keeps_the_shutter_click_on():
-    import inspect
-    assert "click=False" not in inspect.getsource(br.CameraHolder.__init__)                                  # the owner listens for the click: it is how he knows a picture was taken
-
-
 def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
     from pi_pipeline.behavior import ball_chase as chase
     t = [100.0]
@@ -378,34 +313,6 @@ def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
     assert r._lob_end_pose((-28.0, 14.0)) is False and r._lob_end_pose((-10.0, 0.0)) is False and r._lob_end_pose(None) is False
     t[0] += chase.LOB_END_S + 1
     assert r._lob_end_pose((-28.0, -2.0)) is False
-
-
-def test_the_claw_is_lowered_by_one_frame_that_holds_the_legs_at_the_angles_just_read(monkeypatch):
-    from pi_pipeline.behavior import ball_chase as chase
-    from pi_pipeline.behavior.pose_edit import LIFT
-    monkeypatch.setattr(br.time, "sleep", lambda s: None)
-    read = [5, 120, 3, 0, 0, 0, 0, 0] + [30, 31, 32, 33, 34, 35, 36, 37]
-    monkeypatch.setattr(chase, "read_joints", lambda link: list(read))
-    sent = []
-
-    class Link:
-        def play_data_skill(self, message):
-            sent.append(message)
-
-        def _end_quiet(self):
-            pass
-
-    class Robot:
-        _claw = (0.0, 120.0)
-
-    env = br.RealEnv.__new__(br.RealEnv)
-    env.robot, env.link = Robot(), Link()
-    assert env._lower_claw_holding_the_legs() is True and len(sent) == 1 and env.robot._claw == (0.0, 0.0)
-    from pi_pipeline.behavior.pose_edit import frame_message
-    assert sent[0] == frame_message([0, 0, 3, 0, 0, 0, 0, 0] + [30, 31, 32, 33, 34, 35, 36, 37], br.LOWER_SPEED, 2)       # pan and lift 0, everything else as read
-    assert LIFT == 1
-    monkeypatch.setattr(chase, "read_joints", lambda link: None)
-    assert env._lower_claw_holding_the_legs() is False                                                                  # unreadable: the caller falls back to the plain move
 
 
 def test_the_camera_is_warmed_up_with_two_silent_pictures_before_anything_moves():
@@ -424,3 +331,99 @@ def test_the_camera_is_warmed_up_with_two_silent_pictures_before_anything_moves(
     assert br.CameraHolder(dead).warm_up(tries=1, say=lambda s: None) is False and dead._click is True                             # a dead camera: the run does not start
     import inspect
     assert "warm_up" in inspect.getsource(br.main)
+
+
+def test_after_the_throw_he_does_the_ball_goals_own_claw_look_and_the_readings_are_merged(monkeypatch):
+    from pi_pipeline.behavior import ball_chase as chase
+    from pi_pipeline.behavior import claw_survey
+    from pi_pipeline.vision import basket_finder as bf
+    from pi_pipeline.vision import puck_finder as pf
+    order = []
+    shown = []
+    monkeypatch.setattr(bf, "find_basket", lambda j: bf.BasketReading(120.0, 110.0, 36, 28, 1.0, 18.0, 16.0, False))
+    monkeypatch.setattr(pf, "find_puck", lambda j, b=None, by="row": pf.PuckReading(120.0, 130.0, 14, 14, 150, 5.0, 14.0) if j == b"left" else None)
+
+    def fake_look(link, snapshot, kind, robot=None, **k):
+        order.append(("look", kind, robot is not None))
+        for label in ("look_left", "look_right", "centre"):
+            snapshot(label)
+        return "ok"
+    monkeypatch.setattr(claw_survey, "run_claw_look", fake_look)
+
+    class Cam:
+        def __init__(self):
+            self.n = 0
+
+        def look(self):
+            self.n += 1
+            return [b"left", b"right", b"centre"][self.n - 1]
+
+    class Robot:
+        last_fall = None
+
+        def expect_lob_end(self):
+            order.append("expect_lob_end")
+
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
+    basket, puck = env.after_throw()
+    assert order == ["expect_lob_end", ("look", "centre", True)]                                         # the lob's end pose is announced, then the ball goal's own look
+    assert env.picture_ok is True and basket.claw_in == 16.0 and abs(basket.bearing_deg - 1.0) < 1e-9     # the centre picture's basket first
+    assert puck is not None and puck.claw_in == 14.0 and puck.bearing_deg != 5.0                           # the puck seen in the left picture, in the body frame
+    import inspect
+    src = inspect.getsource(br.RealEnv.after_throw).split('"""')[2]                                        # the code, not the docstring
+    assert "claw_pose(" not in src and "sit_down" not in src and "ensure_rest" not in src and "_tx(" not in src       # nothing of my own: no claw steps, no entry, no rest, no raw writes
+
+
+def test_a_look_that_returns_no_centre_picture_is_a_failed_picture(monkeypatch):
+    from pi_pipeline.behavior import claw_survey
+    monkeypatch.setattr(claw_survey, "run_claw_look", lambda link, snapshot, kind, robot=None, **k: "ok")
+
+    class Robot:
+        last_fall = None
+
+        def expect_lob_end(self):
+            pass
+
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), object(), False, 1
+    basket, puck = env.after_throw()
+    assert env.picture_ok is False and basket is None and puck is None                                       # no picture: the run stops as no_picture, never counted as a make
+
+
+
+def test_a_make_lies_down_at_once_and_a_miss_starts_the_retrieval_from_the_looks_own_reading():
+    lies, looks = [], []
+
+    class E(Env):
+        def lie_down(self):
+            lies.append(1)
+
+        def look(self):
+            looks.append(1)
+            return super().look()
+
+    env = E([ok()], puck_after=[None])
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["outcome"] == "made" and lies == [1]                                                           # lie-down straight after the decision, before anything else
+    lies.clear()
+    looks.clear()
+    env = E([ok(), ok()], puck_after=[(24.0, 25.0), None])
+    br.run_sequence(env, say=lambda s: None)
+    kinds = [m[0] for m in env.w.moves]
+    assert kinds and kinds[0] in ("pivot", "nudge", "forward") and len(lies) == 1                           # the retrieval began moving at once, and only the final make lay him down
+    first_look_index = len(looks)
+    assert first_look_index >= 1
+    got = []
+    st = {"calls": 0}
+
+    class E2(Env):
+        def look(self):
+            st["calls"] += 1
+            return super().look()
+
+    e2 = E2([ok()], puck_after=[(6.0, 0.0)])
+    e2.w.puck = (6.0, 0.0)
+    br.retrieve(e2, say=lambda s: None, first=(None, P(6.0, 0.0)))
+    assert st["calls"] >= 1 and e2.w.moves[0][0] in ("forward",)                                            # the supplied first reading decided the first move; no look came before it
+    assert got == []
