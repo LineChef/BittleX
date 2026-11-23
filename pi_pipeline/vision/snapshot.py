@@ -407,6 +407,17 @@ class CameraSnapshotter:
             self._ser = None                               # reopen next time
         return None
 
+    def open_port(self) -> bool:
+        """Open the camera's port without taking a picture (so the first real picture is not also the one that opens it). True when it opened; never raises."""
+        try:
+            with self._lock:
+                self._open()
+            return True
+        except Exception:  # noqa: BLE001
+            log.warning("camera port did not open", exc_info=True)
+            self._ser = None
+            return False
+
     def grab_burst(self, seconds: float, max_frames: int = 60) -> list:
         """Raw frames back to back for `seconds` (a diagnostic, 2026-11-23: the picture record of a throw): no exposure work, no tilt estimate, no shutter click, the camera lock held throughout. Each is
         (the time the request was sent, the time the picture arrived, the jpeg) on this camera's clock; the module answers with the picture of the PREVIOUS request, so a frame shows the scene a little before its request. Never raises; a missing camera gives []."""

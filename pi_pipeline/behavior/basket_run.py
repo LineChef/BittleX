@@ -1,10 +1,10 @@
 """The full basket sequence, as one process on one serial connection (the basket goal, docs/plan-detail/basket-goal-plan.md, steps 3 to 5; owner, 2026-11-23).
 
-THE STEPS THE OWNER WANTS TO SEE, in this order, every attempt (2026-11-23): stand up, pick up, throw (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), go into the attention pose, lift the claw to 120, take ONE picture, put the claw down, then rest (attention to rest, never a stand-up from attention),
+THE STEPS THE OWNER WANTS TO SEE, in this order, every attempt (2026-11-23): stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), go into the attention pose, lift the claw to 120, take ONE picture, put the claw down, then rest (attention to rest, never a stand-up from attention),
 and decide: the puck seen on the floor outside the basket is a miss and he stands up from rest with the eased stand-up; the puck not seen counts as a make and he stays in rest and the run ends for the owner's reset (`goals/basket_outcome.classify_throw` calls the throw).
 After `kcalib` the board starts its own back-legs-first `up` (after `rc`, the firmware's self-right, which fires only while the gyro assist is on): `gb` is sent right after the pose and again before the lie-down.
 A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
-Stops: 5 attempts, a fall, a battery gate that fails, a camera that does not answer (checked before anything moves), no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
+Stops: 5 attempts, a fall, a battery gate that fails, no picture after the throw (and none before the attention pose: the camera is only opened at the start, never used), a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
 
 `next_retrieval_action` and `run_sequence` are pure (the robot, the camera and the throw are handed in as an `Env`), tested on a simulated floor; `RealEnv` wires them to G2 and is only used by `main`. UNPROVEN on G2: the first runs are watched by the owner (a separate process, `g2basket`).
 """
@@ -31,10 +31,8 @@ PICK_UNDERSHOOT_IN = 0.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
-BURST_S = 10.0                       # the picture burst (off by default; the arm stays up after the throw so it never saw the landing)
-AFTER_PICTURE_TIMEOUT_S = 2.5          # the camera's wait for one picture during the run
+AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
 LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
-KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
 
 @dataclass
@@ -98,71 +96,26 @@ class Fell(Exception):
     pass
 
 
-def camera_answers(looker, tries: int = 3, say=print) -> bool:
-    """Is the camera answering? Called while G2 is still at rest, before anything moves: the first picture after a cold open can take about 10 s and a camera left stuck by an interrupted run gave no picture at all (2026-11-23), which held him standing with the puck and then in the attention pose."""
-    if not looker._ready.wait(25.0) or getattr(looker, "_error", None) or getattr(looker, "_cam", None) is None:
-        say("the camera did not open: " + str(getattr(looker, "_error", None) or "no answer"))
-        return False
-    for i in range(tries):
-        try:
-            if looker._cam.snapshot() is not None:
-                return True
-        except Exception:  # noqa: BLE001
-            pass
-        say(f"the camera gave no picture (try {i + 1} of {tries})")
-    return False
+class CameraHolder:
+    """The run's camera, opened but never used until the attention pose with the claw raised (owner, 2026-11-23: no picture before that). `_ready`, `_cam` and `close` are what `RealEnv` needs."""
 
-
-class BurstRecorder:
-    """The picture record of one throw (owner, 2026-11-23: see the puck leave the claw, its path, and the bounce or the miss). `start(t_send)` runs the camera's back-to-back burst in a thread; `join()` waits for it. The frames stay IN MEMORY: nothing is written to the
-    disk (owner: the burst pictures are never saved); `sheet_png()` builds one labelled contact sheet for a review. The look after the throw reads the last frames. A diagnostic only: a failure here never stops the throw."""
-
-    def __init__(self, cam, seconds: float = BURST_S, clock=time.monotonic):
-        self.cam, self.seconds, self._clock = cam, seconds, clock
-        self.thread = None
-        self.t_send = None
-        self.frames: list = []                # (seconds after the send the request went out, seconds after the send the picture arrived, jpeg)
-        self.last_frames: list = []
-
-    def start(self, t_send: float | None = None) -> None:
+    def __init__(self, cam=None):
         import threading
-        self.t_send = t_send if t_send is not None else self._clock()
-        self.thread = threading.Thread(target=self._run, name="burst", daemon=True)
-        self.thread.start()
+        if cam is None:
+            from ..config import settings
+            from ..vision.snapshot import CameraSnapshotter
+            cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0, timeout_s=AFTER_PICTURE_TIMEOUT_S)
+        self._cam, self._error, self._ready = cam, None, threading.Event()
+        self._ready.set()
 
-    def _run(self) -> None:
+    def open_port(self) -> bool:
+        return bool(self._cam.open_port())
+
+    def close(self) -> None:
         try:
-            got = self.cam.grab_burst(self.seconds)
-            self.frames = [(t_req - self.t_send, t_got - self.t_send, jpeg) for t_req, t_got, jpeg in got]
-            self.last_frames = [f[2] for f in self.frames[-KEEP_FRAMES:]]
+            self._cam.close()
         except Exception:  # noqa: BLE001
             pass
-
-    def join(self, timeout: float = 15.0) -> list:
-        if self.thread is not None:
-            self.thread.join(timeout)
-        return self.frames
-
-    def sheet_png(self, cols: int = 8, side: int = 210) -> bytes | None:
-        """One contact sheet of every frame, each labelled with the second it arrived after the send, as PNG bytes (None when there are no frames or no imaging library)."""
-        if not self.frames:
-            return None
-        try:
-            import io
-
-            from PIL import Image, ImageDraw
-            rows = (len(self.frames) + cols - 1) // cols
-            sheet = Image.new("RGB", (cols * side, rows * (side + 16)), (20, 20, 20))
-            draw = ImageDraw.Draw(sheet)
-            for i, (_t_req, t_got, jpeg) in enumerate(self.frames):
-                x, y = (i % cols) * side, (i // cols) * (side + 16)
-                sheet.paste(Image.open(io.BytesIO(jpeg)).convert("RGB").resize((side, side)), (x, y + 16))
-                draw.text((x + 3, y + 2), f"#{i} got {t_got:+.2f}s", fill=(255, 255, 255))
-            out = io.BytesIO()
-            sheet.save(out, "PNG")
-            return out.getvalue()
-        except Exception:  # noqa: BLE001
-            return None
 
 
 def lob_end_lift() -> float:
@@ -248,7 +201,7 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
             break
         say(f"attempt {n}: {'throw (holding the puck)' if holding else 'pick up and throw'}")
         t = env.throw(holding)
-        rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "grip", "pack_pct", "burst")}
+        rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "pack_pct")}
         if t.get("fell"):
             outcome = "fell"
             break
@@ -312,14 +265,13 @@ def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR, p
 class RealEnv:
     """G2 and his camera behind the `Env` interface: `throw`, `after_throw`, `look` (a quick picture), `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
 
-    def __init__(self, link, robot, looker, book=None, burst: bool = False, show_picture: bool = False):
+    def __init__(self, link, robot, looker, book=None, show_picture: bool = False):
         from . import basket_movers as bm
         self.link, self.robot, self.looker = link, robot, looker
         self.mover = bm.BasketMover(robot, book=book)
         self._cam = None
-        self.burst, self.show_picture, self.run_stamp, self.attempt = burst, show_picture, time.strftime("%Y%m%d_%H%M%S"), 0
+        self.show_picture, self.run_stamp, self.attempt = show_picture, time.strftime("%Y%m%d_%H%M%S"), 0
         self.quick_log: list = []
-        self._burst_rec = None
         self.picture_ok = True
         try:
             looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
@@ -329,7 +281,6 @@ class RealEnv:
     def _camera(self):
         from . import ball_chase as chase
         if self._cam is None:
-            self.looker._ready.wait(10.0)
             self._cam = chase._SnapshotCamera(self.looker._cam)
         return self._cam
 
@@ -342,20 +293,14 @@ class RealEnv:
         from . import lob, scripted_skill
         argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt"]
         if not holding:
-            argv += ["--pick", "--pick-gap", str(lob.PICK_GAP_S), "--grip-look"]
+            argv += ["--pick", "--pick-gap", str(lob.PICK_GAP_S)]            # no grip picture between the pickup and the throw (owner, 2026-11-23: it should not be happening and is probably why the board stopped taking the throw)
         a = scripted_skill.parser().parse_args(argv)
         self.attempt += 1
-        rec = None
-        if self.burst and getattr(self.looker, "_ready", None) is not None and self.looker._ready.wait(10.0) and getattr(self.looker, "_cam", None) is not None:
-            rec = BurstRecorder(self.looker._cam)
-        out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False, on_send=rec.start if rec else None)
+        out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=None, rest_after=False)
         self.robot.posture = "stand"
         self.robot._claw = (0.0, lob_end_lift())                            # the arm is where the throw's last frame left it (125 deg), not at 0: the move to the look angle starts from there
         res = out.get("res") or {}
         out["fell"] = bool(out.get("fell")) or res.get("verdict") == "fell"
-        self._burst_rec = rec
-        if rec is not None:
-            out["burst"] = {"frames": len(rec.join())}
         return out
 
     def after_throw(self):
@@ -450,7 +395,6 @@ def main(argv: list | None = None) -> None:
     from ..link import imu_print
     from ..link.serial_link import SerialLink
     from ..power import battery
-    from .grip_look import GripLooker
     link = SerialLink("/dev/serial0")
     link.connect()
     ok, pct, volts = battery.motion_gate(link)
@@ -458,10 +402,9 @@ def main(argv: list | None = None) -> None:
     if not ok or not imu_print.board_answers(link):
         print("not started: the pack gate failed or the board sent no motion data")
         return
-    looker = GripLooker()
-    looker.warm()
-    if not camera_answers(looker):
-        print("not started: the camera is not answering (check its USB plug); nothing was moved")
+    looker = CameraHolder()
+    if not looker.open_port():
+        print("not started: the camera's port did not open (check its USB plug); nothing was moved")
         looker.close()
         return
     robot = chase.SerialRobot(link)

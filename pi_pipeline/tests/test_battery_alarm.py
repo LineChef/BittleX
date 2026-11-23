@@ -47,6 +47,7 @@ def test_a_low_pack_is_read_more_often_than_the_idle_backstop():
 
 
 def test_a_refused_run_sounds_the_alert_once_a_minute(monkeypatch):
+    monkeypatch.setenv("G2_PACK_GATE", "on")                                                # the pack limit refuses only when switched on (owner, 2026-11-23)
     got = []
     battery.set_refusal_alert(lambda lvl, v: got.append((lvl, v)))
     monkeypatch.setattr(battery, "_last_refusal", -1e9)

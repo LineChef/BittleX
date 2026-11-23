@@ -62,6 +62,12 @@ def pack_percent(volts: float, cells: int = 2) -> int:
 MOTION_MIN_PERCENT = 30      # the hardware-session gate: below this no motion script starts or goes on (user, 2026-10-25: the pack died during a chase and nothing warned)
 
 
+def gate_enforced() -> bool:
+    """False by default since 2026-11-23 (owner: "remove any pack restrictions from all tests, I will decide when not to run something"): a pack under MOTION_MIN_PERCENT only logs a warning and the test goes on. G2_PACK_GATE=on brings the refusal back."""
+    import os
+    return os.environ.get("G2_PACK_GATE", "off").strip().lower() in ("1", "on", "true", "yes")
+
+
 def strict() -> bool:
     """True when an unreadable pack reading must stop a test (G2_BATTERY_STRICT=1). Off since 2026-11-01 (user): serial reads came back garbled right after the voice service stopped
     (docs/STATUS.md open problem 15) and blocked every test. A reading that works and is under the minimum still stops."""
@@ -96,6 +102,9 @@ def motion_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, attempts: int = 
             return True, None, None                  # user, 2026-11-01: the garbled serial reads were blocking every test; a reading that works and is low still stops
         return False, None, None
     pct = pack_percent(v)
+    if pct < min_percent and not gate_enforced():
+        log.warning("the pack reads %d%% (%.2f V), under the %d%% limit: running anyway, the owner decides (G2_PACK_GATE=on makes the limit stop a test again)", pct, v, min_percent)
+        return True, pct, v
     return pct >= min_percent, pct, v
 
 

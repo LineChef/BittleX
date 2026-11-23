@@ -218,3 +218,4 @@ On the Mac and in the tools:
 - `G2_ROOT`: Default: the repo; What it does: set by the aliases; `install_voice_service.sh` defaults it to `~/bittleX` on the Pi
 
 See also [`feature-flags.md`](feature-flags.md) for the `G2_FEATURES` subsystem flags.
+- `G2_PACK_GATE`: Default: off (since 2026-11-23). A pack under the 30 percent limit only logs a warning and the hardware test goes on, because the owner decides when not to run something. `on` brings the refusal back for every test script and the ball chase.

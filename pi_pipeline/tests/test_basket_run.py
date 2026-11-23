@@ -168,38 +168,6 @@ def test_the_looks_are_merged_into_one_body_frame_reading():
     assert b.bearing_deg == 31.0 and p is None
 
 
-def test_the_burst_recorder_keeps_frames_in_memory_only_and_builds_a_sheet(tmp_path, monkeypatch):
-    import io
-
-    from PIL import Image
-
-    def jpeg(c):
-        out = io.BytesIO()
-        Image.new("RGB", (240, 240), c).save(out, "JPEG")
-        return out.getvalue()
-
-    class Cam:
-        def grab_burst(self, seconds):
-            return [(10.00, 10.20, jpeg((200, 0, 0))), (10.25, 10.45, jpeg((0, 200, 0))), (10.50, 10.70, jpeg((0, 0, 200)))]
-
-    monkeypatch.chdir(tmp_path)
-    rec = br.BurstRecorder(Cam(), seconds=1.0)
-    rec.start(t_send=10.0)
-    frames = rec.join()
-    assert [round(f[1], 2) for f in frames] == [0.20, 0.45, 0.70] and len(rec.last_frames) == 3
-    assert list(tmp_path.rglob("*")) == []                                                                 # nothing is written to disk
-    png = rec.sheet_png()
-    assert png is not None and png[:8] == b"\x89PNG\r\n\x1a\n"
-
-    class Broken:
-        def grab_burst(self, seconds):
-            raise RuntimeError("no camera")
-
-    bad = br.BurstRecorder(Broken())
-    bad.start(t_send=0.0)
-    assert bad.join() == [] and bad.sheet_png() is None                                                   # a failure here never stops a throw
-
-
 def test_the_camera_burst_returns_back_to_back_frames_without_exposure_work():
     from pi_pipeline.vision.snapshot import CameraSnapshotter, Snapshot
     t = [0.0]
@@ -344,26 +312,31 @@ def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
     assert calls == ["stand_up_from_rest"]
 
 
-def test_a_dead_camera_stops_the_run_before_anything_moves_and_a_failed_picture_is_never_a_make():
-    import threading
-
-    class Looker:
-        def __init__(self, cam, error=None):
-            self._ready, self._cam, self._error = threading.Event(), cam, error
-            self._ready.set()
-
-    class Cam:
-        def __init__(self, answers):
-            self.answers = list(answers)
-
-        def snapshot(self):
-            return self.answers.pop(0) if self.answers else None
-
-    msgs = []
-    assert br.camera_answers(Looker(Cam([None, None, b"j"])), say=msgs.append) is True                  # the third try answers
-    assert br.camera_answers(Looker(Cam([None, None, None])), say=msgs.append) is False
-    assert br.camera_answers(Looker(None, error="OSError"), say=msgs.append) is False
+def test_a_failed_picture_after_the_throw_is_never_a_make_and_no_picture_is_taken_before_the_attention_pose():
     env = Env([ok()], puck_after=[None])
     env.picture_ok = False
     r = br.run_sequence(env, say=lambda s: None)
     assert r["outcome"] == "no_picture" and r["attempts"][0]["after"]["code"] == "no_picture"            # not counted as a make
+    import inspect
+    assert "GripLooker" not in inspect.getsource(br.main) and "snapshot()" not in inspect.getsource(br.main)   # no warm-up picture, no check picture at the start
+    opened = []
+
+    class Cam:
+        def open_port(self):
+            opened.append(1)
+            return True
+
+        def close(self):
+            pass
+
+        def snapshot(self):
+            raise AssertionError("no picture before the attention pose")
+
+    h = br.CameraHolder(Cam())
+    assert h.open_port() is True and opened == [1] and h._ready.is_set()
+
+
+def test_there_is_no_picture_between_the_pickup_and_the_throw():
+    import inspect
+    src = inspect.getsource(br.RealEnv.throw)
+    assert '"--grip-look"' not in src and "--pick" in src                                                    # the owner's sequence: pickup, throw, nothing in between

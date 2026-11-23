@@ -248,7 +248,10 @@ def test_the_battery_gate_is_strict_on_request_and_lets_an_unreadable_pack_throu
         def drain(self, s): pass
         def send(self, c, **k): return self.reply
     assert battery.motion_gate(Link("Voltage: 8.20 V")) == (True, 88, 8.2)
-    ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # a reading that works and is low always stops
+    ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is True and pct < 30 and v == 7.3          # the owner's decision (2026-11-23): a low pack only warns
+    monkeypatch.setenv("G2_PACK_GATE", "on")
+    ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # G2_PACK_GATE=on: a reading that works and is low stops
+    monkeypatch.delenv("G2_PACK_GATE")
     waits = []
     monkeypatch.delenv("G2_BATTERY_STRICT", raising=False)
     assert battery.motion_gate(Link("G"), sleep=waits.append) == (True, None, None)                               # testing (user, 2026-11-01): unreadable does not block
