@@ -284,3 +284,8 @@ def test_the_retrieval_never_stands_straight_up_from_the_attention_pose():
         raise AssertionError("a fall must stop the run")
     except br.Fell:
         pass
+
+
+def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_watch_is_short():
+    assert br.lob_end_lift() == 125.0                                                                         # the lob's last frame: the arm stays up at the throw's lift
+    assert br.THROW_WATCH_S < 3.0                                                                              # the attention pose follows the animation, not the long default watch

@@ -31,6 +31,7 @@ BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 BURST_S = 10.0                       # the picture burst after the throw is sent: the throw (about 1.2 s), the move into the attention pose, the flight, the landing, the bounce and the settle
+THROW_WATCH_S = 2.3                  # the body is watched this long after the throw is sent (the animation ends at about 2.2 s by the IMU trace; the default watch was about 3.1 s): the attention pose follows at once
 KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
 
@@ -145,6 +146,13 @@ class BurstRecorder:
             return out.getvalue()
         except Exception:  # noqa: BLE001
             return None
+
+
+def lob_end_lift() -> float:
+    """The lift angle the lob's last frame leaves the arm at (from the script itself, so a changed script is followed)."""
+    from . import lob, scripted_skill
+    plan = scripted_skill.build_plan(scripted_skill.load_script(lob.SCRIPT), [0] * 8 + [20, 20, 30, 30, 30, 30, 30, 30], amount=lob.AMOUNT)
+    return float(plan[-1]["frame"][1])
 
 
 def merge_looks(seen: dict, offsets: dict):
@@ -302,7 +310,7 @@ class RealEnv:
         """The lob (a pick-up first unless he already holds the puck), then at once the attention pose with the claw at the look height, while the picture burst that began when the throw was sent keeps recording the move and the floor."""
         from . import ball_chase as chase
         from . import lob, scripted_skill
-        argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt"]
+        argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt", "--watch", str(THROW_WATCH_S)]
         if not holding:
             argv += ["--pick", "--pick-gap", str(lob.PICK_GAP_S), "--grip-look"]
         a = scripted_skill.parser().parse_args(argv)
@@ -312,7 +320,7 @@ class RealEnv:
             rec = BurstRecorder(self.looker._cam)
         out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False, on_send=rec.start if rec else None)
         self.robot.posture = "stand"
-        self.robot._claw = (0.0, 0.0)
+        self.robot._claw = (0.0, lob_end_lift())                            # the arm is where the throw's last frame left it (125 deg), not at 0: the raise to the look height is a short move
         res = out.get("res") or {}
         out["fell"] = bool(out.get("fell")) or res.get("verdict") == "fell"
         if out["ok"] and not out["fell"]:
