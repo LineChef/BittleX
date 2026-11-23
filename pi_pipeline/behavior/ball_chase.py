@@ -814,10 +814,10 @@ def _yaw_diff(a: float, b: float) -> float:
 CLAW_CENTER_TOL_DEG = 4.0       # the arm counts as centred and lowered when the board reports both joints within this of 0
 
 
-def claw_path(a: tuple, b: tuple):
+def claw_path(a: tuple, b: tuple, deg_s: float | None = None):
     """The eased steps of an arm move from a to b (pan, lift) at CLAW_DEG_S: yields (pan, lift) in whole degrees. ONE stepping for every claw move in the project (claw_pose and the exploration's claw look)."""
     span = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
-    steps = max(1, int(math.ceil(span / CLAW_DEG_S * CLAW_STEPS_PER_S)))
+    steps = max(1, int(math.ceil(span / (deg_s or CLAW_DEG_S) * CLAW_STEPS_PER_S)))
     for i in range(1, steps + 1):
         u = i / steps
         k = u * u * (3 - 2 * u)
@@ -1737,7 +1737,7 @@ class SerialRobot:
             return "board_silent"                     # the board sends no IMU frames: the walk never started (it rested him); retrying only repeats rest, picture, stand-up
         return "fell" if fell else "ok"
 
-    def claw_pose(self, pan: float, lift: float) -> str:
+    def claw_pose(self, pan: float, lift: float, deg_s: float | None = None) -> str:
         """Move the arm (pan joint 0, lift joint 1) to point the camera, at CLAW_DEG_S, watching the IMU. The legs are not sent. "ok" or "fell"."""
         pan = max(-45.0, min(45.0, float(pan)))
         lift = max(0.0, min(CLAW_LIFT_MAX_DEG, float(lift)))
@@ -1746,7 +1746,7 @@ class SerialRobot:
         self._tx("gP")
         state = "ok"
         sent_p = sent_l = None
-        for i, (pi_, li_) in enumerate(claw_path((p0, l0), (pan, lift)), 1):
+        for i, (pi_, li_) in enumerate(claw_path((p0, l0), (pan, lift), deg_s), 1):
             parts = ([f"0 {pi_}"] if pi_ != sent_p else []) + ([f"1 {li_}"] if li_ != sent_l else [])      # only the joint that changed: at 100 commands a second a two-joint command every tick would be over the 1 KB/s that dropped a byte
             if parts:
                 self._tx("i" + " ".join(parts))

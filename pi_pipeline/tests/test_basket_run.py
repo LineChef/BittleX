@@ -270,16 +270,19 @@ def test_after_the_throw_the_owners_sequence_attention_claw_up_one_picture_claw_
             order.append("attention")
             return "ok"
 
-        def claw_pose(self, pan, lift):
+        def claw_pose(self, pan, lift, deg_s=None):
             order.append(f"claw {lift}")
+            speeds.append(deg_s)
             return "ok"
 
         def _tx(self, c):
             order.append(c)
 
+    speeds = []
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
+    assert speeds == [br.FAST_CLAW_DEG_S, br.FAST_CLAW_DEG_S] and env.attention_hold_s is not None            # both claw moves at the fast pace
     assert order == ["attention", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0", "gb", "rest"]       # the owner's steps, gyro assist off after the pose and before the lie-down
     assert env.robot.posture == "rest" and env.picture_ok is True and basket.claw_in == 16.0 and puck.claw_in == 12.0
     assert "kbalance" not in order                                                                                                # no stand-up anywhere before the rest
@@ -340,3 +343,13 @@ def test_there_is_no_picture_between_the_pickup_and_the_throw():
     import inspect
     src = inspect.getsource(br.RealEnv.throw)
     assert '"--grip-look"' not in src and "--pick" in src                                                    # the owner's sequence: pickup, throw, nothing in between
+
+
+def test_a_pose_held_too_long_skips_the_claw_lowering_and_lies_down():
+    import pi_pipeline.behavior.basket_run as m
+    from pi_pipeline.behavior import ball_chase as chase
+    assert br.ATTENTION_HOLD_MAX_S <= 7.0 and br.FAST_CLAW_DEG_S > chase.CLAW_DEG_S                        # faster than the ball goal's look, and a hold limit under the 8 to 13 s the board allows
+    steps = list(chase.claw_path((0, 0), (0, 120), br.FAST_CLAW_DEG_S))
+    slow = list(chase.claw_path((0, 0), (0, 120)))
+    assert len(steps) < len(slow) / 3 and steps[-1] == (0, 120)                                            # the same path in a fraction of the steps
+    assert m.AFTER_RAISE_SETTLE_S < chase.CLAW_SETTLE_S

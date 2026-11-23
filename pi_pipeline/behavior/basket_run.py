@@ -32,6 +32,9 @@ BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
+FAST_CLAW_DEG_S = 300.0              # the two claw moves of the picture after the throw: at the ball goal's 60 deg/s each took 8 s and the board stood him up by itself 8 to 13 s into the attention pose (2026-11-23)
+AFTER_RAISE_SETTLE_S = 0.5
+ATTENTION_HOLD_MAX_S = 7.0           # past this long in the attention pose he skips what is left and lies down
 LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 
 
@@ -224,7 +227,8 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         code, words = classify_after(basket, puck)
         rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                         "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
-        say(f"after the throw: {code}: {words}")
+        rec["after"]["attention_hold_s"] = getattr(env, "attention_hold_s", None)
+        say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
         persist()
         if code != bo.MISSED:
             outcome = "made" if code in (bo.NOT_SEEN, bo.MADE) else code            # owner, 2026-11-23: not seen by the end of the attention pose means it went in
@@ -273,6 +277,7 @@ class RealEnv:
         self.show_picture, self.run_stamp, self.attempt = show_picture, time.strftime("%Y%m%d_%H%M%S"), 0
         self.quick_log: list = []
         self.picture_ok = True
+        self.attention_hold_s = None
         try:
             looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
         except Exception:  # noqa: BLE001
@@ -312,16 +317,19 @@ class RealEnv:
         from ..vision import puck_finder as pf
         r = self.robot
         r.relax()                                                        # the standard move into the attention pose (no move gate, no stand-up)
+        t_pose = time.monotonic()
         r._tx("gb")                                                      # gyro assist off: no self-right while he holds the pose
-        if r.claw_pose(0.0, LOOK_LIFT_DEG) == "fell":
+        if r.claw_pose(0.0, LOOK_LIFT_DEG, FAST_CLAW_DEG_S) == "fell":
             raise Fell()
-        time.sleep(chase.CLAW_SETTLE_S)
+        time.sleep(AFTER_RAISE_SETTLE_S)
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
-        if r.claw_pose(0.0, 0.0) == "fell":
-            raise Fell()
+        if time.monotonic() - t_pose <= ATTENTION_HOLD_MAX_S:
+            if r.claw_pose(0.0, 0.0, FAST_CLAW_DEG_S) == "fell":
+                raise Fell()
+        self.attention_hold_s = round(time.monotonic() - t_pose, 1)      # logged: the board stood him up 8 to 13 s into the pose
         r._tx("gb")
         chase.ensure_rest(self.link)                                     # attention to rest
         r.posture, r._claw = "rest", (0.0, 0.0)
