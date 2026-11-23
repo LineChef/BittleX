@@ -58,6 +58,7 @@ How fast the lift joint and the claw jaw can be driven decides what a throw can 
 Measured on G2 by eye, with the legs held and the body trace as a check on timing (the lift and jaw speeds and ranges are under "The claw servos" below):
 - Speed 0: a frame's speed byte divided by 8 is the ratio passed to `transform()`, and a ratio of 0 means no interpolation steps, so every joint is sent its target at once (`motion.h`, read from the source). `g2armspeed` accepts 0 only with `--allow-jump`. Petoi's own `tossF` uses speed 0 for its release frame.
 - `--from-attention` plays a run from the attention pose (the claw look's own entry, legs straight, which prevents most of the servo sag) with rest sent straight from it. The `both` series plays the lift up and the jaw open, closed and open again at one speed in one short run.
+- Moving into the attention pose shifts the body about 2 inches backward every time, because the elbows bend forward during the transition and push the body back (owner, observed on G2). Anything measured against the floor or a target (the claw tip's distance to the basket, the puck, a marked start) is 2 inches nearer after the entry than before it; a measurement taken before the entry must allow for it.
 - Body trace: the roll and pitch stayed within a few degrees in every run from the attention pose. Runs from a stand with the arm raised pitched the body nose-up by about 22 degrees, and one jaw sweep with the arm raised for about 8 seconds fell as the legs sagged.
 
 The claw servos

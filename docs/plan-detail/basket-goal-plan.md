@@ -31,6 +31,8 @@ Written 2026-11-21. Goal (owner): a new goal for G2. He picks the cylinder up, t
 
 ## Measurement conventions (owner, 2026-11-22)
 
+- Entering the attention pose moves G2 about 2 inches backward every time (the elbows bend forward and push the body back), so every distance read after a look is from a body 2 inches further back than before it; allow for it between the pick-up position and the position of the picture after the throw.
+
 - Distances are measured along a ruler with its zero at the claw tip, and at the start of every pick-up the claw was touching the cylinder.
 - The basket is circular, 5 inches across, and its centre was at the stated distance (16 inches is the best so far; 18 inches was too far). Its opening spans about 2.5 inches either side of that centre.
 - A bad pick-up means a bad throw, so the pick-up has to be right every time: the grab quality (good, marginal, bad) is worth recording with each throw.
