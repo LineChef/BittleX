@@ -1,9 +1,9 @@
 """The full basket sequence, as one process on one serial connection (the basket goal, docs/plan-detail/basket-goal-plan.md, steps 3 to 5; owner, 2026-11-23).
 
-Per attempt: stand, pick the puck up, take the grip picture, throw (the lob: `behavior/lob.py` through `scripted_skill.play`); then at once the standard lie-down, the claw raised, ONE picture of the floor read by the basket and puck finders, the claw lowered (`goals/basket_outcome.classify_throw` calls the throw).
-No attention pose: after `kcalib` the first byte the Pi sends makes the board start its own back-legs-first `up` and he falls (five runs, and a silence test on 2026-11-23: 14 s of silence and nothing, the next write and he stood up).
-The puck seen on the floor outside the basket is a miss: he stands up from rest (the eased stand-up), searches for it (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor,
-lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up (he already holds it). The puck not seen: counted as a make (owner, 2026-11-23) and the run stops for the owner's reset.
+THE STEPS THE OWNER WANTS TO SEE, in this order, every attempt (2026-11-23): stand up, pick up, throw (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), go into the attention pose, lift the claw to 120, take ONE picture, put the claw down, then rest (attention to rest, never a stand-up from attention),
+and decide: the puck seen on the floor outside the basket is a miss and he stands up from rest with the eased stand-up; the puck not seen counts as a make and he stays in rest and the run ends for the owner's reset (`goals/basket_outcome.classify_throw` calls the throw).
+After `kcalib` the board starts its own back-legs-first `up` (after `rc`, the firmware's self-right, which fires only while the gyro assist is on): `gb` is sent right after the pose and again before the lie-down.
+A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
 Stops: 5 attempts, a fall, a battery gate that fails, a camera that does not answer (checked before anything moves), no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
 
 `next_retrieval_action` and `run_sequence` are pure (the robot, the camera and the throw are handed in as an `Env`), tested on a simulated floor; `RealEnv` wires them to G2 and is only used by `main`. UNPROVEN on G2: the first runs are watched by the owner (a separate process, `g2basket`).
@@ -32,7 +32,6 @@ BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 BURST_S = 10.0                       # the picture burst (off by default; the arm stays up after the throw so it never saw the landing)
-THROW_WATCH_S = 2.3                  # the body is watched this long after the throw is sent (the animation ends at about 2.2 s by the IMU trace; the default watch was about 3.1 s): the attention pose follows at once
 AFTER_PICTURE_TIMEOUT_S = 2.5          # the camera's wait for one picture during the run
 LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
@@ -341,7 +340,7 @@ class RealEnv:
         """The lob (a pick-up first unless he already holds the puck)."""
         from . import ball_chase as chase
         from . import lob, scripted_skill
-        argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt", "--watch", str(THROW_WATCH_S)]
+        argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt"]
         if not holding:
             argv += ["--pick", "--pick-gap", str(lob.PICK_GAP_S), "--grip-look"]
         a = scripted_skill.parser().parse_args(argv)
@@ -360,15 +359,15 @@ class RealEnv:
         return out
 
     def after_throw(self):
-        """Rest first, then one picture from the rest pose with the claw raised (owner, 2026-11-23). NO attention pose and no stand-up before the picture: in five runs the first byte the Pi sent after `kcalib` made the board start its own back-legs-first `up` and he fell, and a picture from
-        the lob's end pose looks 30 degrees too high (the body is pitched nose-up). So: the standard lie-down from the lob's end pose (every lob ends with it), the claw up to LOOK_LIFT_DEG, one picture read by the basket and puck finders (the puck finder's distances are for another pose: only
-        whether the puck is on the floor is used), the claw back down. He stays in rest; he stands up only if the puck was seen on the floor. The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
+        """The owner's sequence after the throw (2026-11-23, to be followed exactly): into the attention pose, the claw up to LOOK_LIFT_DEG, ONE picture, the claw down, then rest (attention to rest, never a stand-up from attention). A puck seen on the floor sends him up with the eased stand-up from rest
+        (`_ready_to_move`); not seen counts as a make and he stays in rest. The firmware's self-right (`rc`, then its own back-legs-first `up`) fires only while the gyro assist is on, and the link switches it on while he holds a pose: `gb` goes out right after the pose and again before the lie-down.
+        The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
         from . import ball_chase as chase
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
         r = self.robot
-        chase.ensure_rest(self.link)
-        r.posture, r._claw = "rest", (0.0, lob_end_lift())
+        r.relax()                                                        # the standard move into the attention pose (no move gate, no stand-up)
+        r._tx("gb")                                                      # gyro assist off: no self-right while he holds the pose
         if r.claw_pose(0.0, LOOK_LIFT_DEG) == "fell":
             raise Fell()
         time.sleep(chase.CLAW_SETTLE_S)
@@ -378,6 +377,9 @@ class RealEnv:
         self.picture_ok = jpeg is not None
         if r.claw_pose(0.0, 0.0) == "fell":
             raise Fell()
+        r._tx("gb")
+        chase.ensure_rest(self.link)                                     # attention to rest
+        r.posture, r._claw = "rest", (0.0, 0.0)
         basket = puck = None
         if jpeg:
             basket = bf.find_basket(jpeg)

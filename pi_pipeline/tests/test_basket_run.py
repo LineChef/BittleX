@@ -270,12 +270,13 @@ def test_the_retrieval_never_stands_straight_up_from_the_attention_pose():
         pass
 
 
-def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_watch_is_short():
+def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_throw_is_never_cut_short():
     assert br.lob_end_lift() == 125.0                                                                         # the lob's last frame: the arm stays up at the throw's lift
-    assert br.THROW_WATCH_S < 3.0                                                                              # the attention pose follows the animation, not the long default watch
+    import inspect
+    assert "--watch" not in inspect.getsource(br.RealEnv.throw)                                                # the throw is watched for its full default length: nothing is written to the board while the lob still plays (2026-11-23: a 2.3 s watch cut the release off)
 
 
-def test_after_the_throw_he_lies_down_first_then_the_claw_goes_up_one_picture_is_taken_and_the_claw_comes_down(monkeypatch):
+def test_after_the_throw_the_owners_sequence_attention_claw_up_one_picture_claw_down_then_rest(monkeypatch):
     from pi_pipeline.behavior import ball_chase as chase
     from pi_pipeline.vision import basket_finder as bf
     from pi_pipeline.vision import puck_finder as pf
@@ -297,6 +298,10 @@ def test_after_the_throw_he_lies_down_first_then_the_claw_goes_up_one_picture_is
         posture = "stand"
         _claw = (0.0, 125.0)
 
+        def relax(self):
+            order.append("attention")
+            return "ok"
+
         def claw_pose(self, pan, lift):
             order.append(f"claw {lift}")
             return "ok"
@@ -307,9 +312,9 @@ def test_after_the_throw_he_lies_down_first_then_the_claw_goes_up_one_picture_is
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert order == ["rest", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0"]            # lie down, claw up, one picture, claw down
-    assert "kcalib" not in order and env.robot.posture == "rest" and env.picture_ok is True
-    assert basket.claw_in == 16.0 and puck.claw_in == 12.0
+    assert order == ["attention", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0", "gb", "rest"]       # the owner's steps, gyro assist off after the pose and before the lie-down
+    assert env.robot.posture == "rest" and env.picture_ok is True and basket.claw_in == 16.0 and puck.claw_in == 12.0
+    assert "kbalance" not in order                                                                                                # no stand-up anywhere before the rest
 
 
 def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
