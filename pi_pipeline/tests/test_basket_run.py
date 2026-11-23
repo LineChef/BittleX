@@ -367,7 +367,7 @@ def test_after_the_throw_he_does_the_ball_goals_own_claw_look_and_the_readings_a
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert order == ["expect_lob_end", ("look", "centre", True)]                                         # the lob's end pose is announced, then the ball goal's own look
+    assert order == ["expect_lob_end", ("look", "centre", True)]                                         # the lob's end pose is announced, then the ball goal's own look, complete (it ends standing)
     assert env.picture_ok is True and basket.claw_in == 16.0 and abs(basket.bearing_deg - 1.0) < 1e-9     # the centre picture's basket first
     assert puck is not None and puck.claw_in == 14.0 and puck.bearing_deg != 5.0                           # the puck seen in the left picture, in the body frame
     import inspect
@@ -411,7 +411,7 @@ def test_a_make_lies_down_at_once_and_a_miss_starts_the_retrieval_from_the_looks
     env = E([ok(), ok()], puck_after=[(24.0, 25.0), None])
     br.run_sequence(env, say=lambda s: None)
     kinds = [m[0] for m in env.w.moves]
-    assert kinds and kinds[0] in ("pivot", "nudge", "forward") and len(lies) == 2                           # the miss lay him down, the retrieval began moving at once, and the final make lay him down again
+    assert kinds and kinds[0] in ("pivot", "nudge", "forward") and len(lies) == 1                           # the miss did not lie down (the look ends standing), the retrieval began moving at once, and only the final make lay him down
     first_look_index = len(looks)
     assert first_look_index >= 1
     got = []
@@ -429,36 +429,7 @@ def test_a_make_lies_down_at_once_and_a_miss_starts_the_retrieval_from_the_looks
     assert got == []
 
 
-def test_the_shared_claw_look_can_stop_after_the_pictures_and_its_default_is_unchanged():
-    from pi_pipeline.behavior import ball_chase as chase
-
-    class R:
-        def __init__(self):
-            self.calls = []
-
-        def sit_down(self):
-            self.calls.append("sit_down")
-            return "ok"
-
-        def claw_pose(self, pan, lift, *a, **k):
-            self.calls.append(f"claw {pan} {lift}")
-            return "ok"
-
-        def stand_from_sit(self):
-            self.calls.append("stand_from_sit")
-            return "ok"
-
-        def _tx(self, c):
-            self.calls.append(c)
-    shots = []
-    full, cut = R(), R()
-    chase.claw_look_sequence(full, lambda pan: shots.append(pan) or False, pans=[-35.0, 35.0, 0.0], from_sit=True, raise_first=True, sleep=lambda s: None)
-    chase.claw_look_sequence(cut, lambda pan: shots.append(pan) or False, pans=[-35.0, 35.0, 0.0], from_sit=True, raise_first=True, sleep=lambda s: None, tail=False)
-    assert full.calls[-2:] == ["claw 0.0 0.0", "stand_from_sit"]                       # the default: claw down, then the eased stand-up
-    assert cut.calls[-1] == f"claw 0.0 {chase.CLAW_LIFT_DEG}" and "stand_from_sit" not in cut.calls and "claw 0.0 0.0" not in cut.calls   # tail=False: stops with the claw up
-
-
-def test_a_make_and_a_miss_both_lie_down_from_the_look_and_a_miss_then_stands_up_from_rest_before_walking():
+def test_a_make_lies_down_from_the_stand_and_a_miss_starts_walking_with_no_rest_in_between():
     events = []
 
     class E(Env):
@@ -466,23 +437,23 @@ def test_a_make_and_a_miss_both_lie_down_from_the_look_and_a_miss_then_stands_up
             events.append("lie_down")
 
         def stand_up_from_rest(self):
-            events.append("stand_up_from_rest")
+            events.append("stand_up_from_rest")                                              # must never be called: the look ends standing
             return True
 
     r = br.run_sequence(E([ok()], puck_after=[None]), say=lambda s: None)
-    assert r["outcome"] == "made" and events == ["lie_down"]                                # a make: rest, nothing else
+    assert r["outcome"] == "made" and events == ["lie_down"]                                # a make: rest, from the stand
     events.clear()
     env = E([ok(), ok()], puck_after=[(24.0, 25.0), None])
     br.run_sequence(env, say=lambda s: None)
-    assert events[:2] == ["lie_down", "stand_up_from_rest"] and events[-1] == "lie_down"   # a miss: rest first, the eased stand-up from rest, then the retrieval walks
-    assert env.w.moves                                                                      # (and the second throw, a make, lay him down again)
+    assert events == ["lie_down"] and env.w.moves                                           # a miss: no lie-down, no stand-up, walking; only the final make lay him down
     events.clear()
     bad = E([ok()], puck_after=[None])
     bad.picture_ok = False
     assert br.run_sequence(bad, say=lambda s: None)["outcome"] == "no_picture" and events == ["lie_down"]
-    events.clear()
 
-    class FellStanding(E):
-        def stand_up_from_rest(self):
-            return False
-    assert br.run_sequence(FellStanding([ok()], puck_after=[(24.0, 0.0)]), say=lambda s: None)["outcome"] == "fell"
+
+def test_the_shared_claw_look_has_no_tail_option_and_still_ends_standing():
+    import inspect
+    from pi_pipeline.behavior import ball_chase as chase, claw_survey
+    assert "tail" not in inspect.signature(chase.claw_look_sequence).parameters and "tail" not in inspect.signature(claw_survey.run_claw_look).parameters
+

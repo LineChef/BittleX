@@ -2010,7 +2010,7 @@ def settle_to_stand(link, sleep=time.sleep) -> None:
     sleep(1.5)
 
 
-def claw_look_sequence(robot, per_pan, *, pans, from_sit: bool = True, raise_first: bool = True, sleep=time.sleep, lap=lambda name: None, stopped=lambda: False, tail: bool = True) -> str:
+def claw_look_sequence(robot, per_pan, *, pans, from_sit: bool = True, raise_first: bool = True, sleep=time.sleep, lap=lambda name: None, stopped=lambda: False) -> str:
     """THE claw look, one standard move for every mode (owner, 2026-11-13: "use the claw look from the ball chase, that is the one that doesn't fall"; every mode calls this and nothing builds its own).
     From a sit-down (`robot.sit_down()`: stand first, then the attention pose, settled), the claw is raised straight up first, then taken to each pan in `pans` (the camera to one side, the other, the centre)
     with a settle at each, and `per_pan(pan)` takes the picture (it returns True to stop early); then the claw goes back to the centre raised, is lowered and centred, and `robot.stand_from_sit()` stands him
@@ -2018,7 +2018,7 @@ def claw_look_sequence(robot, per_pan, *, pans, from_sit: bool = True, raise_fir
     state = "ok"
     was_on = bool(getattr(getattr(robot, "_lk", None), "imu_print_on", False))              # the motion-sensor print stays on where it was on before the look: the guards read it (2026-11-12: a roam ran with it off)
     try:
-        return _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, stopped, tail)
+        return _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, stopped)
     finally:
         if was_on:
             try:
@@ -2027,7 +2027,7 @@ def claw_look_sequence(robot, per_pan, *, pans, from_sit: bool = True, raise_fir
                 log.debug("could not put the motion-sensor print back after the look", exc_info=True)
 
 
-def _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, stopped, tail: bool = True) -> str:
+def _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, stopped) -> str:
     state = "ok"
     if from_sit and robot.sit_down() == "fell":
         return "fell"
@@ -2047,8 +2047,6 @@ def _claw_look_moves(robot, per_pan, pans, from_sit, raise_first, sleep, lap, st
         lap("settle")
         if per_pan(pan):
             break
-    if not tail:                                                                          # the caller finishes the look itself (claw down, then the stand-up) once it has decided what to do: basket_run, after a throw
-        return state
     if state not in ("fell", "stopped") and raise_first and (not pans or pans[-1] != 0.0):
         state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                    # back to the centre still raised (a look that ends on the centre picture is there already) ...
     if state != "fell":
