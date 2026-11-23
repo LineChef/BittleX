@@ -32,6 +32,7 @@ BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
+LOWER_SPEED, LOWER_WAIT_S = 6, 1.8       # the pose editor's own speed and wait for one eased frame (behavior/pose_edit.py)
 LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 
 
@@ -104,12 +105,38 @@ class CameraHolder:
         if cam is None:
             from ..config import settings
             from ..vision.snapshot import CameraSnapshotter
-            cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0, timeout_s=AFTER_PICTURE_TIMEOUT_S, click=False)       # no shutter click: the board's own `up` came 1 to 2 s after a picture's click in several runs (2026-11-23, to be confirmed)
+            cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0, timeout_s=AFTER_PICTURE_TIMEOUT_S)                                                    # the shutter click stays on: the owner listens for it (the click was tried off as a test of the board's own up and made no difference)
         self._cam, self._error, self._ready = cam, None, threading.Event()
         self._ready.set()
 
     def open_port(self) -> bool:
         return bool(self._cam.open_port())
+
+    def warm_up(self, tries: int = 3, say=print) -> bool:
+        """Two throwaway pictures at the very start, with G2 still at rest (owner, 2026-11-23: the camera needs warming up, which is probably why the picture after the throw kept being skipped; a cold camera took 10 s for its first picture). The shutter click is off for these two so the
+        first click the owner hears is the real picture. False when the camera never answered: the run does not start."""
+        click = getattr(self._cam, "_click", True)
+        try:
+            self._cam._click = False
+        except Exception:  # noqa: BLE001
+            pass
+        got = 0
+        try:
+            for i in range(tries * 2):
+                try:
+                    if self._cam.snapshot() is not None:
+                        got += 1
+                except Exception:  # noqa: BLE001
+                    pass
+                if got >= 2:
+                    return True
+                say(f"camera warm-up: no picture yet (try {i + 1})")
+        finally:
+            try:
+                self._cam._click = click
+            except Exception:  # noqa: BLE001
+                pass
+        return False
 
     def close(self) -> None:
         try:
@@ -327,8 +354,9 @@ class RealEnv:
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
         r._tx("gb")
-        if r.claw_pose(0.0, 0.0) == "fell":
-            raise Fell()
+        if not self._lower_claw_holding_the_legs():                      # the pose editor's own move; the plain claw_pose only if the pose cannot be read
+            if r.claw_pose(0.0, 0.0) == "fell":
+                raise Fell()
         self.attention_hold_s = round(time.monotonic() - t_pose, 1)
         chase.ensure_rest(self.link)                                     # attention to rest
         r.posture, r._claw = "rest", (0.0, 0.0)
@@ -340,6 +368,25 @@ class RealEnv:
                 import base64
                 print(f"AFTER_PICTURE {self.attempt} {base64.b64encode(jpeg).decode()}", flush=True)
         return basket, puck
+
+    def _lower_claw_holding_the_legs(self) -> bool:
+        """Lower the claw the way the pose editor moves the arm (owner, 2026-11-23: the back legs pushed up as soon as the claw came down and flipped him every time; the pose editor never did): ONE data skill carrying all 16 joints, the arm at pan 0 and lift 0 and the legs at the
+        angles just read from the board, so the legs are held while the arm's weight shifts back. False when the pose could not be read (the caller uses the plain claw move)."""
+        from . import ball_chase as chase
+        from .pose_edit import LIFT, frame_message
+        j = chase.read_joints(self.link)
+        if not j or len(j) < 16:
+            return False
+        angles = [int(a) for a in j[:16]]
+        angles[0], angles[LIFT] = 0, 0
+        self.link.play_data_skill(frame_message(angles, LOWER_SPEED, 2))
+        time.sleep(LOWER_WAIT_S)
+        try:
+            self.link._end_quiet()                                       # the link keeps the port silent behind a data skill until its `k` echo or 10 s: the move is over
+        except Exception:  # noqa: BLE001
+            pass
+        self.robot._claw = (0.0, 0.0)
+        return True
 
     def _ready_to_move(self) -> None:
         """From the attention pose with the claw up: the claw down, laid in rest, then the eased stand-up from rest (owner, 2026-11-23: a stand-up straight from the attention pose is a fall every time). Standing already: nothing."""
@@ -410,8 +457,8 @@ def main(argv: list | None = None) -> None:
         print("not started: the pack gate failed or the board sent no motion data")
         return
     looker = CameraHolder()
-    if not looker.open_port():
-        print("not started: the camera's port did not open (check its USB plug); nothing was moved")
+    if not looker.open_port() or not looker.warm_up():
+        print("not started: the camera did not open and warm up (check its USB plug); nothing was moved")
         looker.close()
         return
     robot = chase.SerialRobot(link)

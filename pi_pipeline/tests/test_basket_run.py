@@ -280,11 +280,23 @@ def test_after_the_throw_the_owners_sequence_with_the_standard_attention_entry(m
         def _tx(self, c):
             order.append(c)
 
+    class Link:
+        def __init__(self):
+            self.frames = []
+
+        def play_data_skill(self, message):
+            order.append("lower_frame")
+            self.frames.append(message)
+
+        def _end_quiet(self):
+            pass
+
+    monkeypatch.setattr(chase, "read_joints", lambda link: [5, 120, 3, 0, 0, 0, 0, 0] + [30, 31, 32, 33, 34, 35, 36, 37])
     env = br.RealEnv.__new__(br.RealEnv)
-    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
+    env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), Link(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert order == ["expect_lob_end", "sit_down", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "gb", "claw 0.0", "rest"]       # the standard entry, gyro assist off before each claw move, then the owner's steps
-    assert not any(c in order for c in ("kcalib", "kbalance")) and env.robot.posture == "rest" and env.picture_ok is True        # no raw kcalib and no extra writes of mine
+    assert order == ["expect_lob_end", "sit_down", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "gb", "lower_frame", "sleep", "rest"]      # the lowering is the pose editor's data skill, legs held       # the standard entry, gyro assist off before each claw move, then the owner's steps
+    assert "claw 0.0" not in order and not any(c in order for c in ("kcalib", "kbalance")) and env.robot.posture == "rest" and env.picture_ok is True        # no raw kcalib and no extra writes of mine
     assert basket.claw_in == 16.0 and puck.claw_in == 12.0 and env.attention_hold_s is not None
 
 
@@ -348,10 +360,10 @@ def test_there_is_no_picture_between_the_pickup_and_the_throw():
 def test_the_claws_two_moves_after_the_throw_use_the_standard_pace():
     import inspect
     src = inspect.getsource(br.RealEnv.after_throw)
-    assert "FAST_CLAW" not in src and "claw_pose(0.0, LOOK_LIFT_DEG)" in src and "claw_pose(0.0, 0.0)" in src       # the ball goal's look pace, as the pose editor ran it for 22 minutes (the fast pace was followed by the board's own up twice)
-def test_the_runs_camera_makes_no_shutter_click():
+    assert "FAST_CLAW" not in src and "claw_pose(0.0, LOOK_LIFT_DEG)" in src and "_lower_claw_holding_the_legs" in src       # the ball goal's look pace, as the pose editor ran it for 22 minutes (the fast pace was followed by the board's own up twice)
+def test_the_runs_camera_keeps_the_shutter_click_on():
     import inspect
-    assert "click=False" in inspect.getsource(br.CameraHolder.__init__)
+    assert "click=False" not in inspect.getsource(br.CameraHolder.__init__)                                  # the owner listens for the click: it is how he knows a picture was taken
 
 
 def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
@@ -366,3 +378,49 @@ def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
     assert r._lob_end_pose((-28.0, 14.0)) is False and r._lob_end_pose((-10.0, 0.0)) is False and r._lob_end_pose(None) is False
     t[0] += chase.LOB_END_S + 1
     assert r._lob_end_pose((-28.0, -2.0)) is False
+
+
+def test_the_claw_is_lowered_by_one_frame_that_holds_the_legs_at_the_angles_just_read(monkeypatch):
+    from pi_pipeline.behavior import ball_chase as chase
+    from pi_pipeline.behavior.pose_edit import LIFT
+    monkeypatch.setattr(br.time, "sleep", lambda s: None)
+    read = [5, 120, 3, 0, 0, 0, 0, 0] + [30, 31, 32, 33, 34, 35, 36, 37]
+    monkeypatch.setattr(chase, "read_joints", lambda link: list(read))
+    sent = []
+
+    class Link:
+        def play_data_skill(self, message):
+            sent.append(message)
+
+        def _end_quiet(self):
+            pass
+
+    class Robot:
+        _claw = (0.0, 120.0)
+
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot, env.link = Robot(), Link()
+    assert env._lower_claw_holding_the_legs() is True and len(sent) == 1 and env.robot._claw == (0.0, 0.0)
+    from pi_pipeline.behavior.pose_edit import frame_message
+    assert sent[0] == frame_message([0, 0, 3, 0, 0, 0, 0, 0] + [30, 31, 32, 33, 34, 35, 36, 37], br.LOWER_SPEED, 2)       # pan and lift 0, everything else as read
+    assert LIFT == 1
+    monkeypatch.setattr(chase, "read_joints", lambda link: None)
+    assert env._lower_claw_holding_the_legs() is False                                                                  # unreadable: the caller falls back to the plain move
+
+
+def test_the_camera_is_warmed_up_with_two_silent_pictures_before_anything_moves():
+    class Cam:
+        def __init__(self, answers):
+            self.answers, self._click, self.clicks_during = list(answers), True, []
+
+        def snapshot(self):
+            self.clicks_during.append(self._click)
+            return self.answers.pop(0) if self.answers else None
+
+    ok_cam = Cam([None, b"j", b"j"])
+    h = br.CameraHolder(ok_cam)
+    assert h.warm_up(say=lambda s: None) is True and ok_cam.clicks_during == [False, False, False] and ok_cam._click is True        # silent warm-up, click restored
+    dead = Cam([])
+    assert br.CameraHolder(dead).warm_up(tries=1, say=lambda s: None) is False and dead._click is True                             # a dead camera: the run does not start
+    import inspect
+    assert "warm_up" in inspect.getsource(br.main)

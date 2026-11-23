@@ -669,3 +669,20 @@ Nine timed `kbkF` runs on hardwood with the arm and no cylinder, each from the e
 - No falls. The body tilt after each run was 1.6 to 2.7 degrees, the same as before the run. The pack read 93 percent before the first run and 84 percent after the ninth.
 - Reading: the first commanded second moves him about 2 inches and each later second about 6 to 7 inches; the drift to the right is steady (1 to 5 inches) and grows with the length. A run takes 2.7 s or more beyond the commanded time because of the stop. A backward walk holding the cylinder was not run: the cylinder weighs almost nothing.
 - The ball goal's own back-up (1.0 s) is therefore about 2 inches; its logged readings (32 back-ups, ball 2 to 5 inches away) were too noisy to use as a pace.
+
+The board's own stand-up after the claw lowers in the attention pose, 2026-11-23
+-------------------------------------------------------------------------------
+
+Seen in every basket-run attempt that went into the attention pose after the throw (8 runs): the claw is raised, one picture is taken, the claw is lowered, and within about a second the board starts its own `up` (back legs first) and he flips onto his side. The command log marks it "not from the Pi" and the Pi has sent no stand command (the `up` sits between two `K` data-skill echoes).
+
+What is established:
+- It is not new to the project. The command log holds 103 board-started `up` lines since 2026-11-18 (12 on 11-19, 18 on 11-20, 83 on 11-21), most as `krest`, `rest`, `rc`, `up`: the firmware's self-right after a lie-down. It was never seen in the attention pose before today.
+- The attention pose by itself is fine: the pose editor held it for 22 minutes with the claw moving, and for a 25 second silent hold, with no `up`. The pictures of the grip and basket calibration were taken that way.
+- Not the cause (each tried and the `up` came anyway): the camera's shutter click, joint reads (`j`) in the pose, the gyro assist (`gb` was sent after the entry and again before the lowering, confirmed in the log), the pack (the pack limit is now only advisory), a fast claw pace, a picture taken before the pose, the 10 second burst, a raw firmware `kcalib` entry (that one made it worse: the standard `sit_down` entry is now used).
+- The ball goal's look ends differently: right after the claw is lowered the Pi stands him up (`kbalance`, the link's eased back-legs-first stand-up). The basket run lowered the claw and then waited, which the ball goal never does.
+- The pose editor moves the arm with ONE data skill that carries all 16 joints (the legs at the angles just read), so the legs are held while the arm's weight shifts. The basket run lowered the claw with arm-only `i` commands (`claw_pose(0, 0)`).
+
+Leading explanation, not proven: with only the arm commanded, the lowering claw shifts the weight forward and the board reacts with its own back-legs-first stand-up. The next run lowers the claw with the pose editor's legs-holding frame instead. If the `up` still comes, the next test is to stand him up from the attention pose right after the lowering, as the ball goal does, and then lie him down.
+
+Also logged: the first send of the throw script was not taken (no `K`) in the last five runs at a pack of 67 percent or less, and a plain `g2lob` showed the same twice; the resend always worked.
+
