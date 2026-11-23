@@ -345,16 +345,10 @@ def test_there_is_no_picture_between_the_pickup_and_the_throw():
     assert '"--grip-look"' not in src and "--pick" in src                                                    # the owner's sequence: pickup, throw, nothing in between
 
 
-def test_the_fast_claw_path_is_the_same_path_in_fewer_steps():
-    import pi_pipeline.behavior.basket_run as m
-    from pi_pipeline.behavior import ball_chase as chase
-    assert br.FAST_CLAW_DEG_S > chase.CLAW_DEG_S                                                           # faster than the ball goal's look
-    steps = list(chase.claw_path((0, 0), (0, 120), br.FAST_CLAW_DEG_S))
-    slow = list(chase.claw_path((0, 0), (0, 120)))
-    assert len(steps) < len(slow) / 3 and steps[-1] == (0, 120)                                            # the same path in a fraction of the steps
-    assert m.AFTER_RAISE_SETTLE_S < chase.CLAW_SETTLE_S
-
-
+def test_the_claws_two_moves_after_the_throw_use_the_standard_pace():
+    import inspect
+    src = inspect.getsource(br.RealEnv.after_throw)
+    assert "FAST_CLAW" not in src and "claw_pose(0.0, LOOK_LIFT_DEG)" in src and "claw_pose(0.0, 0.0)" in src       # the ball goal's look pace, as the pose editor ran it for 22 minutes (the fast pace was followed by the board's own up twice)
 def test_the_runs_camera_makes_no_shutter_click():
     import inspect
     assert "click=False" in inspect.getsource(br.CameraHolder.__init__)

@@ -32,8 +32,6 @@ BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
-FAST_CLAW_DEG_S = 300.0              # the two claw moves of the picture after the throw: at the ball goal's 60 deg/s each took 8 s and the board stood him up by itself 8 to 13 s into the attention pose (2026-11-23)
-AFTER_RAISE_SETTLE_S = 0.5
 LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 
 
@@ -320,14 +318,14 @@ class RealEnv:
         if r.sit_down() == "fell":                                       # the standard attention entry
             raise Fell()
         t_pose = time.monotonic()
-        if r.claw_pose(0.0, LOOK_LIFT_DEG, FAST_CLAW_DEG_S) == "fell":
+        if r.claw_pose(0.0, LOOK_LIFT_DEG) == "fell":
             raise Fell()
-        time.sleep(AFTER_RAISE_SETTLE_S)
+        time.sleep(chase.CLAW_SETTLE_S)
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
-        if r.claw_pose(0.0, 0.0, FAST_CLAW_DEG_S) == "fell":
+        if r.claw_pose(0.0, 0.0) == "fell":
             raise Fell()
         self.attention_hold_s = round(time.monotonic() - t_pose, 1)
         chase.ensure_rest(self.link)                                     # attention to rest
