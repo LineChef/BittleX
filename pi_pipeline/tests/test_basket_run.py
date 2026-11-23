@@ -244,7 +244,7 @@ def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_throw_is_nev
     assert "--watch" not in inspect.getsource(br.RealEnv.throw)                                                # the throw is watched for its full default length: nothing is written to the board while the lob still plays (2026-11-23: a 2.3 s watch cut the release off)
 
 
-def test_after_the_throw_the_owners_sequence_attention_claw_up_one_picture_claw_down_then_rest(monkeypatch):
+def test_after_the_throw_the_owners_sequence_with_the_standard_attention_entry(monkeypatch):
     from pi_pipeline.behavior import ball_chase as chase
     from pi_pipeline.vision import basket_finder as bf
     from pi_pipeline.vision import puck_finder as pf
@@ -266,28 +266,26 @@ def test_after_the_throw_the_owners_sequence_attention_claw_up_one_picture_claw_
         posture = "stand"
         _claw = (0.0, 125.0)
 
-        def relax(self):
-            order.append("attention")
+        def expect_lob_end(self):
+            order.append("expect_lob_end")
+
+        def sit_down(self):
+            order.append("sit_down")
             return "ok"
 
         def claw_pose(self, pan, lift, deg_s=None, confirm=True):
             order.append(f"claw {lift}")
-            speeds.append(deg_s)
-            confirms.append(confirm)
             return "ok"
 
         def _tx(self, c):
             order.append(c)
 
-    speeds, confirms = [], []
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert speeds == [br.FAST_CLAW_DEG_S, br.FAST_CLAW_DEG_S] and env.attention_hold_s is not None            # both claw moves at the fast pace
-    assert confirms[-1] is False                                                                          # the lowering reads no joints while he holds the pose
-    assert order == ["attention", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0", "gb", "rest"]       # the owner's steps, gyro assist off after the pose and before the lie-down
-    assert env.robot.posture == "rest" and env.picture_ok is True and basket.claw_in == 16.0 and puck.claw_in == 12.0
-    assert "kbalance" not in order                                                                                                # no stand-up anywhere before the rest
+    assert order == ["expect_lob_end", "sit_down", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0", "rest"]       # the standard entry, then the owner's steps
+    assert not any(c in order for c in ("kcalib", "gb", "kbalance")) and env.robot.posture == "rest" and env.picture_ok is True        # no raw kcalib and no extra writes of mine
+    assert basket.claw_in == 16.0 and puck.claw_in == 12.0 and env.attention_hold_s is not None
 
 
 def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
@@ -347,10 +345,10 @@ def test_there_is_no_picture_between_the_pickup_and_the_throw():
     assert '"--grip-look"' not in src and "--pick" in src                                                    # the owner's sequence: pickup, throw, nothing in between
 
 
-def test_a_pose_held_too_long_skips_the_claw_lowering_and_lies_down():
+def test_the_fast_claw_path_is_the_same_path_in_fewer_steps():
     import pi_pipeline.behavior.basket_run as m
     from pi_pipeline.behavior import ball_chase as chase
-    assert br.ATTENTION_HOLD_MAX_S <= 7.0 and br.FAST_CLAW_DEG_S > chase.CLAW_DEG_S                        # faster than the ball goal's look, and a hold limit under the 8 to 13 s the board allows
+    assert br.FAST_CLAW_DEG_S > chase.CLAW_DEG_S                                                           # faster than the ball goal's look
     steps = list(chase.claw_path((0, 0), (0, 120), br.FAST_CLAW_DEG_S))
     slow = list(chase.claw_path((0, 0), (0, 120)))
     assert len(steps) < len(slow) / 3 and steps[-1] == (0, 120)                                            # the same path in a fraction of the steps
@@ -360,3 +358,17 @@ def test_a_pose_held_too_long_skips_the_claw_lowering_and_lies_down():
 def test_the_runs_camera_makes_no_shutter_click():
     import inspect
     assert "click=False" in inspect.getsource(br.CameraHolder.__init__)
+
+
+def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
+    from pi_pipeline.behavior import ball_chase as chase
+    t = [100.0]
+    r = chase.SerialRobot.__new__(chase.SerialRobot)
+    r._clock = lambda: t[0]
+    r.lob_end_until = float("-inf")
+    assert r._lob_end_pose((-28.0, -2.0)) is False
+    r.expect_lob_end()
+    assert r._lob_end_pose((-28.0, -2.0)) is True
+    assert r._lob_end_pose((-28.0, 14.0)) is False and r._lob_end_pose((-10.0, 0.0)) is False and r._lob_end_pose(None) is False
+    t[0] += chase.LOB_END_S + 1
+    assert r._lob_end_pose((-28.0, -2.0)) is False

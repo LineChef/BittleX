@@ -698,6 +698,8 @@ class Camera(Protocol):
 STAND_LEVEL_DEG = 8.0          # (owner-approved 2026-11-17, after two falls that began on a rolled stand) a stand-up that ends more than this off level on pitch or roll is repeated once: laid in rest and stood up again
 FINAL_TILT_S = 0.3             # (same) the tilt is read afresh this long right before every walk, turn, back-up and punt, whatever the last move was and however long ago
 MOVE_TILT_GATE_DEG = 12.0       # (owner, 2026-11-15, after two falls) BEFORE EVERY move (walk, turn, back, punt) the body's tilt is read; more than this far off level on pitch or roll and the move is NOT sent: he is laid down and stood up again (recover_sag: attention pose, then via rest). 0 turns it off
+LOB_END_PITCH_DEG = (-36.0, -20.0)  # MODE-SPECIFIC(ball_chase.py, 2026-11-23): the lob's own end pose leaves him pitched about -28 deg nose-down with the claw up; for LOB_END_S after a lob that pitch is not a sag (roll must still be inside the gate)
+LOB_END_S = 20.0
 SAG_TILT_DEG = 12.0            # standing, the body this far off the tilt measured right after his last good stand-up (or 20 deg off level before there is one): the legs have sagged
 PICTURE_SAG_HINT_S = 30.0       # how long a rolled picture keeps the body-tilt sag check stricter
 PICTURE_SAG_FACTOR = 0.6        # the body-tilt thresholds are this fraction of themselves while the hint is on (12 deg becomes 7)
@@ -929,6 +931,7 @@ class SerialRobot:
 
     def __init__(self, link, poll_imu=None, fall_deg: float = FALL_DEG, sleep=time.sleep, clock=time.monotonic, use_pick: bool = False):
         self._lk, self._sleep, self._clock = link, sleep, clock
+        self.lob_end_until = float("-inf")                      # set by expect_lob_end(): until then a pitch in LOB_END_PITCH_DEG is the lob's end pose, not a sag
         self.use_pick = use_pick                          # True: `kpickF`, the pick skill (it opens and closes the claw); the default is the punch
         self._fall_rad = math.radians(fall_deg)
         self._pitch, self._roll = [], []
@@ -1632,6 +1635,13 @@ class SerialRobot:
         self._posed_at = self._moved_at
         return state
 
+    def expect_lob_end(self, seconds: float = LOB_END_S) -> None:
+        """The lob has just been played: for `seconds` the move gates accept its end pose (pitched nose-down about 28 deg, claw up), so the attention pose can follow at once instead of a lie-down and a stand-up."""
+        self.lob_end_until = self._clock() + seconds
+
+    def _lob_end_pose(self, tilt) -> bool:
+        return bool(tilt is not None and self._clock() < self.lob_end_until and LOB_END_PITCH_DEG[0] <= tilt[0] <= LOB_END_PITCH_DEG[1] and abs(tilt[1]) <= MOVE_TILT_GATE_DEG)
+
     def sit_down(self) -> str:
         """The claw look starts from the "attention" pose (user, 2026-11-01; it used to be a sit): stand first, then CLAW_LOOK_POSE, then still. No fall check in it. Already in the
         attention pose: the pose is sent again (it drives every leg joint again) and no stand-up first; just stood up: no second stand-up."""
@@ -1641,7 +1651,7 @@ class SerialRobot:
             tilt = self._tilt(0.3) if callable(getattr(self._lk, "poll_imu", None)) else None
             if self._already_fell(tilt):
                 return "fell"
-            if tilt is not None and max(abs(tilt[0]), abs(tilt[1])) > MOVE_TILT_GATE_DEG:
+            if tilt is not None and max(abs(tilt[0]), abs(tilt[1])) > MOVE_TILT_GATE_DEG and not self._lob_end_pose(tilt):
                 log.warning("move gate (claw look): the body is tilted pitch %+.0f roll %+.0f deg (more than %.0f): lying down in rest and standing up before the look", tilt[0], tilt[1], MOVE_TILT_GATE_DEG)
                 self.move_gate_stops = getattr(self, "move_gate_stops", 0) + 1
                 if self.recover_sag(tilt) == "fell":

@@ -2,7 +2,7 @@
 
 THE STEPS THE OWNER WANTS TO SEE, in this order, every attempt (2026-11-23): stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), go into the attention pose, lift the claw to 120, take ONE picture, put the claw down, then rest (attention to rest, never a stand-up from attention),
 and decide: the puck seen on the floor outside the basket is a miss and he stands up from rest with the eased stand-up; the puck not seen counts as a make and he stays in rest and the run ends for the owner's reset (`goals/basket_outcome.classify_throw` calls the throw).
-After `kcalib` the board starts its own back-legs-first `up` (after `rc`, the firmware's self-right, which fires only while the gyro assist is on): `gb` is sent right after the pose and again before the lie-down.
+The attention pose is entered by the standard `sit_down()` (stand first, then the eased entry): the raw firmware `kcalib` from the lob's end pose made the board stand him up by itself 8 to 13 s later in every run (2026-11-23).
 A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
 Stops: 5 attempts, a fall, a battery gate that fails, no picture after the throw (and none before the attention pose: the camera is only opened at the start, never used), a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
 
@@ -34,7 +34,6 @@ LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
 FAST_CLAW_DEG_S = 300.0              # the two claw moves of the picture after the throw: at the ball goal's 60 deg/s each took 8 s and the board stood him up by itself 8 to 13 s into the attention pose (2026-11-23)
 AFTER_RAISE_SETTLE_S = 0.5
-ATTENTION_HOLD_MAX_S = 7.0           # past this long in the attention pose he skips what is left and lies down
 LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 
 
@@ -309,16 +308,18 @@ class RealEnv:
         return out
 
     def after_throw(self):
-        """The owner's sequence after the throw (2026-11-23, to be followed exactly): into the attention pose, the claw up to LOOK_LIFT_DEG, ONE picture, the claw down, then rest (attention to rest, never a stand-up from attention). A puck seen on the floor sends him up with the eased stand-up from rest
-        (`_ready_to_move`); not seen counts as a make and he stays in rest. The firmware's self-right (`rc`, then its own back-legs-first `up`) fires only while the gyro assist is on, and the link switches it on while he holds a pose: `gb` goes out right after the pose and again before the lie-down.
+        """The owner's sequence after the throw (2026-11-23): into the attention pose, the claw up to LOOK_LIFT_DEG, ONE picture, the claw down, then rest (attention to rest, never a stand-up from attention); a puck seen on the floor sends him up with the eased stand-up from rest (`_ready_to_move`), not seen counts as a make.
+        The attention pose is entered the STANDARD way, `sit_down()`: `kbalance` first, then the eased move into the pose (the pose editor and every claw look do it, and 20 pictures were taken that way). The first versions of this step sent the raw firmware `kcalib` straight from the lob's pitched end pose
+        (no stand first, no eased entry) and the board stood him up by itself 8 to 13 s later in every run; the claw look's move gate would lay him down and stand him up first because of that pitch, so `expect_lob_end()` tells it the lob's end pose is not a sag (the owner approved that exception).
         The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
         from . import ball_chase as chase
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
         r = self.robot
-        r.relax()                                                        # the standard move into the attention pose (no move gate, no stand-up)
+        r.expect_lob_end()
+        if r.sit_down() == "fell":                                       # the standard attention entry
+            raise Fell()
         t_pose = time.monotonic()
-        r._tx("gb")                                                      # gyro assist off: no self-right while he holds the pose
         if r.claw_pose(0.0, LOOK_LIFT_DEG, FAST_CLAW_DEG_S) == "fell":
             raise Fell()
         time.sleep(AFTER_RAISE_SETTLE_S)
@@ -326,11 +327,9 @@ class RealEnv:
         cam.refresh_exposure()
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
-        if time.monotonic() - t_pose <= ATTENTION_HOLD_MAX_S:
-            if r.claw_pose(0.0, 0.0, FAST_CLAW_DEG_S, confirm=False) == "fell":      # no `j` reads while he holds the pose: the board's own `up` came right after them
-                raise Fell()
-        self.attention_hold_s = round(time.monotonic() - t_pose, 1)      # logged: the board stood him up 8 to 13 s into the pose
-        r._tx("gb")
+        if r.claw_pose(0.0, 0.0, FAST_CLAW_DEG_S) == "fell":
+            raise Fell()
+        self.attention_hold_s = round(time.monotonic() - t_pose, 1)
         chase.ensure_rest(self.link)                                     # attention to rest
         r.posture, r._claw = "rest", (0.0, 0.0)
         basket = puck = None
