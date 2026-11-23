@@ -96,14 +96,14 @@ class Fell(Exception):
 
 
 class BurstRecorder:
-    """The picture record of one throw (owner, 2026-11-23: see the puck leave the claw, its path, and the bounce or the miss). `start(t_send)` runs the camera's back-to-back burst in a thread; `join()` waits and saves the frames to `out_dir`, each
-    named with the time its request and its arrival fell after the throw was sent. A diagnostic only: nothing reads the frames during the run, and a failure here never stops the throw."""
+    """The picture record of one throw (owner, 2026-11-23: see the puck leave the claw, its path, and the bounce or the miss). `start(t_send)` runs the camera's back-to-back burst in a thread; `join()` waits for it. The frames stay IN MEMORY: nothing is written to the
+    disk (owner: the burst pictures are never saved); `sheet_png()` builds one labelled contact sheet for a review. The look after the throw reads the last frames. A diagnostic only: a failure here never stops the throw."""
 
-    def __init__(self, cam, out_dir: str, seconds: float = BURST_S, clock=time.monotonic):
-        self.cam, self.out_dir, self.seconds, self._clock = cam, out_dir, seconds, clock
+    def __init__(self, cam, seconds: float = BURST_S, clock=time.monotonic):
+        self.cam, self.seconds, self._clock = cam, seconds, clock
         self.thread = None
         self.t_send = None
-        self.saved: list = []
+        self.frames: list = []                # (seconds after the send the request went out, seconds after the send the picture arrived, jpeg)
         self.last_frames: list = []
 
     def start(self, t_send: float | None = None) -> None:
@@ -114,21 +114,37 @@ class BurstRecorder:
 
     def _run(self) -> None:
         try:
-            frames = self.cam.grab_burst(self.seconds)
-            os.makedirs(self.out_dir, exist_ok=True)
-            for i, (t_req, t_got, jpeg) in enumerate(frames):
-                name = f"f{i:02d}_req{t_req - self.t_send:+.2f}_got{t_got - self.t_send:+.2f}.jpg"
-                with open(os.path.join(self.out_dir, name), "wb") as f:
-                    f.write(jpeg)
-                self.saved.append(name)
-            self.last_frames = [f[2] for f in frames[-KEEP_FRAMES:]]
+            got = self.cam.grab_burst(self.seconds)
+            self.frames = [(t_req - self.t_send, t_got - self.t_send, jpeg) for t_req, t_got, jpeg in got]
+            self.last_frames = [f[2] for f in self.frames[-KEEP_FRAMES:]]
         except Exception:  # noqa: BLE001
             pass
 
     def join(self, timeout: float = 15.0) -> list:
         if self.thread is not None:
             self.thread.join(timeout)
-        return self.saved
+        return self.frames
+
+    def sheet_png(self, cols: int = 8, side: int = 210) -> bytes | None:
+        """One contact sheet of every frame, each labelled with the second it arrived after the send, as PNG bytes (None when there are no frames or no imaging library)."""
+        if not self.frames:
+            return None
+        try:
+            import io
+
+            from PIL import Image, ImageDraw
+            rows = (len(self.frames) + cols - 1) // cols
+            sheet = Image.new("RGB", (cols * side, rows * (side + 16)), (20, 20, 20))
+            draw = ImageDraw.Draw(sheet)
+            for i, (_t_req, t_got, jpeg) in enumerate(self.frames):
+                x, y = (i % cols) * side, (i // cols) * (side + 16)
+                sheet.paste(Image.open(io.BytesIO(jpeg)).convert("RGB").resize((side, side)), (x, y + 16))
+                draw.text((x + 3, y + 2), f"#{i} got {t_got:+.2f}s", fill=(255, 255, 255))
+            out = io.BytesIO()
+            sheet.save(out, "PNG")
+            return out.getvalue()
+        except Exception:  # noqa: BLE001
+            return None
 
 
 def merge_looks(seen: dict, offsets: dict):
@@ -263,12 +279,12 @@ def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR, p
 class RealEnv:
     """G2 and his camera behind the `Env` interface: `throw`, `after_throw`, `look` (a quick picture), `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
 
-    def __init__(self, link, robot, looker, book=None, burst: bool = True):
+    def __init__(self, link, robot, looker, book=None, burst: bool = True, show_burst: bool = False):
         from . import basket_movers as bm
         self.link, self.robot, self.looker = link, robot, looker
         self.mover = bm.BasketMover(robot, book=book)
         self._cam = None
-        self.burst, self.run_stamp, self.attempt = burst, time.strftime("%Y%m%d_%H%M%S"), 0
+        self.burst, self.show_burst, self.run_stamp, self.attempt = burst, show_burst, time.strftime("%Y%m%d_%H%M%S"), 0
         self.quick_log: list = []
         self._burst_rec = None
 
@@ -293,7 +309,7 @@ class RealEnv:
         self.attempt += 1
         rec = None
         if self.burst and getattr(self.looker, "_ready", None) is not None and self.looker._ready.wait(10.0) and getattr(self.looker, "_cam", None) is not None:
-            rec = BurstRecorder(self.looker._cam, os.path.join(os.path.expanduser(LOG_DIR), "burst", f"{self.run_stamp}_attempt{self.attempt}"))
+            rec = BurstRecorder(self.looker._cam)
         out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False, on_send=rec.start if rec else None)
         self.robot.posture = "stand"
         self.robot._claw = (0.0, 0.0)
@@ -305,7 +321,12 @@ class RealEnv:
                 out["fell"] = True
         self._burst_rec = rec
         if rec is not None:
-            out["burst"] = {"dir": rec.out_dir, "frames": len(rec.join())}
+            out["burst"] = {"frames": len(rec.join())}
+            if self.show_burst:
+                png = rec.sheet_png()
+                if png:
+                    import base64
+                    print(f"BURST_SHEET {self.attempt} {base64.b64encode(png).decode()}", flush=True)       # to the person running it, over the connection: nothing is written to the Pi's disk
         return out
 
     def after_throw(self):
@@ -371,6 +392,7 @@ def main(argv: list | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(description="The full basket sequence on G2 (hands near, the voice service stopped, G2 at rest with the puck touching the claw tip and the basket 16 inches out).")
     ap.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS)
+    ap.add_argument("--show-burst", action="store_true", help="after each throw print the burst's contact sheet (PNG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
     from . import ball_chase as chase
     from . import chase_pace
@@ -392,7 +414,7 @@ def main(argv: list | None = None) -> None:
     path = os.path.join(os.path.expanduser(LOG_DIR), time.strftime("%Y%m%d_%H%M%S") + "_basket_run.json")
     env = None
     try:
-        env = RealEnv(link, robot, looker, book=chase_pace.book_for_now(save=False))
+        env = RealEnv(link, robot, looker, book=chase_pace.book_for_now(save=False), show_burst=a.show_burst)
         result = run_sequence(env, a.max_attempts, save=lambda r: (result.update(r), write_log(r, {"pack_pct_start": pct, "quick": env.quick_log}, path=path)))
     except KeyboardInterrupt:
         result["outcome"] = "interrupted"

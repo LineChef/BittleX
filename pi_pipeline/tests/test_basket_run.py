@@ -168,24 +168,36 @@ def test_the_looks_are_merged_into_one_body_frame_reading():
     assert b.bearing_deg == 31.0 and p is None
 
 
-def test_the_burst_recorder_saves_frames_named_by_their_time_after_the_send(tmp_path):
+def test_the_burst_recorder_keeps_frames_in_memory_only_and_builds_a_sheet(tmp_path, monkeypatch):
+    import io
+
+    from PIL import Image
+
+    def jpeg(c):
+        out = io.BytesIO()
+        Image.new("RGB", (240, 240), c).save(out, "JPEG")
+        return out.getvalue()
+
     class Cam:
         def grab_burst(self, seconds):
-            return [(10.00, 10.20, b"a"), (10.25, 10.45, b"b"), (10.50, 10.70, b"c")]
+            return [(10.00, 10.20, jpeg((200, 0, 0))), (10.25, 10.45, jpeg((0, 200, 0))), (10.50, 10.70, jpeg((0, 0, 200)))]
 
-    rec = br.BurstRecorder(Cam(), str(tmp_path / "b"), seconds=1.0)
+    monkeypatch.chdir(tmp_path)
+    rec = br.BurstRecorder(Cam(), seconds=1.0)
     rec.start(t_send=10.0)
-    names = rec.join()
-    assert names == ["f00_req+0.00_got+0.20.jpg", "f01_req+0.25_got+0.45.jpg", "f02_req+0.50_got+0.70.jpg"]
-    assert (tmp_path / "b" / names[1]).read_bytes() == b"b"
+    frames = rec.join()
+    assert [round(f[1], 2) for f in frames] == [0.20, 0.45, 0.70] and len(rec.last_frames) == 3
+    assert list(tmp_path.rglob("*")) == []                                                                 # nothing is written to disk
+    png = rec.sheet_png()
+    assert png is not None and png[:8] == b"\x89PNG\r\n\x1a\n"
 
     class Broken:
         def grab_burst(self, seconds):
             raise RuntimeError("no camera")
 
-    bad = br.BurstRecorder(Broken(), str(tmp_path / "c"))
+    bad = br.BurstRecorder(Broken())
     bad.start(t_send=0.0)
-    assert bad.join() == []                                                                          # a failure here never stops a throw
+    assert bad.join() == [] and bad.sheet_png() is None                                                   # a failure here never stops a throw
 
 
 def test_the_camera_burst_returns_back_to_back_frames_without_exposure_work():
