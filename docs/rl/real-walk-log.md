@@ -658,3 +658,14 @@ The wave (`khi`): 47 deg pitch swing, flipped him twice (both triggered by mis-h
 - Falls: 1:57 PM, 3 min: none; 2:29 PM, 4 min: one tip-over (112 deg) at the 99% survey stop
 
 Profile (208 s): the wake-word listener 30.7% running (48.4 s CPU), the walk thread 21.3% (11.0 s), the narrator 90% in the speech model. CPU governor `ondemand` at 1 GHz, not throttled. Fixes made afterwards are listed in STATUS (not retested).
+
+Backward walk with the firmware gait, 2026-11-23
+-------------------------------------------------
+
+Nine timed `kbkF` runs on hardwood with the arm and no cylinder, each from the eased stand-up, a timed gait ended by the whole-cycle and eased stop, then rest; one run per serial connection. Distances were measured by hand from the same toe against a tape; the heading change was not read from the IMU (it came back empty).
+- 1 s commanded: 2 inches back and 1 right, 2 and 1, 3 and 1. End to end 3.7 s each.
+- 2 s commanded: 9 inches back and 3 right, 9 and 3, 10 and 3. End to end 4.7 to 5.1 s.
+- 3 s commanded: 16 inches back and 5 right, 14 and 3, 16 and 3. End to end 5.7 to 6.1 s.
+- No falls. The body tilt after each run was 1.6 to 2.7 degrees, the same as before the run. The pack read 93 percent before the first run and 84 percent after the ninth.
+- Reading: the first commanded second moves him about 2 inches and each later second about 6 to 7 inches; the drift to the right is steady (1 to 5 inches) and grows with the length. A run takes 2.7 s or more beyond the commanded time because of the stop. A backward walk holding the cylinder was not run: the cylinder weighs almost nothing.
+- The ball goal's own back-up (1.0 s) is therefore about 2 inches; its logged readings (32 back-ups, ball 2 to 5 inches away) were too noisy to use as a pace.

@@ -2,8 +2,8 @@
 
 The basket is a pale orange circular cup 5 inches across. It is found by colour (`object_finder`, a tight colour tolerance, the biggest blob that is the right size and shape), then:
 - the bearing from the blob's centre column (a horizontal focal length of about 140 pixels, measured from the pictures with the basket 6 inches left and right);
-- the distance from the blob's width: width = WIDTH_OFFSET_PX + WIDTH_K / lens distance, fitted to the pictures taken with the basket at 12, 18, 24, 30 and 36 inches from the claw tip and the two at 16 inches (a plain 1/distance model is wrong because the colour mask grows the blob). The lens sits LENS_OFFSET_IN behind the claw tip.
-The fit is PROVISIONAL: on the recorded pictures it reads within about 1 inch at 18 to 26 inches from the lens but is off by up to 3 inches near 16 inches (and 4 inches past 30), so the line-up uses a wide tolerance until it is calibrated with more pictures in the operating pose. Nothing here moves G2, calls an API or needs a download.
+- the distance from the blob's width: distance from the claw tip = CLAW_K / width in pixels, fitted (2026-11-23) to eight pictures with the claw at lift 120 and the basket 12, 14, 15, 16, 17, 18, 20 and 22 inches from the claw tip (the tape started at the tip). It lands within 0.6 inch of the measured distance at all eight; a second constant did not improve it. The lens sits LENS_OFFSET_IN behind the claw tip, so the lens distance is the tip distance plus that.
+The fit covers 12 to 22 inches in the attention pose with the claw at 120 and has no pictures beyond it (the earlier pictures at 24, 30 and 36 inches were not part of this fit: expect it to read long out there). The pose after a pick-up was not measured. Nothing here moves G2, calls an API or needs a download.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ BASKET_TOL = 0.03                    # normalized red and green share
 BASKET_IN = 5.0                      # its width across
 LENS_OFFSET_IN = 2.0                 # the lens sits this far behind the claw tip (owner, 2026-11-22)
 BEARING_FOCAL_PX = 140.0             # horizontal focal length in pixels
-WIDTH_OFFSET_PX, WIDTH_K = 12.4, 573.0
+CLAW_K = 731.0                       # distance from the claw tip in inches = CLAW_K / width in pixels (fitted 2026-11-23, see the module docstring)
 MIN_BLOB_PX, MIN_WIDTH_PX, MAX_WIDTH_PX = 60, 15, 90
 HORIZON_Y = 50                       # blobs above this row are not on the floor
 ASPECT = (0.45, 1.9)                 # height / width of the blob (the cup, its shadow and its reflection on the floor)
@@ -40,8 +40,8 @@ class BasketReading:
 
 
 def distance_from_width(width_px: float) -> float:
-    """Lens distance in inches from the blob's width (inf when the width is not above the fitted offset)."""
-    return WIDTH_K / (width_px - WIDTH_OFFSET_PX) if width_px > WIDTH_OFFSET_PX + 1 else float("inf")
+    """Lens distance in inches from the blob's width: the fitted distance from the claw tip plus the lens offset (inf for a width of zero or less)."""
+    return CLAW_K / width_px + LENS_OFFSET_IN if width_px > 0 else float("inf")
 
 
 def find_basket_array(rgb: np.ndarray) -> BasketReading | None:

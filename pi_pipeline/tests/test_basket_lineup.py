@@ -15,9 +15,9 @@ def picture(*boxes):
 
 
 def test_the_basket_is_found_with_its_bearing_and_a_distance_from_its_width():
-    r = bf.find_basket_array(picture((98, 88, 145, 121, ORANGE)))                      # 47 px wide: the recorded 12 inch picture's size
+    r = bf.find_basket_array(picture((98, 88, 145, 121, ORANGE)))                      # 47 px wide: about 15.5 inches from the claw tip
     assert r is not None and abs(r.width_px - 47) <= 2 and abs(r.bearing_deg) < 3
-    assert 15 <= r.lens_in <= 18 and abs(r.claw_in - (r.lens_in - bf.LENS_OFFSET_IN)) < 1e-9
+    assert 15 <= r.claw_in <= 16.5 and abs(r.claw_in - (r.lens_in - bf.LENS_OFFSET_IN)) < 1e-9
     right = bf.find_basket_array(picture((136, 88, 170, 108, ORANGE)))
     left = bf.find_basket_array(picture((70, 88, 104, 108, ORANGE)))
     assert right.bearing_deg > 8 and left.bearing_deg < -8                                # + is to G2's right
@@ -114,3 +114,23 @@ def test_a_basket_that_never_gets_closer_stops_for_a_reset_after_the_step_limit(
 
     r = bl.lineup(Stuck().look, Stuck(), say=lambda s: None)
     assert r["outcome"] == "could_not_align" and len(r["steps"]) == bl.MAX_CORRECTIONS + 1
+
+
+def test_the_refit_reads_the_eight_measured_distances_within_an_inch():
+    measured = ((63, 12), (54, 14), (49, 15), (44, 16), (42, 17), (41, 18), (37, 20), (33, 22))      # (width in pixels, inches from the claw tip), 2026-11-23, claw at lift 120
+    for w, d in measured:
+        assert abs(bf.distance_from_width(w) - bf.LENS_OFFSET_IN - d) <= 0.7, (w, d)
+    assert bf.distance_from_width(0) == float("inf")
+    assert bf.distance_from_width(30) > bf.distance_from_width(60) > bf.LENS_OFFSET_IN
+
+
+def test_a_fall_in_a_mover_ends_the_line_up():
+    class Falls:
+        def look(self):
+            return Read(30.0, 0.0)
+
+        def forward(self, inches):
+            return "fell"
+
+    r = bl.lineup(Falls().look, Falls(), say=lambda s: None)
+    assert r["outcome"] == "fell" and len(r["steps"]) == 1

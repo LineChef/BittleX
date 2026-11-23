@@ -75,8 +75,8 @@ def next_action(reading, st: LineupState) -> Action:
 
 
 def lineup(look, mover, max_steps: int = 40, say=print) -> dict:
-    """Run the line-up. `look()` takes a fresh picture and returns a reading or None; `mover` has scan(deg), pivot(deg), nudge(deg), forward(inches), back(inches) (each one step, then still). Returns
-    {"outcome": "aligned" | "basket_not_found" | "could_not_align" | "too_many_steps", "steps": [...], "last": reading}."""
+    """Run the line-up. `look()` takes a fresh picture and returns a reading or None; `mover` has scan(deg), pivot(deg), nudge(deg), forward(inches), back(inches) (each one step, then still, and answering "fell" when he went over). Returns
+    {"outcome": "aligned" | "basket_not_found" | "could_not_align" | "too_many_steps" | "fell", "steps": [...], "last": reading}."""
     st, reading = LineupState(), None
     for _ in range(max_steps):
         reading = look()
@@ -88,5 +88,6 @@ def lineup(look, mover, max_steps: int = 40, say=print) -> dict:
             return {"outcome": "aligned", "steps": st.log, "last": reading}
         if act.kind == "give_up":
             return {"outcome": act.why, "steps": st.log, "last": reading}
-        getattr(mover, {"scan": "scan", "pivot": "pivot", "nudge": "nudge", "forward": "forward", "back": "back"}[act.kind])(act.value)
+        if getattr(mover, act.kind)(act.value) == "fell":                                  # a mover answers "fell" when he went over: the line-up ends there, the caller lays him down
+            return {"outcome": "fell", "steps": st.log, "last": reading}
     return {"outcome": "too_many_steps", "steps": st.log, "last": reading}
