@@ -92,6 +92,9 @@ class Env:
         self.w.puck = self.puck_after.pop(0) if t.get("ok") and self.puck_after else None
         return t
 
+    def after_throw(self):
+        return self.look()
+
     def look(self):
         from pi_pipeline.behavior.basket_run import Fell
         if self.fell_in_look:
@@ -200,3 +203,34 @@ def test_the_camera_burst_returns_back_to_back_frames_without_exposure_work():
     assert cam.grab_burst(1.0, max_frames=2).__len__() == 2
     cam._open = lambda: (_ for _ in ()).throw(OSError("no port"))
     assert cam.grab_burst(1.0) == []                                                                 # never raises
+
+
+def test_a_basket_cut_off_by_the_frame_is_too_near_to_walk_toward():
+    near = B(30.0, 0.0)
+    near.touches_edge = True
+    assert act(P(20.0, 0.0), near).why == "too_near_the_basket"
+
+
+def test_the_save_hook_sees_the_run_as_it_goes_and_a_retrieval_step_is_saved_when_taken():
+    seen = []
+    env = Env([ok(), ok()], puck_after=[(24.0, 25.0), None])
+    br.run_sequence(env, say=lambda s: None, save=lambda r: seen.append(([a.get("retrieval", {}).get("outcome") for a in r["attempts"]], r["outcome"])))
+    assert seen and seen[-1][1] == "running"                                                                  # (the final outcome is the return value)
+    assert any(o and o[0] == "running" for o, _ in seen)                                                      # a retrieval step was saved while it was still running
+    assert any(o and o[0] == "retrieved" for o, _ in seen)
+
+
+def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
+    from pi_pipeline.behavior import ball_chase as chase
+    t = [100.0]
+    r = chase.SerialRobot.__new__(chase.SerialRobot)
+    r._clock = lambda: t[0]
+    r.lob_end_until = float("-inf")
+    assert r._lob_end_pose((-28.0, -2.0)) is False                                                            # no lob: the gate applies as always
+    r.expect_lob_end()
+    assert r._lob_end_pose((-28.0, -2.0)) is True
+    assert r._lob_end_pose((-28.0, 14.0)) is False                                                            # rolled past the gate: still a sag
+    assert r._lob_end_pose((-10.0, 0.0)) is False and r._lob_end_pose((30.0, 0.0)) is False                  # a different pitch is not the lob's pose
+    assert r._lob_end_pose(None) is False
+    t[0] += chase.LOB_END_S + 1
+    assert r._lob_end_pose((-28.0, -2.0)) is False                                                            # and it runs out

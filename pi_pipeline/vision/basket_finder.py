@@ -21,7 +21,7 @@ BASKET_IN = 5.0                      # its width across
 LENS_OFFSET_IN = 2.0                 # the lens sits this far behind the claw tip (owner, 2026-11-22)
 BEARING_FOCAL_PX = 140.0             # horizontal focal length in pixels
 CLAW_K = 731.0                       # distance from the claw tip in inches = CLAW_K / width in pixels (fitted 2026-11-23, see the module docstring)
-MIN_BLOB_PX, MIN_WIDTH_PX, MAX_WIDTH_PX = 60, 15, 90
+MIN_BLOB_PX, MIN_WIDTH_PX, MAX_WIDTH_PX = 60, 15, 150      # 150 px is about 5 inches from the claw tip: a closer basket still reads (2026-11-23: past 90 px it was dropped and the retrieval walked into it)
 HORIZON_Y = 50                       # blobs above this row are not on the floor
 ASPECT = (0.45, 1.9)                 # height / width of the blob (the cup, its shadow and its reflection on the floor)
 SPEC = ObjectSpec("basket", BASKET_RGB, BASKET_IN, min_area=MIN_BLOB_PX, tol=BASKET_TOL)

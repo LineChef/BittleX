@@ -30,7 +30,8 @@ PICK_UNDERSHOOT_IN = 0.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
-BURST_S = 6.0                        # the picture burst after the throw is sent: the throw (about 1.2 s), the flight, the landing, the bounce and the settle
+BURST_S = 10.0                       # the picture burst after the throw is sent: the throw (about 1.2 s), the move into the attention pose, the flight, the landing, the bounce and the settle
+KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
 
 @dataclass
@@ -52,7 +53,7 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
     """The next step toward the puck from a fresh look (a PuckReading or None, and the basket reading or None in the same picture)."""
     if st.steps >= MAX_RETRIEVAL_STEPS:
         return RAction("give_up", 0.0, "could_not_reach_puck")
-    if basket is not None and basket.claw_in < BASKET_GUARD_IN:
+    if basket is not None and (basket.claw_in < BASKET_GUARD_IN or getattr(basket, "touches_edge", False)):         # a basket cut off by the frame is right beside him
         return RAction("give_up", 0.0, "too_near_the_basket")
     if puck is None:
         if st.scanned_deg >= SCAN_MAX_DEG:
@@ -103,6 +104,7 @@ class BurstRecorder:
         self.thread = None
         self.t_send = None
         self.saved: list = []
+        self.last_frames: list = []
 
     def start(self, t_send: float | None = None) -> None:
         import threading
@@ -119,6 +121,7 @@ class BurstRecorder:
                 with open(os.path.join(self.out_dir, name), "wb") as f:
                     f.write(jpeg)
                 self.saved.append(name)
+            self.last_frames = [f[2] for f in frames[-KEEP_FRAMES:]]
         except Exception:  # noqa: BLE001
             pass
 
@@ -144,7 +147,7 @@ def merge_looks(seen: dict, offsets: dict):
     return basket, puck
 
 
-def retrieve(env, say=print) -> dict:
+def retrieve(env, say=print, on_step=None) -> dict:
     """Search for the puck, walk to it and pick it up. Returns {"outcome": "retrieved" | a give-up reason | "fell", "steps": [...]}."""
     st = RState()
     while True:
@@ -156,6 +159,8 @@ def retrieve(env, say=print) -> dict:
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                        "basket_in": None if basket is None else round(basket.claw_in, 1)})
         say(f"retrieve: {act.why}" + (f" ({act.kind} {act.value:.1f})" if act.kind != "give_up" else ""))
+        if on_step is not None:
+            on_step(st.log)
         if act.kind == "give_up":
             return {"outcome": act.why, "steps": st.log}
         if act.kind == "pick":
@@ -182,15 +187,21 @@ def retrieve(env, say=print) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
-def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print) -> dict:
+def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) -> dict:
     """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made_or_lost" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed",
     "basket_not_found", "could_not_align", "puck_not_found", "could_not_reach_puck", "too_near_the_basket", "pick_failed"."""
     attempts: list = []
     holding = False
     outcome = "max_attempts"
+
+    def persist(state="running"):
+        if save is not None:
+            save({"outcome": state, "attempts": attempts})
+
     for n in range(1, max_attempts + 1):
         rec: dict = {"attempt": n, "holding": holding, "time": time.strftime("%H:%M:%S")}
         attempts.append(rec)
+        persist()
         if not env.battery_ok():
             outcome = "battery"
             break
@@ -204,8 +215,9 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print) -> dict:
             outcome = "throw_failed"
             break
         holding = False
+        persist()
         try:
-            basket, puck = env.look()
+            basket, puck = env.after_throw()
         except Fell:
             outcome = "fell"
             break
@@ -213,16 +225,22 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print) -> dict:
         rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                         "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
         say(f"after the throw: {code}: {words}")
+        persist()
         if code != bo.MISSED:
             outcome = "made_or_lost" if code in (bo.NOT_SEEN, bo.MADE) else code
             break
-        r = retrieve(env, say=say)
+        def on_step(log, rec=rec):
+            rec["retrieval"] = {"outcome": "running", "steps": list(log)}
+            persist()
+        r = retrieve(env, say=say, on_step=on_step)
         rec["retrieval"] = r
+        persist()
         if r["outcome"] != "retrieved":
             outcome = r["outcome"]
             break
         lu = bl.lineup(env.quick_basket, env.mover, say=say)
         rec["lineup"] = {"outcome": lu["outcome"], "steps": lu["steps"]}
+        persist()
         if lu["outcome"] != "aligned":
             outcome = lu["outcome"]
             break
@@ -230,11 +248,11 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print) -> dict:
     return {"outcome": outcome, "attempts": attempts}
 
 
-def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR) -> str | None:
+def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR, path: str | None = None) -> str | None:
     try:
         d = os.path.expanduser(log_dir)
         os.makedirs(d, exist_ok=True)
-        path = os.path.join(d, time.strftime("%Y%m%d_%H%M%S") + "_basket_run.json")
+        path = path or os.path.join(d, time.strftime("%Y%m%d_%H%M%S") + "_basket_run.json")
         with open(path, "w") as f:
             json.dump({**result, **(extra or {})}, f, indent=1, default=str)
         return path
@@ -243,7 +261,7 @@ def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR) -
 
 
 class RealEnv:
-    """G2 and his camera behind the `Env` interface: `throw`, `look`, `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
+    """G2 and his camera behind the `Env` interface: `throw`, `after_throw`, `look` (a quick picture), `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
 
     def __init__(self, link, robot, looker, book=None, burst: bool = True):
         from . import basket_movers as bm
@@ -251,6 +269,8 @@ class RealEnv:
         self.mover = bm.BasketMover(robot, book=book)
         self._cam = None
         self.burst, self.run_stamp, self.attempt = burst, time.strftime("%Y%m%d_%H%M%S"), 0
+        self.quick_log: list = []
+        self._burst_rec = None
 
     def _camera(self):
         from . import ball_chase as chase
@@ -263,6 +283,8 @@ class RealEnv:
         return bool(self.robot.battery_ok())
 
     def throw(self, holding: bool) -> dict:
+        """The lob (a pick-up first unless he already holds the puck), then at once the attention pose with the claw at the look height, while the picture burst that began when the throw was sent keeps recording the move and the floor."""
+        from . import ball_chase as chase
         from . import lob, scripted_skill
         argv = [lob.SCRIPT, "--amount", str(lob.AMOUNT), "--gyro-off", "--no-prompt"]
         if not holding:
@@ -273,42 +295,70 @@ class RealEnv:
         if self.burst and getattr(self.looker, "_ready", None) is not None and self.looker._ready.wait(10.0) and getattr(self.looker, "_cam", None) is not None:
             rec = BurstRecorder(self.looker._cam, os.path.join(os.path.expanduser(LOG_DIR), "burst", f"{self.run_stamp}_attempt{self.attempt}"))
         out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False, on_send=rec.start if rec else None)
-        if rec is not None:
-            out["burst"] = {"dir": rec.out_dir, "frames": len(rec.join())}
         self.robot.posture = "stand"
         self.robot._claw = (0.0, 0.0)
         res = out.get("res") or {}
         out["fell"] = bool(out.get("fell")) or res.get("verdict") == "fell"
+        if out["ok"] and not out["fell"]:
+            self.robot.expect_lob_end()                                     # the lob's end pose is not a sag for the gate (owner, 2026-11-23)
+            if self.robot.sit_down() == "fell" or self.robot.claw_pose(0.0, chase.CLAW_LIFT_DEG) == "fell":
+                out["fell"] = True
+        self._burst_rec = rec
+        if rec is not None:
+            out["burst"] = {"dir": rec.out_dir, "frames": len(rec.join())}
         return out
 
-    def look(self):
-        """THE claw look (`claw_survey.run_claw_look`: the attention pose, the claw up, the pictures left, right and centre, the claw down, stand from the attention pose), every picture read by the basket and puck finders and merged into one body-frame reading each."""
-        from . import ball_chase as chase
-        from . import claw_survey
+    def after_throw(self):
+        """The basket and the puck as the burst's last frames show them (taken from the attention pose with the claw at 120, where the puck finder is fitted); a quick picture if the burst gave nothing."""
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
-        cam, seen = self._camera(), {}
-        left = chase.CLAW_PAN_DEG if chase.CLAW_PAN_SIGN == "left" else -chase.CLAW_PAN_DEG
+        frames = list(getattr(self._burst_rec, "last_frames", []) or [])
+        seen = {}
+        for i, jpeg in enumerate(frames):
+            basket = bf.find_basket(jpeg)
+            seen[f"f{i}"] = (basket, pf.find_puck(jpeg, basket))
+        if not seen:
+            return self.look()
+        return merge_looks(seen, {})
 
-        def snapshot(label):
-            cam.refresh_exposure()
-            jpeg = cam.look()
-            if jpeg:
-                basket = bf.find_basket(jpeg)
-                seen[label] = (basket, pf.find_puck(jpeg, basket))
-            return jpeg
-        state = claw_survey.run_claw_look(self.link, snapshot, "centre", robot=self.robot)
-        if state != "ok" and getattr(self.robot, "last_fall", None):
-            raise Fell()
-        return merge_looks(seen, {"look_left": -abs(left), "look_right": abs(left), "centre": 0.0})
+    def _ready_to_move(self) -> None:
+        """From the attention pose with the claw up: the claw down, then the stand-up (back legs first). Standing already: nothing."""
+        if getattr(self.robot, "posture", "stand") == "attention":
+            if self.robot.claw_pose(0.0, 0.0) == "fell" or self.robot.stand_up() == "fell":
+                raise Fell()
 
-    def quick_basket(self):
-        """A quick picture with the claw down (no attention pose), the basket finder's reading or None."""
+    def _quick(self, by: str):
+        """One quick picture with the claw down: (basket reading, puck reading), the picture saved with the readings for the next fit."""
         from ..vision import basket_finder as bf
+        from ..vision import puck_finder as pf
+        self._ready_to_move()
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
-        return bf.find_basket(jpeg) if jpeg else None
+        if not jpeg:
+            return None, None
+        basket = bf.find_basket(jpeg)
+        puck = pf.find_puck(jpeg, basket, by=by)
+        n = len(self.quick_log) + 1
+        d = os.path.join(os.path.expanduser(LOG_DIR), "quick", self.run_stamp)
+        try:
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, f"q{n:02d}.jpg"), "wb") as f:
+                f.write(jpeg)
+        except OSError:
+            pass
+        self.quick_log.append({"n": n, "time": time.strftime("%H:%M:%S"),
+                               "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
+                               "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1), puck.width_px, round(puck.y))})
+        return basket, puck
+
+    def look(self):
+        """The retrieval's look: a quick claw-down picture, as the ball goal takes while it walks up (the puck's distance from its width)."""
+        return self._quick("width")
+
+    def quick_basket(self):
+        """The line-up's look: a quick claw-down picture, the basket's reading or None."""
+        return self._quick("width")[0]
 
     def pick(self):
         from .catapult import pick_up
@@ -339,9 +389,11 @@ def main(argv: list | None = None) -> None:
     looker.warm()
     robot = chase.SerialRobot(link)
     result = {"outcome": "not_run", "attempts": []}
+    path = os.path.join(os.path.expanduser(LOG_DIR), time.strftime("%Y%m%d_%H%M%S") + "_basket_run.json")
+    env = None
     try:
         env = RealEnv(link, robot, looker, book=chase_pace.book_for_now(save=False))
-        result = run_sequence(env, a.max_attempts)
+        result = run_sequence(env, a.max_attempts, save=lambda r: (result.update(r), write_log(r, {"pack_pct_start": pct, "quick": env.quick_log}, path=path)))
     except KeyboardInterrupt:
         result["outcome"] = "interrupted"
     finally:
@@ -351,7 +403,7 @@ def main(argv: list | None = None) -> None:
         except Exception:  # noqa: BLE001
             pass
         chase.ensure_rest(link)
-    path = write_log(result, {"pack_pct_start": pct})
+    path = write_log(result, {"pack_pct_start": pct, "quick": env.quick_log if env else []}, path=path)
     print("RESULT", result["outcome"], f"after {len(result['attempts'])} attempt(s); logged {path}")
 
 

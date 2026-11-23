@@ -52,3 +52,11 @@ def test_the_distance_curve_is_steady_and_the_biggest_blob_wins():
     assert all(a > b for a, b in zip(d, d[1:])) and pf.distance_from_row(90) == float("inf")
     both = pf.find_puck_array(picture((112, 124, 128, 143, RED), (170, 98, 176, 104, RED)))
     assert both is not None and both.area > 100
+
+
+def test_a_quick_claw_down_picture_reads_the_distance_from_the_width():
+    p = pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="width")                   # 14 pixels wide: about 6.8 inches
+    assert p is not None and 6.0 <= p.claw_in <= 7.6
+    q = pf.find_puck_array(picture((113, 124, 122, 134, RED)), by="width")                   # 9 pixels wide: about 10.6 inches
+    assert q is not None and 9.5 <= q.claw_in <= 11.5 and q.claw_in > p.claw_in
+    assert pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="row").claw_in != p.claw_in

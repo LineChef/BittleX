@@ -19,6 +19,7 @@ SAT_MIN, VALUE_MIN = 0.30, 100            # a pixel counts when its saturation a
 TOP_ROW, BOTTOM_ROW, EDGE_COLS = 94, 200, 12   # the floor part of a 240 x 240 picture: below the wall's base, above the jaws, away from the side edges
 MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6  # the puck's blob: at least this many pixels, no side longer than this, not a long sliver
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
+WIDTH_K = 95.0                             # the other reading, for a picture with the claw DOWN (the row means another distance there): distance = WIDTH_K / the blob's width in pixels (14, 11, 9 pixels at 6, 9, 12 inches, face-on); good to about 15 percent inside 12 inches
 BEARING_FOCAL_PX = 140.0                   # the basket finder's horizontal focal length
 
 
@@ -43,8 +44,9 @@ def _inside(basket, x: float, y: float, margin: float = 6.0) -> bool:
     return abs(x - basket.x) <= basket.width_px / 2 + margin and abs(y - basket.y) <= basket.height_px / 2 + margin
 
 
-def find_puck_array(rgb: np.ndarray, basket=None) -> PuckReading | None:
-    """The puck in a decoded picture, or None. `basket`: the basket finder's reading in the same picture (a BasketReading or None); blobs inside its box are the basket, not the puck."""
+def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReading | None:
+    """The puck in a decoded picture, or None. `basket`: the basket finder's reading in the same picture (a BasketReading or None); blobs inside its box are the basket, not the puck. `by`: "row" for a picture taken with the claw
+    raised to 120 in the attention pose (the fit above), "width" for a quick picture with the claw down."""
     a = rgb.astype(float)
     mx, mn = a.max(2), a.min(2)
     m = ((mx - mn) / (mx + 1) > SAT_MIN) & (mx > VALUE_MIN)
@@ -68,9 +70,10 @@ def find_puck_array(rgb: np.ndarray, basket=None) -> PuckReading | None:
     if best is None:
         return None
     n, cx, cy, w, h = best
-    return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), distance_from_row(cy))
+    dist = WIDTH_K / max(w, 1) if by == "width" else distance_from_row(cy)
+    return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), dist)
 
 
-def find_puck(jpeg: bytes, basket=None) -> PuckReading | None:
+def find_puck(jpeg: bytes, basket=None, by: str = "row") -> PuckReading | None:
     rgb = _decode(jpeg)
-    return None if rgb is None else find_puck_array(rgb, basket)
+    return None if rgb is None else find_puck_array(rgb, basket, by)

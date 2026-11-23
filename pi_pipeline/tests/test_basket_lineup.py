@@ -134,3 +134,9 @@ def test_a_fall_in_a_mover_ends_the_line_up():
 
     r = bl.lineup(Falls().look, Falls(), say=lambda s: None)
     assert r["outcome"] == "fell" and len(r["steps"]) == 1
+
+
+def test_a_basket_closer_than_eight_inches_is_still_read_so_the_guard_can_fire():
+    near = bf.find_basket_array(picture((60, 90, 190, 180, ORANGE)))                   # 130 px wide: about 5.6 inches from the claw tip
+    assert near is not None and near.claw_in < bl.BUFFER_IN and bl.next_action(near, bl.LineupState()).kind == "back"
+    assert bf.find_basket_array(picture((10, 70, 230, 130, ORANGE))) is None             # a stripe across the whole frame is still not the cup
