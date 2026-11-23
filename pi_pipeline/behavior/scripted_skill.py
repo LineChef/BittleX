@@ -145,9 +145,9 @@ def play_with_retry(play, say=print):
     return res, echoes, first
 
 
-def play(a, script: dict, overrides: dict, link=None, robot=None, looker=None, rest_after: bool = True) -> dict:
+def play(a, script: dict, overrides: dict, link=None, robot=None, looker=None, rest_after: bool = True, on_send=None) -> dict:
     """Play one scripted skill (the body of `main`). With no `link` it opens the serial port itself and lays him in rest at the end, as `main` always did. A caller that runs several stages on one connection
-    (the basket run) passes its own open `link` (and `robot`, and a warmed `looker` for the grip look) and `rest_after=False`. Returns {"ok", "res", "path", "grip", "pack_pct", "fell"}; "ok" is False when nothing was sent."""
+    (the basket run) passes its own open `link` (and `robot`, and a warmed `looker` for the grip look) and `rest_after=False`; `on_send(monotonic_time)` is called just before the script is written to the board (the basket run starts its picture burst there). Returns {"ok", "res", "path", "grip", "pack_pct", "fell"}; "ok" is False when nothing was sent."""
     out: dict = {"ok": False}
     if a.gyro_off:
         os.environ["G2_GYRO_BALANCE"] = "0"                  # every gB the link would write becomes gb, and the stand-up does not turn it on for the rise
@@ -220,6 +220,11 @@ def play(a, script: dict, overrides: dict, link=None, robot=None, looker=None, r
 
         def _send():
             link.pop_other()                                  # only what the board says after the script went out
+            if on_send is not None:
+                try:
+                    on_send(time.monotonic())
+                except Exception:  # noqa: BLE001 -- a diagnostic never stops the throw
+                    pass
             link.play_data_skill(message)
 
         def _play():

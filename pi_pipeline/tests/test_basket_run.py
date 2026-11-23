@@ -163,3 +163,40 @@ def test_the_looks_are_merged_into_one_body_frame_reading():
     assert br.merge_looks({}, offsets) == (None, None)
     b, p = br.merge_looks({"look_right": (basket(30.0, -4.0), None)}, offsets)
     assert b.bearing_deg == 31.0 and p is None
+
+
+def test_the_burst_recorder_saves_frames_named_by_their_time_after_the_send(tmp_path):
+    class Cam:
+        def grab_burst(self, seconds):
+            return [(10.00, 10.20, b"a"), (10.25, 10.45, b"b"), (10.50, 10.70, b"c")]
+
+    rec = br.BurstRecorder(Cam(), str(tmp_path / "b"), seconds=1.0)
+    rec.start(t_send=10.0)
+    names = rec.join()
+    assert names == ["f00_req+0.00_got+0.20.jpg", "f01_req+0.25_got+0.45.jpg", "f02_req+0.50_got+0.70.jpg"]
+    assert (tmp_path / "b" / names[1]).read_bytes() == b"b"
+
+    class Broken:
+        def grab_burst(self, seconds):
+            raise RuntimeError("no camera")
+
+    bad = br.BurstRecorder(Broken(), str(tmp_path / "c"))
+    bad.start(t_send=0.0)
+    assert bad.join() == []                                                                          # a failure here never stops a throw
+
+
+def test_the_camera_burst_returns_back_to_back_frames_without_exposure_work():
+    from pi_pipeline.vision.snapshot import CameraSnapshotter, Snapshot
+    t = [0.0]
+    cam = CameraSnapshotter("/dev/null", clock=lambda: t[0], sleep=lambda s: None)
+    cam._open = lambda: None
+
+    def grab():
+        t[0] += 0.25
+        return Snapshot(b"jpeg%d" % int(t[0] * 100), 240, 240)
+    cam._grab_one = grab
+    frames = cam.grab_burst(1.0)
+    assert 3 <= len(frames) <= 5 and all(f[2].startswith(b"jpeg") and f[1] >= f[0] for f in frames)
+    assert cam.grab_burst(1.0, max_frames=2).__len__() == 2
+    cam._open = lambda: (_ for _ in ()).throw(OSError("no port"))
+    assert cam.grab_burst(1.0) == []                                                                 # never raises

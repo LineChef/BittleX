@@ -30,6 +30,7 @@ PICK_UNDERSHOOT_IN = 0.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
+BURST_S = 6.0                        # the picture burst after the throw is sent: the throw (about 1.2 s), the flight, the landing, the bounce and the settle
 
 
 @dataclass
@@ -91,6 +92,40 @@ def classify_after(basket, puck) -> tuple[str, str]:
 
 class Fell(Exception):
     pass
+
+
+class BurstRecorder:
+    """The picture record of one throw (owner, 2026-11-23: see the puck leave the claw, its path, and the bounce or the miss). `start(t_send)` runs the camera's back-to-back burst in a thread; `join()` waits and saves the frames to `out_dir`, each
+    named with the time its request and its arrival fell after the throw was sent. A diagnostic only: nothing reads the frames during the run, and a failure here never stops the throw."""
+
+    def __init__(self, cam, out_dir: str, seconds: float = BURST_S, clock=time.monotonic):
+        self.cam, self.out_dir, self.seconds, self._clock = cam, out_dir, seconds, clock
+        self.thread = None
+        self.t_send = None
+        self.saved: list = []
+
+    def start(self, t_send: float | None = None) -> None:
+        import threading
+        self.t_send = t_send if t_send is not None else self._clock()
+        self.thread = threading.Thread(target=self._run, name="burst", daemon=True)
+        self.thread.start()
+
+    def _run(self) -> None:
+        try:
+            frames = self.cam.grab_burst(self.seconds)
+            os.makedirs(self.out_dir, exist_ok=True)
+            for i, (t_req, t_got, jpeg) in enumerate(frames):
+                name = f"f{i:02d}_req{t_req - self.t_send:+.2f}_got{t_got - self.t_send:+.2f}.jpg"
+                with open(os.path.join(self.out_dir, name), "wb") as f:
+                    f.write(jpeg)
+                self.saved.append(name)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def join(self, timeout: float = 15.0) -> list:
+        if self.thread is not None:
+            self.thread.join(timeout)
+        return self.saved
 
 
 def merge_looks(seen: dict, offsets: dict):
@@ -161,7 +196,7 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print) -> dict:
             break
         say(f"attempt {n}: {'throw (holding the puck)' if holding else 'pick up and throw'}")
         t = env.throw(holding)
-        rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "grip", "pack_pct")}
+        rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "grip", "pack_pct", "burst")}
         if t.get("fell"):
             outcome = "fell"
             break
@@ -210,11 +245,12 @@ def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR) -
 class RealEnv:
     """G2 and his camera behind the `Env` interface: `throw`, `look`, `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
 
-    def __init__(self, link, robot, looker, book=None):
+    def __init__(self, link, robot, looker, book=None, burst: bool = True):
         from . import basket_movers as bm
         self.link, self.robot, self.looker = link, robot, looker
         self.mover = bm.BasketMover(robot, book=book)
         self._cam = None
+        self.burst, self.run_stamp, self.attempt = burst, time.strftime("%Y%m%d_%H%M%S"), 0
 
     def _camera(self):
         from . import ball_chase as chase
@@ -232,7 +268,13 @@ class RealEnv:
         if not holding:
             argv += ["--pick", "--pick-gap", str(lob.PICK_GAP_S), "--grip-look"]
         a = scripted_skill.parser().parse_args(argv)
-        out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False)
+        self.attempt += 1
+        rec = None
+        if self.burst and getattr(self.looker, "_ready", None) is not None and self.looker._ready.wait(10.0) and getattr(self.looker, "_cam", None) is not None:
+            rec = BurstRecorder(self.looker._cam, os.path.join(os.path.expanduser(LOG_DIR), "burst", f"{self.run_stamp}_attempt{self.attempt}"))
+        out = scripted_skill.play(a, scripted_skill.load_script(a.script), {}, link=self.link, robot=self.robot, looker=self.looker, rest_after=False, on_send=rec.start if rec else None)
+        if rec is not None:
+            out["burst"] = {"dir": rec.out_dir, "frames": len(rec.join())}
         self.robot.posture = "stand"
         self.robot._claw = (0.0, 0.0)
         res = out.get("res") or {}

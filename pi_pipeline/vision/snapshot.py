@@ -407,6 +407,24 @@ class CameraSnapshotter:
             self._ser = None                               # reopen next time
         return None
 
+    def grab_burst(self, seconds: float, max_frames: int = 60) -> list:
+        """Raw frames back to back for `seconds` (a diagnostic, 2026-11-23: the picture record of a throw): no exposure work, no tilt estimate, no shutter click, the camera lock held throughout. Each is
+        (the time the request was sent, the time the picture arrived, the jpeg) on this camera's clock; the module answers with the picture of the PREVIOUS request, so a frame shows the scene a little before its request. Never raises; a missing camera gives []."""
+        frames: list = []
+        try:
+            with self._lock:
+                self._open()
+                end = self._clock() + seconds
+                while self._clock() < end and len(frames) < max_frames:
+                    t_req = self._clock()
+                    snap = self._grab_one()
+                    if snap is not None:
+                        frames.append((t_req, self._clock(), snap.jpeg))
+        except Exception:  # noqa: BLE001
+            log.warning("camera burst failed", exc_info=True)
+            self._ser = None
+        return frames
+
     def close(self) -> None:
         if self._idle_timer is not None:
             self._idle_timer.cancel()
