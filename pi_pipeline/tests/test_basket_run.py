@@ -270,19 +270,21 @@ def test_after_the_throw_the_owners_sequence_attention_claw_up_one_picture_claw_
             order.append("attention")
             return "ok"
 
-        def claw_pose(self, pan, lift, deg_s=None):
+        def claw_pose(self, pan, lift, deg_s=None, confirm=True):
             order.append(f"claw {lift}")
             speeds.append(deg_s)
+            confirms.append(confirm)
             return "ok"
 
         def _tx(self, c):
             order.append(c)
 
-    speeds = []
+    speeds, confirms = [], []
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
     assert speeds == [br.FAST_CLAW_DEG_S, br.FAST_CLAW_DEG_S] and env.attention_hold_s is not None            # both claw moves at the fast pace
+    assert confirms[-1] is False                                                                          # the lowering reads no joints while he holds the pose
     assert order == ["attention", "gb", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0", "gb", "rest"]       # the owner's steps, gyro assist off after the pose and before the lie-down
     assert env.robot.posture == "rest" and env.picture_ok is True and basket.claw_in == 16.0 and puck.claw_in == 12.0
     assert "kbalance" not in order                                                                                                # no stand-up anywhere before the rest
@@ -353,3 +355,8 @@ def test_a_pose_held_too_long_skips_the_claw_lowering_and_lies_down():
     slow = list(chase.claw_path((0, 0), (0, 120)))
     assert len(steps) < len(slow) / 3 and steps[-1] == (0, 120)                                            # the same path in a fraction of the steps
     assert m.AFTER_RAISE_SETTLE_S < chase.CLAW_SETTLE_S
+
+
+def test_the_runs_camera_makes_no_shutter_click():
+    import inspect
+    assert "click=False" in inspect.getsource(br.CameraHolder.__init__)

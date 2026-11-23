@@ -1737,7 +1737,7 @@ class SerialRobot:
             return "board_silent"                     # the board sends no IMU frames: the walk never started (it rested him); retrying only repeats rest, picture, stand-up
         return "fell" if fell else "ok"
 
-    def claw_pose(self, pan: float, lift: float, deg_s: float | None = None) -> str:
+    def claw_pose(self, pan: float, lift: float, deg_s: float | None = None, confirm: bool = True) -> str:
         """Move the arm (pan joint 0, lift joint 1) to point the camera, at CLAW_DEG_S, watching the IMU. The legs are not sent. "ok" or "fell"."""
         pan = max(-45.0, min(45.0, float(pan)))
         lift = max(0.0, min(CLAW_LIFT_MAX_DEG, float(lift)))
@@ -1761,7 +1761,7 @@ class SerialRobot:
                 self._tx(f"i0 {int(round(pan))} 1 {int(round(lift))}")
         self._claw = (pan, lift)
         self._imu_release()
-        if state != "fell" and pan == 0.0 and lift == 0.0:
+        if state != "fell" and pan == 0.0 and lift == 0.0 and confirm:
             ensure_claw_centered(self._lk, self._sleep)           # the arm down and centred is confirmed with the board, not assumed
         return state
 

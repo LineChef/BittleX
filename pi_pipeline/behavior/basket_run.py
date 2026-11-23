@@ -107,7 +107,7 @@ class CameraHolder:
         if cam is None:
             from ..config import settings
             from ..vision.snapshot import CameraSnapshotter
-            cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0, timeout_s=AFTER_PICTURE_TIMEOUT_S)
+            cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0, timeout_s=AFTER_PICTURE_TIMEOUT_S, click=False)       # no shutter click: the board's own `up` came 1 to 2 s after a picture's click in several runs (2026-11-23, to be confirmed)
         self._cam, self._error, self._ready = cam, None, threading.Event()
         self._ready.set()
 
@@ -327,7 +327,7 @@ class RealEnv:
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
         if time.monotonic() - t_pose <= ATTENTION_HOLD_MAX_S:
-            if r.claw_pose(0.0, 0.0, FAST_CLAW_DEG_S) == "fell":
+            if r.claw_pose(0.0, 0.0, FAST_CLAW_DEG_S, confirm=False) == "fell":      # no `j` reads while he holds the pose: the board's own `up` came right after them
                 raise Fell()
         self.attention_hold_s = round(time.monotonic() - t_pose, 1)      # logged: the board stood him up 8 to 13 s into the pose
         r._tx("gb")
