@@ -32,6 +32,7 @@ GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the 
 LOG_DIR = "~/g2_runs/basket_run"
 BURST_S = 10.0                       # the picture burst after the throw is sent: the throw (about 1.2 s), the move into the attention pose, the flight, the landing, the bounce and the settle
 THROW_WATCH_S = 2.3                  # the body is watched this long after the throw is sent (the animation ends at about 2.2 s by the IMU trace; the default watch was about 3.1 s): the attention pose follows at once
+AFTER_PICTURE_TIMEOUT_S = 2.5          # the camera's wait for one picture during the run
 ATTENTION_POSE_WAIT_S = 7.0          # the most we wait for the board to say the attention pose is done (about 5 s after the send)
 KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
@@ -95,6 +96,21 @@ def classify_after(basket, puck) -> tuple[str, str]:
 
 class Fell(Exception):
     pass
+
+
+def camera_answers(looker, tries: int = 3, say=print) -> bool:
+    """Is the camera answering? Called while G2 is still at rest, before anything moves: the first picture after a cold open can take about 10 s and a camera left stuck by an interrupted run gave no picture at all (2026-11-23), which held him standing with the puck and then in the attention pose."""
+    if not looker._ready.wait(25.0) or getattr(looker, "_error", None) or getattr(looker, "_cam", None) is None:
+        say("the camera did not open: " + str(getattr(looker, "_error", None) or "no answer"))
+        return False
+    for i in range(tries):
+        try:
+            if looker._cam.snapshot() is not None:
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        say(f"the camera gave no picture (try {i + 1} of {tries})")
+    return False
 
 
 class BurstRecorder:
@@ -246,6 +262,12 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         except Fell:
             outcome = "fell"
             break
+        if not getattr(env, "picture_ok", True):
+            rec["after"] = {"code": "no_picture", "words": "The camera gave no picture after the throw, so I cannot say where it went."}
+            say("after the throw: no picture from the camera: stopping (not counted as a make)")
+            outcome = "no_picture"
+            persist()
+            break
         code, words = classify_after(basket, puck)
         rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                         "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
@@ -298,6 +320,11 @@ class RealEnv:
         self.burst, self.show_picture, self.run_stamp, self.attempt = burst, show_picture, time.strftime("%Y%m%d_%H%M%S"), 0
         self.quick_log: list = []
         self._burst_rec = None
+        self.picture_ok = True
+        try:
+            looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
+        except Exception:  # noqa: BLE001
+            pass
 
     def _camera(self):
         from . import ball_chase as chase
@@ -368,6 +395,7 @@ class RealEnv:
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
+        self.picture_ok = jpeg is not None
         chase.ensure_rest(self.link)                                             # the standard lie-down: `krest` goes out first, then the pose is confirmed (and asked again if the board did not take it)
         r.posture, r._claw = "rest", (0.0, 0.0)
         basket = puck = None
@@ -450,6 +478,10 @@ def main(argv: list | None = None) -> None:
         return
     looker = GripLooker()
     looker.warm()
+    if not camera_answers(looker):
+        print("not started: the camera is not answering (check its USB plug); nothing was moved")
+        looker.close()
+        return
     robot = chase.SerialRobot(link)
     result = {"outcome": "not_run", "attempts": []}
     path = os.path.join(os.path.expanduser(LOG_DIR), time.strftime("%Y%m%d_%H%M%S") + "_basket_run.json")

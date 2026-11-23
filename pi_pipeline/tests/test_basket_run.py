@@ -393,3 +393,28 @@ def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
     assert calls == ["stand_up_from_rest"]                                                                 # the eased stand-up from rest, never from the attention pose
     env._ready_to_move()
     assert calls == ["stand_up_from_rest"]
+
+
+def test_a_dead_camera_stops_the_run_before_anything_moves_and_a_failed_picture_is_never_a_make():
+    import threading
+
+    class Looker:
+        def __init__(self, cam, error=None):
+            self._ready, self._cam, self._error = threading.Event(), cam, error
+            self._ready.set()
+
+    class Cam:
+        def __init__(self, answers):
+            self.answers = list(answers)
+
+        def snapshot(self):
+            return self.answers.pop(0) if self.answers else None
+
+    msgs = []
+    assert br.camera_answers(Looker(Cam([None, None, b"j"])), say=msgs.append) is True                  # the third try answers
+    assert br.camera_answers(Looker(Cam([None, None, None])), say=msgs.append) is False
+    assert br.camera_answers(Looker(None, error="OSError"), say=msgs.append) is False
+    env = Env([ok()], puck_after=[None])
+    env.picture_ok = False
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["outcome"] == "no_picture" and r["attempts"][0]["after"]["code"] == "no_picture"            # not counted as a make

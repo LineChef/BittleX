@@ -45,6 +45,9 @@ def classify(jpeg_or_rgb) -> dict:
     return {"verdict": "good" if good else "unclear", "n": n, "cx": cx, "cy": cy}
 
 
+CAMERA_TIMEOUT_S = 3.0           # a stalled camera costs the throw's wait at most this per request (2026-11-23: the 8 s default held him standing with the puck until his legs sagged); the first picture after a cold open can take 10 s, so the run opens and checks the camera while he is still at rest
+
+
 class GripLooker:
     """The camera, warmed up in the background. `factory()` makes the camera (default: the claw camera on the Pi); it needs `.snapshot()` (a picture with `.jpeg`, or None) and may have `.close()`."""
 
@@ -60,7 +63,7 @@ class GripLooker:
     def _default_factory():
         from ..config import settings
         from ..vision.snapshot import CameraSnapshotter
-        return CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0)
+        return CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump, exposure_check=True, idle_close_s=0, timeout_s=CAMERA_TIMEOUT_S)
 
     def warm(self) -> None:
         """Open the camera and take one throwaway picture in the background (it meters the light), so the real one is quick."""
