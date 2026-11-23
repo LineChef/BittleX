@@ -234,3 +234,41 @@ def test_the_lob_end_pose_is_not_a_sag_for_a_short_while_after_a_lob_only():
     assert r._lob_end_pose(None) is False
     t[0] += chase.LOB_END_S + 1
     assert r._lob_end_pose((-28.0, -2.0)) is False                                                            # and it runs out
+
+
+def test_the_retrieval_never_stands_straight_up_from_the_attention_pose():
+    class Robot:
+        def __init__(self):
+            self.posture, self.calls = "attention", []
+
+        def rest_then_stand(self):
+            self.calls.append("rest_then_stand")
+            self.posture = "stand"
+            return "ok"
+
+        def stand_up(self):
+            self.calls.append("stand_up")
+            return "ok"
+
+        def stand_up_from_attention(self):
+            self.calls.append("stand_up_from_attention")
+            return "ok"
+
+    r = Robot()
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot = r
+    env._ready_to_move()
+    assert r.calls == ["rest_then_stand"]                                                                 # claw down, rest, then the eased stand-up from rest
+    env._ready_to_move()
+    assert r.calls == ["rest_then_stand"]                                                                 # standing already: nothing
+
+    class Falls(Robot):
+        def rest_then_stand(self):
+            return "fell"
+
+    env.robot = Falls()
+    try:
+        env._ready_to_move()
+        raise AssertionError("a fall must stop the run")
+    except br.Fell:
+        pass

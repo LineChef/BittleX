@@ -322,9 +322,9 @@ class RealEnv:
         return merge_looks(seen, {})
 
     def _ready_to_move(self) -> None:
-        """From the attention pose with the claw up: the claw down, then the stand-up (back legs first). Standing already: nothing."""
+        """From the attention pose with the claw up: the claw down, laid in rest, then the eased stand-up from rest (owner, 2026-11-23: a stand-up straight from the attention pose is a fall every time). Standing already: nothing."""
         if getattr(self.robot, "posture", "stand") == "attention":
-            if self.robot.claw_pose(0.0, 0.0) == "fell" or self.robot.stand_up() == "fell":
+            if self.robot.rest_then_stand() == "fell":
                 raise Fell()
 
     def _quick(self, by: str):
