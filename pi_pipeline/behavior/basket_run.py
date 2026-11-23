@@ -289,12 +289,12 @@ def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR, p
 class RealEnv:
     """G2 and his camera behind the `Env` interface: `throw`, `after_throw`, `look` (a quick picture), `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
 
-    def __init__(self, link, robot, looker, book=None, burst: bool = True, show_burst: bool = False):
+    def __init__(self, link, robot, looker, book=None, burst: bool = False, show_picture: bool = False):
         from . import basket_movers as bm
         self.link, self.robot, self.looker = link, robot, looker
         self.mover = bm.BasketMover(robot, book=book)
         self._cam = None
-        self.burst, self.show_burst, self.run_stamp, self.attempt = burst, show_burst, time.strftime("%Y%m%d_%H%M%S"), 0
+        self.burst, self.show_picture, self.run_stamp, self.attempt = burst, show_picture, time.strftime("%Y%m%d_%H%M%S"), 0
         self.quick_log: list = []
         self._burst_rec = None
 
@@ -330,11 +330,6 @@ class RealEnv:
         self._burst_rec = rec
         if rec is not None:
             out["burst"] = {"frames": len(rec.join())}
-            if self.show_burst:
-                png = rec.sheet_png()
-                if png:
-                    import base64
-                    print(f"BURST_SHEET {self.attempt} {base64.b64encode(png).decode()}", flush=True)       # to the person running it, over the connection: nothing is written to the Pi's disk
         return out
 
     def _attention_now(self) -> None:
@@ -351,22 +346,37 @@ class RealEnv:
         r._posed_at = r._clock()
 
     def after_throw(self):
-        """The basket and the puck as the burst's last frames show them (taken from the attention pose with the claw at 120, where the puck finder is fitted); a quick picture if the burst gave nothing."""
+        """One picture from the attention pose (owner, 2026-11-23: no burst), read by the basket and puck finders, then the claw down and laid in rest: he stands again only if the puck was seen on the floor. The picture is never saved on the Pi;
+        with show_picture it is printed (base64, one line) for the person running it."""
+        from . import ball_chase as chase
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
-        frames = list(getattr(self._burst_rec, "last_frames", []) or [])
-        seen = {}
-        for i, jpeg in enumerate(frames):
+        r = self.robot
+        time.sleep(chase.CLAW_POSE_S + chase.CLAW_SETTLE_S)                  # the pose skill plays by itself (a write over it cuts it short), then the arm and body settle
+        cam = self._camera()
+        cam.refresh_exposure()
+        jpeg = cam.look()
+        basket = puck = None
+        if jpeg:
             basket = bf.find_basket(jpeg)
-            seen[f"f{i}"] = (basket, pf.find_puck(jpeg, basket))
-        if not seen:
-            return self.look()
-        return merge_looks(seen, {})
+            puck = pf.find_puck(jpeg, basket)
+            if self.show_picture:
+                import base64
+                print(f"AFTER_PICTURE {self.attempt} {base64.b64encode(jpeg).decode()}", flush=True)
+        if r.claw_pose(0.0, 0.0) == "fell":                                   # the claw down before lying down, as every look does
+            raise Fell()
+        chase.ensure_rest(self.link)
+        r.posture = "rest"
+        return basket, puck
 
     def _ready_to_move(self) -> None:
         """From the attention pose with the claw up: the claw down, laid in rest, then the eased stand-up from rest (owner, 2026-11-23: a stand-up straight from the attention pose is a fall every time). Standing already: nothing."""
-        if getattr(self.robot, "posture", "stand") == "attention":
+        posture = getattr(self.robot, "posture", "stand")
+        if posture == "attention":
             if self.robot.rest_then_stand() == "fell":
+                raise Fell()
+        elif posture == "rest":
+            if self.robot.stand_up() == "fell":                                 # the eased stand-up from rest
                 raise Fell()
 
     def _quick(self, by: str):
@@ -413,7 +423,7 @@ def main(argv: list | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(description="The full basket sequence on G2 (hands near, the voice service stopped, G2 at rest with the puck touching the claw tip and the basket 16 inches out).")
     ap.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS)
-    ap.add_argument("--show-burst", action="store_true", help="after each throw print the burst's contact sheet (PNG, base64, one line) for the person running it; never saved on the Pi")
+    ap.add_argument("--show-picture", action="store_true", help="after each throw print the attention-pose picture (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
     from . import ball_chase as chase
     from . import chase_pace
@@ -435,7 +445,7 @@ def main(argv: list | None = None) -> None:
     path = os.path.join(os.path.expanduser(LOG_DIR), time.strftime("%Y%m%d_%H%M%S") + "_basket_run.json")
     env = None
     try:
-        env = RealEnv(link, robot, looker, book=chase_pace.book_for_now(save=False), show_burst=a.show_burst)
+        env = RealEnv(link, robot, looker, book=chase_pace.book_for_now(save=False), show_picture=a.show_picture)
         result = run_sequence(env, a.max_attempts, save=lambda r: (result.update(r), write_log(r, {"pack_pct_start": pct, "quick": env.quick_log}, path=path)))
     except KeyboardInterrupt:
         result["outcome"] = "interrupted"
