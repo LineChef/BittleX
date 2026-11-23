@@ -1,7 +1,7 @@
 """The full basket sequence, as one process on one serial connection (the basket goal, docs/plan-detail/basket-goal-plan.md, steps 3 to 5; owner, 2026-11-23).
 
-Per attempt: stand, pick the puck up, take the grip picture, throw (the lob: `behavior/lob.py` through `scripted_skill.play`); then ONE picture of the floor (the claw lowered from the throw's 125 degrees to AFTER_THROW_LIFT_DEG so the camera is level, read by the basket and puck finders) and straight into rest by the standard lie-down,
-and the throw is classified (`goals/basket_outcome.classify_throw`). No attention pose: after `kcalib` the first byte the Pi sends makes the board start its own back-legs-first `up` and he falls (five runs, and a silence test on 2026-11-23: 14 s of silence and nothing, the next write and he stood up).
+Per attempt: stand, pick the puck up, take the grip picture, throw (the lob: `behavior/lob.py` through `scripted_skill.play`); then at once the standard lie-down, the claw raised, ONE picture of the floor read by the basket and puck finders, the claw lowered (`goals/basket_outcome.classify_throw` calls the throw).
+No attention pose: after `kcalib` the first byte the Pi sends makes the board start its own back-legs-first `up` and he falls (five runs, and a silence test on 2026-11-23: 14 s of silence and nothing, the next write and he stood up).
 The puck seen on the floor outside the basket is a miss: he stands up from rest (the eased stand-up), searches for it (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor,
 lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up (he already holds it). The puck not seen: counted as a make (owner, 2026-11-23) and the run stops for the owner's reset.
 Stops: 5 attempts, a fall, a battery gate that fails, a camera that does not answer (checked before anything moves), no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
@@ -34,7 +34,7 @@ LOG_DIR = "~/g2_runs/basket_run"
 BURST_S = 10.0                       # the picture burst (off by default; the arm stays up after the throw so it never saw the landing)
 THROW_WATCH_S = 2.3                  # the body is watched this long after the throw is sent (the animation ends at about 2.2 s by the IMU trace; the default watch was about 3.1 s): the attention pose follows at once
 AFTER_PICTURE_TIMEOUT_S = 2.5          # the camera's wait for one picture during the run
-AFTER_THROW_LIFT_DEG = 76.0          # the claw angle that brings the camera level in the lob's end pose (125 deg minus the 49 deg the basket's row 210 against row 90 shows); to be checked on the first picture
+LOOK_LIFT_DEG = 120.0                # the claw's look height for the picture after the throw (the same as every claw look)
 KEEP_FRAMES = 4                      # the last frames of the burst kept in memory: the look after the throw reads them
 
 
@@ -360,21 +360,24 @@ class RealEnv:
         return out
 
     def after_throw(self):
-        """One picture of the floor after the throw, then rest (owner, 2026-11-23). NO attention pose: in five runs the first byte the Pi sent after `kcalib` made the board start its own back-legs-first `up` and he fell. The lob's end pose leaves the camera looking about 49 degrees
-        too high (the basket at row 210 instead of 90), so the claw is lowered from the throw's 125 degrees to AFTER_THROW_LIFT_DEG, the picture is taken and the standard lie-down (the one every lob ends with) follows at once. The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
+        """Rest first, then one picture from the rest pose with the claw raised (owner, 2026-11-23). NO attention pose and no stand-up before the picture: in five runs the first byte the Pi sent after `kcalib` made the board start its own back-legs-first `up` and he fell, and a picture from
+        the lob's end pose looks 30 degrees too high (the body is pitched nose-up). So: the standard lie-down from the lob's end pose (every lob ends with it), the claw up to LOOK_LIFT_DEG, one picture read by the basket and puck finders (the puck finder's distances are for another pose: only
+        whether the puck is on the floor is used), the claw back down. He stays in rest; he stands up only if the puck was seen on the floor. The picture is never saved on the Pi; with show_picture it is printed (base64, one line)."""
         from . import ball_chase as chase
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
         r = self.robot
-        if r.claw_pose(0.0, AFTER_THROW_LIFT_DEG) == "fell":
+        chase.ensure_rest(self.link)
+        r.posture, r._claw = "rest", (0.0, lob_end_lift())
+        if r.claw_pose(0.0, LOOK_LIFT_DEG) == "fell":
             raise Fell()
         time.sleep(chase.CLAW_SETTLE_S)
         cam = self._camera()
         cam.refresh_exposure()
         jpeg = cam.look()
         self.picture_ok = jpeg is not None
-        chase.ensure_rest(self.link)
-        r.posture, r._claw = "rest", (0.0, 0.0)
+        if r.claw_pose(0.0, 0.0) == "fell":
+            raise Fell()
         basket = puck = None
         if jpeg:
             basket = bf.find_basket(jpeg)

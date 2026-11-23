@@ -275,7 +275,7 @@ def test_the_arm_lift_after_the_lob_is_read_from_the_script_and_the_watch_is_sho
     assert br.THROW_WATCH_S < 3.0                                                                              # the attention pose follows the animation, not the long default watch
 
 
-def test_after_the_throw_the_claw_is_lowered_one_picture_is_taken_and_he_lies_down_with_no_attention_pose(monkeypatch):
+def test_after_the_throw_he_lies_down_first_then_the_claw_goes_up_one_picture_is_taken_and_the_claw_comes_down(monkeypatch):
     from pi_pipeline.behavior import ball_chase as chase
     from pi_pipeline.vision import basket_finder as bf
     from pi_pipeline.vision import puck_finder as pf
@@ -307,10 +307,9 @@ def test_after_the_throw_the_claw_is_lowered_one_picture_is_taken_and_he_lies_do
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env.link, env._cam, env.show_picture, env.attempt = Robot(), object(), Cam(), False, 1
     basket, puck = env.after_throw()
-    assert order == [f"claw {br.AFTER_THROW_LIFT_DEG}", "sleep", "meter", "picture", "rest"]              # claw to the look angle, one picture, the standard lie-down
+    assert order == ["rest", f"claw {br.LOOK_LIFT_DEG}", "sleep", "meter", "picture", "claw 0.0"]            # lie down, claw up, one picture, claw down
     assert "kcalib" not in order and env.robot.posture == "rest" and env.picture_ok is True
     assert basket.claw_in == 16.0 and puck.claw_in == 12.0
-    assert 40.0 < br.AFTER_THROW_LIFT_DEG < 125.0                                                         # between the arm's raised end of the throw and the floor
 
 
 def test_he_stands_up_again_from_rest_only_when_a_look_is_needed():
