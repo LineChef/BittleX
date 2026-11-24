@@ -78,7 +78,10 @@ def test_an_attempt_runs_through_the_shared_attempt_function_with_the_settings_a
             from types import SimpleNamespace
             return SimpleNamespace(claw_in=16.0, bearing_deg=0.0, width_px=36, height_px=28, x=120.0, y=110.0, touches_edge=False), None       # the basket in view, the puck not: confirmed from close up below
 
-        mover = object()
+        class mover:                                                                                                       # noqa: N801
+            @staticmethod
+            def forward(v):
+                return "ok"
 
         def quick_basket(self):
             from types import SimpleNamespace

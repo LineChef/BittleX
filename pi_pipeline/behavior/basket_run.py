@@ -311,13 +311,14 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
-def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None) -> dict:
+def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None, first=None) -> dict:
     """The confirm look (owner, 2026-11-24): the after-throw look from about 16 inches cannot see into the clear tub (a puck inside is 0 to 5 coloured pixels there, 10 to 90 at 8 inches), so when it did not see the puck he walks up to about 8 inches of the tub (the line-up's own steps and
     buffer, aimed at CONFIRM_READING_IN), goes into the attention pose, raises the claw and takes ONE centred picture (`env.confirm_look()`: the shared claw look, centre only), read by the tub and puck finders. Returns {"stop": a reason or None, "code", "basket", "puck"}: a puck inside is MADE (he lies down: the run ends), the tub not seen is NO_BASKET (lies down),
-    nothing inside is a miss (`code` MISSED, `puck` the puck seen on the floor in that picture or None: the caller searches). Everything it saw goes into `rec["confirm"]` and the pictures are saved by `env`."""
+    nothing inside is a miss (`code` MISSED, `puck` the puck seen on the floor in that picture or None: the caller searches). Everything it saw goes into `rec["confirm"]` and the pictures are saved by `env`. `first`: the tub reading from the after-throw look (taken from the attention pose, so it is the accurate one), used for the walk-up's first decision with no picture: he stands still as little as possible, because the legs sag after about 10 seconds standing (owner, 2026-11-24)."""
     say("confirm: walking up to look into the tub")
-    lu = bl.lineup(env.quick_basket, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG)
-    rec["confirm"] = {"walkup": {"outcome": lu["outcome"], "steps": lu["steps"]}}
+    t_stand = time.monotonic()
+    lu = bl.lineup(env.quick_basket, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG, first=first)
+    rec["confirm"] = {"walkup": {"outcome": lu["outcome"], "steps": lu["steps"]}, "standing_s": round(time.monotonic() - t_stand, 1)}        # how long he stood walking up and looking before the attention pose: the legs sag after about 10 s
     persist()
     if lu["outcome"] != "aligned":
         if lu["outcome"] != "fell" and hasattr(env, "lie_down"):
@@ -385,7 +386,7 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
     confirm = code == bo.NOT_SEEN                                                  # a puck seen on the floor outside the tub is a certain miss: no confirm, straight to the pick-up (owner, 2026-11-24)
     if confirm and hasattr(env, "confirm_look"):
         # The puck was not seen from about 16 inches: inside the clear tub it is 0 to 5 coloured pixels there. Walk up to about 8 inches, look into it from the attention pose and read the picture (owner, 2026-11-24).
-        res = confirm_throw(env, rec, say, persist)
+        res = confirm_throw(env, rec, say, persist, first=basket)
         if res["stop"]:
             return res["stop"], holding
         code, basket, puck = res["code"], res["basket"], res["puck"]

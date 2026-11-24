@@ -177,3 +177,22 @@ def test_the_confirm_walk_up_is_the_line_up_aimed_at_the_close_look_with_the_sam
     assert bl.next_action(NS(claw_in=10.9, bearing_deg=7.0), bl.LineupState(), bl.CONFIRM_READING_IN, bl.CONFIRM_TOL_IN, bl.CONFIRM_ALIGN_TOL_DEG).kind == "shoot"        # a look from 10 inches is fine, the tub within 8 degrees
     assert bl.next_action(NS(claw_in=7.0, bearing_deg=0.0), bl.LineupState(), bl.CONFIRM_READING_IN, bl.CONFIRM_TOL_IN, bl.CONFIRM_ALIGN_TOL_DEG).kind == "back"      # inside the 6 inch buffer plus its margin: back up before anything else
     assert bl.next_action(NS(claw_in=16.0, bearing_deg=0.0), bl.LineupState()).kind == "shoot"                                                                              # the shot's defaults are unchanged
+
+
+def test_a_reading_he_already_has_decides_the_first_step_with_no_picture():
+    from types import SimpleNamespace as NS
+    looks, moves = [], []
+
+    class Mover:
+        def forward(self, v):
+            moves.append(("forward", round(v, 1)))
+            return "ok"
+
+    def look():
+        looks.append(1)
+        return NS(claw_in=9.8, bearing_deg=0.0)
+    r = bl.lineup(look, Mover(), target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG, first=NS(claw_in=16.0, bearing_deg=0.0))
+    assert r["outcome"] == "aligned" and moves and moves[0][0] == "forward" and len(looks) == 1            # the first decision came from `first`, the one picture after the walk checked it
+    looks.clear()
+    bl.lineup(look, Mover(), target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG)
+    assert len(looks) == 1                                                                                  # without it the first decision takes a picture, as before

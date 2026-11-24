@@ -138,6 +138,7 @@ class Env:
         return basket, floor, SimpleNamespace(x=120.0, y=116.0, count=30) if self.w.inside else None
 
     def quick_basket(self):
+        self.quick_calls = getattr(self, "quick_calls", 0) + 1
         return B(*self.w.basket) if self.w.basket else None
 
     def pick(self):
@@ -159,6 +160,7 @@ def test_a_throw_not_seen_from_sixteen_inches_is_confirmed_from_close_up_and_a_p
     assert env.confirm_looks == 1 and a["after"]["code"] == bo.MADE and a["after"]["first_look"]["code"] == bo.NOT_SEEN
     assert abs(env.w.basket[0] - bl.CONFIRM_READING_IN) <= bl.CONFIRM_TOL_IN                         # he walked up to about 8 inches (the finder reads 9.8) before the look
     assert a["confirm"]["walkup"]["outcome"] == "aligned" and a["confirm"]["look"]["tub_puck"] is not None
+    assert env.quick_calls == 1 and a["confirm"]["standing_s"] >= 0                                  # the first decision used the after-throw look's reading: only the check after the walk took a picture
 
 
 def test_a_puck_seen_outside_is_a_miss_with_no_walk_up_and_goes_straight_to_the_pick_up():
