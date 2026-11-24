@@ -66,3 +66,12 @@ def test_a_puck_cut_off_at_the_bottom_of_the_floor_rows_is_marked_clipped():
     at_tip = pf.find_puck_array(picture((112, 186, 128, 215, RED)), by="width")        # runs on into the jaws: its lowest rows are hidden
     assert at_tip is not None and at_tip.clipped
     assert not pf.find_puck_array(picture((112, 124, 128, 143, RED))).clipped
+
+
+def test_the_glare_and_specks_are_not_the_puck_and_a_far_puck_is_seen_in_a_claw_down_picture():
+    GLARE = (150, 110, 92)                                                                  # hardwood glare: saturation 0.39 and below
+    assert pf.find_puck_array(picture((112, 124, 128, 143, GLARE))) is None                 # a puck-sized blob of it
+    assert pf.find_puck_array(picture((124, 134, 128, 138, RED))) is None                   # 4 pixels wide at a row that means 6 inches: a speck
+    far = pf.find_puck_array(picture((130, 86, 136, 92, RED)), by="width")                  # at the wall's base in a claw-down picture (rows 84 to 93)
+    assert far is not None and far.claw_in >= pf.FAR_ZONE_IN
+    assert pf.find_puck_array(picture((130, 86, 136, 92, RED))) is None                     # the claw-120 picture's floor starts at row 94

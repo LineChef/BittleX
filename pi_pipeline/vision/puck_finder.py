@@ -19,6 +19,10 @@ SAT_MIN, VALUE_MIN = 0.30, 100            # a pixel counts when its saturation a
 TOP_ROW, BOTTOM_ROW, EDGE_COLS = 94, 200, 12   # the floor part of a 240 x 240 picture: below the wall's base, above the jaws, away from the side edges
 MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6  # the puck's blob: at least this many pixels, no side longer than this, not a long sliver
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
+TOP_ROW_CLAW_DOWN = 84                       # a claw-down picture sees the floor further out (the puck at the wall's base, about 25 inches, sits at row 91): the floor part starts higher there
+BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN = 0.40, 0.50   # the blob's own colour: the puck is strongly saturated (mean 0.42 to 0.54 and 90th percentile 0.55 to 0.70 over the recognition pictures), the hardwood's glare and grain are not (mean 0.33 to 0.39, 90th percentile 0.35 to 0.46 over the false blobs of 2026-11-23)
+FAR_ZONE_IN = 24.0                          # the puck seen above row 94 in a claw-down picture is at least this far
+MIN_WIDTH_RATIO = 0.4                       # by row: a blob narrower than this fraction of the width its row predicts (WIDTH_K / distance) is a speck, not the puck (a 4 pixel false blob at a row that means 6 inches)
 WIDTH_K = 95.0                             # the other reading, for a picture with the claw DOWN (the row means another distance there): distance = WIDTH_K / the blob's width in pixels (14, 11, 9 pixels at 6, 9, 12 inches, face-on); good to about 15 percent inside 12 inches
 BEARING_FOCAL_PX = 140.0                   # the basket finder's horizontal focal length
 
@@ -50,8 +54,9 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
     raised to 120 in the attention pose (the fit above), "width" for a quick picture with the claw down."""
     a = rgb.astype(float)
     mx, mn = a.max(2), a.min(2)
-    m = ((mx - mn) / (mx + 1) > SAT_MIN) & (mx > VALUE_MIN)
-    m[:TOP_ROW, :] = False
+    sat = (mx - mn) / (mx + 1)
+    m = (sat > SAT_MIN) & (mx > VALUE_MIN)
+    m[:(TOP_ROW_CLAW_DOWN if by == "width" else TOP_ROW), :] = False
     m[BOTTOM_ROW:, :] = False
     m[:, :EDGE_COLS] = False
     m[:, -EDGE_COLS:] = False
@@ -66,12 +71,19 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
         cx, cy = float(xs.mean()), float(ys.mean())
         if _inside(basket, cx, cy):
             continue
+        blob_sat = sat[ys, xs]
+        if float(blob_sat.mean()) < BLOB_SAT_MEAN_MIN or float(np.percentile(blob_sat, 90)) < BLOB_SAT_P90_MIN:
+            continue                                                                   # glare or grain on the hardwood, not the puck's colour
+        if by != "width" and w < MIN_WIDTH_RATIO * WIDTH_K / max(distance_from_row(cy), 1.0):
+            continue                                                                   # a speck far smaller than a puck at that row's distance
         if best is None or n > best[0]:
             best = (n, cx, cy, w, h, bool(ys.max() >= BOTTOM_ROW - 1))
     if best is None:
         return None
     n, cx, cy, w, h, clipped = best
     dist = WIDTH_K / max(w, 1) if by == "width" else distance_from_row(cy)
+    if by == "width" and cy < TOP_ROW:
+        dist = max(dist, FAR_ZONE_IN)                                                  # in the extra rows a claw-down picture adds, the puck is far, whatever a speck merged with the wall's base makes of its width
     return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), dist, clipped)
 
 
