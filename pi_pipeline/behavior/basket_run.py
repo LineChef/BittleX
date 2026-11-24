@@ -85,12 +85,13 @@ def _box(reading, name: str) -> ObjectReading | None:
 
 
 def classify_after(basket, puck) -> tuple[str, str]:
-    """(code, plain words) for one throw from the look afterwards. The puck on the floor with no basket in the picture is still a miss (it is not in a basket)."""
-    if basket is None and puck is not None:
-        return bo.MISSED, "The puck is on the floor and the basket is not in the picture: a miss."
-    if basket is not None and puck is not None and getattr(puck, "other_picture", False):
-        return bo.MISSED, "The puck is on the floor, seen in another picture than the basket: a miss."          # the classifier compares picture positions, which mean nothing across two pictures (2026-11-23: a puck 31 degrees off was called a make)
-    return bo.classify_throw(_box(basket, "basket"), _box(puck, "cylinder"))
+    """(code, plain words) for one throw from the look afterwards. The basket is opaque, so a puck inside it can never be seen (owner, 2026-11-23): a puck seen anywhere is on the floor, a miss; a puck not seen with the basket in view is a make. The throw classifier's
+    "inside the basket's box" test is not used: it compared picture positions, and with the two pictures of the claw look a puck 31 degrees off the basket was called a make."""
+    if puck is not None:
+        return bo.MISSED, "The puck is on the floor: a miss."
+    if basket is None:
+        return bo.NO_BASKET, "I could not see the basket afterwards, so I cannot say where the throw went."
+    return bo.NOT_SEEN, "I could not see the puck anywhere: it is in the basket (the basket is opaque)."
 
 
 class Fell(Exception):
@@ -160,14 +161,12 @@ def merge_looks(seen: dict, offsets: dict):
     for label, (basket, puck) in seen.items():
         off = offsets.get(label, 0.0)
         if basket is not None:
-            baskets.append((0 if label == "centre" else 1, label, replace(basket, bearing_deg=basket.bearing_deg + off)))
+            baskets.append((0 if label == "centre" else 1, replace(basket, bearing_deg=basket.bearing_deg + off)))
         if puck is not None:
-            pucks.append((puck.claw_in, label, replace(puck, bearing_deg=puck.bearing_deg + off)))
-    basket = min(baskets, key=lambda t: t[0]) if baskets else None
-    puck = min(pucks, key=lambda t: t[0]) if pucks else None
-    if basket is not None and puck is not None and basket[1] != puck[1]:
-        object.__setattr__(puck[2], "other_picture", True)                         # the finders' pixel positions only compare within one picture: classify_after calls this a miss
-    return (basket[2] if basket else None), (puck[2] if puck else None)
+            pucks.append((puck.claw_in, replace(puck, bearing_deg=puck.bearing_deg + off)))
+    basket = min(baskets, key=lambda t: t[0])[1] if baskets else None
+    puck = min(pucks, key=lambda t: t[0])[1] if pucks else None
+    return basket, puck
 
 
 def retrieve(env, say=print, on_step=None, first=None) -> dict:

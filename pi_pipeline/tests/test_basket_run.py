@@ -45,7 +45,7 @@ def test_the_throw_is_classified_from_the_look_afterwards():
     assert br.classify_after(basket, P(18.0, 20.0))[0] == bo.MISSED                                  # on the floor outside the basket
     inside = P(16.0, 0.0, 6, 6)
     inside.x, inside.y = basket.x, basket.y
-    assert br.classify_after(basket, inside)[0] == bo.MADE
+    assert br.classify_after(basket, inside)[0] == bo.MISSED                                         # a puck that is seen is on the floor: the basket is opaque, so one inside it is never seen
     assert br.classify_after(None, P(10.0, 5.0))[0] == bo.MISSED                                     # a puck on the floor and no basket in view is still a miss
     assert br.classify_after(None, None)[0] == bo.NO_BASKET
 
@@ -459,7 +459,7 @@ def test_the_shared_claw_look_has_no_tail_option_and_still_ends_standing():
 
 
 
-def test_a_puck_seen_in_another_picture_than_the_basket_is_a_miss_not_a_make():
+def test_a_puck_seen_in_any_picture_is_a_miss_and_not_seen_is_a_make():
     from pi_pipeline.vision import basket_finder as bf, puck_finder as pf
     basket = bf.BasketReading(120.0, 110.0, 36, 28, 0.0, 18.0, 16.0, False)
     puck = pf.PuckReading(120.0, 110.0, 14, 14, 150, 4.0, 8.0)                                                # the same pixel position as the basket's centre, but in the right-hand picture
@@ -467,4 +467,6 @@ def test_a_puck_seen_in_another_picture_than_the_basket_is_a_miss_not_a_make():
     b, p = br.merge_looks({"centre": (basket, None), "look_right": (None, puck)}, offsets)
     assert br.classify_after(b, p)[0] == bo.MISSED and p.bearing_deg == 31.0
     b, p = br.merge_looks({"centre": (basket, puck)}, offsets)
-    assert br.classify_after(b, p)[0] == bo.MADE                                                              # in the same picture it still is one
+    assert br.classify_after(b, p)[0] == bo.MISSED
+    b, p = br.merge_looks({"centre": (basket, None)}, offsets)
+    assert br.classify_after(b, p)[0] == bo.NOT_SEEN
