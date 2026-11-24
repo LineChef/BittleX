@@ -56,3 +56,14 @@ class LockedLink:
     def close(self) -> None:
         with self._lock:
             self._link.close()
+
+    def play_data_skill(self, message: bytes) -> None:
+        """A data skill (a scripted move, the pick-up's frames) is written under the lock like any send: the goals that run inside the voice service (goals/basket.py) play them through the shared link (2026-11-23: the first basket goal run failed here with no such attribute)."""
+        with self._lock:
+            return self._link.play_data_skill(message)
+
+    def __getattr__(self, name):
+        """Everything else (the quiet-after-a-skill state `_quiet_active` and `_end_quiet`, `connect`, ...) is read through from the wrapped link, as the class promised ("pass-through otherwise"). Never for the wrapper's own fields."""
+        if name in ("_link", "_lock") or name.startswith("__"):
+            raise AttributeError(name)
+        return getattr(self._link, name)

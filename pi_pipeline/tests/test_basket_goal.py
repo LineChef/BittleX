@@ -131,3 +131,12 @@ def test_the_limits_the_owner_set():
     assert (br.MAX_RETRIEVAL_STEPS, br.MAX_SCANS, br.PICK_TRIES, bl.MAX_CORRECTIONS, bl.SCAN_MAX_DEG) == (20, 30, 6, 30, 360.0)
     g = spec.BUILTIN["basket"]
     assert (g.attempts, g.minutes) == (10, 20.0)
+
+
+def test_the_environment_the_throw_script_changes_is_put_back(monkeypatch):
+    import os
+    monkeypatch.delenv("G2_GYRO_BALANCE", raising=False)
+    monkeypatch.setenv("G2_STAND_GYRO", "1")
+    with basket.env_restored():
+        os.environ["G2_GYRO_BALANCE"], os.environ["G2_STAND_GYRO"] = "0", "0"
+    assert "G2_GYRO_BALANCE" not in os.environ and os.environ["G2_STAND_GYRO"] == "1"

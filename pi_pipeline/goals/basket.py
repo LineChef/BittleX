@@ -53,6 +53,21 @@ def _mods():
 
 
 @contextlib.contextmanager
+def env_restored(names=("G2_GYRO_BALANCE", "G2_STAND_GYRO")):
+    """The throw's script run turns the gyro balance off for the whole process through the environment (`scripted_skill.play`, gyro_off); inside the voice service that must not outlive the attempt, so the values are put back (or removed) afterwards."""
+    import os
+    was = {n: os.environ.get(n) for n in names}
+    try:
+        yield
+    finally:
+        for n, v in was.items():
+            if v is None:
+                os.environ.pop(n, None)
+            else:
+                os.environ[n] = v
+
+
+@contextlib.contextmanager
 def applied(settings: dict):
     """The attempt's settings put into the behavior modules' constants and put back afterwards, however it ends (the goal never leaves a learned value behind in the running service)."""
     mods, was = _mods(), []
@@ -180,7 +195,7 @@ class BasketGoal:
         rec: dict = {"attempt": self.attempt_no, "holding": self.holding, "time": time.strftime("%H:%M:%S")}
         if ctx.stop():
             return AttemptResult("stopped", 0.0, [], {"rec": rec})
-        with applied(settings):
+        with applied(settings), env_restored():
             try:
                 why, self.holding = br.attempt_once(self.env, rec, self.holding, ctx.say)
             except br.Fell:
