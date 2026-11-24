@@ -93,14 +93,10 @@ def _box(reading, name: str) -> ObjectReading | None:
     return ObjectReading(name, reading.x, reading.y, left, int(left + w - 1), top, int(top + h - 1), int(getattr(reading, "area", w * h)), int(w), float(reading.claw_in), reading.bearing_deg, bool(getattr(reading, "touches_edge", False)))
 
 
-def classify_after(basket, puck) -> tuple[str, str]:
-    """(code, plain words) for one throw from the look afterwards. The basket is opaque, so a puck inside it can never be seen (owner, 2026-11-23): a puck seen anywhere is on the floor, a miss; a puck not seen with the basket in view is a make. The throw classifier's
-    "inside the basket's box" test is not used: it compared picture positions, and with the two pictures of the claw look a puck 31 degrees off the basket was called a make."""
-    if puck is not None:
-        return bo.MISSED, "The puck is on the floor: a miss."
-    if basket is None:
-        return bo.NO_BASKET, "I could not see the basket afterwards, so I cannot say where the throw went."
-    return bo.NOT_SEEN, "I could not see the puck anywhere: it is in the basket (the basket is opaque)."
+def classify_after(basket, puck, tub_puck=None, confirm: bool = False) -> tuple[str, str]:
+    """(code, plain words) for one throw from a look afterwards: `goals/basket_outcome.classify_throw`, the one place the rule lives. `puck`: a puck on the floor outside the tub; `tub_puck`: one seen inside it (only the close confirm look can see one); `confirm`: this is the close look, where
+    nothing inside is a miss. The after-throw look from about 16 inches cannot see inside the tub (the tub's clear walls show a puck there as 0 to 5 coloured pixels): a puck not seen anywhere is NOT_SEEN, a question for the confirm look (owner, 2026-11-24)."""
+    return bo.classify_throw(basket, puck, tub_puck, confirm)
 
 
 class Fell(Exception):

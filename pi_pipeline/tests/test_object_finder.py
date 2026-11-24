@@ -47,8 +47,12 @@ def reading(x, y, left, right, top, bottom, bearing=0.0, name="x"):
 
 
 def test_the_throw_is_made_missed_or_unknown_from_what_the_finders_saw():
-    basket = reading(120, 150, 90, 150, 120, 170, name="basket")
-    assert bo.classify_throw(basket, reading(120, 140, 112, 128, 134, 146, name="cylinder"))[0] == bo.MADE
-    assert bo.classify_throw(basket, reading(200, 190, 192, 208, 184, 196, bearing=25.0, name="cylinder"))[0] == bo.MISSED
-    assert bo.classify_throw(basket, None)[0] == bo.NOT_SEEN                                              # maybe inside, maybe out of view: not a make
-    assert bo.classify_throw(None, reading(120, 140, 112, 128, 134, 146))[0] == bo.NO_BASKET             # the look missed the basket: never a make or a miss
+    from types import SimpleNamespace as NS
+    tub, floor, inside = NS(bearing_deg=0.0), NS(bearing_deg=25.0), NS(x=120.0, y=116.0)
+    assert bo.classify_throw(tub, None, inside, confirm=True)[0] == bo.MADE                               # a coloured blob inside the tub's footprint
+    assert bo.classify_throw(tub, floor)[0] == bo.MISSED                                                  # on the floor outside it
+    assert bo.classify_throw(tub, None)[0] == bo.NOT_SEEN                                                 # a question for the close look, no longer a make
+    assert bo.classify_throw(tub, None, None, confirm=True)[0] == bo.MISSED                               # looked into the tub from close up: not there
+    assert bo.classify_throw(None, None)[0] == bo.NO_BASKET                                               # the look missed the tub: never a make or a miss
+    assert bo.classify_throw(None, floor)[0] == bo.MISSED                                                 # a puck on the floor is outside the tub, in view or not
+    assert bo.classify_throw(None, None, inside)[0] == bo.NO_BASKET

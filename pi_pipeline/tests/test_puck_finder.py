@@ -35,15 +35,48 @@ def test_what_is_not_the_puck_is_ignored():
     assert pf.find_puck_array(picture((80, 120, 160, 128, RED))) is None            # a long sliver
 
 
-def test_the_basket_is_not_the_puck_but_a_puck_beside_it_is():
-    img = picture((98, 100, 145, 133, bf.BASKET_RGB), (60, 124, 76, 143, RED))
+TAPE = (200, 60, 50)
+
+
+def tub_picture(*extra):
+    """The tub as the 8 inch picture shows it: the tape from column 80 to 168 on rows 96 to 104 (the footprint is columns 90 to 158, rows 107 to 125), plus extra boxes."""
+    return picture((80, 96, 169, 105, TAPE), *extra)
+
+
+def test_the_tub_is_not_the_puck_but_a_puck_beside_it_is():
+    img = tub_picture((20, 116, 36, 130, RED))
     basket = bf.find_basket_array(img)
     assert basket is not None
     p = pf.find_puck_array(img, basket)
-    assert p is not None and p.bearing_deg < -8                                      # the puck to the left, not the basket
-    only_basket = picture((98, 120, 124, 140, bf.BASKET_RGB))
-    reading = type("B", (), {"x": 111.0, "y": 130.0, "width_px": 26, "height_px": 20})()
-    assert pf.find_puck_array(only_basket, reading) is None                          # the basket's own box is skipped
+    assert p is not None and p.bearing_deg < -8                                      # the puck to the left, not the tape
+    assert pf.find_puck_array(tub_picture(), bf.find_basket_array(tub_picture())) is None   # the tape's own red is not a puck
+
+
+def test_a_puck_inside_the_tub_is_read_inside_and_not_on_the_floor():
+    img = tub_picture((115, 112, 127, 121, RED))                                    # in the middle of the tub
+    basket = bf.find_basket_array(img)
+    inside = pf.find_puck_in_tub_array(img, basket)
+    assert inside is not None and inside.count >= pf.MIN_INSIDE_PX and 110 <= inside.x <= 130
+    assert pf.find_puck_array(img, basket) is None                                   # not a puck on the floor
+    assert pf.find_puck_in_tub_array(tub_picture(), bf.find_basket_array(tub_picture())) is None          # an empty tub
+    assert pf.find_puck_in_tub_array(img, None) is None                              # no tub, no inside
+
+
+def test_a_puck_touching_the_tub_outside_is_not_inside():
+    for box in ((72, 112, 86, 124),                                                  # against the outer wall: its centre sits on the tape's end column
+                (127, 124, 142, 140),                                                # on the floor against the near side: its centre is under the base
+                (160, 112, 176, 124)):                                               # against the other wall
+        img = tub_picture(box + (RED,))
+        basket = bf.find_basket_array(img)
+        assert pf.find_puck_in_tub_array(img, basket) is None, box
+        assert pf.find_puck_array(img, basket) is not None, box                      # it is a puck on the floor
+
+
+def test_a_small_puck_in_the_tub_still_counts_and_a_speck_does_not():
+    img = tub_picture((100, 114, 104, 119, RED))                                    # 20 pixels, a puck against the far wall
+    assert pf.find_puck_in_tub_array(img, bf.find_basket_array(img)) is not None
+    speck = tub_picture((100, 114, 102, 117, RED))                                  # 6 pixels
+    assert pf.find_puck_in_tub_array(speck, bf.find_basket_array(speck)) is None
 
 
 def test_the_distance_curve_is_steady_and_the_biggest_blob_wins():

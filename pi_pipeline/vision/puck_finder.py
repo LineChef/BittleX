@@ -1,7 +1,7 @@
 """Find the puck (the cylinder the basket goal throws) on the floor in a claw-camera picture: its bearing and a distance from the claw tip (the basket goal, docs/plan-detail/basket-goal-plan.md).
 
 Why not by its band colours (`object_finder.find_cylinder`): tried on the 16 recognition pictures of the puck on the hardwood (2026-11-23) the two-band colour rule found it in only 7, with false hits on the cluttered wall (a bearing of -22 degrees every time) and missed it at 6 and 9 inches.
-The floor is grey and the puck is the one strongly coloured thing on it, so this finds the biggest SATURATED blob on the floor part of the picture (below the wall's base, above the jaws, away from the side edges), the right size and shape for a puck, and not inside the basket's box.
+The floor is grey and the puck is the one strongly coloured thing on it, so this finds the biggest SATURATED blob on the floor part of the picture (below the wall's base, above the jaws, away from the side edges), the right size and shape for a puck, and not inside the tub's footprint (a puck inside the tub is read by `find_puck_in_tub_array` from a close picture).
 - bearing: from the blob's centre column (the basket finder's horizontal focal length);
 - distance from the claw tip: from the blob's centre ROW, as ROW_K / (row - ROW_HORIZON_PX): on the floor plane the row falls steadily with distance, which the puck's width (about 18 pixels at 6 inches, 4 at 24) cannot give. Fitted to the six face-on pictures at 6 to 24 inches with the claw at lift 120 in the attention pose; it is within about 15 percent there and is only valid in that pose.
 Seen only out to about 24 inches, and reliably only inside about 15 (a 4 to 8 pixel speck beyond). Nothing here moves G2, calls an API or needs a download.
@@ -44,9 +44,16 @@ def distance_from_row(row: float) -> float:
 
 
 def _inside(basket, x: float, y: float, margin: float = 6.0) -> bool:
-    if basket is None:
+    """Is the blob's centre inside the tub's footprint (the basket finder's `in_footprint`)? Those blobs are a puck in the tub, read by `find_puck_in_tub_array`, not a puck on the floor. `margin` is unused: the footprint's own margins say where the tub's edge is."""
+    from .basket_finder import in_footprint
+    return in_footprint(basket, x, y)
+
+
+def _on_tape(basket, x: float, y: float, pad: float = 4.0) -> bool:
+    """Is the blob's centre on the tub's red tape (its rows, its columns, a few pixels around)? The tape's red ends can pass the puck's colour test (a 48 pixel blob on the tape's left end read as a puck 45 inches out in the off-centre 8 inch picture)."""
+    if basket is None or getattr(basket, "right", 0) <= getattr(basket, "left", 0):
         return False
-    return abs(x - basket.x) <= basket.width_px / 2 + margin and abs(y - basket.y) <= basket.height_px / 2 + margin
+    return basket.left - pad <= x <= basket.right + pad and basket.rim_row - basket.height_px - pad <= y <= basket.rim_row + pad
 
 
 def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReading | None:
@@ -69,7 +76,7 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
         if max(w, h) > MAX_SIDE_PX or max(w / h, h / w) > MAX_ASPECT:
             continue
         cx, cy = float(xs.mean()), float(ys.mean())
-        if _inside(basket, cx, cy):
+        if _inside(basket, cx, cy) or _on_tape(basket, cx, cy):
             continue
         blob_sat = sat[ys, xs]
         if float(blob_sat.mean()) < BLOB_SAT_MEAN_MIN or float(np.percentile(blob_sat, 90)) < BLOB_SAT_P90_MIN:
@@ -90,3 +97,53 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
 def find_puck(jpeg: bytes, basket=None, by: str = "row") -> PuckReading | None:
     rgb = _decode(jpeg)
     return None if rgb is None else find_puck_array(rgb, basket, by)
+
+
+INSIDE_SAT_MIN = 55                          # a pixel inside the tub counts when its max-minus-min channel spread is above this (the floor seen through the clear walls is grey: 0 such pixels in the empty tub at 8 inches, 10 to 90 with a puck inside)
+MIN_INSIDE_PX = 8                            # the puck inside the tub: at least this many such pixels in one blob (the far wall case read 10, the tub off-centre 8: keep it low and look at the margin when more pictures exist)
+INSIDE_SIDE_COLS = 5                         # the window reaches this far outside the tape's ends and this far under the base, so a blob's centre is read whole
+INSIDE_BELOW_ROWS = 30
+
+
+@dataclass(frozen=True)
+class PuckInTub:
+    x: float
+    y: float
+    count: int                  # the blob's coloured pixels
+    width_px: int
+    height_px: int
+
+
+def find_puck_in_tub_array(rgb: np.ndarray, basket) -> PuckInTub | None:
+    """A coloured blob INSIDE the tub in a close picture (about 8 to 10 inches, the attention pose, the claw at 120), or None. `basket`: the basket finder's reading in the same picture. The blob is read whole in a window around the tub and counted only when its centre is in the footprint
+    (`basket_finder.in_footprint`): a puck on the floor touching the tub's wall or its near side has its centre outside it. At 16 inches a puck inside is 0 to 5 such pixels and cannot be told from an empty tub; this is for the close look."""
+    from .basket_finder import in_footprint
+    if basket is None or getattr(basket, "right", 0) <= getattr(basket, "left", 0):
+        return None
+    a = rgb.astype(np.int16)
+    spread = a.max(2) - a.min(2)
+    m = spread > INSIDE_SAT_MIN
+    h, w = m.shape
+    y0, y1 = max(int(basket.rim_row) + 3, 0), min(int(basket.base_row) + INSIDE_BELOW_ROWS, h - 24)
+    x0, x1 = max(basket.left - INSIDE_SIDE_COLS, 0), min(basket.right + INSIDE_SIDE_COLS + 1, w)
+    win = np.zeros_like(m)
+    win[y0:y1, x0:x1] = m[y0:y1, x0:x1]
+    best = None
+    for ys, xs in _blobs(win):
+        n = len(xs)
+        if n < MIN_INSIDE_PX:
+            continue
+        cx, cy = float(xs.mean()), float(ys.mean())
+        if not in_footprint(basket, cx, cy):
+            continue
+        if best is None or n > best[0]:
+            best = (n, cx, cy, int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1))
+    if best is None:
+        return None
+    n, cx, cy, bw, bh = best
+    return PuckInTub(cx, cy, n, bw, bh)
+
+
+def find_puck_in_tub(jpeg: bytes, basket) -> PuckInTub | None:
+    rgb = _decode(jpeg)
+    return None if rgb is None else find_puck_in_tub_array(rgb, basket)

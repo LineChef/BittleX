@@ -4,7 +4,7 @@ import numpy as np
 from pi_pipeline.behavior import basket_lineup as bl
 from pi_pipeline.vision import basket_finder as bf
 
-ORANGE = bf.BASKET_RGB
+TAPE = (200, 60, 50)                  # the tub's red tape
 
 
 def picture(*boxes):
@@ -14,17 +14,24 @@ def picture(*boxes):
     return img
 
 
-def test_the_basket_is_found_with_its_bearing_and_a_distance_from_its_width():
-    r = bf.find_basket_array(picture((98, 88, 145, 121, ORANGE)))                      # 47 px wide: about 15.5 inches from the claw tip
-    assert r is not None and abs(r.width_px - 47) <= 2 and abs(r.bearing_deg) < 3
-    assert 15 <= r.claw_in <= 16.5 and abs(r.claw_in - (r.lens_in - bf.LENS_OFFSET_IN)) < 1e-9
-    right = bf.find_basket_array(picture((136, 88, 170, 108, ORANGE)))
-    left = bf.find_basket_array(picture((70, 88, 104, 108, ORANGE)))
+def tape(left, right, rim=100, thick=7, c=TAPE):
+    """The tub's tape: a red band from column `left` to `right` ending on row `rim`."""
+    return (left, rim - thick, right + 1, rim + 1, c)
+
+
+def test_the_tub_is_found_by_its_tape_with_a_bearing_and_a_distance_from_its_width():
+    r = bf.find_basket_array(picture(tape(86, 144)))                                      # 59 px wide: about 15.8 inches from the claw tip
+    assert r is not None and abs(r.width_px - 59) <= 2 and abs(r.bearing_deg) < 3
+    assert 15 <= r.claw_in <= 16.6 and abs(r.claw_in - (r.lens_in - bf.LENS_OFFSET_IN)) < 1e-9
+    assert (r.left, r.right) == (86, 144) and r.rim_row == 100 and r.base_row > r.rim_row                  # the footprint the puck finders read
+    right = bf.find_basket_array(picture(tape(150, 190)))
+    left = bf.find_basket_array(picture(tape(50, 90)))
     assert right.bearing_deg > 8 and left.bearing_deg < -8                                # + is to G2's right
-    assert bf.find_basket_array(picture((98, 88, 145, 121, (80, 160, 90)))) is None       # the wrong colour
-    assert bf.find_basket_array(picture((100, 90, 106, 96, ORANGE))) is None             # a speck
-    assert bf.find_basket_array(picture((10, 70, 230, 130, ORANGE))) is None             # far too wide to be the cup
-    assert bf.find_basket_array(picture((98, 10, 145, 40, ORANGE))) is None              # above the horizon
+    assert bf.find_basket_array(picture(tape(86, 144, c=(80, 160, 90)))) is None          # the wrong colour
+    assert bf.find_basket_array(picture(tape(100, 108))) is None                          # a speck
+    assert bf.find_basket_array(picture((100, 90, 118, 108, TAPE))) is None               # a puck's red block: not wide and thin
+    assert bf.find_basket_array(picture(tape(5, 235))) is None                            # far too wide to be the tub's tape
+    assert bf.find_basket_array(picture(tape(86, 144, rim=30))) is None                   # above the horizon
 
 
 class Read:
@@ -116,10 +123,11 @@ def test_a_basket_that_never_gets_closer_stops_for_a_reset_after_the_step_limit(
     assert r["outcome"] == "could_not_align" and len(r["steps"]) == bl.MAX_CORRECTIONS + 1
 
 
-def test_the_refit_reads_the_eight_measured_distances_within_an_inch():
-    measured = ((63, 12), (54, 14), (49, 15), (44, 16), (42, 17), (41, 18), (37, 20), (33, 22))      # (width in pixels, inches from the claw tip), 2026-11-23, claw at lift 120
+def test_the_tub_fit_reads_the_measured_distances():
+    measured = ((82, 12), (68, 14), (59, 16), (55, 17), (52, 18), (47, 19), (47, 20), (46, 22))        # (the tape's width in pixels, inches from the claw tip), the `tub` set 2026-11-24, claw at lift 120
     for w, d in measured:
-        assert abs(bf.distance_from_width(w) - bf.LENS_OFFSET_IN - d) <= 0.7, (w, d)
+        assert abs(bf.distance_from_width(w) - bf.LENS_OFFSET_IN - d) <= 1.5, (w, d)
+    assert abs(bf.distance_from_width(89) - bf.LENS_OFFSET_IN - 8) <= 2.0                                # the 8 inch pictures
     assert bf.distance_from_width(0) == float("inf")
     assert bf.distance_from_width(30) > bf.distance_from_width(60) > bf.LENS_OFFSET_IN
 
@@ -136,10 +144,10 @@ def test_a_fall_in_a_mover_ends_the_line_up():
     assert r["outcome"] == "fell" and len(r["steps"]) == 1
 
 
-def test_a_basket_closer_than_eight_inches_is_still_read_so_the_guard_can_fire():
-    near = bf.find_basket_array(picture((60, 90, 190, 180, ORANGE)))                   # 130 px wide: about 5.6 inches from the claw tip
+def test_a_tub_closer_than_eight_inches_is_still_read_so_the_guard_can_fire():
+    near = bf.find_basket_array(picture(tape(30, 200, rim=130, thick=14)))                # 171 px wide: about 4 inches from the claw tip
     assert near is not None and near.claw_in < bl.BUFFER_IN and bl.next_action(near, bl.LineupState()).kind == "back"
-    assert bf.find_basket_array(picture((10, 70, 230, 130, ORANGE))) is None             # a stripe across the whole frame is still not the cup
+    assert bf.find_basket_array(picture(tape(5, 235, rim=130, thick=14))) is None          # a stripe across the whole frame is still not the tape
 
 
 def test_a_back_up_is_one_move_to_the_shot_distance_allowing_for_the_sideways_drift():
