@@ -2,7 +2,7 @@
 
 THE STEPS, every attempt: stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), then THE BALL GOAL'S OWN CLAW LOOK, complete (`claw_survey.run_claw_look`: the attention pose, the claw up in two steps, a settle, the pictures, the claw down, the eased stand-up), read by the basket and puck finders
 (`goals/basket_outcome.classify_throw`). The basket is a clear tub with red tape on its rim (owner, 2026-11-24). From about 16 inches a puck inside it is 0 to 5 coloured pixels, so that look can see a puck on the floor (a miss, the retrieval starts at once) but not inside. The puck NOT seen: the CONFIRM LOOK (`confirm_throw`): he walks up to about 8 inches of the tub (the line-up's steps and 6 inch buffer),
-goes into the attention pose and takes one centred picture (`claw_survey.run_claw_look(..., centre_only=True)`), read for a puck inside the tub. A puck inside is a make: he lies down and the run ends for the owner's reset. Nothing inside is a miss and he CIRCLES the tub (`circle_search`: short legs, facing the tub at every stop, up to two laps, pivoting back toward it when it drops out of view) until the puck is seen, then fetches it as after any miss;
+takes one picture there (the walk-up's own last quick picture, claw down, read at once so he never stands idle; `CONFIRM_LOOK = "claw_up"` goes into the attention pose and takes one centred picture with `claw_survey.run_claw_look(..., centre_only=True)` instead), read for a puck inside the tub. A puck inside is a make: he lies down and the run ends for the owner's reset. Nothing inside is a miss and he CIRCLES the tub (`circle_search`: short legs, facing the tub at every stop, up to two laps, pivoting back toward it when it drops out of view) until the puck is seen, then fetches it as after any miss;
 two laps without it end the run at rest. Every look picture and what the finders read on it is kept on the Pi (`save_picture`: `~/g2_runs/basket_run/pictures/<run>/`, with `pictures.jsonl`).
 A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
 Stops: 5 attempts, a fall, no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. The camera is warmed up with two silent pictures at the start, before anything moves. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
@@ -37,6 +37,8 @@ PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
+CONFIRM_LOOK = "quick"               # "quick": the walk-up's own last picture (claw down, taken at once, read at once: no attention-pose cycle, no standing about) is the confirm picture (owner, 2026-11-24: "he can just walk up and take a fast picture, but he can't be standing idle for a long time afterwards"); "claw_up": the attention-pose look as first built (`env.confirm_look()`)
+CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answer while he stands in the walk-up: he lies down and the attempt stops (a stalled camera must not leave him standing: the legs sag after about 10 s)
 CIRCLE_RADIUS_IN = 13.0              # the circling search's radius, as the finder reads it: near enough that a puck within about 8 inches of the tub is inside the puck finder's range, far enough from the 6 inch buffer
 CIRCLE_MIN_IN = 9.0                  # nearer than this (as read) he backs off before the next leg
 CIRCLE_STEP_IN = 6.0                 # one leg's walk
@@ -191,6 +193,10 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1) -> dict:
             return {"outcome": "fell", "puck": None, "basket": None, "steps": st.log}
 
 
+class CameraStalled(Exception):
+    """The camera gave no picture CAMERA_MISSES_MAX times in a row while he stood."""
+
+
 class Fell(Exception):
     pass
 
@@ -311,21 +317,48 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
-def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None, first=None) -> dict:
+def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None, first=None, look: str | None = None) -> dict:
     """The confirm look (owner, 2026-11-24): the after-throw look from about 16 inches cannot see into the clear tub (a puck inside is 0 to 5 coloured pixels there, 10 to 90 at 8 inches), so when it did not see the puck he walks up to about 8 inches of the tub (the line-up's own steps and
-    buffer, aimed at CONFIRM_READING_IN), goes into the attention pose, raises the claw and takes ONE centred picture (`env.confirm_look()`: the shared claw look, centre only), read by the tub and puck finders. Returns {"stop": a reason or None, "code", "basket", "puck"}: a puck inside is MADE (he lies down: the run ends), the tub not seen is NO_BASKET (lies down),
-    nothing inside is a miss (`code` MISSED, `puck` the puck seen on the floor in that picture or None: the caller searches). Everything it saw goes into `rec["confirm"]` and the pictures are saved by `env`. `first`: the tub reading from the after-throw look (taken from the attention pose, so it is the accurate one), used for the walk-up's first decision with no picture: he stands still as little as possible, because the legs sag after about 10 seconds standing (owner, 2026-11-24)."""
+    buffer, aimed at CONFIRM_READING_IN). In the default "quick" mode the walk-up's last picture (claw down, taken at once) IS the confirm picture, read for a puck inside the tub the moment it is taken: nothing waits, a make lies down at once and a miss keeps moving, so he never stands idle (owner: the legs sag after about 10 seconds). In the "claw_up" mode he goes
+    into the attention pose, raises the claw and takes ONE centred picture (`env.confirm_look()`: the shared claw look, centre only). Returns {"stop": a reason or None, "code", "basket", "puck"}: a puck inside is MADE (he lies down: the run ends), the tub not seen is NO_BASKET (lies down),
+    nothing inside is a miss (`code` MISSED, `puck` the puck seen on the floor in that picture or None: the caller searches). Everything it saw goes into `rec["confirm"]` and the pictures are saved by `env`. `first`: the tub reading from the after-throw look (taken from the attention pose, so it is the accurate one), used for the walk-up's first decision with no picture.
+    Two pictures in a row with no answer from the camera while he stands (CAMERA_MISSES_MAX) lie him down and stop the attempt."""
+    look_mode = look or CONFIRM_LOOK
     say("confirm: walking up to look into the tub")
     t_stand = time.monotonic()
-    lu = bl.lineup(env.quick_basket, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG, first=first)
-    rec["confirm"] = {"walkup": {"outcome": lu["outcome"], "steps": lu["steps"]}, "standing_s": round(time.monotonic() - t_stand, 1)}        # how long he stood walking up and looking before the attention pose: the legs sag after about 10 s
+    quick = hasattr(env, "quick_confirm") and look_mode == "quick"
+    misses = [0]
+
+    def walk_look():
+        reading = env.quick_basket()
+        misses[0] = misses[0] + 1 if getattr(env, "last_quick_failed", False) else 0
+        if misses[0] >= CAMERA_MISSES_MAX:
+            raise CameraStalled()
+        return reading
+    try:
+        n0 = getattr(env, "quick_count", 0)
+        lu = bl.lineup(walk_look, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG, first=first)
+        if lu["outcome"] == "aligned" and quick and getattr(env, "quick_count", 0) == n0:
+            walk_look()                                                          # he was already in place on the first reading: the confirm picture is taken now
+    except CameraStalled:
+        say("confirm: no pictures from the camera while standing: lying down")
+        if hasattr(env, "lie_down"):
+            env.lie_down()
+        rec["confirm"] = {"walkup": {"outcome": "camera_stalled"}}
+        persist()
+        return {"stop": "no_picture", "code": None, "basket": None, "puck": None}
+    rec["confirm"] = {"walkup": {"outcome": lu["outcome"], "steps": lu["steps"]}, "standing_s": round(time.monotonic() - t_stand, 1), "look": look_mode}        # how long he stood walking up and looking: the legs sag after about 10 s
     persist()
     if lu["outcome"] != "aligned":
         if lu["outcome"] != "fell" and hasattr(env, "lie_down"):
             env.lie_down()
         return {"stop": lu["outcome"], "code": None, "basket": None, "puck": None}
     try:
-        basket, floor, tub = env.confirm_look()
+        if quick:
+            basket, floor, tub = env.quick_confirm()                              # the picture just taken, read at once (the finders take milliseconds): he does not wait on it
+            env.confirm_picture_ok = bool(getattr(env, "last_quick", None))
+        else:
+            basket, floor, tub = env.confirm_look()
     except Fell:
         return {"stop": "fell", "code": None, "basket": None, "puck": None}
     if not getattr(env, "confirm_picture_ok", True):
@@ -336,7 +369,7 @@ def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": Non
         persist()
         return {"stop": "no_picture", "code": None, "basket": None, "puck": None}
     code, words = classify_after(basket, floor, tub, confirm=True)
-    rec["confirm"]["look"] = {"code": code, "words": words, "tub": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
+    rec["confirm"]["look"] = {"mode": look_mode, "code": code, "words": words, "tub": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
                               "floor_puck": None if floor is None else (round(floor.claw_in, 1), round(floor.bearing_deg, 1)),
                               "tub_puck": None if tub is None else (round(tub.x), round(tub.y), tub.count)}
     rec["after"]["first_look"] = {k: rec["after"].get(k) for k in ("code", "words", "puck", "basket")}
@@ -499,6 +532,7 @@ class RealEnv:
         self.attention_hold_s = None
         self.confirm_picture_ok = True
         self.last_walkup = None
+        self.last_quick, self.last_quick_failed = None, False
         try:
             looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
         except Exception:  # noqa: BLE001
@@ -612,10 +646,14 @@ class RealEnv:
         self._ready_to_move()
         cam = self._camera()
         jpeg = cam.look()                                                # no forced re-metering: the warm-up metered the light
+        self.last_quick_failed = not jpeg
         if not jpeg:
+            self.last_quick = None
             return None, None
         basket = bf.find_basket(jpeg)
         puck = pf.find_puck(jpeg, basket, by=by)
+        tub_puck = pf.find_puck_in_tub(jpeg, basket)
+        self.last_quick = (basket, puck, tub_puck)                       # what the confirm step reads when this was its picture (`quick_confirm`)
         n = len(self.quick_log) + 1
         d = os.path.join(os.path.expanduser(LOG_DIR), "quick", self.run_stamp)
         try:
@@ -625,11 +663,19 @@ class RealEnv:
         except OSError:
             pass
         self.last_walkup = None if basket is None else (round(basket.claw_in, 1), round(basket.width_px))
-        save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), f"quick{n:02d}", jpeg, basket, puck, None, {"by": by})
+        save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), f"quick{n:02d}", jpeg, basket, puck, tub_puck, {"by": by})
         self.quick_log.append({"n": n, "time": time.strftime("%H:%M:%S"),
                                "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
                                "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1), puck.width_px, round(puck.y))})
         return basket, puck
+
+    @property
+    def quick_count(self) -> int:
+        return len(self.quick_log)
+
+    def quick_confirm(self):
+        """The confirm step's reading from the last quick picture (claw down, taken at the end of the walk-up): (tub, puck on the floor, puck inside the tub), read when the picture was taken, so nothing waits."""
+        return self.last_quick if self.last_quick is not None else (None, None, None)
 
     def look(self):
         """The retrieval's look: a quick claw-down picture, as the ball goal takes while it walks up (the puck's distance from its width)."""
@@ -652,6 +698,7 @@ def main(argv: list | None = None) -> None:
     ap.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS)
     ap.add_argument("--look-only", action="store_true", help="no throw: stand up from rest, take the claw look once, print what each picture read (basket and puck distance, bearing and picture position), lie down; to check which side the look's pictures point")
     ap.add_argument("--confirm-only", action="store_true", help="no throw: stand up from rest, walk up to about 8 inches of the tub, take the confirm look, print what the finders read (the tub, a puck on the floor, a puck inside it), lie down; for checking the walk-up and the close look with the puck placed by hand (G2 at rest, the tub about 16 inches out)")
+    ap.add_argument("--claw-up", action="store_true", help="with --confirm-only: use the attention-pose confirm look (claw raised, one centred picture) instead of the walk-up's own last picture")
     ap.add_argument("--circle-only", action="store_true", help="no throw: stand up from rest, circle the tub (the puck NOT in view: put it behind the tub or out of the room) looking for the puck, up to two laps, print the steps, lie down; for checking the circling movement (the tub about 16 inches out)")
     ap.add_argument("--show-picture", action="store_true", help="after each throw print the picture of the floor (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
@@ -695,7 +742,7 @@ def main(argv: list | None = None) -> None:
                 raise Fell()
             rec = {"attempt": 0, "after": {}}
             if a.confirm_only:
-                res = confirm_throw(env, rec, say=print)
+                res = confirm_throw(env, rec, say=print, look="claw_up" if a.claw_up else None)
                 print("CONFIRM", json.dumps({"stop": res["stop"], "code": res["code"], "confirm": rec.get("confirm")}, default=str))
             else:
                 c = circle_search(env, say=print)

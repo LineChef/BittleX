@@ -131,15 +131,30 @@ class Env:
 
     def confirm_look(self):
         from types import SimpleNamespace
+        self.claw_up_looks = getattr(self, "claw_up_looks", 0) + 1
         self.confirm_looks = getattr(self, "confirm_looks", 0) + 1
         self.w.walkup = False
         basket = B(*self.w.basket) if self.w.basket else None
         floor = P(*self.w.puck) if self.w.puck else None
         return basket, floor, SimpleNamespace(x=120.0, y=116.0, count=30) if self.w.inside else None
 
+    @property
+    def quick_count(self):
+        return getattr(self, "quick_calls", 0)
+
     def quick_basket(self):
         self.quick_calls = getattr(self, "quick_calls", 0) + 1
         return B(*self.w.basket) if self.w.basket else None
+
+    def quick_confirm(self):
+        """The reading of the picture just taken at the end of the walk-up."""
+        from types import SimpleNamespace
+        self.confirm_looks = getattr(self, "confirm_looks", 0) + 1
+        self.w.walkup = False
+        self.last_quick = True
+        basket = B(*self.w.basket) if self.w.basket else None
+        floor = P(*self.w.puck) if self.w.puck else None
+        return basket, floor, SimpleNamespace(x=120.0, y=116.0, count=30) if self.w.inside else None
 
     def pick(self):
         self.picks += 1
@@ -591,3 +606,47 @@ def test_every_look_picture_is_kept_with_what_the_finders_read(tmp_path):
     assert br.save_picture("x", 1, "none", b"j", None, None, None, log_dir=str(tmp_path))                      # nothing read: still kept, with nulls
     assert br.reading_dict(None) is None and br.reading_dict(NS(a=1, b="x", c=[1])) == {"a": 1, "b": "x"}
     assert br.save_picture("x", 1, "bad", b"j", log_dir="/proc/definitely/not/writable") is None               # a full or missing disk never stops a run
+
+
+def test_the_walk_ups_own_last_picture_is_the_confirm_picture_and_a_make_lies_down_with_nothing_after_it():
+    events = []
+
+    class E(Env):
+        def lie_down(self):
+            events.append("lie_down")
+
+        def quick_basket(self):
+            events.append("picture")
+            return super().quick_basket()
+    env = E([ok()], puck_after=["in"])
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["outcome"] == "made" and getattr(env, "claw_up_looks", 0) == 0                                 # no attention-pose cycle: the quick picture was the confirm
+    assert r["attempts"][0]["confirm"]["look"]["mode"] == "quick"
+    assert events[-1] == "lie_down" and events.count("lie_down") == 1                                       # lying down is the last thing: he does not stand about with the answer
+
+
+def test_the_claw_up_confirm_is_still_available_by_name():
+    env = Env([ok()], puck_after=["in"])
+    env.throw(False)
+    env.w.walkup = True                                                                                     # the world: between the after-throw look and the confirm look
+    rec = {"attempt": 1, "after": {"code": bo.NOT_SEEN}}
+    res = br.confirm_throw(env, rec, say=lambda s: None, first=B(16.0, 0.0), look="claw_up")
+    assert res["stop"] == "made" and env.claw_up_looks == 1 and rec["confirm"]["look"]["mode"] == "claw_up"
+
+
+def test_a_camera_that_stops_answering_while_he_stands_lies_him_down_after_two_misses():
+    lies, asked = [], []
+
+    class Dead(Env):
+        last_quick_failed = True
+
+        def lie_down(self):
+            lies.append(1)
+
+        def quick_basket(self):
+            asked.append(1)
+            return None
+    env = Dead([ok()], puck_after=["in"])
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["outcome"] == "no_picture" and lies == [1] and len(asked) == br.CAMERA_MISSES_MAX              # not a make, not a search: he lies down rather than stand turning on the spot
+    assert r["attempts"][0]["confirm"]["walkup"]["outcome"] == "camera_stalled"
