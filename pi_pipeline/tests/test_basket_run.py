@@ -197,9 +197,15 @@ def test_the_camera_burst_returns_back_to_back_frames_without_exposure_work():
 
 
 def test_a_basket_cut_off_by_the_frame_is_too_near_to_walk_toward():
-    near = B(30.0, 0.0)
+    near = B(11.0, 0.0)
     near.touches_edge = True
-    assert act(P(20.0, 0.0), near).why == "too_near_the_basket"
+    assert act(P(20.0, 0.0), near).why == "too_near_the_basket"                                      # clipped and near
+    wide = B(30.0, 0.0)
+    wide.touches_edge, wide.width_px = True, 90
+    assert act(P(20.0, 0.0), wide).why == "too_near_the_basket"                                      # clipped and wide
+    far = B(17.0, 35.6)
+    far.touches_edge, far.width_px = True, 43
+    assert act(P(20.0, 0.0), far).kind != "give_up"                                                  # a small, far basket just out of frame (the run that ended on it, 2026-11-23)
 
 
 def test_the_save_hook_sees_the_run_as_it_goes_and_a_retrieval_step_is_saved_when_taken():

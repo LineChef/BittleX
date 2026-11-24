@@ -31,6 +31,7 @@ APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 0.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
+EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
@@ -56,7 +57,7 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
     """The next step toward the puck from a fresh look (a PuckReading or None, and the basket reading or None in the same picture)."""
     if st.steps >= MAX_RETRIEVAL_STEPS:
         return RAction("give_up", 0.0, "could_not_reach_puck")
-    if basket is not None and (basket.claw_in < BASKET_GUARD_IN or getattr(basket, "touches_edge", False)):         # a basket cut off by the frame is right beside him
+    if basket is not None and (basket.claw_in < BASKET_GUARD_IN or (getattr(basket, "touches_edge", False) and (basket.claw_in <= EDGE_GUARD_IN or basket.width_px >= EDGE_GUARD_WIDTH_PX))):
         return RAction("give_up", 0.0, "too_near_the_basket")
     if puck is None:
         if st.scanned_deg >= SCAN_MAX_DEG or st.scans >= MAX_SCANS:
