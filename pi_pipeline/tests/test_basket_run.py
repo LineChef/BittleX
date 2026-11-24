@@ -387,6 +387,7 @@ def test_after_the_throw_he_does_the_ball_goals_own_claw_look_and_the_readings_a
     assert order == ["expect_lob_end", ("look", "centre", True)]                                         # the lob's end pose is announced, then the ball goal's own look, complete (it ends standing)
     assert env.picture_ok is True and basket.claw_in == 16.0 and abs(basket.bearing_deg - 1.0) < 1e-9     # the centre picture's basket first
     assert puck is not None and puck.claw_in == 14.0 and puck.bearing_deg != 5.0                           # the puck seen in the left picture, in the body frame
+    assert set(env.look_readings) == {"look_left", "look_right", "centre"} and env.look_readings["look_left"]["puck"][0] == 14.0    # what each picture read is kept for the run log
     import inspect
     src = inspect.getsource(br.RealEnv.after_throw).split('"""')[2]                                        # the code, not the docstring
     assert "claw_pose(" not in src and "sit_down" not in src and "ensure_rest" not in src and "_tx(" not in src       # nothing of my own: no claw steps, no entry, no rest, no raw writes
@@ -487,3 +488,13 @@ def test_a_puck_seen_in_any_picture_is_a_miss_and_not_seen_is_a_make():
     assert br.classify_after(b, p)[0] == bo.MISSED
     b, p = br.merge_looks({"centre": (basket, None)}, offsets)
     assert br.classify_after(b, p)[0] == bo.NOT_SEEN
+
+
+def test_the_scan_keeps_turning_the_way_the_last_turn_toward_the_puck_went():
+    st = br.RState()
+    assert act(None, None, st).value == br.SCAN_STEP_DEG                                           # nothing seen yet: to the right
+    assert act(P(8.0, -33.0), None, st).kind == "pivot"                                            # a turn left toward it...
+    a = act(None, None, st)
+    assert a.kind == "scan" and a.value == -br.SCAN_STEP_DEG                                        # ...and when it drops out of view the scan goes on to the left, not back
+    act(P(12.0, 14.0), None, st)
+    assert act(None, None, st).value == br.SCAN_STEP_DEG

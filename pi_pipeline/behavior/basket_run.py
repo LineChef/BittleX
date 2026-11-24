@@ -47,6 +47,7 @@ class RAction:
 @dataclass
 class RState:
     scanned_deg: float = 0.0
+    scan_dir: int = 1                # + right: the pivot scan keeps turning the way the last turn toward the puck went (2026-11-23: a scan to the right undid a turn to the left)
     steps: int = 0
     scans: int = 0
     picks: int = 0
@@ -64,9 +65,11 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
             return RAction("give_up", 0.0, "puck_not_found")
         st.scanned_deg += SCAN_STEP_DEG
         st.scans += 1
-        return RAction("scan", SCAN_STEP_DEG, "puck not in view: pivot scan")
+        return RAction("scan", SCAN_STEP_DEG * st.scan_dir, "puck not in view: pivot scan")
     st.scanned_deg = 0.0
     d, b = float(puck.claw_in), float(puck.bearing_deg)
+    if abs(b) > ALIGN_DEG:
+        st.scan_dir = 1 if b > 0 else -1
     if abs(b) >= bl.PIVOT_MIN_DEG:
         st.steps += 1
         return RAction("pivot", bl._pivot_for(b), "puck far off to the side: pivot toward it")
@@ -266,6 +269,7 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                         "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
         rec["after"]["attention_hold_s"] = getattr(env, "attention_hold_s", None)
+        rec["after"]["pictures"] = getattr(env, "look_readings", None)                    # what each picture of the look read (the merge keeps one basket and one puck)
         if code != bo.MISSED and hasattr(env, "lie_down"):
             env.lie_down()                                                       # a make: rest, from the stand the look ended in (the standard lie-down); a miss: no pause, the retrieval starts walking
         say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
@@ -317,6 +321,7 @@ class RealEnv:
         self.show_picture, self.run_stamp, self.attempt = show_picture, time.strftime("%Y%m%d_%H%M%S"), 0
         self.quick_log: list = []
         self.picture_ok = True
+        self.look_readings: dict = {}
         self.attention_hold_s = None
         try:
             looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
@@ -359,12 +364,16 @@ class RealEnv:
         cam, seen = self._camera(), {}
         left = chase.CLAW_PAN_DEG if chase.CLAW_PAN_SIGN == "left" else -chase.CLAW_PAN_DEG
         self.picture_ok = False
+        self.look_readings = {}
 
         def snapshot(label):
             jpeg = cam.look()
             if jpeg:
                 basket = bf.find_basket(jpeg)
                 seen[label] = (basket, pf.find_puck(jpeg, basket))
+                b_, p_ = seen[label]
+                self.look_readings[label] = {"basket": None if b_ is None else (round(b_.claw_in, 1), round(b_.bearing_deg, 1), b_.width_px),
+                                             "puck": None if p_ is None else (round(p_.claw_in, 1), round(p_.bearing_deg, 1), p_.width_px, round(p_.x), round(p_.y))}
                 if label == "centre":
                     self.picture_ok = True
                     if self.show_picture:
@@ -438,6 +447,7 @@ def main(argv: list | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(description="The full basket sequence on G2 (hands near, the voice service stopped, G2 at rest with the puck touching the claw tip and the basket 16 inches out).")
     ap.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS)
+    ap.add_argument("--look-only", action="store_true", help="no throw: stand up from rest, take the claw look once, print what each picture read (basket and puck distance, bearing and picture position), lie down; to check which side the look's pictures point")
     ap.add_argument("--show-picture", action="store_true", help="after each throw print the picture of the floor (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
     from . import ball_chase as chase
@@ -463,6 +473,17 @@ def main(argv: list | None = None) -> None:
     env = None
     try:
         env = RealEnv(link, robot, looker, book=chase_pace.book_for_now(save=False), show_picture=a.show_picture)
+        if a.look_only:
+            env.attempt = 0
+            if robot.stand_up_from_rest() == "fell":
+                raise Fell()
+            basket, puck = env.after_throw()
+            print(f"LOOK offsets: look_left -{chase.CLAW_PAN_DEG:.0f}, look_right +{chase.CLAW_PAN_DEG:.0f}, centre 0 (degrees, + to G2's right)")
+            for label, r in env.look_readings.items():
+                print(f"LOOK {label}: basket {r['basket']} puck {r['puck']}   (distance in, bearing deg, width px[, x, y])")
+            print("LOOK merged: basket", None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1)), "puck", None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)))
+            env.lie_down()
+            return
         result = run_sequence(env, a.max_attempts, save=lambda r: (result.update(r), write_log(r, {"pack_pct_start": pct, "quick": env.quick_log}, path=path)))
     except KeyboardInterrupt:
         result["outcome"] = "interrupted"
