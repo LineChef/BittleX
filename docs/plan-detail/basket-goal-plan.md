@@ -134,7 +134,7 @@ Decided rules (owner):
 - The puck outside the tub, past it, or not seen anywhere is a miss, and G2 starts searching. It is not behind him, so no turn scan first: he walks past the basket on one side, then the other, and scans (turns) only if he still does not see it in front of the basket.
 - The tape not seen is `no_basket` (never a make or a miss).
 
-Changes to make, after the calibration pictures (item 16 of the plan in STATUS) and with a parity test and a `check_modes.py` rule each:
+Changes to make, after the calibration pictures (item 3 of the plan in STATUS) and with a parity test and a `check_modes.py` rule each:
 - `vision/basket_finder.py`: find the red tape (wide, thin, saturated red blob; aspect about 11 to 1) instead of the cup's colour; refit `CLAW_K` and `BASKET_IN` (the tub's width) from the new distance series; return the tape's left, right and rim row plus the tub's base row (about 0.3 times the tape's width below the rim, to be measured); keep `touches_edge`.
 - `vision/puck_finder.py`: `_inside()` and its exclusion box change from "the basket's box" to "the tape" (the tape's red must not be read as the puck's red band: reject by size and aspect); lower `MIN_PX` and the width floor so a puck seen through the tub, 7 to 10 pixels wide, is kept; read it with a flag for inside the tub's footprint (centre column within the tape's columns, row between the rim and the base row).
 - `goals/basket_outcome.classify_throw`: replace the box test with the footprint test; `NOT_SEEN` is a miss (no longer a make), `MADE` only for a coloured blob in the footprint, `NO_BASKET` as now; update the docstring and the constant `INSIDE_MARGIN_PX`.
