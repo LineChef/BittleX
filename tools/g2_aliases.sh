@@ -587,8 +587,10 @@ g2lob() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.lob$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   [ "$ro" = 1 ] || { _g2_voice_back; }
 }
-# g2basket [--max-attempts N]  -- THE FULL BASKET SEQUENCE (UNPROVEN, owner watches the first runs): G2 at rest, the puck touching the claw tip, the basket centre 16 inches from the claw tip. Per attempt: stand, pick up, grip picture, lob, then a claw look; a miss (the puck seen on the floor) is searched for, walked to, picked up and lined up on the basket again before the next throw; a puck not seen anywhere is a make or a lost one and the run stops for your reset. Up to 5 attempts, stops on a fall; every stage is logged on the Pi in ~/g2_runs/basket_run/. Stops the voice service first (`G2_KEEP_VOICE_OFF=1` keeps it off after).
-g2basket() {
+# g2basket  -- START THE BASKET GOAL inside the voice service (the same as `g2goal run basket` and "G2, basket goal"): G2 at rest, the puck touching the claw tip, the basket centre 16 inches from the claw tip. Up to 10 attempts or 20 minutes; a make ends the session for your reset; a miss is searched for, picked up, lined up again and thrown again. What he learns is judged per setting (`g2goal show basket`); every attempt (with the look's picture timing) is logged on the Pi in ~/g2_runs/basket_run/. Stop with `g2goal stop`.
+g2basket() { g2goal run basket; }
+# g2basketrun [--look-only] [--max-attempts N]  -- the basket sequence as its own test process (UNPROVEN tool; the goal is `g2basket`): stops the voice service first, runs `basket_run` on the Pi, brings the service back. `--look-only` takes one claw look and prints what each picture read.
+g2basketrun() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local rest; rest="$(printf ' %q' "$@")"
   g2stop voice || return 1

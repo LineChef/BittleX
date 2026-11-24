@@ -20,10 +20,10 @@ from ..goals import basket_outcome as bo
 from ..vision.object_finder import ObjectReading
 
 MAX_ATTEMPTS = 5
-MAX_RETRIEVAL_STEPS = 16             # walking steps (pivots, turns, walks, pick-ups); the pivot scans have their own cap
-MAX_SCANS = 28                        # two full circles of scan pivots in all, however often the puck is seen and lost (owner, 2026-11-23: scans must not use up the walking steps)
+MAX_RETRIEVAL_STEPS = 20             # walking steps (pivots, turns, walks, pick-ups); the pivot scans have their own cap
+MAX_SCANS = 30                        # about two full circles of scan pivots in all, however often the puck is seen and lost (owner, 2026-11-23: scans must not use up the walking steps)
 BLIND_STEP_IN = 1.5                   # a puck at the claw tip (its blob cut off at the bottom of the picture): the finder's distance is wrong, so one short blind step, then the pick-up
-PICK_TRIES = 3
+PICK_TRIES = 6
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 ALIGN_DEG = 6.0                      # the puck's bearing must be inside this before the last walk (a pick-up window is about 1 inch wide)
 PICK_STAND_IN = 7.0                  # nearer than this and centred, he makes the last walk and picks up

@@ -23,7 +23,7 @@ ALIGN_TOL_DEG = 3.0          # about 0.8 inch sideways at 16 inches, the sideway
 PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's centre (the goal learns it): the basket is lined up at this far left of straight ahead, so it reads at minus this bearing
-MAX_CORRECTIONS = 12
+MAX_CORRECTIONS = 30
 
 
 @dataclass
@@ -95,7 +95,7 @@ def next_action(reading, st: LineupState) -> Action:
     return Action("shoot", 0.0, "aligned at the shot distance")
 
 
-def lineup(look, mover, max_steps: int = 40, say=print) -> dict:
+def lineup(look, mover, max_steps: int = 60, say=print) -> dict:
     """Run the line-up. `look()` takes a fresh picture and returns a reading or None; `mover` has scan(deg), pivot(deg), nudge(deg), forward(inches), back(inches) (each one step, then still, and answering "fell" when he went over). Returns
     {"outcome": "aligned" | "basket_not_found" | "could_not_align" | "too_many_steps" | "fell", "steps": [...], "last": reading}."""
     st, reading = LineupState(), None

@@ -113,3 +113,21 @@ def test_a_session_on_a_made_up_world_finds_the_standoff_that_makes_the_shot():
             res = sess.run()
             final = sess.judge.state
     assert res is not None and abs(sess.judge.best("standoff_in", 16.0) - 15.0) <= 1.0, sess.judge.state.get("values", {}).get("standoff_in")
+
+
+def test_every_attempt_is_logged_with_the_look_timing(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(br, "LOG_DIR", str(tmp_path))
+    said = []
+    a = basket.BasketGoal()
+    rec = {"attempt": 1, "after": {"pictures": {"look_left": {"t_s": (3.1, 4.0)}, "centre": {"t_s": (9.0, 9.9)}}}}
+    a._log_attempt(rec, "made", AttemptContext(say=said.append))
+    assert said and "look_left 3.1 to 4.0" in said[0] and "centre 9.0 to 9.9" in said[0]
+    logs = list(tmp_path.glob("*_basket_goal.json"))
+    assert len(logs) == 1 and json.loads(logs[0].read_text())["attempts"][0]["attempt"] == 1
+
+
+def test_the_limits_the_owner_set():
+    assert (br.MAX_RETRIEVAL_STEPS, br.MAX_SCANS, br.PICK_TRIES, bl.MAX_CORRECTIONS, bl.SCAN_MAX_DEG) == (20, 30, 6, 30, 360.0)
+    g = spec.BUILTIN["basket"]
+    assert (g.attempts, g.minutes) == (10, 20.0)

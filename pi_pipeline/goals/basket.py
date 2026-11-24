@@ -97,6 +97,8 @@ class BasketGoal:
         self._own_link = False
         self.holding = False
         self.attempt_no = 0
+        self._recs: list = []
+        self._log_path = None
         self.last_pack_pct = None
 
     # ---------------------------------------------------------------------------------------------------- settings
@@ -183,7 +185,24 @@ class BasketGoal:
                 why, self.holding = br.attempt_once(self.env, rec, self.holding, ctx.say)
             except br.Fell:
                 why = "fell"
+        self._log_attempt(rec, why, ctx)
         return AttemptResult(why or "ready", round(time.monotonic() - t0, 1), [], {"rec": rec, "settings": {k: settings.get(k) for k in KNOBS}})
+
+    def _log_attempt(self, rec: dict, why, ctx) -> None:
+        """Every attempt goes to ~/g2_runs/basket_run/ as `g2basket`'s own runs do (the look's picture timing and readings, the retrieval and line-up steps, the quick-picture readings), and the look's picture timing is said once (owner, 2026-11-23: watch how late the left picture is taken)."""
+        import os
+        from ..behavior import basket_run as br
+        pics = (rec.get("after") or {}).get("pictures") or {}
+        timing = {label: r.get("t_s") for label, r in pics.items() if isinstance(r, dict)}
+        if timing:
+            ctx.say("look picture timing (asked, answered; seconds after the look began): " + "; ".join(f"{k} {v[0]} to {v[1]}" for k, v in timing.items() if v))
+        self._recs.append(rec)
+        if self._log_path is None:
+            self._log_path = os.path.join(os.path.expanduser(br.LOG_DIR), time.strftime("%Y%m%d_%H%M%S") + "_basket_goal.json")
+        try:
+            br.write_log({"outcome": why or "running", "attempts": self._recs}, {"quick": getattr(self.env, "quick_log", [])}, path=self._log_path)
+        except Exception:  # noqa: BLE001
+            pass
 
     # ---------------------------------------------------------------------------------------------------- scoring
     def score(self, result: AttemptResult, settings: dict) -> Outcome:
