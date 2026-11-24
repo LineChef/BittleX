@@ -139,6 +139,11 @@ def test_the_line_up_tells_the_mover_how_far_the_target_is_so_a_turn_can_be_a_pi
     m.pivot(27.0)
     assert seen == [12.0] and opencat.lineup_uses_pivot(seen[-1]) is True                  # 12 in: the in-place pivot (kvtR / kvtL)
     assert opencat.lineup_uses_pivot(None) is False and opencat.lineup_uses_pivot(5.0) is False       # no distance or under 8 in: the walking arc, which moves forward
+    for told in (None, 5.6, 60.0):                                                          # but the basket mover never lets a turn be the arc: a scan, a near puck, a far target
+        seen.clear()
+        m.set_distance(told)
+        m.pivot(27.0)
+        assert opencat.lineup_uses_pivot(seen[-1]) is True
 
     class World:
         def __init__(self):

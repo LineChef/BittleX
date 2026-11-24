@@ -20,6 +20,7 @@ BACK_TAIL_IN_S = 6.0                                     # beyond the last measu
 BACK_MIN_S = BACK_POINTS[0][0]                           # the shortest back-up measured (and the ball goal's own)
 BACK_MAX_IN = 12.0                                       # a safety cap on one back-up step (the line-up asks for 6 at most)
 FWD_MAX_IN = 12.0
+PIVOT_MIN_IN, PIVOT_MAX_IN, PIVOT_DISTANCE_IN = 8.0, 40.0, 20.0    # every basket-run turn is the in-place pivot: a distance outside 8 to 40 inches, or none at all (a scan with nothing in view), would pick the walking arc, which creeps forward (2026-11-23: a scan and a turn toward a puck 5.6 inches away walked him from 16 inches to 7 inches of the basket)
 TURN_MAX_DEG = 60.0                                      # a safety cap on one turn step (the line-up asks for 54 at most: two pivot cycles)
 
 
@@ -62,7 +63,7 @@ class BasketMover:
 
     def set_distance(self, inches: float | None) -> None:
         """How far the target was at the decision the next turn belongs to. The ball goal's run loop sets `robot.lineup_ball_in` before every line-up turn; without it `opencat.lineup_tokens` has no distance and always picks the walking arc turn (`kwkR` / `kwkL`), which creeps FORWARD while it turns: 2026-11-23 the line-up's "pivots" all moved him toward the basket and it never aligned. With a distance of 8 to 40 inches the turn is the in-place pivot."""
-        self.robot.lineup_ball_in = inches
+        self.robot.lineup_ball_in = PIVOT_DISTANCE_IN if inches is None else min(max(float(inches), PIVOT_MIN_IN), PIVOT_MAX_IN)
 
     def _rate(self, degrees: float, pulse: bool) -> float:
         side = 1 if degrees > 0 else -1
