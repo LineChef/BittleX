@@ -119,21 +119,50 @@ def test_the_tub_out_of_view_makes_him_pivot_toward_its_side_and_a_full_turn_end
     assert kinds[:12] == ["pivot"] * 12 and kinds[12] == "give_up"                            # 12 x 30 degrees is a full turn
 
 
-def test_the_circle_goes_face_square_arc_peek_look_and_turns_back_by_the_tubs_measured_bearing():
+def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_few_arcs():
     st = br.CircleState(side=1)
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
-    assert br.next_circle_action(None, tub(13.0, 20.0), st).why == "circling: face the tub"
-    a = br.next_circle_action(None, tub(13.0, 2.0), st)
+    assert br.next_circle_action(None, tub(16.0, 20.0), st).why == "circling: face the tub"
+    a = br.next_circle_action(None, tub(16.0, 2.0), st)
     assert a.kind == "pivot" and a.value < 0 and abs(a.value) >= 54 and st.phase == "arc"     # the tub goes to his right: a turn to the left of about 90
     a = br.next_circle_action(None, None, st)
-    assert a.kind == "arc" and a.value == br.CIRCLE_ARC_DEG and st.phase == "peek"           # one wide arc toward the tub
+    assert a.kind == "arc" and a.value == br.CIRCLE_ARC_DEG and st.phase == "straight"       # one wide arc toward the tub
     a = br.next_circle_action(None, None, st)
-    assert a.kind == "pivot" and a.value > 0 and st.phase == "look"                           # turn toward it to look
-    a = br.next_circle_action(None, tub(13.0, 30.0), st)
+    assert a.kind == "forward" and a.value == br.CIRCLE_STRAIGHT_IN and st.phase == "glance"  # a straight walk widens it
+    a = br.next_circle_action(None, None, st)                                                 # the forward picture shows no tub: the circle is not too tight
+    assert a.kind == "arc" and st.phase == "straight"
+    for _ in range(2):                                                                        # arcs 2 and 3
+        br.next_circle_action(None, None, st)
+        br.next_circle_action(None, None, st)
+        st.phase = "glance" if st.phase != "glance" else st.phase
+    st.arcs = br.CIRCLE_PEEK_EVERY
+    st.phase = "glance"
+    a = br.next_circle_action(None, None, st)
+    assert a.kind == "pivot" and a.value > 0 and st.phase == "look"                           # every third arc: turn toward the tub to look
+    a = br.next_circle_action(None, tub(16.0, 30.0), st)
     assert a.kind == "pivot" and a.value < 0 and abs(a.value) >= 54 and st.phase == "arc"     # back by (90 - 30) at the right radius
     st.phase = "look"
     a2 = br.next_circle_action(None, tub(10.5, 30.0), st)
     assert abs(a2.value) >= abs(a.value)                                                      # too near: turns back further, away from the tub
+    st.phase = "look"
+    wide = br.next_circle_action(None, tub(40.0, 30.0), st)
+    assert abs(wide.value) >= 27 and abs(wide.value) <= abs(a.value)                          # too wide is corrected only a little, never by much
+
+
+def test_a_tub_in_the_forward_picture_means_too_tight_and_he_turns_away_by_how_far_forward_it_stands():
+    tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
+    for b, lo, hi in ((30.0, 54, 66), (60.0, 27, 33), (85.0, 15, 27)):
+        st = br.CircleState(side=1)
+        st.phase, st.arcs = "glance", 1
+        a = br.next_circle_action(None, tub(14.0, b), st)
+        assert a.kind in ("pivot", "nudge") and a.value < 0 and lo <= abs(a.value) <= hi, (b, a)   # away from the tub, more the further forward it stands
+        assert st.phase == "arc"
+    st = br.CircleState(side=1)
+    st.phase, st.arcs = "glance", 1
+    assert br.next_circle_action(None, tub(8.0, 40.0), st).kind == "back"                    # and nearer than the limit he backs off first
+    st = br.CircleState(side=-1)
+    st.phase, st.arcs = "glance", 1
+    assert br.next_circle_action(None, tub(14.0, -30.0), st).value > 0                       # the mirror: the tub on his left, away is to the right
 
 
 def test_a_puck_in_view_ends_the_search_and_too_near_the_tub_backs_off_first():
@@ -147,7 +176,7 @@ def test_a_puck_seen_with_the_tub_out_of_view_this_near_is_the_tubs_own_tape():
     class E:
         def __init__(self):
             self.looks = [(NS(claw_in=11.0, bearing_deg=0.0), None), (None, NS(claw_in=4.1, bearing_deg=-30.0)), (None, None)]
-            self.mover = type("M", (), {"pivot": lambda s, v: "ok", "nudge": lambda s, v: "ok", "back": lambda s, v: "ok", "arc": lambda s, v: "ok", "set_distance": lambda s, v: None, "last_arc_deg": 45.0})()
+            self.mover = type("M", (), {"pivot": lambda s, v: "ok", "nudge": lambda s, v: "ok", "back": lambda s, v: "ok", "arc": lambda s, v: "ok", "forward": lambda s, v: "ok", "set_distance": lambda s, v: None, "last_arc_deg": 45.0})()
 
         def look(self):
             return self.looks.pop(0) if self.looks else (None, None)

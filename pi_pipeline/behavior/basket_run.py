@@ -39,14 +39,18 @@ EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 CONFIRM_LOOK = "quick"               # "quick": the walk-up's own last picture (claw down, taken at once, read at once: no attention-pose cycle, no standing about) is the confirm picture (owner, 2026-11-24: "he can just walk up and take a fast picture, but he can't be standing idle for a long time afterwards"); "claw_up": the attention-pose look as first built (`env.confirm_look()`)
 CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answer while he stands in the walk-up: he lies down and the attempt stops (a stalled camera must not leave him standing: the legs sag after about 10 s)
-CIRCLE_RADIUS_IN = 13.0              # the circle's radius as the finder reads it: near enough that a puck within about 8 inches of the tub is inside the puck finder's range, far enough from the 6 inch buffer
+CIRCLE_RADIUS_IN = 16.0              # the circle's radius as the finder reads it, used at the peeks (too tight was the problem on the first arc run, never too wide: owner, 2026-11-24)
 CIRCLE_MIN_IN = 10.0                 # nearer than this (as read) he backs off before anything else (the first goal run ended a leg 4.5 inches from the tub)
 CIRCLE_ARC_DEG = 45.0                # one wide arc's heading change: 8 arcs a lap
 CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
+CIRCLE_STRAIGHT_IN = 6.0             # a straight walk after every arc widens the circle: an arc of 45 degrees on a guessed 9 inch radius is 7 inches of path, with 6 straight it is about 13 inches of path for 45 degrees, a radius near 16 (the arc's real radius is not measured yet)
+CIRCLE_PEEK_EVERY = 3                # a peek (turn toward the tub, read its distance and scan the floor round it) only after this many arcs (every 4 missed a puck in the simulated floor, every 3 found all four spots); between arcs the forward picture alone says whether the circle is tight
+CIRCLE_TIGHT_MIN_TURN_DEG, CIRCLE_TIGHT_MAX_TURN_DEG = 15.0, 60.0   # the tub in the forward picture means the circle is too tight: turn away by how far forward it stands (it should be beside him), at least and at most this
 CIRCLE_PEEK_DEG = 60.0               # between arcs: turn this far toward the tub, which then stands about 30 degrees off his nose, look, and turn back
 CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before the circle starts
 CIRCLE_RADIUS_GAIN = 2.0             # degrees of extra turn away from (or toward) the tub per inch the radius is off (clamped)
-CIRCLE_CORRECTION_MAX_DEG = 25.0
+CIRCLE_CORRECTION_MAX_DEG = 25.0   # outward (too near); a circle too wide is corrected by at most CIRCLE_WIDE_MAX_DEG the other way
+CIRCLE_WIDE_MAX_DEG = 8.0
 CIRCLE_LOST_STEP_DEG = 30.0          # the tub out of view: pivot this much toward its side
 CIRCLE_TAPE_GUARD_IN = 12.0          # a "puck" in view with the tub out of view, when the tub was last read nearer than this, is the tub's own red tape seen from too close, not a puck (the first goal run chased it for 22 scans)
 CIRCLE_MAX_LAPS = 2.0                # more than two laps without the puck ends the session (owner, 2026-11-24)
@@ -123,24 +127,28 @@ class CircleState:
     steps: int = 0
     lost_deg: float = 0.0
     side: int = 1                    # the side the tub is kept on: +1 his right (the arcs curve right), -1 his left
-    phase: str = "face"              # "face" (find the tub and face it) -> "arc" (a wide turn) -> "peek" (turn toward the tub) -> "look" (read it, correct, turn back) -> "arc" ...
+    phase: str = "face"              # "face" (find the tub and face it) -> "arc" (a wide turn) -> "straight" (a walk that widens the circle) -> "glance" (the forward picture: the tub in it means too tight) -> "arc" ...; every CIRCLE_PEEK_EVERY arcs: "peek" (turn toward the tub) -> "look" (read it, correct, turn back) -> "arc"
+    arcs: int = 0
     last_d: float | None = None      # the last tub distance read
     log: list = field(default_factory=list)
 
     @property
     def needs_look(self) -> bool:
-        return self.phase in ("face", "look")
+        return self.phase in ("face", "glance", "look")
 
 
 def next_circle_action(puck, basket, st: CircleState) -> RAction:
-    """The next step of the circling search (pure, like `next_retrieval_action`). The circle is one wide ARC at a time round the tub kept beside him (owner, 2026-11-24): face the tub, pivot 90 degrees so it is beside him, then arc CIRCLE_ARC_DEG toward it (the firmware's walking arc curves forward while it turns),
-    peek (turn CIRCLE_PEEK_DEG toward the tub so it is about 30 degrees off his nose), look (the tub's distance and bearing, and the puck), correct the radius by how far he turns back (away from the tub when he is too near), and arc again. 360 degrees of arcs is one lap. A puck in view ends it ("found");
-    CIRCLE_MAX_LAPS laps end it ("circled_twice"); the tub out of view makes him pivot toward its side ("tub_lost" after a full turn); nearer than CIRCLE_MIN_IN he backs off first."""
-    import math
+    """The next step of the circling search (pure, like `next_retrieval_action`). One wide ARC at a time round the tub kept beside him (owner, 2026-11-24): face the tub, pivot 90 degrees so it is beside him, then arc CIRCLE_ARC_DEG toward it (the firmware's walking arc curves forward while it turns) and walk CIRCLE_STRAIGHT_IN straight to widen
+    the circle. The forward picture after that is the cheap check: the tub should be beside him, out of the picture, so a tub IN the picture means the turn was too tight and he turns away by how far forward it stands (too tight was always the problem, never too wide). Only every CIRCLE_PEEK_EVERY arcs does he peek (turn CIRCLE_PEEK_DEG toward the tub so it stands
+    about 30 degrees off his nose, read its distance, turn back corrected by it). 360 degrees of arcs is one lap. A puck in view ends it ("found"); CIRCLE_MAX_LAPS laps end it ("circled_twice"); the tub out of view after a peek or at the start makes him pivot toward its side ("tub_lost" after a full turn); nearer than CIRCLE_MIN_IN he backs off first."""
     if st.phase == "arc":
-        st.phase = "peek"
+        st.phase = "straight"
+        st.arcs += 1
         st.steps += 1
         return RAction("arc", st.side * CIRCLE_ARC_DEG, "circling: wide arc round the tub")
+    if st.phase == "straight":
+        st.phase = "glance"
+        return RAction("forward", CIRCLE_STRAIGHT_IN, "circling: walk straight to widen the circle")
     if st.phase == "peek":
         st.phase = "look"
         return RAction("pivot", bl._pivot_for(st.side * CIRCLE_PEEK_DEG), "circling: turn toward the tub to look")
@@ -148,6 +156,20 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         return RAction("found", 0.0, "puck in view")
     if st.steps >= CIRCLE_MAX_STEPS or st.angle_deg >= 360.0 * CIRCLE_MAX_LAPS:
         return RAction("give_up", 0.0, "circled_twice")
+    if st.phase == "glance":
+        # the forward picture: no tub is the good case; a tub in it is too tight
+        if basket is not None:
+            d, b = float(basket.claw_in), float(basket.bearing_deg)
+            st.last_d, st.lost_deg = d, 0.0
+            if d < CIRCLE_MIN_IN:
+                st.steps += 1
+                return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
+            turn_away = max(CIRCLE_TIGHT_MIN_TURN_DEG, min(CIRCLE_TIGHT_MAX_TURN_DEG, 90.0 - abs(b)))
+            st.phase = "peek" if st.arcs % CIRCLE_PEEK_EVERY == 0 else "arc"
+            st.steps += 1
+            return RAction("pivot" if turn_away >= bl.PIVOT_MIN_DEG else "nudge", -st.side * (bl._pivot_for(turn_away) if turn_away >= bl.PIVOT_MIN_DEG else turn_away), "circling: the tub is in view, the turn was too tight: turn away")
+        st.phase = "peek" if st.arcs % CIRCLE_PEEK_EVERY == 0 else "arc"
+        return next_circle_action(None, None, st)
     if basket is None:
         if st.lost_deg >= 360.0:
             return RAction("give_up", 0.0, "tub_lost")
@@ -167,8 +189,8 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         st.phase = "arc"
         st.steps += 1
         return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: turn so the tub is beside him")
-    # phase "look": he has turned toward the tub; turn back so the tub ends up beside him, a little more away from it when he is too near and less when too far
-    correction = max(-CIRCLE_CORRECTION_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (CIRCLE_RADIUS_IN - d)))
+    # phase "look": he has turned toward the tub; turn back so the tub ends up beside him, more away from it when he is too near and only a little less when too far
+    correction = max(-CIRCLE_WIDE_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (CIRCLE_RADIUS_IN - d)))
     turn_back = CIRCLE_SQUARE_DEG + correction - abs(b)
     st.phase = "arc"
     st.steps += 1
