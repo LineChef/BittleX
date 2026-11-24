@@ -152,3 +152,9 @@ def test_a_back_up_is_one_move_to_the_shot_distance_allowing_for_the_sideways_dr
     assert bl.back_inches_to_target(10.0, 0.0) < bl.TARGET_IN - 10.0                                          # the drift lengthens the line, so a little less than straight back
     assert bl.back_inches_to_target(1.0, 0.0) == bl.BACK_STEP_MAX_IN                                          # the mover's one-step cap
     assert act(5.4, 17.3).value > 6.0                                                                          # the inside-the-buffer back-up is no longer capped at 6
+
+
+def test_an_aim_offset_lines_him_up_to_one_side_of_the_basket_centre(monkeypatch):
+    assert act(16.0, 0.0).kind == "shoot"
+    monkeypatch.setattr(bl, "AIM_OFFSET_DEG", 2.0)                                                            # aim 2 degrees right of centre: the basket should read 2 degrees to his left
+    assert act(16.0, 0.0).kind == "shoot" and act(16.0, 5.0).kind == "nudge" and act(16.0, 5.0).value == 7.0 and act(16.0, -2.0).kind == "shoot"

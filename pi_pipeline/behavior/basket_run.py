@@ -223,6 +223,62 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
+def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
+    """ONE attempt: the throw, the look, and after a miss the retrieval and the line-up for the next throw. `rec` is the attempt's record (filled in as it goes). Returns (why it must stop or None to go on, whether he is holding the puck
+    for the next throw). The stop reasons are those of `run_sequence`; "made" and the other after-throw codes end a run for the owner's reset. The goal (goals/basket.py) and `run_sequence` both call this."""
+    n = rec.get("attempt", 1)
+    if not env.battery_ok():
+        return "battery", holding
+    say(f"attempt {n}: {'throw (holding the puck)' if holding else 'pick up and throw'}")
+    t = env.throw(holding)
+    rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "pack_pct")}
+    if t.get("fell"):
+        return "fell", holding
+    if not t.get("ok"):
+        return "throw_failed", holding
+    holding = False
+    persist()
+    try:
+        basket, puck = env.after_throw()
+    except Fell:
+        return "fell", holding
+    if not getattr(env, "picture_ok", True):
+        rec["after"] = {"code": "no_picture", "words": "The camera gave no picture after the throw, so I cannot say where it went."}
+        if hasattr(env, "lie_down"):
+            env.lie_down()
+        say("after the throw: no picture from the camera: stopping (not counted as a make)")
+        persist()
+        return "no_picture", holding
+    code, words = classify_after(basket, puck)
+    rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
+                    "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
+    rec["after"]["attention_hold_s"] = getattr(env, "attention_hold_s", None)
+    rec["after"]["pictures"] = getattr(env, "look_readings", None)                    # what each picture of the look read (the merge keeps one basket and one puck)
+    if code != bo.MISSED and hasattr(env, "lie_down"):
+        env.lie_down()                                                       # a make: rest, from the stand the look ended in (the standard lie-down); a miss: no pause, the retrieval starts walking
+    say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
+    persist()
+    if code != bo.MISSED:
+        if code == bo.NOT_SEEN:
+            say("the puck was not seen by the end of the attention pose: counted as a make")
+        return ("made" if code in (bo.NOT_SEEN, bo.MADE) else code), holding            # owner, 2026-11-23: not seen by the end of the attention pose means it went in
+
+    def on_step(log, rec=rec):
+        rec["retrieval"] = {"outcome": "running", "steps": list(log)}
+        persist()
+    r = retrieve(env, say=say, on_step=on_step, first=(basket, puck))
+    rec["retrieval"] = r
+    persist()
+    if r["outcome"] != "retrieved":
+        return r["outcome"], holding
+    lu = bl.lineup(env.quick_basket, env.mover, say=say)
+    rec["lineup"] = {"outcome": lu["outcome"], "steps": lu["steps"]}
+    persist()
+    if lu["outcome"] != "aligned":
+        return lu["outcome"], holding
+    return None, True
+
+
 def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) -> dict:
     """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed",
     "basket_not_found", "could_not_align", "puck_not_found", "could_not_reach_puck", "too_near_the_basket", "pick_failed"."""
@@ -238,63 +294,10 @@ def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) ->
         rec: dict = {"attempt": n, "holding": holding, "time": time.strftime("%H:%M:%S")}
         attempts.append(rec)
         persist()
-        if not env.battery_ok():
-            outcome = "battery"
+        why, holding = attempt_once(env, rec, holding, say, persist)
+        if why:
+            outcome = why
             break
-        say(f"attempt {n}: {'throw (holding the puck)' if holding else 'pick up and throw'}")
-        t = env.throw(holding)
-        rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "pack_pct")}
-        if t.get("fell"):
-            outcome = "fell"
-            break
-        if not t.get("ok"):
-            outcome = "throw_failed"
-            break
-        holding = False
-        persist()
-        try:
-            basket, puck = env.after_throw()
-        except Fell:
-            outcome = "fell"
-            break
-        if not getattr(env, "picture_ok", True):
-            rec["after"] = {"code": "no_picture", "words": "The camera gave no picture after the throw, so I cannot say where it went."}
-            if hasattr(env, "lie_down"):
-                env.lie_down()
-            say("after the throw: no picture from the camera: stopping (not counted as a make)")
-            outcome = "no_picture"
-            persist()
-            break
-        code, words = classify_after(basket, puck)
-        rec["after"] = {"code": code, "words": words, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
-                        "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
-        rec["after"]["attention_hold_s"] = getattr(env, "attention_hold_s", None)
-        rec["after"]["pictures"] = getattr(env, "look_readings", None)                    # what each picture of the look read (the merge keeps one basket and one puck)
-        if code != bo.MISSED and hasattr(env, "lie_down"):
-            env.lie_down()                                                       # a make: rest, from the stand the look ended in (the standard lie-down); a miss: no pause, the retrieval starts walking
-        say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
-        persist()
-        if code != bo.MISSED:
-            outcome = "made" if code in (bo.NOT_SEEN, bo.MADE) else code            # owner, 2026-11-23: not seen by the end of the attention pose means it went in
-            if code == bo.NOT_SEEN:
-                say("the puck was not seen by the end of the attention pose: counted as a make")
-            break
-        def on_step(log, rec=rec):
-            rec["retrieval"] = {"outcome": "running", "steps": list(log)}
-            persist()
-        r = retrieve(env, say=say, on_step=on_step, first=(basket, puck))
-        rec["retrieval"] = r
-        persist()
-        if r["outcome"] != "retrieved":
-            outcome = r["outcome"]
-            break
-        lu = bl.lineup(env.quick_basket, env.mover, say=say)
-        rec["lineup"] = {"outcome": lu["outcome"], "steps": lu["steps"]}
-        persist()
-        if lu["outcome"] != "aligned":
-            outcome = lu["outcome"]
-            break
-        holding = True
     return {"outcome": outcome, "attempts": attempts}
 
 

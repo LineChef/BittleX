@@ -5,6 +5,11 @@ for the next attempt (no Claude call), and writes it all down. Code: `pi_pipelin
 The first goal is **the ball punt** (the arm fitted, the green treat ball on the floor). A punt is judged by one straight picture about a second after the punch: the ball gone from
 in front of the claw, or at least 2 in farther away, counts as punted; still at the claw is a miss. Leave the ball where it rolls: the next attempt looks for it, then searches.
 
+The second goal is **the basket**: G2 picks the puck up, throws it into a basket 16 in away, looks to see whether it went in, and after a miss finds the puck, picks it up, lines up and throws again.
+Start: **"G2, basket goal"** (or `g2goal run basket`), with the arm fitted, G2 at rest, the puck touching the claw tip and the basket about 16 in straight ahead, voice service running (it runs inside it, like the ball goal).
+A make is the only success. A miss earns half a point when G2 finds the puck, picks it up and lines up for another throw, and nothing otherwise. After a make the puck is in the basket, so the session ends there for a reset.
+What he learns, one setting at a time: the distance he throws from, which way he aims, how far short of the puck the last walk stops, the last blind step, and how exact the line-up has to be. The throw's strength stays fixed. `g2goal show basket` lists them; `g2goal pin / limit / undo / forget` work as for the ball.
+
 1\. Before a session
 -------------------
 

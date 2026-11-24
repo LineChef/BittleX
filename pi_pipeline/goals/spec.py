@@ -108,13 +108,16 @@ BUILTIN = {
     "ball_punt": Goal("ball_punt", "Punt the ball", "ball_punt", attempts=10, minutes=20.0, min_pack_pct=30, target_successes=None,
                       start_words=("ball goal", "punt goal", "start the ball goal", "start the punt goal", "goal attempt", "start a goal attempt"),
                       needs_attachment="arm", practice_words=("ball", "punt", "punting", "the ball", "the punt"), practice_say="punting the ball"),
+    "basket": Goal("basket", "Throw the puck into the basket", "basket", attempts=10, minutes=20.0, min_pack_pct=30, target_successes=1,
+                   start_words=("basket goal", "start the basket goal", "basket shot", "start the basket shot"),
+                   needs_attachment="arm", practice_words=("basket", "the basket", "throwing", "shooting"), practice_say="throwing into the basket", auto_practice=False),
     "discover_objects": Goal("discover_objects", "Identify new objects", "discover_objects", attempts=3, minutes=10.5, min_pack_pct=40, rest_between_s=3.0,
                              start_words=("object goal", "new objects goal", "find new objects", "start the object goal", "identify new objects", "discovery goal"),
                              practice_words=("objects", "new objects", "discovering", "discovery", "finding objects"), practice_say="finding new objects", auto_practice=False),
     "walls": Goal("walls", "Turn away from walls", "walls", kind="standing", attempts=0, minutes=5.0, min_pack_pct=30,
                   practice_words=("walls", "wall", "the walls", "turning", "turning away"), practice_say="turning away from walls"),
 }
-DEFAULT_PRIORITY = ("walls", "ball_punt", "discover_objects")        # walls above the punt (user, 2026-10-31: always turn away from a wall, also while chasing the ball)
+DEFAULT_PRIORITY = ("walls", "ball_punt", "basket", "discover_objects")        # walls above the punt (user, 2026-10-31: always turn away from a wall, also while chasing the ball)
 
 
 def path() -> str:

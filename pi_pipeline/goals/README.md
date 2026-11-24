@@ -5,6 +5,7 @@ G2 works toward a goal that is set for him and learns from his attempts, all on 
 - `spec.py`: `Knob` (one setting: kind, bounds, step, free / ask / fixed), `Goal` (budget, the operator's controls, start phrases), `goals.json`, the built-in `ball_punt`
 - `approach.py`: The `Approach` protocol a goal plugs in (knobs, one attempt, a scorer, a diagnosis table), `AttemptResult`, `Outcome`, the registry
 - `ball_punt.py`: The first approach: one ball-chase attempt (`behavior/ball_chase.py`) and its scorer (hit, missed, never found, pushed away, could not line up, ...)
+- `basket.py`: The basket goal's approach: one attempt is `behavior/basket_run.attempt_once` (throw, look, retrieve and line up after a miss); scored made / half for a miss that ends with the puck picked up again; six settings judged by the throw, retrieve and line-up stages
 - `judge.py`: The shared judgement: a record per setting and value judged by its own stage, failures vote a direction, one setting at a (see below)
 - `overrides.py`: The operator's pins, limits and undone values (`g2goal pin / limit / undo / forget`), per scope (everywhere, a floor, an attachment)
 - `journal.py`: `goal_journal.jsonl`, `goal_state.json`, conditions (attachment + floor + hardware epoch) and the nearest other conditions to start from, the lessons saved as memory facts

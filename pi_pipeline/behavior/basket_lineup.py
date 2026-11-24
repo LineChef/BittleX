@@ -22,6 +22,7 @@ MIN_STEP_IN = 1.5
 ALIGN_TOL_DEG = 3.0          # about 0.8 inch sideways at 16 inches, the sideways spread of the lob
 PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
+AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's centre (the goal learns it): the basket is lined up at this far left of straight ahead, so it reads at minus this bearing
 MAX_CORRECTIONS = 12
 
 
@@ -70,7 +71,7 @@ def next_action(reading, st: LineupState) -> Action:
         st.scanned_deg += SCAN_STEP_DEG
         return Action("scan", SCAN_STEP_DEG, "basket not in view: pivot scan")
     st.scanned_deg = 0.0
-    d, b = float(reading.claw_in), float(reading.bearing_deg)
+    d, b = float(reading.claw_in), float(reading.bearing_deg) + AIM_OFFSET_DEG          # b: the bearing error, how far he is from facing the aim point
     if st.corrections >= MAX_CORRECTIONS:
         return Action("give_up", 0.0, "could_not_align")
     if d < BUFFER_IN + CLOSE_MARGIN_IN:
