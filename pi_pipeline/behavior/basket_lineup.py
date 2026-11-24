@@ -88,6 +88,8 @@ def lineup(look, mover, max_steps: int = 40, say=print) -> dict:
             return {"outcome": "aligned", "steps": st.log, "last": reading}
         if act.kind == "give_up":
             return {"outcome": act.why, "steps": st.log, "last": reading}
+        if hasattr(mover, "set_distance"):
+            mover.set_distance(None if reading is None else float(reading.claw_in))      # the turn picks the in-place pivot or the walking arc by how far the target is (opencat.lineup_tokens), as the ball goal's run loop tells it
         if getattr(mover, act.kind)(act.value) == "fell":                                  # a mover answers "fell" when he went over: the line-up ends there, the caller lays him down
             return {"outcome": "fell", "steps": st.log, "last": reading}
     return {"outcome": "too_many_steps", "steps": st.log, "last": reading}

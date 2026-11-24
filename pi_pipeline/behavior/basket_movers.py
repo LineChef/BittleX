@@ -60,6 +60,10 @@ class BasketMover:
     def __init__(self, robot, say=print, book=None):
         self.robot, self.say, self.state, self.book = robot, say, "ok", book           # book: the ball goal's PaceBook (chase_pace.book_for_now()); None = the ball goal's defaults
 
+    def set_distance(self, inches: float | None) -> None:
+        """How far the target was at the decision the next turn belongs to. The ball goal's run loop sets `robot.lineup_ball_in` before every line-up turn; without it `opencat.lineup_tokens` has no distance and always picks the walking arc turn (`kwkR` / `kwkL`), which creeps FORWARD while it turns: 2026-11-23 the line-up's "pivots" all moved him toward the basket and it never aligned. With a distance of 8 to 40 inches the turn is the in-place pivot."""
+        self.robot.lineup_ball_in = inches
+
     def _rate(self, degrees: float, pulse: bool) -> float:
         side = 1 if degrees > 0 else -1
         if self.book is not None:

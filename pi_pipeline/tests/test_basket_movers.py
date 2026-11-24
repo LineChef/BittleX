@@ -120,3 +120,47 @@ def test_a_pace_book_sets_the_walk_and_turn_times_and_the_measured_start_run_is_
     assert r.calls[-1][1][1] == 40.0 / 10.0                                                       # left side is slower in this book
     m.nudge(10.0)
     assert r.calls[-1][1][1] == max(chase.MIN_MOVE_S, 10.0 / 10.0)                                # a pulse uses the pulse rate
+
+
+def test_the_line_up_tells_the_mover_how_far_the_target_is_so_a_turn_can_be_a_pivot():
+    from pi_pipeline.link import opencat
+    seen = []
+
+    class R(FakeRobot):
+        lineup_ball_in = None
+
+        def turn(self, degrees, seconds, stop_deg=0.0):
+            seen.append(self.lineup_ball_in)
+            return super().turn(degrees, seconds, stop_deg)
+
+    r = R()
+    m = bm.BasketMover(r)
+    m.set_distance(12.0)
+    m.pivot(27.0)
+    assert seen == [12.0] and opencat.lineup_uses_pivot(seen[-1]) is True                  # 12 in: the in-place pivot (kvtR / kvtL)
+    assert opencat.lineup_uses_pivot(None) is False and opencat.lineup_uses_pivot(5.0) is False       # no distance or under 8 in: the walking arc, which moves forward
+
+    class World:
+        def __init__(self):
+            self.d, self.b, self.dist_at_turn = 12.0, 30.0, []
+
+        def look(self):
+            return type("Rd", (), {"claw_in": self.d, "bearing_deg": self.b})()
+
+        def set_distance(self, inches):
+            self.last = inches
+
+        def pivot(self, deg):
+            self.dist_at_turn.append(self.last)
+            self.b -= deg
+
+        nudge = pivot
+
+        def forward(self, inches):
+            self.d -= inches
+
+        def back(self, inches):
+            self.d += inches
+    w = World()
+    bl.lineup(w.look, w, say=lambda s: None)
+    assert w.dist_at_turn and all(x is not None for x in w.dist_at_turn)                  # every turn step was told the distance

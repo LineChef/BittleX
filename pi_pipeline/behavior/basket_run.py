@@ -204,6 +204,8 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             if st.picks >= PICK_TRIES:
                 return {"outcome": "pick_failed", "steps": st.log}
             continue
+        if hasattr(env.mover, "set_distance"):
+            env.mover.set_distance(None if puck is None else float(puck.claw_in))     # the turn picks pivot or arc by how far the puck is
         result = getattr(env.mover, {"scan": "scan", "pivot": "pivot", "nudge": "nudge", "forward": "forward"}[act.kind])(act.value)
         if result == "fell":
             return {"outcome": "fell", "steps": st.log}
