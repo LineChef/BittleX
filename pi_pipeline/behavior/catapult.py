@@ -39,6 +39,7 @@ AMOUNT_MIN = 0.1
 LOG_DIR = "~/g2_runs/catapult"
 WATCH_S = 3.0
 PICK_MIN_S = 10.0                                           # the earliest the wait may end: the board's end echo is not trusted before this (an older `k` ended it at 0.5 s); lower it only from the times the wait records
+PICK_ECHO_FLOOR_S = 3.6                                     # inside the voice service the wait cannot read the board's end echo (the service's own reader takes the lines), but the link still notices the `k` and ends its silence: from this time on that counts as the end (pickF takes about 3.3 s; an old `k` ends the silence at 0.1 s, which is why nothing earlier counts). Without it the wait ran the full 10 s, the legs sagged and he fell when the throw began (2026-11-23)
 PICK_WAIT_S = 12.0                                         # the longest wait for the board to finish `pickF` (it echoes `k` when it does)
 
 
@@ -115,7 +116,7 @@ def previous_stage_ok(stage: str, log_dir: str | None = None) -> str | None:
     return f"no logged {before} run with the body ok: run the {before} stage first (--allow-skip skips this check)"
 
 
-def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic, min_s: float = PICK_MIN_S, seen: list | None = None, name: str | None = None) -> bool:
+def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=time.monotonic, min_s: float = PICK_MIN_S, seen: list | None = None, name: str | None = None, echo_floor_s: float | None = None) -> bool:
     """After a behavior skill (`pickF`): wait until the link's silence window ends (the board echoed its `k`), at most `max_s`, and not before `min_s`. True when it ended by itself. The link only notices the `k` when the port is READ, so the
     wait reads it (`drain` writes nothing, so it cannot abort the skill). `min_s` because the first read after the skill found an OLD `k` (the stand-up's) and ended the wait 0.5 s in, with pickF still playing: the next command (a joint read)
     then went out mid-skill (2026-11-21). `seen`, when given, collects (seconds, line) for every line the board sent meanwhile, so the real end echo's time is on record.
@@ -130,6 +131,8 @@ def wait_skill_done(link, max_s: float = PICK_WAIT_S, sleep=time.sleep, clock=ti
             return True
         if clock() - t0 >= min_s and not link._quiet_active():
             return True
+        if echo_floor_s is not None and clock() - t0 >= echo_floor_s and not link._quiet_active():
+            return True                                                                   # the link has seen the end echo even though this wait could not read it
         if read is not None:
             lines = read(0.1)
             for ln in (lines or "").splitlines():
@@ -152,7 +155,7 @@ def pick_up(link, seen: list | None = None) -> bool:
     if drain is not None:
         drain(0.3)
     link.send("kpickF", read_reply=False, settle=0.0)
-    return wait_skill_done(link, seen=seen, name="pickF")
+    return wait_skill_done(link, seen=seen, name="pickF", echo_floor_s=PICK_ECHO_FLOOR_S)
 
 
 def write_log(res: dict, extra: dict) -> str | None:

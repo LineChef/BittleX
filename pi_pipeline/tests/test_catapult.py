@@ -151,3 +151,26 @@ def test_the_pick_up_reads_the_old_lines_before_pickF_goes_out_so_they_cannot_en
     monkeypatch.setattr(c, "wait_skill_done", lambda link, **kw: order.append(("wait", kw.get("name"))) or True)
     assert c.pick_up(Link()) is True
     assert order == ["drain", "kpickF", ("wait", "pickF")]                                          # the old `balance` and `k` are read before the skill is sent, then the wait is for pickF's own end
+
+
+def test_inside_the_service_the_wait_ends_when_the_link_has_seen_the_end_echo_not_after_the_full_minimum():
+    class Link:                                                       # the service's own reader takes the board's lines: drain sees nothing, but the link's silence ends at the `k`
+        def __init__(self):
+            self.t = 0.0
+
+        def _quiet_active(self):
+            return now[0] < 2.6
+
+        def drain(self, seconds=0.3):
+            now[0] += seconds
+            return ""
+
+    now = [0.0]
+    assert c.wait_skill_done(Link(), 12.0, clock=lambda: now[0], min_s=10.0, name="pickF", echo_floor_s=c.PICK_ECHO_FLOOR_S) is True
+    assert 3.6 <= now[0] < 4.5                                        # not at the 10 second minimum
+    now[0] = 0.0
+
+    class Early(Link):                                                # an old k ended the silence at once: still nothing before the floor
+        def _quiet_active(self):
+            return False
+    assert c.wait_skill_done(Early(), 12.0, clock=lambda: now[0], min_s=10.0, name="pickF", echo_floor_s=c.PICK_ECHO_FLOOR_S) is True and now[0] >= 3.6
