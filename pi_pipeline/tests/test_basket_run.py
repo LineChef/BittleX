@@ -67,9 +67,17 @@ class World:
     def __init__(self, puck=None, basket=(16.0, 0.0)):
         self.puck, self.basket = puck, basket
         self.moves = []
+        self.inside = False                 # the puck is in the tub (the confirm look sees it)
+        self.hidden = None                  # the puck is behind the tub, seen only after `reveal_legs` circling legs
+        self.reveal_legs, self.legs = 3, 0
+        self.walkup = False                 # between the after-throw look and the confirm look a forward walk brings him nearer to the tub
 
     def mover_call(self, kind, v):
         self.moves.append((kind, round(v, 1)))
+        if kind == "forward" and v == br.CIRCLE_STEP_IN and not self.walkup:
+            self.legs += 1
+        elif kind == "forward" and self.walkup:
+            self.basket = (max(0.0, self.basket[0] - v), self.basket[1])
         if kind == "forward" and self.puck:
             self.puck = (max(0.0, self.puck[0] - v), self.puck[1])
             self.basket = (self.basket[0] + v * 0.0, self.basket[1])
@@ -100,11 +108,15 @@ class Env:
     def throw(self, holding):
         self.thrown.append(holding)
         t = self.throws.pop(0)
-        self.w.puck = self.puck_after.pop(0) if t.get("ok") and self.puck_after else None
+        p = self.puck_after.pop(0) if t.get("ok") and self.puck_after else None
+        self.w.inside, self.w.hidden = p == "in", (14.0, 20.0) if p == "behind" else None
+        self.w.puck = None if p in ("in", "behind") else p
         return t
 
     def after_throw(self):
-        return self.look()
+        basket, puck = self.look()
+        self.w.walkup = puck is None or br.CONFIRM_ALWAYS                                                  # the confirm look follows
+        return basket, puck
 
     def look(self):
         from pi_pipeline.behavior.basket_run import Fell
@@ -112,7 +124,18 @@ class Env:
             raise Fell()
         basket = B(*self.w.basket) if self.w.basket else None
         puck = P(*self.w.puck) if self.w.puck else None
+        if puck is None and self.w.hidden and self.w.legs >= self.w.reveal_legs:
+            self.w.puck, self.w.hidden = self.w.hidden, None                                                   # seen from this side now: an ordinary puck on the floor
+            puck = P(*self.w.puck)
         return basket, puck
+
+    def confirm_look(self):
+        from types import SimpleNamespace
+        self.confirm_looks = getattr(self, "confirm_looks", 0) + 1
+        self.w.walkup = False
+        basket = B(*self.w.basket) if self.w.basket else None
+        floor = P(*self.w.puck) if self.w.puck else None
+        return basket, floor, SimpleNamespace(x=120.0, y=116.0, count=30) if self.w.inside else None
 
     def quick_basket(self):
         return B(*self.w.basket) if self.w.basket else None
@@ -128,14 +151,65 @@ def ok(**k):
     return {"ok": True, **k}
 
 
-def test_a_throw_that_is_not_seen_afterwards_counts_as_a_make_and_stops_for_the_owners_reset():
-    env = Env([ok()], puck_after=[None])
+def test_a_throw_not_seen_from_sixteen_inches_is_confirmed_from_close_up_and_a_puck_inside_is_a_make():
+    env = Env([ok()], puck_after=["in"])
     r = br.run_sequence(env, say=lambda s: None)
     assert r["outcome"] == "made" and len(r["attempts"]) == 1 and env.thrown == [False]
+    a = r["attempts"][0]
+    assert env.confirm_looks == 1 and a["after"]["code"] == bo.MADE and a["after"]["first_look"]["code"] == bo.NOT_SEEN
+    assert abs(env.w.basket[0] - bl.CONFIRM_READING_IN) <= bl.CONFIRM_TOL_IN                         # he walked up to about 8 inches (the finder reads 9.8) before the look
+    assert a["confirm"]["walkup"]["outcome"] == "aligned" and a["confirm"]["look"]["tub_puck"] is not None
+
+
+def test_a_puck_seen_outside_is_a_miss_with_no_walk_up_unless_confirming_always_is_on():
+    env = Env([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["attempts"][0]["after"]["code"] == bo.MISSED and "confirm" not in r["attempts"][0]            # a puck on the floor is already a certain miss
+    old = br.CONFIRM_ALWAYS
+    try:
+        br.CONFIRM_ALWAYS = True
+        env = Env([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
+        r = br.run_sequence(env, say=lambda s: None)
+        assert "confirm" in r["attempts"][0] and r["attempts"][0]["confirm"]["look"]["floor_puck"] is not None and r["outcome"] == "made"
+    finally:
+        br.CONFIRM_ALWAYS = old
+
+
+def test_nothing_inside_is_a_miss_and_he_circles_the_tub_until_he_sees_the_puck_then_fetches_it():
+    env = Env([ok(), ok()], puck_after=["behind", "in"])
+    r = br.run_sequence(env, say=lambda s: None)
+    a = r["attempts"][0]
+    assert a["after"]["code"] == bo.MISSED and a["circle"]["outcome"] == "found" and a["retrieval"]["outcome"] == "retrieved"
+    assert any(s["action"] == "forward" and s["value"] == br.CIRCLE_STEP_IN for s in a["circle"]["steps"])
+    assert r["outcome"] == "made" and env.thrown == [False, True]                                          # then lined up and threw again without a pick-up
+
+
+def test_two_laps_without_the_puck_end_the_session_at_rest():
+    class E(Env):
+        lies = 0
+
+        def lie_down(self):
+            E.lies += 1
+    env = E([ok()], puck_after=[None])                                                                      # in no picture: not inside, not on the floor, not behind
+    r = br.run_sequence(env, say=lambda s: None)
+    a = r["attempts"][0]
+    assert r["outcome"] == "circled_twice" and a["circle"]["outcome"] == "circled_twice" and E.lies == 1
+    legs = [s for s in a["circle"]["steps"] if s["action"] == "forward"]
+    assert len(legs) * (360.0 / (360.0 * 1.0)) > 0 and a["circle"]["steps"][-1]["angle_deg"] >= 720            # two laps counted from the legs walked
+
+
+def test_the_confirm_walk_up_failing_or_the_tub_lost_ends_the_attempt_without_a_make():
+    env = Env([ok()], puck_after=["in"])
+    env.w.basket = None                                                                                     # the tub is out of view and never found
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["outcome"] == "no_basket"                                                                      # the first look cannot see the tub: no confirm, never a make
+    env = Env([ok()], puck_after=["in"])
+    env.mover.forward = lambda v: "fell"
+    assert br.run_sequence(env, say=lambda s: None)["outcome"] == "fell"
 
 
 def test_a_miss_is_searched_picked_up_lined_up_and_thrown_again_without_a_pick_up():
-    env = Env([ok(), ok()], puck_after=[(24.0, 25.0), None])
+    env = Env([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
     r = br.run_sequence(env, say=lambda s: None)
     assert r["outcome"] == "made" and len(r["attempts"]) == 2
     assert env.thrown == [False, True]                                                           # the second throw is from a puck already held
@@ -143,7 +217,7 @@ def test_a_miss_is_searched_picked_up_lined_up_and_thrown_again_without_a_pick_u
     assert a1["after"]["code"] == bo.MISSED and a1["retrieval"]["outcome"] == "retrieved" and a1["lineup"]["outcome"] == "aligned"
     kinds = [m[0] for m in env.w.moves]
     assert "pivot" in kinds and "forward" in kinds and env.picks == 1
-    assert abs(env.w.basket[0] - bl.TARGET_IN) <= bl.DIST_TOL_IN                                 # ends lined up at the shot distance
+    assert abs(a1["lineup"]["steps"][-1]["claw_in"] - bl.TARGET_IN) <= bl.DIST_TOL_IN               # the line-up ended at the shot distance
 
 
 def test_the_stops():
@@ -212,7 +286,7 @@ def test_a_basket_cut_off_by_the_frame_is_too_near_to_walk_toward():
 
 def test_the_save_hook_sees_the_run_as_it_goes_and_a_retrieval_step_is_saved_when_taken():
     seen = []
-    env = Env([ok(), ok()], puck_after=[(24.0, 25.0), None])
+    env = Env([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
     br.run_sequence(env, say=lambda s: None, save=lambda r: seen.append(([a.get("retrieval", {}).get("outcome") for a in r["attempts"]], r["outcome"])))
     assert seen and seen[-1][1] == "running"                                                                  # (the final outcome is the return value)
     assert any(o and o[0] == "running" for o, _ in seen)                                                      # a retrieval step was saved while it was still running
@@ -423,12 +497,12 @@ def test_a_make_lies_down_at_once_and_a_miss_starts_the_retrieval_from_the_looks
             looks.append(1)
             return super().look()
 
-    env = E([ok()], puck_after=[None])
+    env = E([ok()], puck_after=["in"])
     r = br.run_sequence(env, say=lambda s: None)
     assert r["outcome"] == "made" and lies == [1]                                                           # lie-down straight after the decision, before anything else
     lies.clear()
     looks.clear()
-    env = E([ok(), ok()], puck_after=[(24.0, 25.0), None])
+    env = E([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
     br.run_sequence(env, say=lambda s: None)
     kinds = [m[0] for m in env.w.moves]
     assert kinds and kinds[0] in ("pivot", "nudge", "forward") and len(lies) == 1                           # the miss did not lie down (the look ends standing), the retrieval began moving at once, and only the final make lay him down
@@ -460,14 +534,14 @@ def test_a_make_lies_down_from_the_stand_and_a_miss_starts_walking_with_no_rest_
             events.append("stand_up_from_rest")                                              # must never be called: the look ends standing
             return True
 
-    r = br.run_sequence(E([ok()], puck_after=[None]), say=lambda s: None)
+    r = br.run_sequence(E([ok()], puck_after=["in"]), say=lambda s: None)
     assert r["outcome"] == "made" and events == ["lie_down"]                                # a make: rest, from the stand
     events.clear()
-    env = E([ok(), ok()], puck_after=[(24.0, 25.0), None])
+    env = E([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
     br.run_sequence(env, say=lambda s: None)
     assert events == ["lie_down"] and env.w.moves                                           # a miss: no lie-down, no stand-up, walking; only the final make lay him down
     events.clear()
-    bad = E([ok()], puck_after=[None])
+    bad = E([ok()], puck_after=["in"])
     bad.picture_ok = False
     assert br.run_sequence(bad, say=lambda s: None)["outcome"] == "no_picture" and events == ["lie_down"]
 
@@ -504,3 +578,20 @@ def test_the_scan_keeps_turning_the_way_the_last_turn_toward_the_puck_went():
     assert a.kind == "scan" and a.value == -br.SCAN_STEP_DEG                                        # ...and when it drops out of view the scan goes on to the left, not back
     act(P(12.0, 14.0), None, st)
     assert act(None, None, st).value == br.SCAN_STEP_DEG
+
+
+def test_every_look_picture_is_kept_with_what_the_finders_read(tmp_path):
+    from types import SimpleNamespace as NS
+    from pi_pipeline.vision import basket_finder as bf, puck_finder as pf
+    tub = bf.BasketReading(124.0, 100.0, 89, 9, 1.6, 11.8, 9.8, False, 80, 168, 104.0, 128.0)
+    floor = pf.PuckReading(120.0, 130.0, 14, 14, 150, 5.0, 9.0)
+    inside = pf.PuckInTub(122.0, 116.0, 48, 8, 8)
+    path = br.save_picture("20261124_120000", 2, "confirm", b"jpegbytes", tub, floor, inside, {"walkup_final": (9.8, 89)}, log_dir=str(tmp_path))
+    assert path and open(path, "rb").read() == b"jpegbytes" and path.endswith("a02_confirm.jpg")
+    import json
+    line = json.loads((tmp_path / "pictures" / "20261124_120000" / "pictures.jsonl").read_text().splitlines()[0])
+    assert line["label"] == "confirm" and line["attempt"] == 2 and line["tub"]["left"] == 80 and line["tub"]["base_row"] == 128.0
+    assert line["floor_puck"]["claw_in"] == 9.0 and line["tub_puck"]["count"] == 48 and line["walkup_final"] == [9.8, 89]
+    assert br.save_picture("x", 1, "none", b"j", None, None, None, log_dir=str(tmp_path))                      # nothing read: still kept, with nulls
+    assert br.reading_dict(None) is None and br.reading_dict(NS(a=1, b="x", c=[1])) == {"a": 1, "b": "x"}
+    assert br.save_picture("x", 1, "bad", b"j", log_dir="/proc/definitely/not/writable") is None               # a full or missing disk never stops a run

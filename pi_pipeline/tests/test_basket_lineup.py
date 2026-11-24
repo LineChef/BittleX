@@ -166,3 +166,14 @@ def test_an_aim_offset_lines_him_up_to_one_side_of_the_basket_centre(monkeypatch
     assert act(16.0, 0.0).kind == "shoot"
     monkeypatch.setattr(bl, "AIM_OFFSET_DEG", 2.0)                                                            # aim 2 degrees right of centre: the basket should read 2 degrees to his left
     assert act(16.0, 0.0).kind == "shoot" and act(16.0, 5.0).kind == "nudge" and act(16.0, 5.0).value == 7.0 and act(16.0, -2.0).kind == "shoot"
+
+
+def test_the_confirm_walk_up_is_the_line_up_aimed_at_the_close_look_with_the_same_buffer():
+    from types import SimpleNamespace as NS
+    st = bl.LineupState()
+    far = bl.next_action(NS(claw_in=16.0, bearing_deg=0.0), st, bl.CONFIRM_READING_IN, bl.CONFIRM_TOL_IN, bl.CONFIRM_ALIGN_TOL_DEG)
+    assert far.kind == "forward" and 5.0 <= far.value <= bl.FWD_STEP_MAX_IN                      # walks up to the tub
+    assert bl.next_action(NS(claw_in=9.8, bearing_deg=0.0), bl.LineupState(), bl.CONFIRM_READING_IN, bl.CONFIRM_TOL_IN, bl.CONFIRM_ALIGN_TOL_DEG).kind == "shoot"      # about 8 inches really: look
+    assert bl.next_action(NS(claw_in=10.9, bearing_deg=7.0), bl.LineupState(), bl.CONFIRM_READING_IN, bl.CONFIRM_TOL_IN, bl.CONFIRM_ALIGN_TOL_DEG).kind == "shoot"        # a look from 10 inches is fine, the tub within 8 degrees
+    assert bl.next_action(NS(claw_in=7.0, bearing_deg=0.0), bl.LineupState(), bl.CONFIRM_READING_IN, bl.CONFIRM_TOL_IN, bl.CONFIRM_ALIGN_TOL_DEG).kind == "back"      # inside the 6 inch buffer plus its margin: back up before anything else
+    assert bl.next_action(NS(claw_in=16.0, bearing_deg=0.0), bl.LineupState()).kind == "shoot"                                                                              # the shot's defaults are unchanged

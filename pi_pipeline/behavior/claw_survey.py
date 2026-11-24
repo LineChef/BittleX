@@ -39,10 +39,10 @@ def look_seconds() -> float:
     return bc.SIT_STAND_FIRST_S + bc.CLAW_POSE_S + sweep / bc.CLAW_DEG_S + 3 * bc.CLAW_SETTLE_S + 6.0              # (the last 6 s: lying down in rest and the stand-up from rest)
 
 
-def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, robot=None) -> str:
+def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda: False, discard=None, miss_skips: bool = False, robot=None, centre_only: bool = False) -> str:
     """THE claw look (see the module note), from standing: the pictures are `look_left`, `look_right` and `kind` (the centre one, the one that counts). `snapshot(label)` takes one picture (None = no camera: the
     arm still moves); `discard()` throws away one stale camera frame before each picture (the module answers with the picture of the PREVIOUS request); `miss_skips` skips the other side picture after the
-    camera missed one (it would wait for the camera again); `stopped()` ends it between moves; `robot` is the chase robot to run it on (default: one on `link`). G2 is standing when it returns.
+    camera missed one (it would wait for the camera again); `stopped()` ends it between moves; `centre_only` takes the centre picture alone (no side pictures: the basket goal's confirm look, one picture from close to the tub; the same moves otherwise); `robot` is the chase robot to run it on (default: one on `link`). G2 is standing when it returns.
     Returns "ok", "stopped" (stopped, or he fell: the fall guard handles the fall) or "error". Never raises."""
     from . import ball_chase as bc
     from ..gait import policy_walker
@@ -71,7 +71,7 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
         return False
     try:
         robot = robot or bc.SerialRobot(link, sleep=sleep)
-        state = bc.claw_look_sequence(robot, per_pan, pans=[left, -left, 0.0], from_sit=True, raise_first=True, sleep=sleep, stopped=stopped)
+        state = bc.claw_look_sequence(robot, per_pan, pans=[0.0] if centre_only else [left, -left, 0.0], from_sit=True, raise_first=True, sleep=sleep, stopped=stopped)
     except Exception:  # noqa: BLE001
         log.exception("the claw look failed")
         return "error"

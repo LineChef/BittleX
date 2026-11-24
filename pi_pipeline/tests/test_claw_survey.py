@@ -67,6 +67,15 @@ def test_the_standard_look_is_the_chases_sequence_stand_first_attention_claw_up_
     assert r.moves == ["sit_down", ("claw", 0.0, bc.CLAW_LIFT_DEG), ("claw", left, bc.CLAW_LIFT_DEG), ("claw", -left, bc.CLAW_LIFT_DEG), ("claw", 0.0, bc.CLAW_LIFT_DEG), ("claw", 0.0, 0.0), "stand_from_sit"]
 
 
+def test_the_confirm_look_is_the_same_move_with_the_centre_picture_alone():
+    """Owner, 2026-11-24: the basket goal's confirm look is ONE picture from close to the tub. Not a second look: `centre_only` of the shared function, so the stand, the attention pose, the claw moves and the stand-up are the ones every look makes."""
+    from pi_pipeline.behavior import ball_chase as bc
+    r, shots = _Robot(), []
+    state = claw_survey.run_claw_look(None, shots.append, "centre", sleep=lambda s: None, robot=r, centre_only=True)
+    assert state == "ok" and shots == ["centre"]
+    assert r.moves == ["sit_down", ("claw", 0.0, bc.CLAW_LIFT_DEG), ("claw", 0.0, bc.CLAW_LIFT_DEG), ("claw", 0.0, 0.0), "stand_from_sit"]      # raised, the one centre pose (the settle and the picture), lowered, stood up
+
+
 def test_a_stop_between_moves_ends_the_look_with_the_claw_lowered_and_a_fall_ends_it_at_once():
     r, shots = _Robot(), []
     n = {"i": 0}

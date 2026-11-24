@@ -1,7 +1,11 @@
 """The full basket sequence, as one process on one serial connection (the basket goal, docs/plan-detail/basket-goal-plan.md, steps 3 to 5; owner, 2026-11-23).
 
 THE STEPS, every attempt: stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), then THE BALL GOAL'S OWN CLAW LOOK, complete (`claw_survey.run_claw_look`: the attention pose, the claw up in two steps, a settle, the pictures, the claw down, the eased stand-up), read by the basket and puck finders
-(`goals/basket_outcome.classify_throw` calls the throw). Attention pose, stand-up, then rest if he made the shot, or walking at once if he has to fetch the puck (owner, 2026-11-23). The puck not seen: counted as a make; he lies down from the stand and the run ends for the owner's reset. The puck seen on the floor outside the basket is a miss: the retrieval starts at once.
+(`goals/basket_outcome.classify_throw`). The basket is a clear tub with red tape on its rim (owner, 2026-11-24). From about 16 inches a puck inside it is 0 to 5 coloured pixels, so that look can see a puck on the floor (a miss, the retrieval starts at once) but not inside. The puck NOT seen: the CONFIRM LOOK (`confirm_throw`): he walks up to about 8 inches of the tub (the line-up's steps and 6 inch buffer),
+goes into the attention pose and takes one centred picture (`claw_survey.run_claw_look(..., centre_only=True)`), read for a puck inside the tub. A puck inside is a make: he lies down and the run ends for the owner's reset. Nothing inside is a miss and he CIRCLES the tub (`circle_search`: short legs, facing the tub at every stop, up to two laps, pivoting back toward it when it drops out of view) until the puck is seen, then fetches it as after any miss;
+two laps without it end the run at rest. Every look picture and what the finders read on it is kept on the Pi (`save_picture`: `~/g2_runs/basket_run/pictures/<run>/`, with `pictures.jsonl`).
+A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
+Stops: 5 attempts, a fall, no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. The camera is warmed up with two silent pictures at the start, before anything moves. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
 Everything I had rebuilt in place of that look (raw `kcalib`, `gb` writes, a fast claw, a legs-holding lowering frame, a lie-down before the stand-up) was followed by the board's own `up` and a flip in 10 runs; see the real walk log, "The board's own stand-up after the claw lowers".
 A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
 Stops: 5 attempts, a fall, no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. The camera is warmed up with two silent pictures at the start, before anything moves. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
@@ -33,6 +37,17 @@ PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
+CONFIRM_ALWAYS = False               # the confirm look (walk up to about 8 inches of the tub and look into it) runs when the puck was not seen after the throw; True also runs it when the puck was seen outside (owner, 2026-11-24: "after every throw"; a puck seen on the floor is already a certain miss, so the default skips the walk-up)
+CIRCLE_RADIUS_IN = 13.0              # the circling search's radius, as the finder reads it: near enough that a puck within about 8 inches of the tub is inside the puck finder's range, far enough from the 6 inch buffer
+CIRCLE_MIN_IN = 9.0                  # nearer than this (as read) he backs off before the next leg
+CIRCLE_STEP_IN = 6.0                 # one leg's walk
+CIRCLE_TANGENT_DEG = 75.0            # a leg's heading is this far off the line to the tub (90 would keep the radius; a little less keeps it from drifting outward), corrected by the radius error
+CIRCLE_RADIUS_GAIN = 2.0             # degrees off the tangent per inch of radius error (clamped to CIRCLE_CORRECTION_MAX_DEG)
+CIRCLE_CORRECTION_MAX_DEG = 25.0
+CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before a leg starts
+CIRCLE_LOST_STEP_DEG = 30.0          # the tub out of view: pivot this much toward the side it should be on
+CIRCLE_MAX_LAPS = 2.0                # more than two laps without the puck ends the session (owner, 2026-11-24)
+CIRCLE_MAX_STEPS = 150
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
 
@@ -97,6 +112,84 @@ def classify_after(basket, puck, tub_puck=None, confirm: bool = False) -> tuple[
     """(code, plain words) for one throw from a look afterwards: `goals/basket_outcome.classify_throw`, the one place the rule lives. `puck`: a puck on the floor outside the tub; `tub_puck`: one seen inside it (only the close confirm look can see one); `confirm`: this is the close look, where
     nothing inside is a miss. The after-throw look from about 16 inches cannot see inside the tub (the tub's clear walls show a puck there as 0 to 5 coloured pixels): a puck not seen anywhere is NOT_SEEN, a question for the confirm look (owner, 2026-11-24)."""
     return bo.classify_throw(basket, puck, tub_puck, confirm)
+
+
+@dataclass
+class CircleState:
+    angle_deg: float = 0.0           # how far round the tub he has gone from where he started, in degrees (each leg adds its walk over the radius)
+    steps: int = 0
+    lost_deg: float = 0.0
+    side: int = 1                    # +1: each leg starts with a right turn (he circles clockwise seen from above, the tub on his left); -1: the other way
+    phase: str = "look"              # "look" (facing the tub, a fresh picture decides) | "turned" (the leg's heading is set: walk) | "walked" (turn back toward the tub)
+    leg_turn: float = 0.0            # the leg's heading change (+ right), to turn back by
+    log: list = field(default_factory=list)
+
+    @property
+    def needs_look(self) -> bool:
+        return self.phase == "look"
+
+
+def next_circle_action(puck, basket, st: CircleState) -> RAction:
+    """The next step of the circling search (pure, like `next_retrieval_action`): round the tub in short legs, facing it at every stop so the finders see the floor around it from every side, until the puck is seen. A puck in view ends it ("found"); more than CIRCLE_MAX_LAPS laps ends it ("circled_twice");
+    the tub out of view makes him pivot toward the side it should be on ("tub_lost" after a full turn). A leg: turn CIRCLE_TANGENT_DEG off the line to the tub, walk CIRCLE_STEP_IN, turn back toward it by the heading change plus the angle gone round; the next look corrects what is left."""
+    import math
+    if st.phase == "turned":
+        st.phase = "walked"
+        st.angle_deg += math.degrees(CIRCLE_STEP_IN / CIRCLE_RADIUS_IN)
+        return RAction("forward", CIRCLE_STEP_IN, "circling: walk the leg")
+    if st.phase == "walked":
+        st.phase = "look"
+        back = -st.leg_turn - st.side * math.degrees(CIRCLE_STEP_IN / CIRCLE_RADIUS_IN)
+        return RAction("pivot", bl._pivot_for(back), "circling: turn back toward the tub")
+    if puck is not None:
+        return RAction("found", 0.0, "puck in view")
+    if st.steps >= CIRCLE_MAX_STEPS or st.angle_deg >= 360.0 * CIRCLE_MAX_LAPS:
+        return RAction("give_up", 0.0, "circled_twice")
+    if basket is None:
+        if st.lost_deg >= 360.0:
+            return RAction("give_up", 0.0, "tub_lost")
+        st.lost_deg += CIRCLE_LOST_STEP_DEG
+        st.steps += 1
+        return RAction("pivot", -st.side * CIRCLE_LOST_STEP_DEG, "tub out of view: pivot toward the side it should be on")      # after a leg the tub is on the side opposite the leg's turn
+    st.lost_deg = 0.0
+    d, b = float(basket.claw_in), float(basket.bearing_deg)
+    if abs(b) > CIRCLE_FACE_TOL_DEG:
+        st.steps += 1
+        return RAction("pivot" if abs(b) >= bl.PIVOT_MIN_DEG else "nudge", bl._pivot_for(b) if abs(b) >= bl.PIVOT_MIN_DEG else b, "circling: face the tub")
+    if d < CIRCLE_MIN_IN:
+        st.steps += 1
+        return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
+    correction = max(-CIRCLE_CORRECTION_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (d - CIRCLE_RADIUS_IN)))
+    st.leg_turn = st.side * (CIRCLE_TANGENT_DEG - correction)
+    st.phase = "turned"
+    st.steps += 1
+    return RAction("pivot", bl._pivot_for(st.leg_turn), "circling: turn onto the leg")
+
+
+def circle_search(env, say=print, on_step=None, start_side: int = 1) -> dict:
+    """Search round the tub for the puck. Returns {"outcome": "found" | "circled_twice" | "tub_lost" | "fell", "puck", "basket", "steps"}; `puck` and `basket` are the last readings when it is found. Uses the environment's quick look and the line-up's movers (nothing new moves G2: pivots and walks)."""
+    st = CircleState(side=start_side)
+    basket = puck = None
+    while True:
+        if st.needs_look:
+            try:
+                basket, puck = env.look()
+            except Fell:
+                return {"outcome": "fell", "puck": None, "basket": None, "steps": st.log}
+        act = next_circle_action(puck, basket, st)
+        st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "angle_deg": round(st.angle_deg), "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
+                       "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))})
+        say(f"circle: {act.why}" + (f" ({act.kind} {act.value:.1f}, {st.angle_deg:.0f} degrees round)" if act.kind not in ("found", "give_up") else ""))
+        if on_step is not None:
+            on_step(st.log)
+        if act.kind == "found":
+            return {"outcome": "found", "puck": puck, "basket": basket, "steps": st.log}
+        if act.kind == "give_up":
+            return {"outcome": act.why, "puck": None, "basket": basket, "steps": st.log}
+        if hasattr(env.mover, "set_distance"):
+            env.mover.set_distance(None if basket is None else float(basket.claw_in))
+        if getattr(env.mover, act.kind)(act.value) == "fell":
+            return {"outcome": "fell", "puck": None, "basket": None, "steps": st.log}
 
 
 class Fell(Exception):
@@ -219,9 +312,47 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
+def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None) -> dict:
+    """The confirm look (owner, 2026-11-24): the after-throw look from about 16 inches cannot see into the clear tub (a puck inside is 0 to 5 coloured pixels there, 10 to 90 at 8 inches), so when it did not see the puck he walks up to about 8 inches of the tub (the line-up's own steps and
+    buffer, aimed at CONFIRM_READING_IN), goes into the attention pose, raises the claw and takes ONE centred picture (`env.confirm_look()`: the shared claw look, centre only), read by the tub and puck finders. Returns {"stop": a reason or None, "code", "basket", "puck"}: a puck inside is MADE (he lies down: the run ends), the tub not seen is NO_BASKET (lies down),
+    nothing inside is a miss (`code` MISSED, `puck` the puck seen on the floor in that picture or None: the caller searches). Everything it saw goes into `rec["confirm"]` and the pictures are saved by `env`."""
+    say("confirm: walking up to look into the tub")
+    lu = bl.lineup(env.quick_basket, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG)
+    rec["confirm"] = {"walkup": {"outcome": lu["outcome"], "steps": lu["steps"]}}
+    persist()
+    if lu["outcome"] != "aligned":
+        if lu["outcome"] != "fell" and hasattr(env, "lie_down"):
+            env.lie_down()
+        return {"stop": lu["outcome"], "code": None, "basket": None, "puck": None}
+    try:
+        basket, floor, tub = env.confirm_look()
+    except Fell:
+        return {"stop": "fell", "code": None, "basket": None, "puck": None}
+    if not getattr(env, "confirm_picture_ok", True):
+        rec["confirm"]["look"] = {"code": "no_picture"}
+        if hasattr(env, "lie_down"):
+            env.lie_down()
+        say("confirm: no picture from the camera: stopping (not counted as a make)")
+        persist()
+        return {"stop": "no_picture", "code": None, "basket": None, "puck": None}
+    code, words = classify_after(basket, floor, tub, confirm=True)
+    rec["confirm"]["look"] = {"code": code, "words": words, "tub": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
+                              "floor_puck": None if floor is None else (round(floor.claw_in, 1), round(floor.bearing_deg, 1)),
+                              "tub_puck": None if tub is None else (round(tub.x), round(tub.y), tub.count)}
+    rec["after"]["first_look"] = {k: rec["after"].get(k) for k in ("code", "words", "puck", "basket")}
+    rec["after"].update({"code": code, "words": words, "puck": rec["confirm"]["look"]["floor_puck"], "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))})
+    say(f"confirm: {code}: {words}")
+    persist()
+    if code in (bo.MADE, bo.NO_BASKET):
+        if hasattr(env, "lie_down"):
+            env.lie_down()                                                       # a make: rest from the stand the look ended in; the run ends for the owner's reset
+        return {"stop": "made" if code == bo.MADE else code, "code": code, "basket": basket, "puck": None}
+    return {"stop": None, "code": code, "basket": basket, "puck": floor}
+
+
 def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
     """ONE attempt: the throw, the look, and after a miss the retrieval and the line-up for the next throw. `rec` is the attempt's record (filled in as it goes). Returns (why it must stop or None to go on, whether he is holding the puck
-    for the next throw). The stop reasons are those of `run_sequence`; "made" and the other after-throw codes end a run for the owner's reset. The goal (goals/basket.py) and `run_sequence` both call this."""
+    for the next throw). The stop reasons are those of `run_sequence`; "made" (a puck seen inside the tub from close up) and the other after-throw codes end a run for the owner's reset. The goal (goals/basket.py) and `run_sequence` both call this."""
     n = rec.get("attempt", 1)
     if not env.battery_ok():
         return "battery", holding
@@ -250,18 +381,37 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
                     "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))}
     rec["after"]["attention_hold_s"] = getattr(env, "attention_hold_s", None)
     rec["after"]["pictures"] = getattr(env, "look_readings", None)                    # what each picture of the look read (the merge keeps one basket and one puck)
-    if code != bo.MISSED and hasattr(env, "lie_down"):
-        env.lie_down()                                                       # a make: rest, from the stand the look ended in (the standard lie-down); a miss: no pause, the retrieval starts walking
     say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
     persist()
-    if code != bo.MISSED:
-        if code == bo.NOT_SEEN:
-            say("the puck was not seen by the end of the attention pose: counted as a make")
-        return ("made" if code in (bo.NOT_SEEN, bo.MADE) else code), holding            # owner, 2026-11-23: not seen by the end of the attention pose means it went in
+    confirm = code == bo.NOT_SEEN or (CONFIRM_ALWAYS and code == bo.MISSED)
+    if confirm and hasattr(env, "confirm_look"):
+        # The puck was not seen from about 16 inches: inside the clear tub it is 0 to 5 coloured pixels there. Walk up to about 8 inches, look into it from the attention pose and read the picture (owner, 2026-11-24).
+        res = confirm_throw(env, rec, say, persist)
+        if res["stop"]:
+            return res["stop"], holding
+        code, basket, puck = res["code"], res["basket"], res["puck"]
+    elif code != bo.MISSED:
+        if hasattr(env, "lie_down"):
+            env.lie_down()                                                       # no tub in view (or no confirm look to ask): rest, the run ends for the owner's check
+        return code, holding
 
     def on_step(log, rec=rec):
         rec["retrieval"] = {"outcome": "running", "steps": list(log)}
         persist()
+    if puck is None:
+        # Looked into the tub from close up and the puck is not in it, and not on the floor in view: search round the tub (owner, 2026-11-24)
+        def on_circle(log, rec=rec):
+            rec["circle"] = {"outcome": "running", "steps": list(log)}
+            persist()
+        c = circle_search(env, say=say, on_step=on_circle)
+        rec["circle"] = {"outcome": c["outcome"], "steps": c["steps"]}
+        persist()
+        if c["outcome"] != "found":
+            rec["retrieval"] = {"outcome": "puck_not_found" if c["outcome"] != "fell" else "fell", "steps": []}
+            if c["outcome"] != "fell" and hasattr(env, "lie_down"):
+                env.lie_down()                                                   # two laps without the puck (or the tub lost): the session ends at rest
+            return ("fell" if c["outcome"] == "fell" else c["outcome"]), holding
+        basket, puck = c["basket"], c["puck"]
     r = retrieve(env, say=say, on_step=on_step, first=(basket, puck))
     rec["retrieval"] = r
     persist()
@@ -276,7 +426,7 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
 
 
 def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) -> dict:
-    """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed",
+    """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed", "circled_twice", "tub_lost", "no_basket",
     "basket_not_found", "could_not_align", "puck_not_found", "could_not_reach_puck", "too_near_the_basket", "pick_failed"."""
     attempts: list = []
     holding = False
@@ -309,6 +459,31 @@ def write_log(result: dict, extra: dict | None = None, log_dir: str = LOG_DIR, p
         return None
 
 
+def reading_dict(r) -> dict | None:
+    """A finder's reading as plain numbers for the picture log (a dataclass or any object with attributes; None stays None)."""
+    if r is None:
+        return None
+    import dataclasses
+    d = dataclasses.asdict(r) if dataclasses.is_dataclass(r) else dict(vars(r))
+    return {k: (round(float(v), 2) if isinstance(v, float) else v) for k, v in d.items() if isinstance(v, (int, float, bool, str))}
+
+
+def save_picture(run_stamp: str, attempt: int, label: str, jpeg: bytes, basket=None, floor=None, tub=None, extra: dict | None = None, log_dir: str = LOG_DIR) -> str | None:
+    """Keep one look picture and what the finders read on it, for debugging and the next calibration (owner, 2026-11-24: "include the logging for each pic"). The picture goes to `<log_dir>/pictures/<run>/a<attempt>_<label>.jpg` on the Pi and one JSON line with the readings
+    (the tub's tape columns, rim and base rows, width, distance, bearing; the puck on the floor; the puck inside the tub) to `pictures.jsonl` beside it. Never raises: a full disk must not stop a run. The pictures show the home: they stay on the Pi and the Mac and never go in the repository."""
+    try:
+        d = os.path.join(os.path.expanduser(log_dir), "pictures", run_stamp)
+        os.makedirs(d, exist_ok=True)
+        name = f"a{attempt:02d}_{label}.jpg"
+        with open(os.path.join(d, name), "wb") as f:
+            f.write(jpeg)
+        with open(os.path.join(d, "pictures.jsonl"), "a") as f:
+            f.write(json.dumps({"file": name, "time": time.strftime("%H:%M:%S"), "attempt": attempt, "label": label, "tub": reading_dict(basket), "floor_puck": reading_dict(floor), "tub_puck": reading_dict(tub), **(extra or {})}) + "\n")
+        return os.path.join(d, name)
+    except OSError:
+        return None
+
+
 class RealEnv:
     """G2 and his camera behind the `Env` interface: `throw`, `after_throw`, `look` (a quick picture), `quick_basket`, `pick`, `battery_ok` and `mover`. Built once per run on one open serial link."""
 
@@ -322,6 +497,8 @@ class RealEnv:
         self.picture_ok = True
         self.look_readings: dict = {}
         self.attention_hold_s = None
+        self.confirm_picture_ok = True
+        self.last_walkup = None
         try:
             looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
         except Exception:  # noqa: BLE001
@@ -373,6 +550,7 @@ class RealEnv:
                 basket = bf.find_basket(jpeg)
                 seen[label] = (basket, pf.find_puck(jpeg, basket))
                 b_, p_ = seen[label]
+                save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), f"after_{label}", jpeg, b_, p_, pf.find_puck_in_tub(jpeg, basket), {"t_s": round(time.monotonic() - t_look, 2)})
                 self.look_readings[label] = {"t_s": (round(t_start, 2), round(t_end, 2)), "basket": None if b_ is None else (round(b_.claw_in, 1), round(b_.bearing_deg, 1), b_.width_px),
                                              "puck": None if p_ is None else (round(p_.claw_in, 1), round(p_.bearing_deg, 1), p_.width_px, round(p_.x), round(p_.y))}
                 if label == "centre":
@@ -388,6 +566,28 @@ class RealEnv:
         if state != "ok" and getattr(self.robot, "last_fall", None):
             raise Fell()
         return merge_looks(seen, {"look_left": -abs(left), "look_right": abs(left), "centre": 0.0})
+
+    def confirm_look(self):
+        """The confirm look: the shared claw look with the centre picture only (`claw_survey.run_claw_look(..., centre_only=True)`: stand, the attention pose, the claw up in two steps, a settle, ONE picture, the claw down, the eased stand-up), read three ways: the tub, a puck on the floor outside it and a puck inside it.
+        Returns (tub reading or None, floor puck or None, puck inside or None). He is STANDING when it returns. The picture and every reading go to the picture log (`save_picture`). Sets `confirm_picture_ok`."""
+        from . import claw_survey
+        from ..vision import basket_finder as bf
+        from ..vision import puck_finder as pf
+        cam, got = self._camera(), {}
+        self.confirm_picture_ok = False
+
+        def snapshot(label):
+            jpeg = cam.look()
+            if jpeg:
+                basket = bf.find_basket(jpeg)
+                got[label] = (basket, pf.find_puck(jpeg, basket), pf.find_puck_in_tub(jpeg, basket))
+                self.confirm_picture_ok = True
+                save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), "confirm", jpeg, *got[label], {"walkup_final": getattr(self, "last_walkup", None)})
+            return jpeg
+        state = claw_survey.run_claw_look(self.link, snapshot, "centre", robot=self.robot, centre_only=True)
+        if state != "ok" and getattr(self.robot, "last_fall", None):
+            raise Fell()
+        return got.get("centre", (None, None, None))
 
     def lie_down(self) -> None:
         """The standard lie-down from the stand (a make: nothing else to do)."""
@@ -424,6 +624,8 @@ class RealEnv:
                 f.write(jpeg)
         except OSError:
             pass
+        self.last_walkup = None if basket is None else (round(basket.claw_in, 1), round(basket.width_px))
+        save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), f"quick{n:02d}", jpeg, basket, puck, None, {"by": by})
         self.quick_log.append({"n": n, "time": time.strftime("%H:%M:%S"),
                                "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
                                "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1), puck.width_px, round(puck.y))})
@@ -449,6 +651,8 @@ def main(argv: list | None = None) -> None:
     ap = argparse.ArgumentParser(description="The full basket sequence on G2 (hands near, the voice service stopped, G2 at rest with the puck touching the claw tip and the basket 16 inches out).")
     ap.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS)
     ap.add_argument("--look-only", action="store_true", help="no throw: stand up from rest, take the claw look once, print what each picture read (basket and puck distance, bearing and picture position), lie down; to check which side the look's pictures point")
+    ap.add_argument("--confirm-only", action="store_true", help="no throw: stand up from rest, walk up to about 8 inches of the tub, take the confirm look, print what the finders read (the tub, a puck on the floor, a puck inside it), lie down; for checking the walk-up and the close look with the puck placed by hand (G2 at rest, the tub about 16 inches out)")
+    ap.add_argument("--circle-only", action="store_true", help="no throw: stand up from rest, circle the tub (the puck NOT in view: put it behind the tub or out of the room) looking for the puck, up to two laps, print the steps, lie down; for checking the circling movement (the tub about 16 inches out)")
     ap.add_argument("--show-picture", action="store_true", help="after each throw print the picture of the floor (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
     from . import ball_chase as chase
@@ -484,6 +688,20 @@ def main(argv: list | None = None) -> None:
                 print(f"LOOK {label}: basket {r['basket']} puck {r['puck']} picture asked at {r['t_s'][0]} s, answered at {r['t_s'][1]} s after the look began   (distance in, bearing deg, width px[, x, y])")
             print("LOOK merged: basket", None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1)), "puck", None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)))
             env.lie_down()
+            return
+        if a.confirm_only or a.circle_only:
+            env.attempt = 0
+            if robot.stand_up_from_rest() == "fell":
+                raise Fell()
+            rec = {"attempt": 0, "after": {}}
+            if a.confirm_only:
+                res = confirm_throw(env, rec, say=print)
+                print("CONFIRM", json.dumps({"stop": res["stop"], "code": res["code"], "confirm": rec.get("confirm")}, default=str))
+            else:
+                c = circle_search(env, say=print)
+                print("CIRCLE", c["outcome"], f"after {len(c['steps'])} step(s)", None if c["puck"] is None else (round(c["puck"].claw_in, 1), round(c["puck"].bearing_deg, 1)))
+            env.lie_down()
+            print("pictures kept in", os.path.join(os.path.expanduser(LOG_DIR), "pictures", env.run_stamp))
             return
         result = run_sequence(env, a.max_attempts, save=lambda r: (result.update(r), write_log(r, {"pack_pct_start": pct, "quick": env.quick_log}, path=path)))
     except KeyboardInterrupt:

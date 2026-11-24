@@ -589,7 +589,7 @@ g2lob() {
 }
 # g2basket  -- START THE BASKET GOAL inside the voice service (the same as `g2goal run basket` and "G2, basket goal"): G2 at rest, the puck touching the claw tip, the basket centre 16 inches from the claw tip. Up to 10 attempts or 20 minutes; a make ends the session for your reset; a miss is searched for, picked up, lined up again and thrown again. What he learns is judged per setting (`g2goal show basket`); every attempt (with the look's picture timing) is logged on the Pi in ~/g2_runs/basket_run/. Stop with `g2goal stop`.
 g2basket() { g2goal run basket; }
-# g2basketrun [--look-only] [--max-attempts N]  -- the basket sequence as its own test process (UNPROVEN tool; the goal is `g2basket`): stops the voice service first, runs `basket_run` on the Pi, brings the service back. `--look-only` takes one claw look and prints what each picture read.
+# g2basketrun [--look-only] [--confirm-only] [--circle-only] [--max-attempts N]  -- the basket sequence as its own test process (UNPROVEN tool; the goal is `g2basket`): stops the voice service first, runs `basket_run` on the Pi, brings the service back. `--look-only` takes one claw look and prints what each picture read; `--confirm-only` walks up to about 8 inches of the tub, takes the close confirm look and prints what the finders read (no throw; the puck placed by hand); `--circle-only` circles the tub looking for the puck (no throw). The pictures are kept on the Pi under ~/g2_runs/basket_run/pictures/.
 g2basketrun() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local rest; rest="$(printf ' %q' "$@")"

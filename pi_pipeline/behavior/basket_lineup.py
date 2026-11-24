@@ -24,6 +24,9 @@ PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's centre (the goal learns it): the basket is lined up at this far left of straight ahead, so it reads at minus this bearing
 MAX_CORRECTIONS = 30
+CONFIRM_READING_IN = 9.8       # the confirm look's walk-up target, as the finder READS it (8 inches from the claw tip really: the finder reads 1.8 inches long at 8 inches in the attention pose); a look from 8 to 10 inches is fine (owner, 2026-11-24)
+CONFIRM_TOL_IN = 1.5
+CONFIRM_ALIGN_TOL_DEG = 8.0     # the tub only has to be well inside the frame at 8 inches (89 pixels wide, 3 degrees is 7 pixels)
 
 
 @dataclass
@@ -45,9 +48,9 @@ def _pivot_for(bearing: float) -> float:
     return cycles * PIVOT_CYCLE_DEG * (1 if bearing > 0 else -1)
 
 
-def back_inches_to_target(d: float, bearing_deg: float) -> float:
-    """How far to back up so the claw tip ends TARGET_IN from the basket after the backward walk's sideways drift. Straight back would end `TARGET_IN - d` inches further; the walk also slides him to his right by BACK_DRIFT_RATIO of its length, which puts
-    the basket off to the side and lengthens the straight line to it, so the line is solved from the basket's position (d and the bearing, + right) after a back-up of b inches: sqrt((d cos(bearing) + b)^2 + (d sin(bearing) - ratio b)^2) = TARGET_IN."""
+def back_inches_to_target(d: float, bearing_deg: float, target_in: float = TARGET_IN) -> float:
+    """How far to back up so the claw tip ends `target_in` (the shot distance unless given) from the basket after the backward walk's sideways drift. Straight back would end `target_in - d` inches further; the walk also slides him to his right by BACK_DRIFT_RATIO of its length, which puts
+    the basket off to the side and lengthens the straight line to it, so the line is solved from the basket's position (d and the bearing, + right) after a back-up of b inches: sqrt((d cos(bearing) + b)^2 + (d sin(bearing) - ratio b)^2) = target_in."""
     th = math.radians(bearing_deg)
     ahead, right = d * math.cos(th), d * math.sin(th)
 
@@ -55,16 +58,16 @@ def back_inches_to_target(d: float, bearing_deg: float) -> float:
         return math.hypot(ahead + b, right - BACK_DRIFT_RATIO * b)
 
     lo, hi = 0.0, BACK_STEP_MAX_IN
-    if dist(hi) <= TARGET_IN:
+    if dist(hi) <= target_in:
         return hi
     for _ in range(40):
         mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if dist(mid) < TARGET_IN else (lo, mid)
+        lo, hi = (mid, hi) if dist(mid) < target_in else (lo, mid)
     return max(MIN_STEP_IN, min(BACK_STEP_MAX_IN, (lo + hi) / 2))
 
 
-def next_action(reading, st: LineupState) -> Action:
-    """The next step from a fresh reading (a BasketReading-like object with `claw_in` and `bearing_deg`, or None when the basket is not in the picture)."""
+def next_action(reading, st: LineupState, target_in: float = TARGET_IN, dist_tol: float = DIST_TOL_IN, align_tol: float = ALIGN_TOL_DEG) -> Action:
+    """The next step from a fresh reading (a BasketReading-like object with `claw_in` and `bearing_deg`, or None when the basket is not in the picture). `target_in`, `dist_tol` and `align_tol` default to the shot; the confirm look's walk-up gives its own (CONFIRM_*): the same function, so the same buffer and the same pivots."""
     if reading is None:
         if st.scanned_deg >= SCAN_MAX_DEG:
             return Action("give_up", 0.0, "basket_not_found")
@@ -76,32 +79,32 @@ def next_action(reading, st: LineupState) -> Action:
         return Action("give_up", 0.0, "could_not_align")
     if d < BUFFER_IN + CLOSE_MARGIN_IN:
         st.corrections += 1
-        return Action("back", back_inches_to_target(d, b), "inside the buffer: back up first")
+        return Action("back", back_inches_to_target(d, b, target_in), "inside the buffer: back up first")
     if abs(b) >= PIVOT_MIN_DEG:
         st.corrections += 1
         return Action("pivot", _pivot_for(b), "basket far off to the side: pivot toward it")
-    if d - TARGET_IN > DIST_TOL_IN:
+    if d - target_in > dist_tol:
         cap = FAR_STEP_MAX_IN if d > FAR_IN else FWD_STEP_MAX_IN
-        step = min(cap, d - TARGET_IN, d - BUFFER_IN - CLOSE_MARGIN_IN)                   # never ends inside the buffer
+        step = min(cap, d - target_in, d - BUFFER_IN - CLOSE_MARGIN_IN)                   # never ends inside the buffer
         if step >= MIN_STEP_IN:
             st.corrections += 1
             return Action("forward", step, "too far: walk closer")
-    if TARGET_IN - d > DIST_TOL_IN:
+    if target_in - d > dist_tol:
         st.corrections += 1
-        return Action("back", back_inches_to_target(d, b), "too close: back up")
-    if abs(b) > ALIGN_TOL_DEG:
+        return Action("back", back_inches_to_target(d, b, target_in), "too close: back up")
+    if abs(b) > align_tol:
         st.corrections += 1
         return Action("nudge", b, "small alignment turn")
     return Action("shoot", 0.0, "aligned at the shot distance")
 
 
-def lineup(look, mover, max_steps: int = 60, say=print) -> dict:
+def lineup(look, mover, max_steps: int = 60, say=print, target_in: float = TARGET_IN, dist_tol: float = DIST_TOL_IN, align_tol: float = ALIGN_TOL_DEG) -> dict:
     """Run the line-up. `look()` takes a fresh picture and returns a reading or None; `mover` has scan(deg), pivot(deg), nudge(deg), forward(inches), back(inches) (each one step, then still, and answering "fell" when he went over). Returns
     {"outcome": "aligned" | "basket_not_found" | "could_not_align" | "too_many_steps" | "fell", "steps": [...], "last": reading}."""
     st, reading = LineupState(), None
     for _ in range(max_steps):
         reading = look()
-        act = next_action(reading, st)
+        act = next_action(reading, st, target_in, dist_tol, align_tol)
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "claw_in": None if reading is None else round(reading.claw_in, 1),
                        "bearing_deg": None if reading is None else round(reading.bearing_deg, 1)})
         say(f"line-up: {act.why}" + (f" ({act.kind} {act.value:.1f})" if act.kind not in ("shoot", "give_up") else ""))
