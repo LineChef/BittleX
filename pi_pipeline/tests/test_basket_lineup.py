@@ -140,3 +140,15 @@ def test_a_basket_closer_than_eight_inches_is_still_read_so_the_guard_can_fire()
     near = bf.find_basket_array(picture((60, 90, 190, 180, ORANGE)))                   # 130 px wide: about 5.6 inches from the claw tip
     assert near is not None and near.claw_in < bl.BUFFER_IN and bl.next_action(near, bl.LineupState()).kind == "back"
     assert bf.find_basket_array(picture((10, 70, 230, 130, ORANGE))) is None             # a stripe across the whole frame is still not the cup
+
+
+def test_a_back_up_is_one_move_to_the_shot_distance_allowing_for_the_sideways_drift():
+    import math
+    for d, b in ((10.0, 0.0), (5.4, 17.3), (6.8, -4.1), (11.6, 25.0)):
+        inches = bl.back_inches_to_target(d, b)
+        th = math.radians(b)
+        end = math.hypot(d * math.cos(th) + inches, d * math.sin(th) - bl.BACK_DRIFT_RATIO * inches)
+        assert abs(end - bl.TARGET_IN) < 0.05 and inches <= bl.BACK_STEP_MAX_IN                              # ends at the shot distance, in one step
+    assert bl.back_inches_to_target(10.0, 0.0) < bl.TARGET_IN - 10.0                                          # the drift lengthens the line, so a little less than straight back
+    assert bl.back_inches_to_target(1.0, 0.0) == bl.BACK_STEP_MAX_IN                                          # the mover's one-step cap
+    assert act(5.4, 17.3).value > 6.0                                                                          # the inside-the-buffer back-up is no longer capped at 6

@@ -9,13 +9,15 @@ Distances are in inches from the claw tip; bearings in degrees, + to the right. 
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 TARGET_IN = 16.0              # the shot distance
 DIST_TOL_IN = 2.5             # provisional: the basket finder's distance is good to about 1 to 3 inches at this range (vision/basket_finder.py); tighten after calibration
 BUFFER_IN = 6.0               # never closer than this to the basket (owner: he can get within 6 inches without pushing it)
 CLOSE_MARGIN_IN = 2.0         # inside BUFFER_IN + this he backs up before anything else (no turning next to the basket)
-FWD_STEP_MAX_IN, BACK_STEP_MAX_IN, FAR_STEP_MAX_IN, FAR_IN = 6.0, 6.0, 12.0, 30.0
+FWD_STEP_MAX_IN, BACK_STEP_MAX_IN, FAR_STEP_MAX_IN, FAR_IN = 6.0, 12.0, 12.0, 30.0     # a back-up is ONE move all the way to the shot distance (the mover caps it at 12)
+BACK_DRIFT_RATIO = 0.33       # a backward walk drifts to his right by this fraction of its length (nine timed runs 2026-11-23: 1 of 2, 3 of 9, 3 to 5 of 16 inches; docs/rl/real-walk-log.md)
 MIN_STEP_IN = 1.5
 ALIGN_TOL_DEG = 3.0          # about 0.8 inch sideways at 16 inches, the sideways spread of the lob
 PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
@@ -42,6 +44,24 @@ def _pivot_for(bearing: float) -> float:
     return cycles * PIVOT_CYCLE_DEG * (1 if bearing > 0 else -1)
 
 
+def back_inches_to_target(d: float, bearing_deg: float) -> float:
+    """How far to back up so the claw tip ends TARGET_IN from the basket after the backward walk's sideways drift. Straight back would end `TARGET_IN - d` inches further; the walk also slides him to his right by BACK_DRIFT_RATIO of its length, which puts
+    the basket off to the side and lengthens the straight line to it, so the line is solved from the basket's position (d and the bearing, + right) after a back-up of b inches: sqrt((d cos(bearing) + b)^2 + (d sin(bearing) - ratio b)^2) = TARGET_IN."""
+    th = math.radians(bearing_deg)
+    ahead, right = d * math.cos(th), d * math.sin(th)
+
+    def dist(b: float) -> float:
+        return math.hypot(ahead + b, right - BACK_DRIFT_RATIO * b)
+
+    lo, hi = 0.0, BACK_STEP_MAX_IN
+    if dist(hi) <= TARGET_IN:
+        return hi
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if dist(mid) < TARGET_IN else (lo, mid)
+    return max(MIN_STEP_IN, min(BACK_STEP_MAX_IN, (lo + hi) / 2))
+
+
 def next_action(reading, st: LineupState) -> Action:
     """The next step from a fresh reading (a BasketReading-like object with `claw_in` and `bearing_deg`, or None when the basket is not in the picture)."""
     if reading is None:
@@ -55,7 +75,7 @@ def next_action(reading, st: LineupState) -> Action:
         return Action("give_up", 0.0, "could_not_align")
     if d < BUFFER_IN + CLOSE_MARGIN_IN:
         st.corrections += 1
-        return Action("back", max(MIN_STEP_IN, min(BACK_STEP_MAX_IN, TARGET_IN - d)), "inside the buffer: back up first")
+        return Action("back", back_inches_to_target(d, b), "inside the buffer: back up first")
     if abs(b) >= PIVOT_MIN_DEG:
         st.corrections += 1
         return Action("pivot", _pivot_for(b), "basket far off to the side: pivot toward it")
@@ -67,7 +87,7 @@ def next_action(reading, st: LineupState) -> Action:
             return Action("forward", step, "too far: walk closer")
     if TARGET_IN - d > DIST_TOL_IN:
         st.corrections += 1
-        return Action("back", max(MIN_STEP_IN, min(BACK_STEP_MAX_IN, TARGET_IN - d)), "too close: back up")
+        return Action("back", back_inches_to_target(d, b), "too close: back up")
     if abs(b) > ALIGN_TOL_DEG:
         st.corrections += 1
         return Action("nudge", b, "small alignment turn")
