@@ -20,7 +20,9 @@ from ..goals import basket_outcome as bo
 from ..vision.object_finder import ObjectReading
 
 MAX_ATTEMPTS = 5
-MAX_RETRIEVAL_STEPS = 16
+MAX_RETRIEVAL_STEPS = 16             # walking steps (pivots, turns, walks, pick-ups); the pivot scans have their own cap
+MAX_SCANS = 28                        # two full circles of scan pivots in all, however often the puck is seen and lost (owner, 2026-11-23: scans must not use up the walking steps)
+BLIND_STEP_IN = 1.5                   # a puck at the claw tip (its blob cut off at the bottom of the picture): the finder's distance is wrong, so one short blind step, then the pick-up
 PICK_TRIES = 3
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 ALIGN_DEG = 6.0                      # the puck's bearing must be inside this before the last walk (a pick-up window is about 1 inch wide)
@@ -45,6 +47,7 @@ class RAction:
 class RState:
     scanned_deg: float = 0.0
     steps: int = 0
+    scans: int = 0
     picks: int = 0
     log: list = field(default_factory=list)
 
@@ -56,10 +59,10 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
     if basket is not None and (basket.claw_in < BASKET_GUARD_IN or getattr(basket, "touches_edge", False)):         # a basket cut off by the frame is right beside him
         return RAction("give_up", 0.0, "too_near_the_basket")
     if puck is None:
-        if st.scanned_deg >= SCAN_MAX_DEG:
+        if st.scanned_deg >= SCAN_MAX_DEG or st.scans >= MAX_SCANS:
             return RAction("give_up", 0.0, "puck_not_found")
         st.scanned_deg += SCAN_STEP_DEG
-        st.steps += 1
+        st.scans += 1
         return RAction("scan", SCAN_STEP_DEG, "puck not in view: pivot scan")
     st.scanned_deg = 0.0
     d, b = float(puck.claw_in), float(puck.bearing_deg)
@@ -69,6 +72,8 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
     if abs(b) > ALIGN_DEG:
         st.steps += 1
         return RAction("nudge", b, "small turn onto the puck")
+    if getattr(puck, "clipped", False):                                                   # at the claw tip already (owner, 2026-11-23: line up until one step away, one blind step, then the pick-up)
+        return RAction("pick", BLIND_STEP_IN, "puck at the claw tip: one blind step, then the pick-up")
     if d > PICK_STAND_IN + APPROACH_TOL_IN:
         st.steps += 1
         return RAction("forward", min(APPROACH_STEP_MAX_IN, d - PICK_STAND_IN), "walk up to the puck")

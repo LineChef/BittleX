@@ -35,6 +35,17 @@ def test_the_retrieval_decisions():
     assert a.kind == "pick" and abs(a.value - (6.5 - br.PICK_UNDERSHOOT_IN)) < 1e-9                   # the last walk stops short of the finder's distance
     assert act(P(0.2, 0.0)).value == 0.0
     assert act(P(20.0, 0.0), B(7.0, 0.0)).value == 0.0 and act(P(20.0, 0.0), B(7.0, 0.0)).why == "too_near_the_basket"     # never walks on toward a basket inside the buffer
+    c = P(7.9, 0.4)
+    c.clipped = True
+    a = act(c)
+    assert a.kind == "pick" and a.value == br.BLIND_STEP_IN                                          # a puck at the claw tip: the finder's distance is not used
+    assert act(c.__class__(7.9, 12.0)).kind == "nudge"                                               # but a puck off to one side is still turned onto first
+    st = br.RState(scans=br.MAX_SCANS - 1)
+    assert act(None, None, st).kind == "scan" and act(None, None, st).why == "puck_not_found"        # scans have their own cap and use no walking steps
+    st = br.RState()
+    for _ in range(10):
+        assert act(None, None, st).kind == "scan"
+    assert st.steps == 0
     st = br.RState(steps=br.MAX_RETRIEVAL_STEPS)
     assert act(P(20.0, 0.0), None, st).why == "could_not_reach_puck"
 

@@ -32,6 +32,7 @@ class PuckReading:
     area: int
     bearing_deg: float          # + = to G2's right
     claw_in: float              # distance from the claw tip along the floor (by the blob's row)
+    clipped: bool = False       # the blob runs down to the picture's lowest floor row: the puck is at the claw tip, partly hidden by the jaws, so its width and row understate how near it is
 
 
 def distance_from_row(row: float) -> float:
@@ -66,12 +67,12 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
         if _inside(basket, cx, cy):
             continue
         if best is None or n > best[0]:
-            best = (n, cx, cy, w, h)
+            best = (n, cx, cy, w, h, bool(ys.max() >= BOTTOM_ROW - 1))
     if best is None:
         return None
-    n, cx, cy, w, h = best
+    n, cx, cy, w, h, clipped = best
     dist = WIDTH_K / max(w, 1) if by == "width" else distance_from_row(cy)
-    return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), dist)
+    return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), dist, clipped)
 
 
 def find_puck(jpeg: bytes, basket=None, by: str = "row") -> PuckReading | None:

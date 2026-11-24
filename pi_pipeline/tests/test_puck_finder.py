@@ -60,3 +60,9 @@ def test_a_quick_claw_down_picture_reads_the_distance_from_the_width():
     q = pf.find_puck_array(picture((113, 124, 122, 134, RED)), by="width")                   # 9 pixels wide: about 10.6 inches
     assert q is not None and 9.5 <= q.claw_in <= 11.5 and q.claw_in > p.claw_in
     assert pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="row").claw_in != p.claw_in
+
+
+def test_a_puck_cut_off_at_the_bottom_of_the_floor_rows_is_marked_clipped():
+    at_tip = pf.find_puck_array(picture((112, 186, 128, 215, RED)), by="width")        # runs on into the jaws: its lowest rows are hidden
+    assert at_tip is not None and at_tip.clipped
+    assert not pf.find_puck_array(picture((112, 124, 128, 143, RED))).clipped
