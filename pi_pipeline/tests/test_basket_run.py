@@ -457,3 +457,14 @@ def test_the_shared_claw_look_has_no_tail_option_and_still_ends_standing():
     from pi_pipeline.behavior import ball_chase as chase, claw_survey
     assert "tail" not in inspect.signature(chase.claw_look_sequence).parameters and "tail" not in inspect.signature(claw_survey.run_claw_look).parameters
 
+
+
+def test_a_puck_seen_in_another_picture_than_the_basket_is_a_miss_not_a_make():
+    from pi_pipeline.vision import basket_finder as bf, puck_finder as pf
+    basket = bf.BasketReading(120.0, 110.0, 36, 28, 0.0, 18.0, 16.0, False)
+    puck = pf.PuckReading(120.0, 110.0, 14, 14, 150, 4.0, 8.0)                                                # the same pixel position as the basket's centre, but in the right-hand picture
+    offsets = {"look_right": 27.0, "centre": 0.0}
+    b, p = br.merge_looks({"centre": (basket, None), "look_right": (None, puck)}, offsets)
+    assert br.classify_after(b, p)[0] == bo.MISSED and p.bearing_deg == 31.0
+    b, p = br.merge_looks({"centre": (basket, puck)}, offsets)
+    assert br.classify_after(b, p)[0] == bo.MADE                                                              # in the same picture it still is one
