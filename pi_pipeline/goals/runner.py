@@ -151,6 +151,9 @@ class GoalSession:
                     self._speak("My board is not answering. Please switch it off and on.")
                     why = "board_silent"
                     break
+                if result.ended in tuple(getattr(self.approach, "ends_session", ())):          # an attempt that cannot go on (the basket goal: no puck to throw, the tub not found): the next attempt would only pick up nothing and throw it
+                    why = result.ended
+                    break
                 if result.ended == "stopped" or self.stop():
                     why = "stopped"
                     break

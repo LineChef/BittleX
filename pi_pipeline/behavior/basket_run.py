@@ -317,6 +317,14 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
+def _rest(env, rec: dict) -> None:
+    """Lay him down in rest once for this attempt (`rec["rested"]`): every way an attempt can end, other than a fall, ends with him lying, never standing about (owner, 2026-11-24: the legs sag after about 10 s and he fell on the next move). A fake environment without `lie_down` is left alone."""
+    if rec.get("rested") or not hasattr(env, "lie_down"):
+        return
+    env.lie_down()
+    rec["rested"] = True
+
+
 def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None, first=None, look: str | None = None) -> dict:
     """The confirm look (owner, 2026-11-24): the after-throw look from about 16 inches cannot see into the clear tub (a puck inside is 0 to 5 coloured pixels there, 10 to 90 at 8 inches), so when it did not see the puck he walks up to about 8 inches of the tub (the line-up's own steps and
     buffer, aimed at CONFIRM_READING_IN). In the default "quick" mode the walk-up's last picture (claw down, taken at once) IS the confirm picture, read for a puck inside the tub the moment it is taken: nothing waits, a make lies down at once and a miss keeps moving, so he never stands idle (owner: the legs sag after about 10 seconds). In the "claw_up" mode he goes
@@ -342,16 +350,15 @@ def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": Non
             walk_look()                                                          # he was already in place on the first reading: the confirm picture is taken now
     except CameraStalled:
         say("confirm: no pictures from the camera while standing: lying down")
-        if hasattr(env, "lie_down"):
-            env.lie_down()
+        _rest(env, rec)
         rec["confirm"] = {"walkup": {"outcome": "camera_stalled"}}
         persist()
         return {"stop": "no_picture", "code": None, "basket": None, "puck": None}
     rec["confirm"] = {"walkup": {"outcome": lu["outcome"], "steps": lu["steps"]}, "standing_s": round(time.monotonic() - t_stand, 1), "look": look_mode}        # how long he stood walking up and looking: the legs sag after about 10 s
     persist()
     if lu["outcome"] != "aligned":
-        if lu["outcome"] != "fell" and hasattr(env, "lie_down"):
-            env.lie_down()
+        if lu["outcome"] != "fell":
+            _rest(env, rec)
         return {"stop": lu["outcome"], "code": None, "basket": None, "puck": None}
     try:
         if quick:
@@ -363,8 +370,7 @@ def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": Non
         return {"stop": "fell", "code": None, "basket": None, "puck": None}
     if not getattr(env, "confirm_picture_ok", True):
         rec["confirm"]["look"] = {"code": "no_picture"}
-        if hasattr(env, "lie_down"):
-            env.lie_down()
+        _rest(env, rec)
         say("confirm: no picture from the camera: stopping (not counted as a make)")
         persist()
         return {"stop": "no_picture", "code": None, "basket": None, "puck": None}
@@ -377,13 +383,12 @@ def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": Non
     say(f"confirm: {code}: {words}")
     persist()
     if code in (bo.MADE, bo.NO_BASKET):
-        if hasattr(env, "lie_down"):
-            env.lie_down()                                                       # a make: rest from the stand the look ended in; the run ends for the owner's reset
+        _rest(env, rec)                                                       # a make: rest from the stand the look ended in; the run ends for the owner's reset
         return {"stop": "made" if code == bo.MADE else code, "code": code, "basket": basket, "puck": None}
     return {"stop": None, "code": code, "basket": basket, "puck": floor}
 
 
-def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
+def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
     """ONE attempt: the throw, the look, and after a miss the retrieval and the line-up for the next throw. `rec` is the attempt's record (filled in as it goes). Returns (why it must stop or None to go on, whether he is holding the puck
     for the next throw). The stop reasons are those of `run_sequence`; "made" (a puck seen inside the tub from close up) and the other after-throw codes end a run for the owner's reset. The goal (goals/basket.py) and `run_sequence` both call this."""
     n = rec.get("attempt", 1)
@@ -404,8 +409,7 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
         return "fell", holding
     if not getattr(env, "picture_ok", True):
         rec["after"] = {"code": "no_picture", "words": "The camera gave no picture after the throw, so I cannot say where it went."}
-        if hasattr(env, "lie_down"):
-            env.lie_down()
+        _rest(env, rec)
         say("after the throw: no picture from the camera: stopping (not counted as a make)")
         persist()
         return "no_picture", holding
@@ -424,8 +428,7 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
             return res["stop"], holding
         code, basket, puck = res["code"], res["basket"], res["puck"]
     elif code != bo.MISSED:
-        if hasattr(env, "lie_down"):
-            env.lie_down()                                                       # no tub in view (or no confirm look to ask): rest, the run ends for the owner's check
+        _rest(env, rec)                                                       # no tub in view (or no confirm look to ask): rest, the run ends for the owner's check
         return code, holding
 
     def on_step(log, rec=rec):
@@ -441,8 +444,8 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
         persist()
         if c["outcome"] != "found":
             rec["retrieval"] = {"outcome": "puck_not_found" if c["outcome"] != "fell" else "fell", "steps": []}
-            if c["outcome"] != "fell" and hasattr(env, "lie_down"):
-                env.lie_down()                                                   # two laps without the puck (or the tub lost): the session ends at rest
+            if c["outcome"] != "fell":
+                _rest(env, rec)                                                   # two laps without the puck (or the tub lost): the session ends at rest
             return ("fell" if c["outcome"] == "fell" else c["outcome"]), holding
         basket, puck = c["basket"], c["puck"]
     r = retrieve(env, say=say, on_step=on_step, first=(basket, puck))
@@ -456,6 +459,15 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
     if lu["outcome"] != "aligned":
         return lu["outcome"], holding
     return None, True
+
+
+def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
+    """ONE attempt (see `_attempt_once`). Whatever stops it, other than a fall, he is laid down in rest before this returns: a retrieval that gave up, a line-up that could not align, a camera that stalled, the battery. Standing idle after the attempt let the legs sag and he fell on the next move
+    (2026-11-24). Returns (why it must stop or None to go on, whether he is holding the puck)."""
+    why, holding = _attempt_once(env, rec, holding, say, persist)
+    if why and why != "fell":
+        _rest(env, rec)
+    return why, holding
 
 
 def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) -> dict:

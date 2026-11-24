@@ -154,3 +154,9 @@ def test_the_environment_the_throw_script_changes_is_put_back(monkeypatch):
     with basket.env_restored():
         os.environ["G2_GYRO_BALANCE"], os.environ["G2_STAND_GYRO"] = "0", "0"
     assert "G2_GYRO_BALANCE" not in os.environ and os.environ["G2_STAND_GYRO"] == "1"
+
+
+def test_the_basket_session_ends_after_any_attempt_that_leaves_no_puck_to_throw():
+    ends = set(basket.BasketGoal.ends_session)
+    assert {"puck_not_found", "could_not_reach_puck", "pick_failed", "circled_twice", "tub_lost", "no_basket", "made"} <= ends     # 2026-11-24: "could not get the puck back" went on to attempt 2, a pick-up of nothing and a throw at nothing
+    assert "fell" not in ends and None not in ends and "ready" not in ends                                                          # a made-ready line-up goes on; a fall is the runner's own stop

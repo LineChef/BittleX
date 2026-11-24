@@ -507,6 +507,21 @@ def test_a_fall_or_a_low_battery_ends_the_session(tmp_path):
     assert s.run()["why"] == "battery" and len(ap.ran) == 1
 
 
+def test_an_attempt_that_cannot_go_on_ends_the_session_when_the_approach_says_so(tmp_path):
+    class Ends(FakeApproach):
+        ends_session = ("puck_not_found",)
+
+        def run_attempt(self, settings, ctx):
+            self.ran.append(dict(settings))
+            return AttemptResult("puck_not_found", 1.0, [])
+    ap = Ends([oc("bad", 0.2), oc("hit", 1, True)])
+    s, _ = _session(tmp_path, ap)
+    assert s.run()["why"] == "puck_not_found" and len(ap.ran) == 1 and ap.closed == 1                              # not another attempt at a puck that is not there
+    ap = FakeApproach([oc("bad", 0.2), oc("hit", 1, True)])                                                         # an approach with no such set carries on as before
+    s, _ = _session(tmp_path, ap, attempts=2)
+    assert len(s.run() and ap.ran) == 2
+
+
 def test_a_session_stops_on_the_flag_and_at_its_target(tmp_path):
     ap = FakeApproach([oc("hit", 1, True)] * 4)
     s, _ = _session(tmp_path, ap, stop=lambda: True)

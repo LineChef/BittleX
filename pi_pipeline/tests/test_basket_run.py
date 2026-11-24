@@ -650,3 +650,19 @@ def test_a_camera_that_stops_answering_while_he_stands_lies_him_down_after_two_m
     r = br.run_sequence(env, say=lambda s: None)
     assert r["outcome"] == "no_picture" and lies == [1] and len(asked) == br.CAMERA_MISSES_MAX              # not a make, not a search: he lies down rather than stand turning on the spot
     assert r["attempts"][0]["confirm"]["walkup"]["outcome"] == "camera_stalled"
+
+
+def test_every_way_an_attempt_can_stop_but_a_fall_ends_with_him_lying_down():
+    lies = []
+
+    class E(Env):
+        def lie_down(self):
+            lies.append(1)
+    for kwargs, why in (({"puck_after": [(24.0, 0.0)], "pick_works": False}, "pick_failed"),                  # a retrieval that gave up
+                        ({"puck_after": [(20.0, 0.0)], "basket_start": (6.0, 0.0)}, "too_near_the_basket"),
+                        ({"puck_after": [None]}, "circled_twice")):
+        lies.clear()
+        r = br.run_sequence(E([ok()], **kwargs), say=lambda s: None)
+        assert r["outcome"] == why and lies == [1], (why, lies)                                                  # once: never standing about with the legs sagging, never twice
+    lies.clear()
+    assert br.run_sequence(E([ok()], fell_in_look=True), say=lambda s: None)["outcome"] == "fell" and lies == []   # a fall is the guards' to handle: no command is sent to a fallen G2
