@@ -367,12 +367,14 @@ class RealEnv:
         self.look_readings = {}
 
         def snapshot(label):
+            t_start = time.monotonic() - t_look
             jpeg = cam.look()
+            t_end = time.monotonic() - t_look
             if jpeg:
                 basket = bf.find_basket(jpeg)
                 seen[label] = (basket, pf.find_puck(jpeg, basket))
                 b_, p_ = seen[label]
-                self.look_readings[label] = {"basket": None if b_ is None else (round(b_.claw_in, 1), round(b_.bearing_deg, 1), b_.width_px),
+                self.look_readings[label] = {"t_s": (round(t_start, 2), round(t_end, 2)), "basket": None if b_ is None else (round(b_.claw_in, 1), round(b_.bearing_deg, 1), b_.width_px),
                                              "puck": None if p_ is None else (round(p_.claw_in, 1), round(p_.bearing_deg, 1), p_.width_px, round(p_.x), round(p_.y))}
                 if label == "centre":
                     self.picture_ok = True
@@ -381,7 +383,7 @@ class RealEnv:
                         print(f"AFTER_PICTURE {self.attempt} {base64.b64encode(jpeg).decode()}", flush=True)
             return jpeg
         self.robot.expect_lob_end()
-        t0 = time.monotonic()
+        t0 = t_look = time.monotonic()
         state = claw_survey.run_claw_look(self.link, snapshot, "centre", robot=self.robot)
         self.attention_hold_s = round(time.monotonic() - t0, 1)
         if state != "ok" and getattr(self.robot, "last_fall", None):
@@ -480,7 +482,7 @@ def main(argv: list | None = None) -> None:
             basket, puck = env.after_throw()
             print(f"LOOK offsets: look_left -{chase.CLAW_PAN_DEG:.0f}, look_right +{chase.CLAW_PAN_DEG:.0f}, centre 0 (degrees, + to G2's right)")
             for label, r in env.look_readings.items():
-                print(f"LOOK {label}: basket {r['basket']} puck {r['puck']}   (distance in, bearing deg, width px[, x, y])")
+                print(f"LOOK {label}: basket {r['basket']} puck {r['puck']} picture asked at {r['t_s'][0]} s, answered at {r['t_s'][1]} s after the look began   (distance in, bearing deg, width px[, x, y])")
             print("LOOK merged: basket", None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1)), "puck", None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)))
             env.lie_down()
             return
