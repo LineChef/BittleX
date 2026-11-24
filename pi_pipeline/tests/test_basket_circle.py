@@ -1,5 +1,6 @@
 """The circling search (behavior/basket_run.circle_search) on a simulated floor: the tub at the origin, G2 somewhere round it, a camera with a 35 degree half view that cannot see a puck behind the tub, movers that do what they are told (pivots, a wide arc of a guessed radius that curves while it turns, a turn that can come up a tenth short)."""
 import math
+import time
 from types import SimpleNamespace as NS
 
 from pi_pipeline.behavior import basket_run as br
@@ -182,3 +183,90 @@ def test_a_puck_seen_with_the_tub_out_of_view_this_near_is_the_tubs_own_tape():
             return self.looks.pop(0) if self.looks else (None, None)
     r = br.circle_search(E(), say=lambda s: None)
     assert r["outcome"] != "found" and r["puck"] is None                                       # the 4 inch "puck" beside a tub read 11 inches a moment ago was not chased
+
+
+def _test_run(sim, **kw):
+    kw = {"max_laps": 1000, "peek_every": 3, "ignore_puck": True, "deadline": time.monotonic() + 20.0, **kw}
+    return br.circle_search(Env(sim), say=lambda s: None, **kw)
+
+
+def test_the_circle_test_passes_after_three_clean_laps_in_a_row_on_a_floor_that_holds_the_radius():
+    r = _test_run(Sim(puck=None), streak_target=3)
+    rep = r["report"]
+    assert r["outcome"] == "passed" and rep["streak"] >= 3 and len(rep["laps"]) >= 3
+    assert all(lap["clean"] for lap in rep["laps"][-3:])
+    assert rep["gyro_over_asked"] == 1.0 and rep["distance_in"]["min"] >= br.CIRCLE_MIN_IN
+    assert all("gyro_deg" in e and "straight_in" in e for e in r["arcs"][:-1]) and any("peek" in e for e in r["arcs"])      # every arc was logged, with what each peek read
+
+
+def test_the_test_ignores_a_puck_and_the_goals_own_defaults_are_unchanged():
+    r = _test_run(Sim(puck=(0.0, 8.0)), streak_target=1)
+    assert r["outcome"] == "passed"
+    r = br.circle_search(Env(Sim(puck=None)), say=lambda s: None)                                    # the goal's call: two laps end it
+    assert r["outcome"] == "circled_twice" and len(r["arcs"]) <= 18
+    st = br.CircleState()
+    assert (st.max_laps, st.peek_every, st.streak_target) == (br.CIRCLE_MAX_LAPS, br.CIRCLE_PEEK_EVERY, 0)
+
+
+def test_the_clock_ends_the_test_and_a_spoiled_lap_resets_the_streak():
+    r = _test_run(Sim(puck=None), deadline=0.0)                                                      # the time is already up
+    assert r["outcome"] == "time_up" and r["arcs"] == []
+    st = br.CircleState(streak_target=2)
+    st.arcs, st.angle_deg = 8, 3 * 360.0
+    assert br.clean_streak(st) == 3
+    st.note_soft("back_off", d=8.0)                                                                  # during the lap 3 just ended? no: before the first arc nothing counts
+    assert st.soft[-1]["lap"] == 3 and br.clean_streak(st) == 3
+    st.soft[-1]["lap"] = 1
+    assert br.clean_streak(st) == 1 and [row["clean"] for row in br.lap_table(st)] == [True, False, True]
+    st = br.CircleState()
+    st.note_soft("back_off")                                                                         # before the first arc: the start-up, no lap
+    assert st.soft[0]["lap"] == -1 and br.clean_streak(st) == 0
+
+
+def test_a_back_off_a_tub_in_the_forward_picture_and_a_peek_out_of_band_are_soft_failures():
+    tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                                  # noqa: E731
+    st = br.CircleState(side=1)
+    st.phase, st.arcs = "glance", 1
+    st.events.append({"arc": 1})
+    br.next_circle_action(None, tub(8.0, 40.0), st)
+    br.next_circle_action(None, tub(14.0, 40.0), st)
+    st.phase = "look"
+    br.next_circle_action(None, tub(24.0, 30.0), st)
+    assert [s["kind"] for s in st.soft] == ["back_off", "too_tight", "out_of_band"]
+    assert st.events[0]["peek"] == (24.0, 30.0)
+
+
+def test_the_straight_walk_is_the_default_unless_the_gain_is_on_and_the_reading_is_fresh(monkeypatch):
+    assert br.straight_for(None) == br.CIRCLE_STRAIGHT_IN and br.straight_for(10.0) == br.CIRCLE_STRAIGHT_IN                 # gain 0: off
+    monkeypatch.setattr(br, "CIRCLE_STRAIGHT_GAIN", 0.5)
+    assert br.straight_for(10.0) == br.CIRCLE_STRAIGHT_IN + 3.0 and br.straight_for(30.0) == br.CIRCLE_STRAIGHT_MIN_IN
+    assert br.straight_for(0.0) == br.CIRCLE_STRAIGHT_MAX_IN
+
+
+def test_a_camera_stall_and_a_fall_end_the_test_with_their_own_outcome():
+    class Stall(Env):
+        def look(self):
+            raise br.CameraStalled()
+    assert br.circle_search(Stall(Sim()), say=lambda s: None, ignore_puck=True)["outcome"] == "camera_stalled"
+    sim = Sim()
+    sim.pivot = lambda deg: "fell"
+    assert _test_run(sim, streak_target=3)["outcome"] == "fell"
+
+
+def test_the_end_of_run_summary_lists_every_lap_and_arc():
+    r = _test_run(Sim(puck=None), streak_target=1)
+    lines = br.circle_report_lines(r)
+    assert lines[0].startswith("CIRCLE TEST passed") and any("lap 1:" in x for x in lines) and any("arc 1:" in x for x in lines)
+
+
+def test_the_peek_learns_how_far_to_turn_from_where_the_last_one_found_the_tub():
+    tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                                  # noqa: E731
+    st = br.CircleState(side=1)
+    st.phase, st.arcs = "peek", 1
+    assert br.next_circle_action(None, None, st).value == br.bl._pivot_for(br.CIRCLE_PEEK_DEG) and st.peek_turn == br.CIRCLE_PEEK_DEG
+    br.next_circle_action(None, None, st)                                                            # not in view: a 30 degree lost step is added to the turn
+    assert st.peek_turn == br.CIRCLE_PEEK_DEG + br.CIRCLE_LOST_STEP_DEG
+    br.next_circle_action(None, tub(14.0, 14.0), st)                                                 # found 14 degrees off his nose after 90: he was 104 degrees off before the peek
+    assert abs(st.peek_deg - (14.0 + 90.0 - br.CIRCLE_PEEK_TARGET_DEG)) < 1e-6
+    st.phase, st.arcs = "peek", 2
+    assert br.next_circle_action(None, None, st).value == br.bl._pivot_for(st.peek_deg)
