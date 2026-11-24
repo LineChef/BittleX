@@ -115,7 +115,7 @@ class Env:
 
     def after_throw(self):
         basket, puck = self.look()
-        self.w.walkup = puck is None or br.CONFIRM_ALWAYS                                                  # the confirm look follows
+        self.w.walkup = puck is None                                                                        # the confirm look follows
         return basket, puck
 
     def look(self):
@@ -161,18 +161,12 @@ def test_a_throw_not_seen_from_sixteen_inches_is_confirmed_from_close_up_and_a_p
     assert a["confirm"]["walkup"]["outcome"] == "aligned" and a["confirm"]["look"]["tub_puck"] is not None
 
 
-def test_a_puck_seen_outside_is_a_miss_with_no_walk_up_unless_confirming_always_is_on():
+def test_a_puck_seen_outside_is_a_miss_with_no_walk_up_and_goes_straight_to_the_pick_up():
     env = Env([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
     r = br.run_sequence(env, say=lambda s: None)
-    assert r["attempts"][0]["after"]["code"] == bo.MISSED and "confirm" not in r["attempts"][0]            # a puck on the floor is already a certain miss
-    old = br.CONFIRM_ALWAYS
-    try:
-        br.CONFIRM_ALWAYS = True
-        env = Env([ok(), ok()], puck_after=[(24.0, 25.0), "in"])
-        r = br.run_sequence(env, say=lambda s: None)
-        assert "confirm" in r["attempts"][0] and r["attempts"][0]["confirm"]["look"]["floor_puck"] is not None and r["outcome"] == "made"
-    finally:
-        br.CONFIRM_ALWAYS = old
+    a = r["attempts"][0]
+    assert a["after"]["code"] == bo.MISSED and "confirm" not in a                                           # a puck on the floor is already a certain miss (owner, 2026-11-24)
+    assert a["retrieval"]["outcome"] == "retrieved" and env.picks == 1 and env.confirm_looks == 1             # the only confirm look is the second throw's
 
 
 def test_nothing_inside_is_a_miss_and_he_circles_the_tub_until_he_sees_the_puck_then_fetches_it():

@@ -37,7 +37,6 @@ PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the fin
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
-CONFIRM_ALWAYS = False               # the confirm look (walk up to about 8 inches of the tub and look into it) runs when the puck was not seen after the throw; True also runs it when the puck was seen outside (owner, 2026-11-24: "after every throw"; a puck seen on the floor is already a certain miss, so the default skips the walk-up)
 CIRCLE_RADIUS_IN = 13.0              # the circling search's radius, as the finder reads it: near enough that a puck within about 8 inches of the tub is inside the puck finder's range, far enough from the 6 inch buffer
 CIRCLE_MIN_IN = 9.0                  # nearer than this (as read) he backs off before the next leg
 CIRCLE_STEP_IN = 6.0                 # one leg's walk
@@ -383,7 +382,7 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
     rec["after"]["pictures"] = getattr(env, "look_readings", None)                    # what each picture of the look read (the merge keeps one basket and one puck)
     say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
     persist()
-    confirm = code == bo.NOT_SEEN or (CONFIRM_ALWAYS and code == bo.MISSED)
+    confirm = code == bo.NOT_SEEN                                                  # a puck seen on the floor outside the tub is a certain miss: no confirm, straight to the pick-up (owner, 2026-11-24)
     if confirm and hasattr(env, "confirm_look"):
         # The puck was not seen from about 16 inches: inside the clear tub it is 0 to 5 coloured pixels there. Walk up to about 8 inches, look into it from the attention pose and read the picture (owner, 2026-11-24).
         res = confirm_throw(env, rec, say, persist)
