@@ -21,6 +21,7 @@ BACK_MIN_S = BACK_POINTS[0][0]                           # the shortest back-up 
 BACK_MAX_IN = 12.0                                       # a safety cap on one back-up step (the line-up asks for 6 at most)
 FWD_MAX_IN = 12.0
 PIVOT_MIN_IN, PIVOT_MAX_IN, PIVOT_DISTANCE_IN = 8.0, 40.0, 20.0    # every basket-run turn is the in-place pivot: a distance outside 8 to 40 inches, or none at all (a scan with nothing in view), would pick the walking arc, which creeps forward (2026-11-23: a scan and a turn toward a puck 5.6 inches away walked him from 16 inches to 7 inches of the basket)
+ARC_MAX_DEG = 90.0                                       # a safety cap on one wide arc (the circling search asks for 45)
 TURN_MAX_DEG = 60.0                                      # a safety cap on one turn step (the line-up asks for 54 at most: two pivot cycles)
 
 
@@ -87,6 +88,20 @@ class BasketMover:
 
     def nudge(self, degrees: float) -> str:
         return self._turn(degrees, pulse=abs(degrees) < chase.PIVOT_MIN_DEG)
+
+    def arc(self, degrees: float) -> str:
+        """A wide turn: the firmware's walking arc (`kwkL` / `kwkR`), gyro-stopped after `degrees` of heading change, which curves FORWARD while it turns (the circling search, owner 2026-11-24). `lineup_ball_in` is cleared so the robot picks the arc skills, not the in-place pivot.
+        `last_arc_deg` is what the gyro says he turned (the lap is counted from it, not from what was asked). The forward speed and radius of the arc are NOT measured yet (the arc calibration is the next hardware session's job): a first guess is about 4 inches a second at about 28 degrees a second, a radius near 9 inches."""
+        want = min(abs(degrees), ARC_MAX_DEG)
+        if want <= 0:
+            return self.state
+        self.robot.lineup_ball_in = None
+        rate = self._rate(degrees, pulse=False)
+        signed = want if degrees > 0 else -want
+        self.state = self.robot.turn(signed, max(chase.MIN_MOVE_S, want / rate), stop_deg=want)
+        done = getattr(self.robot, "last_turn_deg", None)
+        self.last_arc_deg = abs(float(done)) if done else want
+        return self.state
 
     def forward(self, inches: float) -> str:
         secs = forward_seconds(inches, self.book.walk_in_s() if self.book is not None else None)

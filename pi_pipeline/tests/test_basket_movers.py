@@ -169,3 +169,18 @@ def test_the_line_up_tells_the_mover_how_far_the_target_is_so_a_turn_can_be_a_pi
     w = World()
     bl.lineup(w.look, w, say=lambda s: None)
     assert w.dist_at_turn and all(x is not None for x in w.dist_at_turn)                  # every turn step was told the distance
+
+
+def test_a_wide_arc_is_a_gyro_stopped_walking_turn_with_no_pivot_distance_and_reports_what_was_turned():
+    r = FakeRobot()
+    r.lineup_ball_in = 20.0                                                                    # an earlier turn left a pivot distance behind
+    m = bm.BasketMover(r)
+    assert m.arc(45.0) == "ok" and r.lineup_ball_in is None                                    # no distance: the robot picks the firmware arc skills, not the in-place pivot
+    name, args, kw = r.calls[-1]
+    assert name == "turn" and args[0] == 45.0 and kw["stop_deg"] == 45.0 and args[1] >= chase.MIN_MOVE_S
+    r.last_turn_deg = 52.0                                                                    # the gyro says he turned more than asked
+    m.arc(-45.0)
+    assert r.calls[-1][1][0] == -45.0 and m.last_arc_deg == 52.0
+    m.arc(500.0)
+    assert r.calls[-1][2]["stop_deg"] == bm.ARC_MAX_DEG                                        # a safety cap on one arc
+    assert bm.BasketMover(FakeRobot(fall_on="turn")).arc(45.0) == "fell"

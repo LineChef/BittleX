@@ -2,7 +2,7 @@
 
 THE STEPS, every attempt: stand up, pick up, throw with nothing in between (the lob: `behavior/lob.py` through `scripted_skill.play`, played to its end), then THE BALL GOAL'S OWN CLAW LOOK, complete (`claw_survey.run_claw_look`: the attention pose, the claw up in two steps, a settle, the pictures, the claw down, the eased stand-up), read by the basket and puck finders
 (`goals/basket_outcome.classify_throw`). The basket is a clear tub with red tape on its rim (owner, 2026-11-24). From about 16 inches a puck inside it is 0 to 5 coloured pixels, so that look can see a puck on the floor (a miss, the retrieval starts at once) but not inside. The puck NOT seen: the CONFIRM LOOK (`confirm_throw`): he walks up to about 8 inches of the tub (the line-up's steps and 6 inch buffer),
-takes one picture there (the walk-up's own last quick picture, claw down, read at once so he never stands idle; `CONFIRM_LOOK = "claw_up"` goes into the attention pose and takes one centred picture with `claw_survey.run_claw_look(..., centre_only=True)` instead), read for a puck inside the tub. A puck inside is a make: he lies down and the run ends for the owner's reset. Nothing inside is a miss and he CIRCLES the tub (`circle_search`: short legs, facing the tub at every stop, up to two laps, pivoting back toward it when it drops out of view) until the puck is seen, then fetches it as after any miss;
+takes one picture there (the walk-up's own last quick picture, claw down, read at once so he never stands idle; `CONFIRM_LOOK = "claw_up"` goes into the attention pose and takes one centred picture with `claw_survey.run_claw_look(..., centre_only=True)` instead), read for a puck inside the tub. A puck inside is a make: he lies down and the run ends for the owner's reset. Nothing inside is a miss and he CIRCLES the tub (`circle_search`: a wide 45 degree arc at a time with the tub beside him, a peek toward it between arcs, up to two laps, pivoting toward it when it drops out of view) until the puck is seen, then fetches it as after any miss;
 two laps without it end the run at rest. Every look picture and what the finders read on it is kept on the Pi (`save_picture`: `~/g2_runs/basket_run/pictures/<run>/`, with `pictures.jsonl`).
 A miss: he searches for the puck (pivot scan, quick claw-down pictures), walks to it (the line-up's movers, the pace book's paces), walks the last inches and picks it up with `pickF`, checks by a picture that it is gone from the floor, lines up on the basket again (`basket_lineup.lineup`: quick pictures with the claw down) and throws the next attempt without a pick-up.
 Stops: 5 attempts, a fall, no picture after the throw, a basket never found, a puck never found or reached, three failed pick-ups, and never closer than the line-up's buffer to the basket. The camera is warmed up with two silent pictures at the start, before anything moves. Every stage is logged to `~/g2_runs/basket_run/` as it happens.
@@ -39,14 +39,16 @@ EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 CONFIRM_LOOK = "quick"               # "quick": the walk-up's own last picture (claw down, taken at once, read at once: no attention-pose cycle, no standing about) is the confirm picture (owner, 2026-11-24: "he can just walk up and take a fast picture, but he can't be standing idle for a long time afterwards"); "claw_up": the attention-pose look as first built (`env.confirm_look()`)
 CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answer while he stands in the walk-up: he lies down and the attempt stops (a stalled camera must not leave him standing: the legs sag after about 10 s)
-CIRCLE_RADIUS_IN = 13.0              # the circling search's radius, as the finder reads it: near enough that a puck within about 8 inches of the tub is inside the puck finder's range, far enough from the 6 inch buffer
-CIRCLE_MIN_IN = 9.0                  # nearer than this (as read) he backs off before the next leg
-CIRCLE_STEP_IN = 6.0                 # one leg's walk
-CIRCLE_TANGENT_DEG = 75.0            # a leg's heading is this far off the line to the tub (90 would keep the radius; a little less keeps it from drifting outward), corrected by the radius error
-CIRCLE_RADIUS_GAIN = 2.0             # degrees off the tangent per inch of radius error (clamped to CIRCLE_CORRECTION_MAX_DEG)
+CIRCLE_RADIUS_IN = 13.0              # the circle's radius as the finder reads it: near enough that a puck within about 8 inches of the tub is inside the puck finder's range, far enough from the 6 inch buffer
+CIRCLE_MIN_IN = 10.0                 # nearer than this (as read) he backs off before anything else (the first goal run ended a leg 4.5 inches from the tub)
+CIRCLE_ARC_DEG = 45.0                # one wide arc's heading change: 8 arcs a lap
+CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
+CIRCLE_PEEK_DEG = 60.0               # between arcs: turn this far toward the tub, which then stands about 30 degrees off his nose, look, and turn back
+CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before the circle starts
+CIRCLE_RADIUS_GAIN = 2.0             # degrees of extra turn away from (or toward) the tub per inch the radius is off (clamped)
 CIRCLE_CORRECTION_MAX_DEG = 25.0
-CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before a leg starts
-CIRCLE_LOST_STEP_DEG = 30.0          # the tub out of view: pivot this much toward the side it should be on
+CIRCLE_LOST_STEP_DEG = 30.0          # the tub out of view: pivot this much toward its side
+CIRCLE_TAPE_GUARD_IN = 12.0          # a "puck" in view with the tub out of view, when the tub was last read nearer than this, is the tub's own red tape seen from too close, not a puck (the first goal run chased it for 22 scans)
 CIRCLE_MAX_LAPS = 2.0                # more than two laps without the puck ends the session (owner, 2026-11-24)
 CIRCLE_MAX_STEPS = 150
 LOG_DIR = "~/g2_runs/basket_run"
@@ -117,31 +119,31 @@ def classify_after(basket, puck, tub_puck=None, confirm: bool = False) -> tuple[
 
 @dataclass
 class CircleState:
-    angle_deg: float = 0.0           # how far round the tub he has gone from where he started, in degrees (each leg adds its walk over the radius)
+    angle_deg: float = 0.0           # how far round the tub he has gone, in degrees: the arcs' heading change as the gyro reports it (one lap is 360 whatever the radius, as long as the tub stays on the same side)
     steps: int = 0
     lost_deg: float = 0.0
-    side: int = 1                    # +1: each leg starts with a right turn (he circles clockwise seen from above, the tub on his left); -1: the other way
-    phase: str = "look"              # "look" (facing the tub, a fresh picture decides) | "turned" (the leg's heading is set: walk) | "walked" (turn back toward the tub)
-    leg_turn: float = 0.0            # the leg's heading change (+ right), to turn back by
+    side: int = 1                    # the side the tub is kept on: +1 his right (the arcs curve right), -1 his left
+    phase: str = "face"              # "face" (find the tub and face it) -> "arc" (a wide turn) -> "peek" (turn toward the tub) -> "look" (read it, correct, turn back) -> "arc" ...
+    last_d: float | None = None      # the last tub distance read
     log: list = field(default_factory=list)
 
     @property
     def needs_look(self) -> bool:
-        return self.phase == "look"
+        return self.phase in ("face", "look")
 
 
 def next_circle_action(puck, basket, st: CircleState) -> RAction:
-    """The next step of the circling search (pure, like `next_retrieval_action`): round the tub in short legs, facing it at every stop so the finders see the floor around it from every side, until the puck is seen. A puck in view ends it ("found"); more than CIRCLE_MAX_LAPS laps ends it ("circled_twice");
-    the tub out of view makes him pivot toward the side it should be on ("tub_lost" after a full turn). A leg: turn CIRCLE_TANGENT_DEG off the line to the tub, walk CIRCLE_STEP_IN, turn back toward it by the heading change plus the angle gone round; the next look corrects what is left."""
+    """The next step of the circling search (pure, like `next_retrieval_action`). The circle is one wide ARC at a time round the tub kept beside him (owner, 2026-11-24): face the tub, pivot 90 degrees so it is beside him, then arc CIRCLE_ARC_DEG toward it (the firmware's walking arc curves forward while it turns),
+    peek (turn CIRCLE_PEEK_DEG toward the tub so it is about 30 degrees off his nose), look (the tub's distance and bearing, and the puck), correct the radius by how far he turns back (away from the tub when he is too near), and arc again. 360 degrees of arcs is one lap. A puck in view ends it ("found");
+    CIRCLE_MAX_LAPS laps end it ("circled_twice"); the tub out of view makes him pivot toward its side ("tub_lost" after a full turn); nearer than CIRCLE_MIN_IN he backs off first."""
     import math
-    if st.phase == "turned":
-        st.phase = "walked"
-        st.angle_deg += math.degrees(CIRCLE_STEP_IN / CIRCLE_RADIUS_IN)
-        return RAction("forward", CIRCLE_STEP_IN, "circling: walk the leg")
-    if st.phase == "walked":
+    if st.phase == "arc":
+        st.phase = "peek"
+        st.steps += 1
+        return RAction("arc", st.side * CIRCLE_ARC_DEG, "circling: wide arc round the tub")
+    if st.phase == "peek":
         st.phase = "look"
-        back = -st.leg_turn - st.side * math.degrees(CIRCLE_STEP_IN / CIRCLE_RADIUS_IN)
-        return RAction("pivot", bl._pivot_for(back), "circling: turn back toward the tub")
+        return RAction("pivot", bl._pivot_for(st.side * CIRCLE_PEEK_DEG), "circling: turn toward the tub to look")
     if puck is not None:
         return RAction("found", 0.0, "puck in view")
     if st.steps >= CIRCLE_MAX_STEPS or st.angle_deg >= 360.0 * CIRCLE_MAX_LAPS:
@@ -151,24 +153,30 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
             return RAction("give_up", 0.0, "tub_lost")
         st.lost_deg += CIRCLE_LOST_STEP_DEG
         st.steps += 1
-        return RAction("pivot", -st.side * CIRCLE_LOST_STEP_DEG, "tub out of view: pivot toward the side it should be on")      # after a leg the tub is on the side opposite the leg's turn
+        return RAction("pivot", st.side * CIRCLE_LOST_STEP_DEG, "tub out of view: pivot toward the side it should be on")
     st.lost_deg = 0.0
     d, b = float(basket.claw_in), float(basket.bearing_deg)
-    if abs(b) > CIRCLE_FACE_TOL_DEG:
-        st.steps += 1
-        return RAction("pivot" if abs(b) >= bl.PIVOT_MIN_DEG else "nudge", bl._pivot_for(b) if abs(b) >= bl.PIVOT_MIN_DEG else b, "circling: face the tub")
+    st.last_d = d
     if d < CIRCLE_MIN_IN:
         st.steps += 1
         return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
-    correction = max(-CIRCLE_CORRECTION_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (d - CIRCLE_RADIUS_IN)))
-    st.leg_turn = st.side * (CIRCLE_TANGENT_DEG - correction)
-    st.phase = "turned"
+    if st.phase == "face":
+        if abs(b) > CIRCLE_FACE_TOL_DEG:
+            st.steps += 1
+            return RAction("pivot" if abs(b) >= bl.PIVOT_MIN_DEG else "nudge", bl._pivot_for(b) if abs(b) >= bl.PIVOT_MIN_DEG else b, "circling: face the tub")
+        st.phase = "arc"
+        st.steps += 1
+        return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: turn so the tub is beside him")
+    # phase "look": he has turned toward the tub; turn back so the tub ends up beside him, a little more away from it when he is too near and less when too far
+    correction = max(-CIRCLE_CORRECTION_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (CIRCLE_RADIUS_IN - d)))
+    turn_back = CIRCLE_SQUARE_DEG + correction - abs(b)
+    st.phase = "arc"
     st.steps += 1
-    return RAction("pivot", bl._pivot_for(st.leg_turn), "circling: turn onto the leg")
+    return RAction("pivot" if abs(turn_back) >= bl.PIVOT_MIN_DEG else "nudge", -st.side * (bl._pivot_for(turn_back) if abs(turn_back) >= bl.PIVOT_MIN_DEG else turn_back), "circling: turn back so the tub is beside him")
 
 
 def circle_search(env, say=print, on_step=None, start_side: int = 1) -> dict:
-    """Search round the tub for the puck. Returns {"outcome": "found" | "circled_twice" | "tub_lost" | "fell", "puck", "basket", "steps"}; `puck` and `basket` are the last readings when it is found. Uses the environment's quick look and the line-up's movers (nothing new moves G2: pivots and walks)."""
+    """Search round the tub for the puck. Returns {"outcome": "found" | "circled_twice" | "tub_lost" | "fell", "puck", "basket", "steps"}; `puck` and `basket` are the last readings when it is found. Uses the environment's quick look and the movers: pivots, a wide `arc`, a back-off."""
     st = CircleState(side=start_side)
     basket = puck = None
     while True:
@@ -177,6 +185,11 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1) -> dict:
                 basket, puck = env.look()
             except Fell:
                 return {"outcome": "fell", "puck": None, "basket": None, "steps": st.log}
+            if basket is not None:
+                st.last_d = float(basket.claw_in)
+            elif puck is not None and st.last_d is not None and st.last_d < CIRCLE_TAPE_GUARD_IN:
+                say("circle: a 'puck' with the tub out of view this near it is the tub's own tape: ignored")
+                puck = None
         act = next_circle_action(puck, basket, st)
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "angle_deg": round(st.angle_deg), "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                        "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))})
@@ -187,10 +200,12 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1) -> dict:
             return {"outcome": "found", "puck": puck, "basket": basket, "steps": st.log}
         if act.kind == "give_up":
             return {"outcome": act.why, "puck": None, "basket": basket, "steps": st.log}
-        if hasattr(env.mover, "set_distance"):
+        if act.kind != "arc" and hasattr(env.mover, "set_distance"):
             env.mover.set_distance(None if basket is None else float(basket.claw_in))
         if getattr(env.mover, act.kind)(act.value) == "fell":
             return {"outcome": "fell", "puck": None, "basket": None, "steps": st.log}
+        if act.kind == "arc":
+            st.angle_deg += abs(getattr(env.mover, "last_arc_deg", abs(act.value)))
 
 
 class CameraStalled(Exception):

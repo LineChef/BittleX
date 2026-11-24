@@ -74,7 +74,7 @@ class World:
 
     def mover_call(self, kind, v):
         self.moves.append((kind, round(v, 1)))
-        if kind == "forward" and v == br.CIRCLE_STEP_IN and not self.walkup:
+        if kind == "arc":
             self.legs += 1
         elif kind == "forward" and self.walkup:
             self.basket = (max(0.0, self.basket[0] - v), self.basket[1])
@@ -91,7 +91,7 @@ class World:
 class Mover:
     def __init__(self, w):
         self.w = w
-        for k in ("scan", "pivot", "nudge", "forward", "back"):
+        for k in ("scan", "pivot", "nudge", "forward", "back", "arc"):
             setattr(self, k, (lambda kind: lambda v: self.w.mover_call(kind, v))(k))
 
 
@@ -191,7 +191,7 @@ def test_nothing_inside_is_a_miss_and_he_circles_the_tub_until_he_sees_the_puck_
     r = br.run_sequence(env, say=lambda s: None)
     a = r["attempts"][0]
     assert a["after"]["code"] == bo.MISSED and a["circle"]["outcome"] == "found" and a["retrieval"]["outcome"] == "retrieved"
-    assert any(s["action"] == "forward" and s["value"] == br.CIRCLE_STEP_IN for s in a["circle"]["steps"])
+    assert any(s["action"] == "arc" and s["value"] == br.CIRCLE_ARC_DEG for s in a["circle"]["steps"])
     assert r["outcome"] == "made" and env.thrown == [False, True]                                          # then lined up and threw again without a pick-up
 
 
@@ -205,8 +205,8 @@ def test_two_laps_without_the_puck_end_the_session_at_rest():
     r = br.run_sequence(env, say=lambda s: None)
     a = r["attempts"][0]
     assert r["outcome"] == "circled_twice" and a["circle"]["outcome"] == "circled_twice" and E.lies == 1
-    legs = [s for s in a["circle"]["steps"] if s["action"] == "forward"]
-    assert len(legs) * (360.0 / (360.0 * 1.0)) > 0 and a["circle"]["steps"][-1]["angle_deg"] >= 720            # two laps counted from the legs walked
+    arcs = [s for s in a["circle"]["steps"] if s["action"] == "arc"]
+    assert len(arcs) == 16 and a["circle"]["steps"][-1]["angle_deg"] >= 720                                  # two laps are 16 arcs of 45 degrees
 
 
 def test_the_confirm_walk_up_failing_or_the_tub_lost_ends_the_attempt_without_a_make():
