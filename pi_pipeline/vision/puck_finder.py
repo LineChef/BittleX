@@ -99,8 +99,8 @@ def find_puck(jpeg: bytes, basket=None, by: str = "row") -> PuckReading | None:
     return None if rgb is None else find_puck_array(rgb, basket, by)
 
 
-INSIDE_SAT_MIN = 55                          # a pixel inside the tub counts when its max-minus-min channel spread is above this (the floor seen through the clear walls is grey: 0 such pixels in the empty tub at 8 inches, 10 to 90 with a puck inside)
-MIN_INSIDE_PX = 8                            # the puck inside the tub: at least this many such pixels in one blob (the far wall case read 10, the tub off-centre 8: keep it low and look at the margin when more pictures exist)
+INSIDE_SAT_MIN = 45                          # a pixel inside the tub counts when its max-minus-min channel spread is above this (the floor seen through the clear walls is grey). 2026-11-24 first run on G2: a puck inside read a spread of at most 52 in a darker picture, so the first 55 missed it; at 45 the empty and outside cases hold 0 to 2 such pixels (the past case 2) and every puck inside 25 or more (the far wall 35, the dark run 25)
+MIN_INSIDE_PX = 8                            # the puck inside the tub: at least this many such pixels in one blob (8 against 0 to 2 for no puck, 25 or more with one: a margin both ways)
 INSIDE_SIDE_COLS = 5                         # the window reaches this far outside the tape's ends and this far under the base, so a blob's centre is read whole
 INSIDE_BELOW_ROWS = 30
 
