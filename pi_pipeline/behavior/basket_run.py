@@ -164,7 +164,7 @@ def lob_end_lift() -> float:
 
 def merge_looks(seen: dict, offsets: dict):
     """One (basket, puck) from the claw look's pictures. `seen`: label to (basket reading or None, puck reading or None) in picture bearings; `offsets`: label to where that picture points, in degrees from straight ahead (+ right).
-    The basket comes from the centre picture first, else the first other one; the puck is the nearest seen in any picture. Bearings are returned in the body frame (the picture's bearing plus its offset)."""
+    The basket comes from the centre picture first, else the first other one; the puck likewise comes from the centre picture first (its bearing and distance), and only when the centre picture has none from the nearest side picture, which then says which side it was last seen on. Bearings are returned in the body frame (the picture's bearing plus its offset)."""
     from dataclasses import replace
     baskets, pucks = [], []
     for label, (basket, puck) in seen.items():
@@ -172,9 +172,9 @@ def merge_looks(seen: dict, offsets: dict):
         if basket is not None:
             baskets.append((0 if label == "centre" else 1, replace(basket, bearing_deg=basket.bearing_deg + off)))
         if puck is not None:
-            pucks.append((puck.claw_in, replace(puck, bearing_deg=puck.bearing_deg + off)))
+            pucks.append((0 if label == "centre" else 1, puck.claw_in, replace(puck, bearing_deg=puck.bearing_deg + off)))
     basket = min(baskets, key=lambda t: t[0])[1] if baskets else None
-    puck = min(pucks, key=lambda t: t[0])[1] if pucks else None
+    puck = min(pucks, key=lambda t: t[:2])[2] if pucks else None                    # the centre picture's puck when it has one; the side pictures only say which side it was last seen on (owner, 2026-11-23: a 4 pixel false blob in the left picture beat the real puck seen in the centre one)
     return basket, puck
 
 

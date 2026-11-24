@@ -173,7 +173,9 @@ def test_the_looks_are_merged_into_one_body_frame_reading():
     seen = {"look_left": (None, puck(14.0, 5.0)), "look_right": (basket(30.0, -4.0), None), "centre": (basket(18.0, 1.0), puck(20.0, 2.0))}
     b, p = br.merge_looks(seen, offsets)
     assert b.claw_in == 18.0 and b.bearing_deg == 1.0                                                         # the centre picture's basket first
-    assert p.claw_in == 14.0 and p.bearing_deg == -30.0                                                       # the nearest puck, in the body frame: 5 degrees right of a picture pointing 35 left
+    assert p.claw_in == 20.0 and p.bearing_deg == 2.0                                                         # the centre picture's puck wins (the side pictures only say which side), its own bearing
+    b, p = br.merge_looks({"look_left": (None, puck(14.0, 5.0)), "look_right": (None, puck(18.0, -3.0)), "centre": (basket(18.0, 1.0), None)}, offsets)
+    assert p.claw_in == 14.0 and p.bearing_deg == -30.0                                                       # none in the centre: the nearest side picture's, in the body frame (5 degrees right of a picture pointing 35 left)
     assert br.merge_looks({}, offsets) == (None, None)
     b, p = br.merge_looks({"look_right": (basket(30.0, -4.0), None)}, offsets)
     assert b.bearing_deg == 31.0 and p is None
@@ -484,6 +486,10 @@ def test_a_puck_seen_in_any_picture_is_a_miss_and_not_seen_is_a_make():
     offsets = {"look_right": 27.0, "centre": 0.0}
     b, p = br.merge_looks({"centre": (basket, None), "look_right": (None, puck)}, offsets)
     assert br.classify_after(b, p)[0] == bo.MISSED and p.bearing_deg == 31.0
+    false_speck = pf.PuckReading(125.0, 136.0, 4, 3, 12, 2.0, 5.9)                                            # 2026-11-23: a 4 pixel false blob in the left picture, the real puck in the centre one
+    real = pf.PuckReading(189.0, 124.0, 6, 6, 40, 26.2, 8.2)
+    b, p = br.merge_looks({"look_left": (basket, false_speck), "centre": (basket, real)}, {"look_left": -35.0, "centre": 0.0})
+    assert p.bearing_deg == 26.2 and p.claw_in == 8.2
     b, p = br.merge_looks({"centre": (basket, puck)}, offsets)
     assert br.classify_after(b, p)[0] == bo.MISSED
     b, p = br.merge_looks({"centre": (basket, None)}, offsets)
