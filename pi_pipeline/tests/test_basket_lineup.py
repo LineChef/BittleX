@@ -214,3 +214,22 @@ def test_after_a_back_up_he_squares_up_to_the_tub_before_walking_forward():
     assert bl.next_action(NS(claw_in=22.0, bearing_deg=6.0), st2).kind == "forward"
     st3 = bl.LineupState()
     assert bl.next_action(NS(claw_in=10.0, bearing_deg=0.0), st3).kind == "back" and st3.backed      # too close also counts
+
+
+def test_a_strip_that_gets_wider_after_a_back_up_is_a_corner_view_and_he_faces_the_tub_before_trusting_its_distance():
+    from types import SimpleNamespace as NS
+    st = bl.LineupState()
+    a = bl.next_action(NS(claw_in=9.9, bearing_deg=0.0, width_px=88), st)                           # too close: back up
+    assert a.kind == "back" and st.backed
+    a = bl.next_action(NS(claw_in=12.6, bearing_deg=-14.6, width_px=72), st)                        # after the back-up: narrower is expected, 72 is not wider than 88
+    assert a.kind != "back" or "corner" not in a.why
+    st = bl.LineupState()
+    st.last_width, st.backed = 51.0, True
+    a = bl.next_action(NS(claw_in=12.6, bearing_deg=-14.6, width_px=72), st)                        # the 2026-11-25 readings: 51 pixels, a back-up, then 72 at 14.6 degrees left
+    assert a.kind in ("nudge", "pivot") and a.value < 0 and "corner" in a.why and not st.backed
+    st = bl.LineupState()
+    st.last_width, st.backed = 51.0, True
+    assert "corner" not in bl.next_action(NS(claw_in=14.0, bearing_deg=3.0, width_px=72), st).why   # squarely in front: the width is believed
+    st = bl.LineupState()
+    st.last_width = 51.0                                                                             # no back-up first: not a corner call
+    assert "corner" not in bl.next_action(NS(claw_in=14.0, bearing_deg=-14.0, width_px=72), st).why

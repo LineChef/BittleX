@@ -26,6 +26,7 @@ AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's c
 MAX_CORRECTIONS = 60
 CONFIRM_READING_IN = 10.0      # the confirm look's walk-up target, as the finder READS it (8 inches from the claw tip really: the finder reads 1.8 inches long at 8 inches in the attention pose); a look from 7 to 13 inches is fine (owner, 2026-11-24)
 CONFIRM_TOL_IN = 3.0           # 7 to 13 inches: a forward walk moves him 5 to 10 inches (about 8) whatever is asked, 12 logged walks (2026-11-25), so a window narrower than that overshot, backed up and re-aligned; a puck inside the tub read 49 coloured pixels at 12.6 inches
+CORNER_WIDTH_JUMP, CORNER_BEARING_DEG = 1.15, 8.0   # a back-up that makes the strip wider by this much, seen this far off his nose, means he is looking at a corner of the tub (two faces make the strip wider and the distance read short: 51 pixels at 18.6 inches became 72 at "12.6" after a back-up, 2026-11-25): face it squarely before trusting the distance
 CONFIRM_ALIGN_TOL_DEG = 8.0     # the tub only has to be well inside the frame at 8 inches (89 pixels wide, 3 degrees is 7 pixels)
 
 
@@ -40,6 +41,7 @@ class Action:
 class LineupState:
     scanned_deg: float = 0.0
     corrections: int = 0
+    last_width: float | None = None  # the tape's width in the last reading: after a back-up it should be narrower, never wider
     backed: bool = False             # he just backed up: the tub must be squared up again (a back-up drifts him sideways) before he walks forward (owner, 2026-11-25)
     log: list = field(default_factory=list)
 
@@ -82,6 +84,13 @@ def next_action(reading, st: LineupState, target_in: float = TARGET_IN, dist_tol
         st.corrections += 1
         st.backed = True
         return Action("back", back_inches_to_target(d, b, target_in), "inside the buffer: back up first")
+    width = getattr(reading, "width_px", None)
+    jumped = bool(st.backed and st.last_width and width and width > st.last_width * CORNER_WIDTH_JUMP and abs(b) > CORNER_BEARING_DEG)
+    st.last_width = width if width else st.last_width
+    if jumped:
+        st.corrections += 1
+        st.backed = False
+        return Action("pivot", _pivot_for(b), "the strip got wider after a back-up: a corner view, face the tub squarely first") if abs(b) >= PIVOT_MIN_DEG else Action("nudge", b, "the strip got wider after a back-up: a corner view, face the tub squarely first")
     if abs(b) >= PIVOT_MIN_DEG:
         st.corrections += 1
         return Action("pivot", _pivot_for(b), "basket far off to the side: pivot toward it")

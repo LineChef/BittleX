@@ -24,13 +24,15 @@ from ..goals import basket_outcome as bo
 from ..vision.object_finder import ObjectReading
 
 MAX_ATTEMPTS = 5
-MAX_RETRIEVAL_STEPS = 20             # walking steps (pivots, turns, walks, pick-ups); the pivot scans have their own cap
+MAX_RETRIEVAL_STEPS = 30             # walking steps (pivots, turns, walks, pick-ups); the pivot scans have their own cap
 MAX_SCANS = 30                        # about two full circles of scan pivots in all, however often the puck is seen and lost (owner, 2026-11-23: scans must not use up the walking steps)
 BLIND_STEP_IN = 1.5                   # a puck at the claw tip (its blob cut off at the bottom of the picture): the finder's distance is wrong, so one short blind step, then the pick-up
 PICK_TRIES = 6
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 ALIGN_DEG = 6.0                      # the puck's bearing must be inside this before the last walk (a pick-up window is about 1 inch wide)
-PICK_STAND_IN = 7.0                  # nearer than this and centred, he makes the last walk and picks up
+PICK_STAND_IN = 9.5                  # the puck this far from the claw tip (as the finder reads it) is where the last walk starts: a forward walk moves about 8 inches whatever is asked (12 logged walks, 2026-11-25) and the pick-up wants the puck at the claw tip, so a puck 5.3 inches off with a 3.8 inch last walk was passed over; nearer than PICK_STAND_IN - PICK_STAND_TOL_IN he backs up first (back-ups are finer), farther than PICK_STAND_IN + PICK_STAND_TOL_IN he walks up
+PICK_STAND_TOL_IN = 2.0
+PICK_AT_TIP_IN = 3.0
 APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
@@ -121,9 +123,12 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
         return RAction("nudge", b, "small turn onto the puck")
     if getattr(puck, "clipped", False):                                                   # at the claw tip already (owner, 2026-11-23: line up until one step away, one blind step, then the pick-up)
         return RAction("pick", BLIND_STEP_IN, "puck at the claw tip: one blind step, then the pick-up")
-    if d > PICK_STAND_IN + APPROACH_TOL_IN:
+    if d > PICK_STAND_IN + PICK_STAND_TOL_IN:
         st.steps += 1
         return RAction("forward", min(APPROACH_STEP_MAX_IN, d - PICK_STAND_IN), "walk up to the puck")
+    if PICK_AT_TIP_IN <= d < PICK_STAND_IN - PICK_STAND_TOL_IN:                             # (nearer than PICK_AT_TIP_IN it is at the claw tip already: no walk, the pick-up)
+        st.steps += 1
+        return RAction("back", PICK_STAND_IN - d, "too near the puck for the last walk (it moves about 8 inches): back up")
     return RAction("pick", max(0.0, d - PICK_UNDERSHOOT_IN), "centred and close: the last walk, then the pick-up")
 
 
@@ -559,7 +564,7 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             continue
         if hasattr(env.mover, "set_distance"):
             env.mover.set_distance(None if puck is None else float(puck.claw_in))     # the turn picks pivot or arc by how far the puck is
-        result = getattr(env.mover, {"scan": "scan", "pivot": "pivot", "nudge": "nudge", "forward": "forward"}[act.kind])(act.value)
+        result = getattr(env.mover, {"scan": "scan", "pivot": "pivot", "nudge": "nudge", "forward": "forward", "back": "back"}[act.kind])(act.value)
         if result == "fell":
             return {"outcome": "fell", "steps": st.log}
 

@@ -142,7 +142,7 @@ def test_every_attempt_is_logged_with_the_look_timing(tmp_path, monkeypatch):
 
 
 def test_the_limits_the_owner_set():
-    assert (br.MAX_RETRIEVAL_STEPS, br.MAX_SCANS, br.PICK_TRIES, bl.MAX_CORRECTIONS, bl.SCAN_MAX_DEG) == (20, 30, 6, 60, 864.0)                                                              # the line-up: 60 corrections and a 54 degree scan step for 16 steps (two full circles really; the owner raised them 2026-11-25, the attempt was cut off before the shot was lined up)
+    assert (br.MAX_RETRIEVAL_STEPS, br.MAX_SCANS, br.PICK_TRIES, bl.MAX_CORRECTIONS, bl.SCAN_MAX_DEG) == (30, 30, 6, 60, 864.0)                                                              # the line-up: 60 corrections and a 54 degree scan step for 16 steps (two full circles really; the owner raised them 2026-11-25, the attempt was cut off before the shot was lined up)
     g = spec.BUILTIN["basket"]
     assert (g.attempts, g.minutes) == (10, 20.0)
 

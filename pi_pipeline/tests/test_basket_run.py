@@ -29,10 +29,12 @@ def test_the_retrieval_decisions():
     assert a.kind == "nudge" and a.value == 10.0
     a = act(P(20.0, 2.0))
     assert a.kind == "forward" and a.value == br.APPROACH_STEP_MAX_IN                                 # a long way: the step cap
+    a = act(P(14.0, 2.0))
+    assert a.kind == "forward" and abs(a.value - (14.0 - br.PICK_STAND_IN)) < 1e-9
     a = act(P(11.0, 2.0))
-    assert a.kind == "forward" and abs(a.value - (11.0 - br.PICK_STAND_IN)) < 1e-9
-    a = act(P(6.5, 1.0))
-    assert a.kind == "pick" and abs(a.value - (6.5 - br.PICK_UNDERSHOOT_IN)) < 1e-9                   # the last walk stops short of the finder's distance
+    assert a.kind == "pick" and abs(a.value - (11.0 - br.PICK_UNDERSHOOT_IN)) < 1e-9                  # inside the window (7.5 to 11.5): the last walk (about 8 inches really)
+    a = act(P(5.3, 1.4))
+    assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 5.3)) < 1e-9                        # the 2026-11-25 pick-up: 5.3 inches is too near for a walk that moves about 8: back up first
     assert act(P(0.2, 0.0)).value == 0.0
     assert act(P(20.0, 0.0), B(7.0, 0.0)).value == 0.0 and act(P(20.0, 0.0), B(7.0, 0.0)).why == "too_near_the_basket"     # never walks on toward a basket inside the buffer
     c = P(7.9, 0.4)
@@ -555,9 +557,9 @@ def test_a_make_lies_down_at_once_and_a_miss_starts_the_retrieval_from_the_looks
             st["calls"] += 1
             return super().look()
 
-    e2 = E2([ok()], puck_after=[(6.0, 0.0)])
-    e2.w.puck = (6.0, 0.0)
-    br.retrieve(e2, say=lambda s: None, first=(None, P(6.0, 0.0)))
+    e2 = E2([ok()], puck_after=[(14.0, 0.0)])
+    e2.w.puck = (14.0, 0.0)
+    br.retrieve(e2, say=lambda s: None, first=(None, P(14.0, 0.0)))
     assert st["calls"] >= 1 and e2.w.moves[0][0] in ("forward",)                                            # the supplied first reading decided the first move; no look came before it
     assert got == []
 
