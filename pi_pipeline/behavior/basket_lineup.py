@@ -21,9 +21,9 @@ BACK_DRIFT_RATIO = 0.33       # a backward walk drifts to his right by this frac
 MIN_STEP_IN = 1.5
 ALIGN_TOL_DEG = 3.0          # about 0.8 inch sideways at 16 inches, the sideways spread of the lob
 PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
-SCAN_STEP_DEG, SCAN_MAX_DEG = 54.0, 432.0            # the line-up's pivot scan for the tub: two pivot cycles a step (about 45 degrees really, inside the camera's 70 degree view; 27 degrees took 14 steps and 2 minutes to find it on 2026-11-25) and 8 steps, a full circle really (one pivot move turns about 0.83 of what is asked)
+SCAN_STEP_DEG, SCAN_MAX_DEG = 54.0, 864.0            # the line-up's pivot scan for the tub: two pivot cycles a step (about 45 degrees really, inside the camera's 70 degree view) and 16 steps, two full circles really (owner, 2026-11-25: the attempt was cut off before he could finish aligning a shot after recovering the puck: one circle, 8 steps, was not enough when the tub was far or read badly from a corner); one pivot move turns about 0.83 of what is asked
 AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's centre (the goal learns it): the basket is lined up at this far left of straight ahead, so it reads at minus this bearing
-MAX_CORRECTIONS = 30
+MAX_CORRECTIONS = 60
 CONFIRM_READING_IN = 10.0      # the confirm look's walk-up target, as the finder READS it (8 inches from the claw tip really: the finder reads 1.8 inches long at 8 inches in the attention pose); a look from 7 to 13 inches is fine (owner, 2026-11-24)
 CONFIRM_TOL_IN = 3.0           # 7 to 13 inches: a forward walk moves him 5 to 10 inches (about 8) whatever is asked, 12 logged walks (2026-11-25), so a window narrower than that overshot, backed up and re-aligned; a puck inside the tub read 49 coloured pixels at 12.6 inches
 CONFIRM_ALIGN_TOL_DEG = 8.0     # the tub only has to be well inside the frame at 8 inches (89 pixels wide, 3 degrees is 7 pixels)
@@ -105,7 +105,7 @@ def next_action(reading, st: LineupState, target_in: float = TARGET_IN, dist_tol
     return Action("shoot", 0.0, "aligned at the shot distance")
 
 
-def lineup(look, mover, max_steps: int = 60, say=print, target_in: float = TARGET_IN, dist_tol: float = DIST_TOL_IN, align_tol: float = ALIGN_TOL_DEG, first=None) -> dict:
+def lineup(look, mover, max_steps: int = 120, say=print, target_in: float = TARGET_IN, dist_tol: float = DIST_TOL_IN, align_tol: float = ALIGN_TOL_DEG, first=None) -> dict:
     """Run the line-up. `look()` takes a fresh picture and returns a reading or None; `mover` has scan(deg), pivot(deg), nudge(deg), forward(inches), back(inches) (each one step, then still, and answering "fell" when he went over). Returns
     {"outcome": "aligned" | "basket_not_found" | "could_not_align" | "too_many_steps" | "fell", "steps": [...], "last": reading}."""
     st, reading = LineupState(), None

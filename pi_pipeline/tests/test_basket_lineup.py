@@ -66,7 +66,7 @@ def test_the_pivot_scan_runs_up_to_a_full_circle_and_gives_up_and_a_found_basket
     st = bl.LineupState()
     n = int(bl.SCAN_MAX_DEG // bl.SCAN_STEP_DEG)
     kinds = [bl.next_action(None, st).kind for _ in range(n + 1)]
-    assert n == 8 and kinds[:n] == ["scan"] * n and kinds[n] == "give_up"                                       # 8 x 54 degrees asked (432): about 45 each really, a full circle
+    assert n == 16 and kinds[:n] == ["scan"] * n and kinds[n] == "give_up"                                     # 16 x 54 degrees asked (864): about 45 each really, two full circles
     st = bl.LineupState()
     bl.next_action(None, st)
     bl.next_action(Read(16.0, 0.0), st)
