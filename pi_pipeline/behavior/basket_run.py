@@ -46,7 +46,7 @@ CIRCLE_PIVOT_CHUNK_DEG = 54.0         # one pivot move is two cycles at most and
 CIRCLE_SQUARE_ASK_DEG = 108.0          # what the first pivot asks for to turn him about 90 degrees: four cycles of about 22 each (two moves of two cycles; one move of two turned only about 45)
 CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
 CIRCLE_STRAIGHT_IN = 0.0             # no straight walk after an arc (owner, 2026-11-24): the arc is measured at about 15 inches of radius, already the circle we want, and on the simulated floor the 6 inches that widened a guessed 9 inch arc threw it out to 11 to 28 inches and lost the tub (without it 12.5 to 18); a number above 0 brings the walk back
-CIRCLE_PEEK_EVERY = 2                # a peek (turn toward the tub, read its distance and scan the floor round it) only after this many arcs (every 4 missed a puck in the simulated floor, every 3 found all four spots); between arcs the forward picture alone says whether the circle is tight
+CIRCLE_PEEK_EVERY = 0                # no peeks (owner, 2026-11-25: the circle test ran 23 arcs and about two laps with the forward picture as the only check, and the peek was what lost the tub): the forward picture after each arc is the scan, a tub in it turns him outward, a puck in it ends the search; N > 0 peeks (turns toward the tub, reads its distance and the floor) every N arcs
 CIRCLE_TIGHT_MIN_TURN_DEG, CIRCLE_TIGHT_MAX_TURN_DEG = 15.0, 60.0   # the tub in the forward picture means the circle is too tight: turn away by how far forward it stands (it should be beside him), at least and at most this
 CIRCLE_PEEK_DEG = 60.0               # the first peek: turn this far toward the tub, look, and turn back; after that the peek turns by where the last one found the tub (CIRCLE_PEEK_TARGET_DEG off his nose), because on the simulated floor 60 degrees left the tub out of the picture on almost every peek
 CIRCLE_PEEK_TARGET_DEG = 25.0        # where the peek aims to put the tub, off his nose (the camera sees about 35 degrees each side)
@@ -180,9 +180,16 @@ class CircleState:
 
 
 def pivot_chunks(degrees: float) -> list:
-    """A pivot of `degrees` as moves of at most CIRCLE_PIVOT_CHUNK_DEG each, equal and in the same direction (one pivot move turns two cycles at most, and the mover caps an ask at 60 degrees: a 108 degree ask used to turn about 50)."""
-    n = max(1, int(-(-abs(degrees) // CIRCLE_PIVOT_CHUNK_DEG)))
-    return [degrees / n] * n
+    """A pivot of `degrees` as moves of whole cycles, two cycles (CIRCLE_PIVOT_CHUNK_DEG) at most each, in the same direction: one pivot move turns two cycles at most and the mover caps an ask at 60 degrees (a 108 degree ask used to turn about 50). 108 is [54, 54], 81 is [54, 27], 27 is [27]."""
+    cycles = max(1, round(abs(degrees) / bl.PIVOT_CYCLE_DEG))
+    per_move = max(1, round(CIRCLE_PIVOT_CHUNK_DEG / bl.PIVOT_CYCLE_DEG))
+    sign = 1.0 if degrees >= 0 else -1.0
+    out = []
+    while cycles > 0:
+        n = min(per_move, cycles)
+        out.append(sign * n * bl.PIVOT_CYCLE_DEG)
+        cycles -= n
+    return out
 
 
 def lap_table(st: CircleState) -> list:

@@ -81,7 +81,7 @@ class Env:
 def test_a_puck_behind_the_tub_is_found_by_circling_and_he_never_comes_inside_the_buffer():
     for puck in ((0.0, 8.0), (-8.0, 2.0), (7.0, -3.0), (4.0, 6.0)):
         sim = Sim(puck=puck)
-        r = br.circle_search(Env(sim), say=lambda s: None)
+        r = br.circle_search(Env(sim), say=lambda s: None, peek_every=2)                         # a peek every second arc looks across the circle: all four spots are found; with no peeks only a puck ahead of him in the forward picture is (below)
         assert r["outcome"] == "found", (puck, r["outcome"], r["steps"][-1])
         assert min(math.hypot(x, y) for x, y in sim.path) >= 6.0, puck                          # never inside the line-up's 6 inch buffer
 
@@ -106,7 +106,7 @@ def test_a_wider_or_narrower_arc_than_guessed_is_corrected_by_the_looks():
 
 def test_a_turn_that_comes_up_short_is_corrected_by_the_next_look():
     sim = Sim(puck=(0.0, 8.0), turn_gain=0.9)
-    r = br.circle_search(Env(sim), say=lambda s: None)
+    r = br.circle_search(Env(sim), say=lambda s: None, peek_every=2)
     assert r["outcome"] == "found"
 
 
@@ -147,7 +147,7 @@ def test_the_tub_not_in_view_at_the_start_makes_him_walk_forward_and_look_again_
 
 def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_few_arcs(monkeypatch):
     monkeypatch.setattr(br, "CIRCLE_STRAIGHT_IN", 6.0)                                           # the straight walk is off by default; this is the walk when it is on
-    st = br.CircleState(side=1)
+    st = br.CircleState(side=1, peek_every=2)
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
     assert br.next_circle_action(None, tub(16.0, 20.0), st).why == "circling: face the tub"
     a = br.next_circle_action(None, tub(19.0, 2.0), st)                                       # facing it at 19 inches: walk up to about 11
@@ -221,7 +221,7 @@ def test_a_puck_seen_with_the_tub_out_of_view_this_near_is_the_tubs_own_tape():
 
 
 def _test_run(sim, **kw):
-    kw = {"max_laps": 1000, "peek_every": 3, "ignore_puck": True, "deadline": time.monotonic() + 20.0, **kw}
+    kw = {"max_laps": 1000, "peek_every": br.CIRCLE_PEEK_EVERY, "ignore_puck": True, "deadline": time.monotonic() + 20.0, **kw}
     return br.circle_search(Env(sim), say=lambda s: None, **kw)
 
 
@@ -230,8 +230,10 @@ def test_the_circle_test_passes_after_three_clean_laps_in_a_row_on_a_floor_that_
     rep = r["report"]
     assert r["outcome"] == "passed" and rep["streak"] >= 3 and len(rep["laps"]) >= 3
     assert all(lap["clean"] for lap in rep["laps"][-3:])
-    assert rep["gyro_over_asked"] == 1.0 and rep["distance_in"]["min"] >= br.CIRCLE_MIN_IN
-    assert all("gyro_deg" in e and "straight_in" in e for e in r["arcs"][:-1]) and any("peek" in e for e in r["arcs"])      # every arc was logged, with what each peek read
+    assert rep["gyro_over_asked"] == 1.0 and (rep["distance_in"] is None or rep["distance_in"]["min"] >= br.CIRCLE_MIN_IN)       # no peeks: the tub is never in the forward picture, so no distance
+    assert all("gyro_deg" in e and "straight_in" in e for e in r["arcs"][:-1])                      # every arc was logged
+    r3 = _test_run(Sim(puck=None), streak_target=1, peek_every=3)
+    assert any("peek" in e for e in r3["arcs"])                                                     # and with peeks, what each peek read
 
 
 def test_the_test_ignores_a_puck_and_the_goals_own_defaults_are_unchanged():
@@ -240,7 +242,7 @@ def test_the_test_ignores_a_puck_and_the_goals_own_defaults_are_unchanged():
     r = br.circle_search(Env(Sim(puck=None)), say=lambda s: None)                                    # the goal's call: two laps end it
     assert r["outcome"] == "circled_twice" and len(r["arcs"]) <= 18
     st = br.CircleState()
-    assert (st.max_laps, st.peek_every, st.streak_target) == (br.CIRCLE_MAX_LAPS, br.CIRCLE_PEEK_EVERY, 0) and br.CIRCLE_PEEK_EVERY == 2
+    assert (st.max_laps, st.peek_every, st.streak_target) == (br.CIRCLE_MAX_LAPS, br.CIRCLE_PEEK_EVERY, 0) and br.CIRCLE_PEEK_EVERY == 0                      # no peeks by default (owner, 2026-11-25)
 
 
 def test_the_clock_ends_the_test_and_a_spoiled_lap_resets_the_streak():
@@ -414,8 +416,8 @@ def test_he_stands_up_while_the_camera_takes_a_throwaway_picture_so_the_first_lo
 
 
 def test_a_big_pivot_is_made_of_moves_of_at_most_two_cycles_one_after_the_other():
-    assert br.pivot_chunks(108.0) == [54.0, 54.0] and br.pivot_chunks(-108.0) == [-54.0, -54.0] and br.pivot_chunks(54.0) == [54.0] and br.pivot_chunks(81.0) == [40.5, 40.5]
-    assert br.pivot_chunks(30.0) == [30.0] and br.CIRCLE_SQUARE_ASK_DEG == 108.0 and br.bl._pivot_for(br.CIRCLE_SQUARE_ASK_DEG) == 108.0
+    assert br.pivot_chunks(108.0) == [54.0, 54.0] and br.pivot_chunks(-108.0) == [-54.0, -54.0] and br.pivot_chunks(54.0) == [54.0] and br.pivot_chunks(81.0) == [54.0, 27.0]      # whole cycles, two to a move
+    assert br.pivot_chunks(30.0) == [27.0] and br.pivot_chunks(-30.0) == [-27.0] and br.CIRCLE_SQUARE_ASK_DEG == 108.0 and br.bl._pivot_for(br.CIRCLE_SQUARE_ASK_DEG) == 108.0
     calls = []
 
     class Rec(Env):
@@ -437,3 +439,11 @@ def test_with_peeks_off_he_never_turns_toward_the_tub_to_look_and_the_forward_pi
     assert br.next_circle_action(None, None, st).kind == "arc"                                      # no tub in the picture: he is still circling it, on to the next arc
     st.phase, st.arcs = "glance", 4
     assert br.next_circle_action(None, NS(claw_in=14.0, bearing_deg=30.0), st).kind in ("pivot", "nudge") and st.phase == "arc"      # seen: a little outward, then the next arc, no peek
+
+
+def test_with_no_peeks_a_puck_ahead_of_him_is_found_by_the_forward_picture_and_one_across_the_circle_is_not():
+    for puck in ((-8.0, 2.0), (7.0, -3.0), (0.0, -12.0)):                                          # in view from where he starts or at once after the first arc
+        r = br.circle_search(Env(Sim(puck=puck)), say=lambda s: None)
+        assert r["outcome"] == "found", puck
+    r = br.circle_search(Env(Sim(puck=(0.0, 8.0))), say=lambda s: None)                              # behind the tub: only a look across the circle sees it (the simulated floor: 6 of 10 spots were missed without peeks, all found with a peek every second arc)
+    assert r["outcome"] == "circled_twice" and len([s for s in r["steps"] if s["action"] == "arc"]) == 16
