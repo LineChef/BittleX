@@ -540,6 +540,8 @@ def test_the_turn_calibration_logs_asked_against_counted_yaw_and_stops_on_a_fall
     assert out["ended"] == "done" and len(out["trials"]) == 4 and out["summary"]["asked_6"]["overshoot_median"] == 2.0 and out["summary"]["asked_6"]["roll_swing_max"] == 3.0
     out = tc.run_turn_cal(R(fall_at=2), asks=(6.0, 20.0), repeats=1, say=lambda *_: None, sleep=lambda s: None)
     assert out["ended"] == "fell" and len(out["trials"]) == 2 and out["summary"]["fell"] == 1
+    out = tc.run_turn_cal(R(), asks=(90.0,), repeats=2, say=lambda *_: None, sleep=lambda s: None, sides=(+1,))                  # the arc measurement: every turn the same way, so they add up round a circle
+    assert [t["dir"] for t in out["trials"]] == ["right", "right"]
 
 
 def test_the_turn_calibration_measures_forward_travel_from_a_fixed_ball_and_the_turn_skill_can_be_swapped():

@@ -40,7 +40,7 @@ def _xy(ball):
     return ball.distance_in * math.cos(a), ball.distance_in * math.sin(a)
 
 
-def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, timed_s: float = 0.0, nogyro: bool = False, say=print, sleep=time.sleep, stopped=lambda: False, rate=lambda side: 45.0, look=None) -> dict:
+def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, timed_s: float = 0.0, nogyro: bool = False, say=print, sleep=time.sleep, stopped=lambda: False, rate=lambda side: 45.0, look=None, sides=(+1, -1)) -> dict:
     """Returns {"ended", "trials", "summary"}. Never raises; the caller lays him in rest."""
     from .. import focus
     res = {"ended": "error", "trials": [], "summary": {}}
@@ -54,7 +54,7 @@ def run_turn_cal(robot, asks=(6.0, 10.0, 20.0), repeats: int = 2, *, timed_s: fl
             seen = _xy(look()) if look is not None else None                       # where the ball is now (a fixed ball ahead: how far each turn moves him forward)
             for rep in range(repeats):
                 for ask in asks:
-                    for sign in (+1, -1):
+                    for sign in sides:
                         if stopped():
                             res["ended"] = "stopped"
                             return res
@@ -104,6 +104,7 @@ def main() -> None:
     ap.add_argument("--nogyro", action="store_true", help="with --timed S: a plain timed turn of S seconds with no gyro stop (the whole-cycle stop only applies to these); the gyro angle is then not measured")
     ap.add_argument("--cycle-stop", choices=("on", "off"), default=None, help="switch the whole-cycle stop on or off for this run (default: G2_CYCLE_STOP)")
     ap.add_argument("--cap", type=float, default=0.0, help="the longest one turn may run, in seconds, for this calibration only (0 = the ball goal's own cap, ALIGN_CAP_S): longer pivots show whether a turn stays in place")
+    ap.add_argument("--sides", choices=("both", "right", "left"), default="both", help="the way to turn: both = right then left each time (the default); right or left = every turn that way, so repeated turns add up round a circle (the arc measurement: `--asks 90 --repeats 2 --sides right` is a half circle, the start to the end is the circle's diameter)")
     ap.add_argument("--ball", action="store_true", help="a ball fixed 14 to 20 in straight ahead: the camera measures how far each turn moves him forward")
     args = ap.parse_args()
     from ..link import imu_print
@@ -160,7 +161,7 @@ def main() -> None:
                     time.sleep(0.5)
                 return None
         res = run_turn_cal(robot, tuple(float(a) for a in args.asks.split(",")), max(1, args.repeats), timed_s=min(args.timed, 6.0), nogyro=args.nogyro, stopped=lambda: os.path.exists(stop_path),
-                           rate=lambda side: planner._turn_rate(side, False), look=look)
+                           rate=lambda side: planner._turn_rate(side, False), look=look, sides={"both": (+1, -1), "right": (+1,), "left": (-1,)}[args.sides])
         print(f"RESULT: {res['ended']}")
     except KeyboardInterrupt:
         print("ended")
