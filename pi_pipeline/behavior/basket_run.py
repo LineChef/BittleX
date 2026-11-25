@@ -67,7 +67,7 @@ CIRCLE_BAND_IN = (12.0, 22.0)        # a peek's distance outside this is a soft 
 CIRCLE_TEST_LAPS_IN_A_ROW = 3        # the circle test passes when this many clean laps follow one another (owner, 2026-11-24)
 CIRCLE_TEST_MINUTES = 4.0            # the circle test's first time cap (owner, 2026-11-24)
 LOG_DIR = "~/g2_runs/basket_run"
-AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture during the run (the first picture after a cold start can take about 10 s: nothing is taken earlier, by the owner's rule)
+AFTER_PICTURE_TIMEOUT_S = 4.0          # the camera's wait for one picture during the run, once warm (owner, 2026-11-24: 8 s waits while standing sagged the legs; the camera USB stalls left him standing 12 to 13 s a time in the circle test; each look's own time is logged (`look_s`) to refit this). The warm-up before the run waits longer for the first picture after a cold start (about 10 s)
 
 
 @dataclass
@@ -149,6 +149,7 @@ class CircleState:
     events: list = field(default_factory=list)   # one record per arc: asked and gyro degrees, the straight walk, what the forward picture and the peek read
     peek_deg: float = CIRCLE_PEEK_DEG    # how far the next peek turns toward the tub (learned from the last one)
     peek_turn: float = 0.0               # the turn made toward the tub in this peek so far (the peek plus any lost-tub steps)
+    looks: list = field(default_factory=list)   # every look: the phase, the arc, how long the picture took and whether one came (what standing still waiting for the camera cost)
     d_arc: int = -99                     # the arc after which last_d was read by a peek (a reading a few arcs old steered the straight walk the wrong way on the simulated floor)
     soft: list = field(default_factory=list)     # what spoiled a lap: back-offs, a tub in the forward picture, a peek outside the band, the tub lost
 
@@ -287,7 +288,9 @@ def circle_report(st: CircleState) -> dict:
     return {"laps": lap_table(st), "streak": clean_streak(st), "arcs": len(st.events), "angle_deg": round(st.angle_deg),
             "gyro_over_asked": None if not asked else round(gyro / asked, 2), "arc_s_mean": None if not times else round(sum(times) / len(times), 1),
             "distance_in": None if not reads else {"min": min(reads), "mean": round(sum(reads) / len(reads), 1), "max": max(reads)},
-            "soft": list(st.soft)}
+            "soft": list(st.soft), "looks": list(st.looks),
+            "look_s": None if not [x["look_s"] for x in st.looks if x["look_s"] is not None] else {"n": len(st.looks), "misses": sum(1 for x in st.looks if not x["ok"]), "max": max(x["look_s"] for x in st.looks if x["look_s"] is not None),
+                                                                                                   "mean": round(sum(x["look_s"] for x in st.looks if x["look_s"] is not None) / len([1 for x in st.looks if x["look_s"] is not None]), 2)}}
 
 
 def circle_report_lines(c: dict) -> list:
@@ -296,6 +299,7 @@ def circle_report_lines(c: dict) -> list:
     lines = [f"CIRCLE TEST {c['outcome']}: {r['arcs']} arcs, {r['angle_deg']} degrees round by the gyro, {len(r['laps'])} lap(s) done, {r['streak']} clean in a row at the end"]
     for lap in r["laps"]:
         lines.append(f"  lap {lap['lap'] + 1}: " + ("clean" if lap["clean"] else "NOT clean: " + ", ".join(lap["soft"])))
+    lines.append(f"  looks (picture waits, s): {r.get('look_s')}")
     lines.append(f"  gyro turned {r['gyro_over_asked']} of what was asked per arc; an arc took {r['arc_s_mean']} s on average; tub distances read (in): {r['distance_in']}")
     for e in c["arcs"]:
         lines.append(f"  arc {e['arc']}: asked {e['asked_deg']:.0f}, gyro {e.get('gyro_deg')}, {e.get('arc_s')} s, straight {e.get('straight_in')} in, forward picture {e.get('glance')}, peek {e.get('peek')}")
@@ -328,6 +332,7 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
                 return done("fell")
             except CameraStalled:
                 return done("camera_stalled", basket_=basket)
+            st.looks.append({"phase": st.phase, "arc": st.arcs, "look_s": getattr(env, "last_look_s", None), "ok": not getattr(env, "last_quick_failed", False)})
             if getattr(env, "last_quick_failed", False):                    # no picture at all (the camera's USB dropped on 2026-11-24 and the search pivoted blind through 360 degrees): two in a row end it, lying him down
                 misses += 1
                 if misses >= CAMERA_MISSES_MAX:
@@ -833,7 +838,9 @@ class RealEnv:
         from ..vision import puck_finder as pf
         self._ready_to_move()
         cam = self._camera()
+        t_look = time.monotonic()
         jpeg = cam.look()                                                # no forced re-metering: the warm-up metered the light
+        self.last_look_s = round(time.monotonic() - t_look, 2)
         self.last_quick_failed = not jpeg
         if not jpeg:
             self.last_quick = None
@@ -851,7 +858,7 @@ class RealEnv:
         except OSError:
             pass
         self.last_walkup = None if basket is None else (round(basket.claw_in, 1), round(basket.width_px))
-        save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), f"quick{n:02d}", jpeg, basket, puck, tub_puck, {"by": by, "circle": getattr(self, "circle_note", None)})
+        save_picture(getattr(self, "run_stamp", "run"), getattr(self, "attempt", 0), f"quick{n:02d}", jpeg, basket, puck, tub_puck, {"by": by, "look_s": self.last_look_s, "circle": getattr(self, "circle_note", None)})
         self.quick_log.append({"n": n, "time": time.strftime("%H:%M:%S"),
                                "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1), basket.width_px),
                                "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1), puck.width_px, round(puck.y))})

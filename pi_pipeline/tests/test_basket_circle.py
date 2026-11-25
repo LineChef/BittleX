@@ -301,3 +301,17 @@ def test_the_peek_learns_how_far_to_turn_from_the_signed_bearing_and_clamps_it()
     st.phase, st.peek_turn = "look", 300.0
     br.next_circle_action(None, tub(14.0, 0.0), st)
     assert st.peek_deg == br.CIRCLE_PEEK_MAX_DEG
+
+
+def test_every_look_is_logged_with_how_long_the_picture_took_and_whether_one_came():
+    class Timed(Env):
+        last_look_s, last_quick_failed = 0.8, False
+
+        def look(self):
+            self.last_look_s = 0.8
+            return self.sim.look()
+    r = br.circle_search(Timed(Sim()), say=lambda s: None, ignore_puck=True, max_laps=1000, peek_every=3, streak_target=1)
+    rep = r["report"]
+    assert rep["look_s"]["n"] == len(rep["looks"]) >= 10 and rep["look_s"]["misses"] == 0 and rep["look_s"]["max"] == 0.8
+    assert any("looks (picture waits" in x for x in br.circle_report_lines(r))
+    assert br.AFTER_PICTURE_TIMEOUT_S == 4.0
