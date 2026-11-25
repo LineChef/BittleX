@@ -31,8 +31,8 @@ def test_the_retrieval_decisions():
     assert a.kind == "forward" and a.value == br.APPROACH_STEP_MAX_IN                                 # a long way: the step cap
     a = act(P(14.0, 2.0))
     assert a.kind == "forward" and abs(a.value - (14.0 - br.PICK_STAND_IN)) < 1e-9
-    a = act(P(11.0, 2.0))
-    assert a.kind == "pick" and abs(a.value - (11.0 - br.PICK_UNDERSHOOT_IN)) < 1e-9                  # inside the window (7.5 to 11.5): the last walk (about 8 inches really)
+    a = act(P(8.5, 2.0))
+    assert a.kind == "pick" and abs(a.value - (8.5 - br.PICK_UNDERSHOOT_IN)) < 1e-9                  # inside the window (6.5 to 9.5): the last walk (about 8 inches really)
     a = act(P(5.3, 1.4))
     assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 5.3)) < 1e-9                        # the 2026-11-25 pick-up: 5.3 inches is too near for a walk that moves about 8: back up first
     assert act(P(0.2, 0.0)).value == 0.0
@@ -742,3 +742,17 @@ def test_he_says_which_thing_he_is_searching_for_when_a_search_begins():
     m = type("M", (), {"scan": lambda s, v: "ok", "pivot": lambda s, v: "ok", "nudge": lambda s, v: "ok", "forward": lambda s, v: "ok", "back": lambda s, v: "ok"})()
     bl.lineup(lambda: next(looks), m, say=lambda s: None, announce=said.append, max_steps=7)
     assert said == ["searching for the basket", "searching for the basket"]                                    # once per search (a second search after the tub was seen again), not once per scan step
+
+
+def test_after_the_back_up_he_looks_then_turns_onto_the_puck_before_any_walk():
+    """Owner, 2026-11-25: the back-up curves him aside, so the last walk waits for the turn onto the puck."""
+    st = br.RState()
+    a = br.next_retrieval_action(P(5.3, 1.4), None, st)                                                       # too near: back up to the stand
+    assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 5.3)) < 1e-9
+    a = br.next_retrieval_action(P(br.PICK_STAND_IN, 10.0), None, st)                                         # the look after it: the puck drifted 10 degrees: a small turn first
+    assert a.kind == "nudge" and a.value == 10.0
+    a = br.next_retrieval_action(P(br.PICK_STAND_IN, 22.0), None, st)                                         # 22 degrees: a pivot
+    assert a.kind == "pivot" and a.value > 0
+    a = br.next_retrieval_action(P(br.PICK_STAND_IN, 2.0), None, st)                                          # squared up: now the last walk and the pick-up
+    assert a.kind == "pick"
+    assert br.PICK_STAND_IN - br.PICK_STAND_TOL_IN >= 6.0                                                    # the stand sits inside the finder's floor window at row 89 or so, never at its upper edge
