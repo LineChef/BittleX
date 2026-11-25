@@ -65,6 +65,7 @@ CIRCLE_STRAIGHT_MIN_IN, CIRCLE_STRAIGHT_MAX_IN = 2.0, 14.0
 CIRCLE_ANGLE_SCALE = 1.0             # the lap is counted from each arc's counted degrees times this: the degrees ASKED now (the arc is timed; the gyro read 0.15 of a real right turn and 1.8 of a left one, 2026-11-24), the real turn fitted from the circle test's log
 CIRCLE_BAND_IN = (12.0, 22.0)        # a peek's distance outside this is a soft failure of the circle test (22 is the finder's far limit)
 CIRCLE_TEST_LAPS_IN_A_ROW = 3        # the circle test passes when this many clean laps follow one another (owner, 2026-11-24)
+STAND_IDLE_REST_S = 6.0               # a look that gets no picture while he has stood this long with no leg move lies him down instead of waiting for the next try (owner, 2026-11-24: standing still more than about 10 s sags the legs; the camera stalls left him standing 12 to 13 s); the next look or move stands him up from rest
 CIRCLE_TEST_MINUTES = 4.0            # the circle test's first time cap (owner, 2026-11-24)
 LOG_DIR = "~/g2_runs/basket_run"
 AFTER_PICTURE_TIMEOUT_S = 4.0          # the camera's wait for one picture during the run, once warm (owner, 2026-11-24: 8 s waits while standing sagged the legs; the camera USB stalls left him standing 12 to 13 s a time in the circle test; each look's own time is logged (`look_s`) to refit this). The warm-up before the run waits longer for the first picture after a cold start (about 10 s)
@@ -357,6 +358,11 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
             return done("found", puck, basket)
         if act.kind == "give_up":
             return done(act.why, basket_=basket)
+        if hasattr(env, "ready_to_move"):
+            try:
+                env.ready_to_move()
+            except Fell:
+                return done("fell")
         if act.kind != "arc" and hasattr(env.mover, "set_distance"):
             env.mover.set_distance(None if basket is None else float(basket.claw_in))
         t0 = time.monotonic()
@@ -822,6 +828,29 @@ class RealEnv:
         chase.ensure_rest(self.link)
         self.robot.posture, self.robot._claw = "rest", (0.0, 0.0)
 
+    def idle_stand_s(self) -> float | None:
+        """How long he has stood with no leg move (since the last move or stand-up ended), or None when that is not known or he is not standing."""
+        moved = getattr(self.robot, "_moved_at", None)
+        if moved is None or getattr(self.robot, "posture", "stand") not in ("stand", "unknown"):
+            return None
+        try:
+            return float(self.robot._clock() - moved)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _rest_if_idle(self) -> bool:
+        """No picture came and he has stood STAND_IDLE_REST_S or more with no leg move: lie him down now rather than wait for another try (a stall left him standing 12 to 13 s and the legs sagged). True when he was laid down; the next look or move stands him up from rest."""
+        idle = self.idle_stand_s()
+        if idle is None or idle < STAND_IDLE_REST_S:
+            return False
+        self.idle_rests = getattr(self, "idle_rests", 0) + 1
+        self.lie_down()
+        return True
+
+    def ready_to_move(self) -> None:
+        """Stand him up if he is lying (after an idle rest), before any move: the moves send nothing of their own to stand him."""
+        self._ready_to_move()
+
     def _ready_to_move(self) -> None:
         """From the attention pose with the claw up: the claw down, laid in rest, then the eased stand-up from rest (owner, 2026-11-23: a stand-up straight from the attention pose is a fall every time). Standing already: nothing."""
         posture = getattr(self.robot, "posture", "stand")
@@ -844,6 +873,7 @@ class RealEnv:
         self.last_quick_failed = not jpeg
         if not jpeg:
             self.last_quick = None
+            self._rest_if_idle()
             return None, None
         basket = bf.find_basket(jpeg)
         puck = pf.find_puck(jpeg, basket, by=by)
@@ -897,7 +927,7 @@ def main(argv: list | None = None) -> None:
     ap.add_argument("--circle-only", action="store_true", help="no throw: stand up from rest, circle the tub (the puck NOT in view: put it behind the tub or out of the room) looking for the puck, up to two laps, print the steps, lie down; for checking the circling movement (the tub about 16 inches out)")
     ap.add_argument("--circle-test", action="store_true", help="the circle test: stand up from rest and circle the tub over and over (no puck, nothing thrown; the tub about 16 inches out, four feet of clear floor round it) until --minutes run out or --laps clean laps follow one another, then lie down; logs every arc and picture, prints a lap table")
     ap.add_argument("--minutes", type=float, default=CIRCLE_TEST_MINUTES, help="with --circle-test: the time cap")
-    ap.add_argument("--peek-every", type=int, default=1, help="with --circle-test: a peek every this many arcs (1 = every arc, for the data; the goal's own is CIRCLE_PEEK_EVERY; on the simulated floor every arc held the 12 to 22 inch band worse than every third)")
+    ap.add_argument("--peek-every", type=int, default=CIRCLE_PEEK_EVERY, help="with --circle-test: a peek every this many arcs (default CIRCLE_PEEK_EVERY, the goal's own: owner, 2026-11-24; 1 = every arc, for more data; on the simulated floor every arc held the 12 to 22 inch band worse than every third)")
     ap.add_argument("--laps", type=int, default=CIRCLE_TEST_LAPS_IN_A_ROW, help="with --circle-test: clean laps in a row that pass the test")
     ap.add_argument("--show-picture", action="store_true", help="after each throw print the picture of the floor (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)

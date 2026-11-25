@@ -314,4 +314,45 @@ def test_every_look_is_logged_with_how_long_the_picture_took_and_whether_one_cam
     rep = r["report"]
     assert rep["look_s"]["n"] == len(rep["looks"]) >= 10 and rep["look_s"]["misses"] == 0 and rep["look_s"]["max"] == 0.8
     assert any("looks (picture waits" in x for x in br.circle_report_lines(r))
-    assert br.AFTER_PICTURE_TIMEOUT_S == 4.0
+    assert br.AFTER_PICTURE_TIMEOUT_S == 4.0 and br.STAND_IDLE_REST_S == 6.0
+
+
+def test_a_look_with_no_picture_after_six_seconds_standing_lies_him_down_and_the_next_move_stands_him_up():
+    class Robot:
+        posture, _moved_at = "stand", 100.0
+
+        def _clock(self):
+            return self.now
+        now = 100.0
+
+        def stand_up_from_rest(self):
+            self.posture = "stand"
+            self.ups = getattr(self, "ups", 0) + 1
+            return "ok"
+
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot = Robot()
+    laid = []
+    env.lie_down = lambda: (laid.append(1), setattr(env.robot, "posture", "rest"))
+    env.robot.now = 105.0
+    assert env.idle_stand_s() == 5.0 and env._rest_if_idle() is False and not laid                  # stood 5 s: not yet
+    env.robot.now = 106.5
+    assert env._rest_if_idle() is True and laid == [1] and env.idle_rests == 1                       # 6.5 s with no picture: lie down
+    assert env.idle_stand_s() is None                                                                # lying: not standing idle
+    env.ready_to_move()
+    assert env.robot.ups == 1 and env.robot.posture == "stand"                                       # the next move stands him up first
+    env.ready_to_move()
+    assert env.robot.ups == 1
+
+
+def test_the_circle_stands_him_up_before_a_move_when_a_look_laid_him_down():
+    class Ready(Env):
+        def __init__(self, sim):
+            super().__init__(sim)
+            self.ready = 0
+
+        def ready_to_move(self):
+            self.ready += 1
+    env = Ready(Sim())
+    r = br.circle_search(env, say=lambda s: None, ignore_puck=True, max_laps=1000, streak_target=1, deadline=time.monotonic() + 20.0)
+    assert env.ready >= len([s for s in r["steps"] if s["action"] not in ("give_up", "found")])
