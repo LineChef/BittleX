@@ -76,7 +76,7 @@ class World:
         self.moves.append((kind, round(v, 1)))
         if kind == "arc":
             self.legs += 1
-        elif kind == "forward" and self.walkup:
+        elif kind == "forward" and self.walkup and self.basket is not None:
             self.basket = (max(0.0, self.basket[0] - v), self.basket[1])
         if kind == "forward" and self.puck:
             self.puck = (max(0.0, self.puck[0] - v), self.puck[1])
@@ -207,6 +207,34 @@ def test_two_laps_without_the_puck_end_the_session_at_rest():
     assert r["outcome"] == "circled_twice" and a["circle"]["outcome"] == "circled_twice" and E.lies == 1
     arcs = [s for s in a["circle"]["steps"] if s["action"] == "arc"]
     assert len(arcs) == 16 and a["circle"]["steps"][-1]["angle_deg"] >= 720                                  # two laps are 16 arcs of 45 degrees
+
+
+def test_no_tub_after_the_throw_makes_him_walk_forward_in_short_bursts_and_look_until_he_sees_it():
+    """Owner, 2026-11-25: the tub is always right in front of him at the start; if the look does not read it he walks forward a burst at a time, looking after each, then looks into it."""
+    env = Env([ok()], puck_after=["in"])
+    env.w.basket = None                                                                                     # not in view at the after-throw look
+    forwards = []
+    real = env.mover.forward
+
+    def forward(v):
+        forwards.append(v)
+        if len(forwards) == 2:
+            env.w.basket, env.w.walkup = (14.0, 0.0), True                                                   # in view after the second burst
+        return real(v)
+    env.mover.forward = forward
+    r = br.run_sequence(env, say=lambda s: None)
+    a = r["attempts"][0]
+    assert r["outcome"] == "made" and a["after"]["tub_found_after_bursts"] == 2 and forwards[:2] == [br.BLIND_BURST_IN] * 2     # two bursts, then the confirm look read the puck inside
+    env = Env([ok()], puck_after=["in"])
+    env.w.basket = None                                                                                     # never seen: BLIND_BURSTS walks, then he gives up at rest
+    n = []
+    env.mover.forward = lambda v: (n.append(v), "ok")[1]
+    r = br.run_sequence(env, say=lambda s: None)
+    assert r["outcome"] == "no_basket" and len(n) == br.BLIND_BURSTS and r["attempts"][0]["after"]["tub_found_after_bursts"] is None
+    env = Env([ok()], puck_after=["in"])
+    env.w.basket = None
+    env.mover.forward = lambda v: "fell"
+    assert br.run_sequence(env, say=lambda s: None)["outcome"] == "fell"
 
 
 def test_the_confirm_walk_up_failing_or_the_tub_lost_ends_the_attempt_without_a_make():

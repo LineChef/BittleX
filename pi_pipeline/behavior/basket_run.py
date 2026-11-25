@@ -54,6 +54,7 @@ CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
 CIRCLE_SEEN_TURN_DEG = 15.0        # the tub in the forward picture after an arc at all (owner, 2026-11-24: he plowed through the tub): turn outward this much; nearer his nose or near, by how far forward it stands (CIRCLE_TIGHT_MIN_TURN_DEG up to CIRCLE_TIGHT_MAX_TURN_DEG)
 CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
 CIRCLE_TIGHT_NEAR_IN = 12.0
+BLIND_BURSTS, BLIND_BURST_IN = 4, 6.0     # no tub in the after-throw look: walk forward this many inches (a walk moves about 8 whatever is asked) and look again, up to this many times, before giving up (owner, 2026-11-25: the tub is always right in front of him at the start, he may just need to get closer to see it)
 CIRCLE_START_IN, CIRCLE_START_TOL_IN, CIRCLE_START_MIN_IN, CIRCLE_START_WALKS, CIRCLE_START_STEP_IN = 11.0, 3.0, 8.0, 5, 3.0   # the circle starts close (owner, 2026-11-24): face the tub, walk up to about CIRCLE_START_IN of it (within 10 to 12.5 inches), then pivot 90 degrees away and arc toward it; nearer than CIRCLE_START_MIN_IN (the finder's limit) at the start he backs off
 CIRCLE_FIND_FAR_IN, CIRCLE_FIND_BACK_IN = 22.0, 4.0     # the tub lost at the start after being read at or under this many inches: back up this far and look (walking forward closer to a tub that is too near rammed it on 2026-11-24); over it or never seen: walk forward
 CIRCLE_FIND_FORWARD_IN, CIRCLE_FIND_FORWARD_MAX = 6.0, 3   # the tub not in view at the start: walk forward this far and look again, up to this many times, before any pivoting (owner, 2026-11-24)
@@ -563,6 +564,18 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
+def find_tub_ahead(env, say=print) -> tuple:
+    """The after-throw look did not read the tub: walk forward in short bursts, a quick picture after each, until it is read (owner, 2026-11-25: it is always right in front of him, he may just need to get closer). Returns (reading or None after BLIND_BURSTS, how many bursts it took). Raises Fell if a walk ends in a fall."""
+    for n in range(1, BLIND_BURSTS + 1):
+        say(f"no tub in view after the throw: walking forward and looking again ({n} of {BLIND_BURSTS})")
+        if env.mover.forward(BLIND_BURST_IN) == "fell":
+            raise Fell()
+        reading = env.quick_basket()
+        if reading is not None:
+            return reading, n
+    return None, BLIND_BURSTS
+
+
 def _rest(env, rec: dict) -> None:
     """Lay him down in rest once for this attempt (`rec["rested"]`): every way an attempt can end, other than a fall, ends with him lying, never standing about (owner, 2026-11-24: the legs sag after about 10 s and he fell on the next move). A fake environment without `lie_down` is left alone."""
     if rec.get("rested") or not hasattr(env, "lie_down"):
@@ -666,6 +679,16 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
     rec["after"]["pictures"] = getattr(env, "look_readings", None)                    # what each picture of the look read (the merge keeps one basket and one puck)
     say(f"after the throw: {code}: {words}" + (f" (attention pose held {env.attention_hold_s} s)" if getattr(env, "attention_hold_s", None) is not None else ""))
     persist()
+    if code == bo.NO_BASKET and hasattr(env, "confirm_look") and hasattr(env, "quick_basket"):
+        try:
+            found, bursts = find_tub_ahead(env, say)
+        except Fell:
+            return "fell", holding
+        rec["after"]["tub_found_after_bursts"] = bursts if found is not None else None
+        if found is not None:
+            basket, code = found, bo.NOT_SEEN                                      # the tub is in view now: look into it as for any throw whose puck was not seen
+            say(f"tub in view after {bursts} walk(s) forward: looking into it")
+        persist()
     confirm = code == bo.NOT_SEEN                                                  # a puck seen on the floor outside the tub is a certain miss: no confirm, straight to the pick-up (owner, 2026-11-24)
     if confirm and hasattr(env, "confirm_look"):
         # The puck was not seen from about 16 inches: inside the clear tub it is 0 to 5 coloured pixels there. Walk up to about 8 inches, look into it from the attention pose and read the picture (owner, 2026-11-24).
