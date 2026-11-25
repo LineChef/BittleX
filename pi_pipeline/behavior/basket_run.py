@@ -51,6 +51,7 @@ CIRCLE_PEEK_TARGET_DEG = 25.0        # where the peek aims to put the tub, off h
 CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
 CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
 CIRCLE_TIGHT_NEAR_IN = 12.0
+CIRCLE_FIND_FORWARD_IN, CIRCLE_FIND_FORWARD_MAX = 6.0, 3   # the tub not in view at the start: walk forward this far and look again, up to this many times, before any pivoting (owner, 2026-11-24)
 CIRCLE_LOST_MAX_DEG = 180.0          # the most he pivots looking for a tub that is out of view (owner, 2026-11-24: no spinning round; 360 degrees of blind pivots ended two test runs), then he lies down
 CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before the circle starts
 CIRCLE_RADIUS_GAIN = 2.0             # degrees of extra turn away from (or toward) the tub per inch the radius is off (clamped)
@@ -148,6 +149,7 @@ class CircleState:
     max_steps: int = CIRCLE_MAX_STEPS
     streak_target: int = 0               # clean laps in a row that end the search as "passed" (the circle test only; 0 = off)
     events: list = field(default_factory=list)   # one record per arc: asked and gyro degrees, the straight walk, what the forward picture and the peek read
+    find_forward: int = 0                # forward steps made so far looking for the tub at the start
     peek_deg: float = CIRCLE_PEEK_DEG    # how far the next peek turns toward the tub (learned from the last one)
     peek_turn: float = 0.0               # the turn made toward the tub in this peek so far (the peek plus any lost-tub steps)
     looks: list = field(default_factory=list)   # every look: the phase, the arc, how long the picture took and whether one came (what standing still waiting for the camera cost)
@@ -239,6 +241,10 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
         return next_circle_action(None, None, st)
     if basket is None:
+        if st.phase == "face" and st.find_forward < CIRCLE_FIND_FORWARD_MAX and st.lost_deg == 0.0:
+            st.find_forward += 1
+            st.steps += 1
+            return RAction("forward", CIRCLE_FIND_FORWARD_IN, "tub not in view at the start: walk forward and look again")
         if st.lost_deg >= CIRCLE_LOST_MAX_DEG:
             return RAction("give_up", 0.0, "tub_lost")
         if st.lost_deg == 0.0 and st.phase != "face":

@@ -112,17 +112,34 @@ def test_a_turn_that_comes_up_short_is_corrected_by_the_next_look():
 
 def test_the_tub_out_of_view_makes_him_sweep_never_spin_and_a_half_turn_ends_it():
     st = br.CircleState(side=1)
+    st.find_forward = br.CIRCLE_FIND_FORWARD_MAX                                              # (the forward steps at the start are the next test)
     a = br.next_circle_action(None, None, st)
     assert a.kind == "pivot" and a.value > 0 and "out of view" in a.why                         # the tub is on his right
     st = br.CircleState(side=-1)
+    st.find_forward = br.CIRCLE_FIND_FORWARD_MAX
     assert br.next_circle_action(None, None, st).value < 0
     st = br.CircleState(side=1)
+    st.find_forward = br.CIRCLE_FIND_FORWARD_MAX
     acts = [br.next_circle_action(None, None, st) for _ in range(7)]
     assert [a.value for a in acts[:6]] == [30.0, 30.0, -30.0, -30.0, -30.0, -30.0] and acts[6].kind == "give_up"       # on 60 degrees, then back and past the start: 180 degrees of pivots at most
     assert sum(abs(a.value) for a in acts[:6]) == br.CIRCLE_LOST_MAX_DEG
     st = br.CircleState(side=1)                                                                # a peek that turned 90 or more has gone past the tub: back first
     st.phase, st.arcs, st.peek_turn = "look", 1, 108.0
     assert br.next_circle_action(None, None, st).value == -30.0 and st.peek_turn == 78.0
+
+
+def test_the_tub_not_in_view_at_the_start_makes_him_walk_forward_and_look_again_before_any_pivot():
+    st = br.CircleState(side=1)
+    acts = [br.next_circle_action(None, None, st) for _ in range(br.CIRCLE_FIND_FORWARD_MAX + 1)]
+    assert [a.kind for a in acts[:-1]] == ["forward"] * br.CIRCLE_FIND_FORWARD_MAX and all(a.value == br.CIRCLE_FIND_FORWARD_IN for a in acts[:-1])
+    assert acts[-1].kind == "pivot" and st.phase == "face"                                    # still not seen after the forward steps: the sweep
+    sim = Sim(puck=None, start=(0.0, -34.0))                                                  # 34 inches out: past the simulated camera range (30), so not seen at first
+    r = br.circle_search(Env(sim), say=lambda s: None, ignore_puck=True, max_laps=1000, streak_target=1, deadline=time.monotonic() + 20.0)
+    assert r["steps"][0]["action"] == "forward" and r["outcome"] in ("passed", "time_up")
+    assert min(math.hypot(x, y) for x, y in sim.path) >= 6.0
+    st = br.CircleState(side=1)                                                               # after the start (a peek that lost it) the forward steps are not used
+    st.phase = "look"
+    assert br.next_circle_action(None, None, st).kind == "pivot"
 
 
 def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_few_arcs(monkeypatch):
