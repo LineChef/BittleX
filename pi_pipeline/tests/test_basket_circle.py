@@ -126,6 +126,9 @@ def test_the_tub_out_of_view_makes_him_sweep_never_spin_and_a_half_turn_ends_it(
     st = br.CircleState(side=1)                                                                # a peek that turned 90 or more has gone past the tub: back first
     st.phase, st.arcs, st.peek_turn = "look", 1, 108.0
     assert br.next_circle_action(None, None, st).value == -30.0 and st.peek_turn == 78.0
+    st = br.CircleState(side=1)                                                                # a short peek goes on toward the tub for two steps even though the first step lifts the turn past 90
+    st.phase, st.arcs, st.peek_turn = "look", 1, 60.0
+    assert [br.next_circle_action(None, None, st).value for _ in range(3)] == [30.0, 30.0, -30.0]
 
 
 def test_the_tub_not_in_view_at_the_start_makes_him_walk_forward_and_look_again_before_any_pivot():
@@ -147,7 +150,9 @@ def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_fe
     st = br.CircleState(side=1)
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
     assert br.next_circle_action(None, tub(16.0, 20.0), st).why == "circling: face the tub"
-    a = br.next_circle_action(None, tub(16.0, 2.0), st)
+    a = br.next_circle_action(None, tub(19.0, 2.0), st)                                       # facing it at 19 inches: walk up to about 11
+    assert a.kind == "forward" and abs(a.value - min(8.0, getattr(br.bl, "FWD_STEP_MAX_IN", 12.0))) < 1e-9 and st.phase == "face"
+    a = br.next_circle_action(None, tub(11.0, 2.0), st)
     assert a.kind == "pivot" and a.value < 0 and abs(a.value) >= 54 and st.phase == "arc"     # the tub goes to his right: a turn to the left of about 90
     a = br.next_circle_action(None, None, st)
     assert a.kind == "arc" and a.value == br.CIRCLE_ARC_DEG and st.phase == "straight"       # one wide arc toward the tub
@@ -272,7 +277,8 @@ def test_there_is_no_straight_walk_by_default_and_the_arc_goes_straight_to_the_g
     st.phase = "arc"
     assert br.next_circle_action(None, None, st).kind == "arc" and st.phase == "glance" and st.events[0]["straight_in"] == 0.0     # no 'forward 0 inches': a zero walk still walks (the slow start)
     r = _test_run(Sim(puck=None), streak_target=1)
-    assert all(s["action"] != "forward" for s in r["steps"])
+    first_arc = next(i for i, s in enumerate(r["steps"]) if s["action"] == "arc")
+    assert all(s["action"] != "forward" for s in r["steps"][first_arc:])                       # a walk only at the start, to get up to the tub
 
 
 def test_the_straight_walk_is_the_default_unless_the_gain_is_on_and_the_reading_is_fresh(monkeypatch):

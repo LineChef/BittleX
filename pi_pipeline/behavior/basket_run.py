@@ -52,6 +52,7 @@ CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
 CIRCLE_SEEN_TURN_DEG = 15.0        # the tub in the forward picture after an arc at all (owner, 2026-11-24: he plowed through the tub): turn outward this much; nearer his nose or near, by how far forward it stands (CIRCLE_TIGHT_MIN_TURN_DEG up to CIRCLE_TIGHT_MAX_TURN_DEG)
 CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
 CIRCLE_TIGHT_NEAR_IN = 12.0
+CIRCLE_START_IN, CIRCLE_START_TOL_IN, CIRCLE_START_MIN_IN, CIRCLE_START_WALKS = 11.0, 1.5, 8.0, 3   # the circle starts close (owner, 2026-11-24): face the tub, walk up to about CIRCLE_START_IN of it (within 10 to 12.5 inches), then pivot 90 degrees away and arc toward it; nearer than CIRCLE_START_MIN_IN (the finder's limit) at the start he backs off
 CIRCLE_FIND_FORWARD_IN, CIRCLE_FIND_FORWARD_MAX = 6.0, 3   # the tub not in view at the start: walk forward this far and look again, up to this many times, before any pivoting (owner, 2026-11-24)
 CIRCLE_LOST_MAX_DEG = 180.0          # the most he pivots looking for a tub that is out of view (owner, 2026-11-24: no spinning round; 360 degrees of blind pivots ended two test runs), then he lies down
 CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before the circle starts
@@ -150,6 +151,8 @@ class CircleState:
     max_steps: int = CIRCLE_MAX_STEPS
     streak_target: int = 0               # clean laps in a row that end the search as "passed" (the circle test only; 0 = off)
     events: list = field(default_factory=list)   # one record per arc: asked and gyro degrees, the straight walk, what the forward picture and the peek read
+    lost_first: int = 1                  # which way the lost-tub sweep goes first (+1 toward the tub's side, -1 back the way he came)
+    start_walks: int = 0                 # walks made up to the tub at the start
     find_forward: int = 0                # forward steps made so far looking for the tub at the start
     peek_deg: float = CIRCLE_PEEK_DEG    # how far the next peek turns toward the tub (learned from the last one)
     peek_turn: float = 0.0               # the turn made toward the tub in this peek so far (the peek plus any lost-tub steps)
@@ -252,8 +255,9 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         if st.lost_deg == 0.0 and st.phase != "face":
             st.note_soft("tub_lost")
         # a peek that turned far (90 degrees or more) has gone past the tub: look back the way he came first; a short one has not reached it yet: on toward it. Two steps that way, then the other way for the rest (a sweep, never a spin)
-        first = -1 if (st.phase == "look" and st.peek_turn >= 90.0) else 1
-        way = first if st.lost_deg < 2 * CIRCLE_LOST_STEP_DEG else -first
+        if st.lost_deg == 0.0:
+            st.lost_first = -1 if (st.phase == "look" and st.peek_turn >= 90.0) else 1       # decided once, when the tub is first lost
+        way = st.lost_first if st.lost_deg < 2 * CIRCLE_LOST_STEP_DEG else -st.lost_first
         if st.phase == "look":
             st.peek_turn += way * CIRCLE_LOST_STEP_DEG
         st.lost_deg += CIRCLE_LOST_STEP_DEG
@@ -269,7 +273,10 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
             st.peek_deg = max(CIRCLE_PEEK_MIN_DEG, min(CIRCLE_PEEK_MAX_DEG, st.side * b + st.peek_turn - CIRCLE_PEEK_TARGET_DEG))
         if not CIRCLE_BAND_IN[0] <= d <= CIRCLE_BAND_IN[1] and d >= CIRCLE_MIN_IN:
             st.note_soft("out_of_band", d=round(d, 1))
-    if d < CIRCLE_MIN_IN:
+    if st.phase == "face" and d < CIRCLE_START_MIN_IN:
+        st.steps += 1
+        return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_START_IN - d), "circling: too near the tub to start, back off")
+    if d < CIRCLE_MIN_IN and st.phase != "face":
         st.steps += 1
         st.note_soft("back_off", d=round(d, 1))
         return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
@@ -277,9 +284,13 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         if abs(b) > CIRCLE_FACE_TOL_DEG:
             st.steps += 1
             return RAction("pivot" if abs(b) >= bl.PIVOT_MIN_DEG else "nudge", bl._pivot_for(b) if abs(b) >= bl.PIVOT_MIN_DEG else b, "circling: face the tub")
+        if d > CIRCLE_START_IN + CIRCLE_START_TOL_IN and st.start_walks < CIRCLE_START_WALKS:
+            st.start_walks += 1                                               # facing it: walk up to about CIRCLE_START_IN of it, look again (the walk's length is a guess, the next look corrects it)
+            st.steps += 1
+            return RAction("forward", min(bl.FWD_STEP_MAX_IN if hasattr(bl, "FWD_STEP_MAX_IN") else 12.0, d - CIRCLE_START_IN), "circling: walk up to the tub")
         st.phase = "arc"
         st.steps += 1
-        return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: turn so the tub is beside him")
+        return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: close enough: turn so the tub is beside him")
     # phase "look": he has turned toward the tub; turn back so the tub ends up beside him, more away from it when he is too near and only a little less when too far
     correction = max(-CIRCLE_WIDE_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (CIRCLE_RADIUS_IN - d)))
     turn_back = CIRCLE_SQUARE_DEG + correction - st.side * b                         # signed: a tub he has turned past (on the other side of his nose) needs the longer turn back
