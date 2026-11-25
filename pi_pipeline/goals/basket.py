@@ -104,7 +104,7 @@ class BasketGoal:
     diagnosis = DIAGNOSIS
     stage_of = STAGE_OF
     # An attempt that ended any of these ways leaves no puck in the claw and nothing to line up on: the session ends there (owner, 2026-11-24: after "could not get the puck back" it went on to pick up a puck that was not there and throw it at nothing). "made" ends it for the owner's reset.
-    ends_session = ("made", "puck_not_found", "could_not_reach_puck", "pick_failed", "circled_twice", "tub_lost", "no_basket", "basket_not_found", "could_not_align", "too_near_the_basket", "too_many_steps", "no_picture", "throw_failed")
+    ends_session = ("made", "puck_not_found", "could_not_reach_puck", "pick_failed", "circled_twice", "tub_lost", "camera_stalled", "no_basket", "basket_not_found", "could_not_align", "too_near_the_basket", "too_many_steps", "no_picture", "throw_failed")
 
     def __init__(self, *, shared=None, env=None, pace=None):
         self._shared, self.env, self.pace = shared, env, pace

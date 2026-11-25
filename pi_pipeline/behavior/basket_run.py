@@ -300,6 +300,7 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
     st = CircleState(side=start_side, max_laps=max_laps, peek_every=peek_every, streak_target=streak_target, max_steps=CIRCLE_MAX_STEPS if streak_target == 0 and not ignore_puck else 100000)
     basket = puck = None
     t_start = time.monotonic()
+    misses = 0
 
     def done(outcome, puck_=None, basket_=None):
         return {"outcome": outcome, "puck": puck_, "basket": basket_, "steps": st.log, "arcs": st.events, "report": circle_report(st)}
@@ -319,6 +320,13 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
                 return done("fell")
             except CameraStalled:
                 return done("camera_stalled", basket_=basket)
+            if getattr(env, "last_quick_failed", False):                    # no picture at all (the camera's USB dropped on 2026-11-24 and the search pivoted blind through 360 degrees): two in a row end it, lying him down
+                misses += 1
+                if misses >= CAMERA_MISSES_MAX:
+                    say("circle: the camera gave no picture twice in a row: stopping")
+                    return done("camera_stalled", basket_=basket)
+            else:
+                misses = 0
             if ignore_puck:
                 puck = None
             if basket is not None:

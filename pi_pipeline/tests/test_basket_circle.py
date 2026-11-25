@@ -282,3 +282,22 @@ def test_the_peek_learns_how_far_to_turn_from_where_the_last_one_found_the_tub()
     assert abs(st.peek_deg - (14.0 + 90.0 - br.CIRCLE_PEEK_TARGET_DEG)) < 1e-6
     st.phase, st.arcs = "peek", 2
     assert br.next_circle_action(None, None, st).value == br.bl._pivot_for(st.peek_deg)
+
+
+def test_two_looks_in_a_row_with_no_picture_end_the_circle_instead_of_pivoting_blind():
+    class Blind(Env):
+        last_quick_failed = True
+
+        def __init__(self, sim):
+            super().__init__(sim)
+            self.looks = 0
+
+        def look(self):
+            self.looks += 1
+            return None, None
+    env = Blind(Sim())
+    r = br.circle_search(env, say=lambda s: None, ignore_puck=True)
+    assert r["outcome"] == "camera_stalled" and env.looks == br.CAMERA_MISSES_MAX and not any(s["action"] == "pivot" and "out of view" in s["why"] for s in r["steps"][1:])      # at most the one pivot before the second try
+    ok = Env(Sim())
+    ok.last_quick_failed = False
+    assert br.circle_search(ok, say=lambda s: None, ignore_puck=True, deadline=time.monotonic() + 0.0)["outcome"] == "time_up"
