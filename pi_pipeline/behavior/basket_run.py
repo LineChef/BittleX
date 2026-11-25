@@ -48,7 +48,10 @@ CIRCLE_PEEK_EVERY = 3                # a peek (turn toward the tub, read its dis
 CIRCLE_TIGHT_MIN_TURN_DEG, CIRCLE_TIGHT_MAX_TURN_DEG = 15.0, 60.0   # the tub in the forward picture means the circle is too tight: turn away by how far forward it stands (it should be beside him), at least and at most this
 CIRCLE_PEEK_DEG = 60.0               # the first peek: turn this far toward the tub, look, and turn back; after that the peek turns by where the last one found the tub (CIRCLE_PEEK_TARGET_DEG off his nose), because on the simulated floor 60 degrees left the tub out of the picture on almost every peek
 CIRCLE_PEEK_TARGET_DEG = 25.0        # where the peek aims to put the tub, off his nose (the camera sees about 35 degrees each side)
-CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 100.0
+CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
+CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
+CIRCLE_TIGHT_NEAR_IN = 12.0
+CIRCLE_LOST_MAX_DEG = 180.0          # the most he pivots looking for a tub that is out of view (owner, 2026-11-24: no spinning round; 360 degrees of blind pivots ended two test runs), then he lies down
 CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before the circle starts
 CIRCLE_RADIUS_GAIN = 2.0             # degrees of extra turn away from (or toward) the tub per inch the radius is off (clamped)
 CIRCLE_CORRECTION_MAX_DEG = 25.0   # outward (too near); a circle too wide is corrected by at most CIRCLE_WIDE_MAX_DEG the other way
@@ -224,23 +227,28 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
                 st.steps += 1
                 st.note_soft("back_off", d=round(d, 1))
                 return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
+            st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
+            if abs(b) >= CIRCLE_TIGHT_BEARING_DEG and d >= CIRCLE_TIGHT_NEAR_IN:
+                return next_circle_action(None, None, st)                    # in view but well off his nose and not near: the arc brought it forward, the circle is not tight
             turn_away = max(CIRCLE_TIGHT_MIN_TURN_DEG, min(CIRCLE_TIGHT_MAX_TURN_DEG, 90.0 - abs(b)))
             st.note_soft("too_tight", d=round(d, 1), b=round(b, 1))
-            st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
             st.steps += 1
             return RAction("pivot" if turn_away >= bl.PIVOT_MIN_DEG else "nudge", -st.side * (bl._pivot_for(turn_away) if turn_away >= bl.PIVOT_MIN_DEG else turn_away), "circling: the tub is in view, the turn was too tight: turn away")
         st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
         return next_circle_action(None, None, st)
     if basket is None:
-        if st.lost_deg >= 360.0:
+        if st.lost_deg >= CIRCLE_LOST_MAX_DEG:
             return RAction("give_up", 0.0, "tub_lost")
         if st.lost_deg == 0.0 and st.phase != "face":
             st.note_soft("tub_lost")
+        # a peek that turned far (90 degrees or more) has gone past the tub: look back the way he came first; a short one has not reached it yet: on toward it. Two steps that way, then the other way for the rest (a sweep, never a spin)
+        first = -1 if (st.phase == "look" and st.peek_turn >= 90.0) else 1
+        way = first if st.lost_deg < 2 * CIRCLE_LOST_STEP_DEG else -first
         if st.phase == "look":
-            st.peek_turn += CIRCLE_LOST_STEP_DEG
+            st.peek_turn += way * CIRCLE_LOST_STEP_DEG
         st.lost_deg += CIRCLE_LOST_STEP_DEG
         st.steps += 1
-        return RAction("pivot", st.side * CIRCLE_LOST_STEP_DEG, "tub out of view: pivot toward the side it should be on")
+        return RAction("pivot", st.side * way * CIRCLE_LOST_STEP_DEG, "tub out of view: pivot " + ("toward the side it should be on" if way > 0 else "back the other way"))
     st.lost_deg = 0.0
     d, b = float(basket.claw_in), float(basket.bearing_deg)
     st.last_d = d
@@ -248,7 +256,7 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         st.cur()["peek"] = (round(d, 1), round(b, 1))
         st.d_arc = st.arcs
         if st.peek_turn:                                                      # the tub stood about |b| + the turn made off his beam before the peek: aim the next one to leave it CIRCLE_PEEK_TARGET_DEG off his nose
-            st.peek_deg = max(CIRCLE_PEEK_MIN_DEG, min(CIRCLE_PEEK_MAX_DEG, abs(b) + st.peek_turn - CIRCLE_PEEK_TARGET_DEG))
+            st.peek_deg = max(CIRCLE_PEEK_MIN_DEG, min(CIRCLE_PEEK_MAX_DEG, st.side * b + st.peek_turn - CIRCLE_PEEK_TARGET_DEG))
         if not CIRCLE_BAND_IN[0] <= d <= CIRCLE_BAND_IN[1] and d >= CIRCLE_MIN_IN:
             st.note_soft("out_of_band", d=round(d, 1))
     if d < CIRCLE_MIN_IN:
@@ -264,7 +272,7 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: turn so the tub is beside him")
     # phase "look": he has turned toward the tub; turn back so the tub ends up beside him, more away from it when he is too near and only a little less when too far
     correction = max(-CIRCLE_WIDE_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (CIRCLE_RADIUS_IN - d)))
-    turn_back = CIRCLE_SQUARE_DEG + correction - abs(b)
+    turn_back = CIRCLE_SQUARE_DEG + correction - st.side * b                         # signed: a tub he has turned past (on the other side of his nose) needs the longer turn back
     st.phase = "arc"
     st.steps += 1
     return RAction("pivot" if abs(turn_back) >= bl.PIVOT_MIN_DEG else "nudge", -st.side * (bl._pivot_for(turn_back) if abs(turn_back) >= bl.PIVOT_MIN_DEG else turn_back), "circling: turn back so the tub is beside him")
@@ -355,7 +363,8 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
             st.angle_deg += gyro * CIRCLE_ANGLE_SCALE
             ev = st.cur()
             g = getattr(env.mover, "last_arc_gyro_deg", None)
-            ev.update({"counted_deg": round(gyro, 1), "gyro_deg": None if g is None else round(g, 1), "arc_s": took, "t_s": round(time.monotonic() - t_start, 1), "pack_pct": getattr(env, "pack_pct", None)})
+            cmd = getattr(env.mover, "last_arc_s", None)
+            ev.update({"counted_deg": round(gyro, 1), "gyro_deg": None if g is None else round(g, 1), "arc_s": took, "cmd_s": cmd, "tail_s": None if cmd is None else round(took - cmd, 1), "t_s": round(time.monotonic() - t_start, 1), "pack_pct": getattr(env, "pack_pct", None)})
         elif act.kind == "forward" and st.events:
             st.cur()["straight_s"] = took
 

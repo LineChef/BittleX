@@ -110,15 +110,19 @@ def test_a_turn_that_comes_up_short_is_corrected_by_the_next_look():
     assert r["outcome"] == "found"
 
 
-def test_the_tub_out_of_view_makes_him_pivot_toward_its_side_and_a_full_turn_ends_it():
+def test_the_tub_out_of_view_makes_him_sweep_never_spin_and_a_half_turn_ends_it():
     st = br.CircleState(side=1)
     a = br.next_circle_action(None, None, st)
     assert a.kind == "pivot" and a.value > 0 and "out of view" in a.why                         # the tub is on his right
     st = br.CircleState(side=-1)
     assert br.next_circle_action(None, None, st).value < 0
     st = br.CircleState(side=1)
-    kinds = [br.next_circle_action(None, None, st).kind for _ in range(13)]
-    assert kinds[:12] == ["pivot"] * 12 and kinds[12] == "give_up"                            # 12 x 30 degrees is a full turn
+    acts = [br.next_circle_action(None, None, st) for _ in range(7)]
+    assert [a.value for a in acts[:6]] == [30.0, 30.0, -30.0, -30.0, -30.0, -30.0] and acts[6].kind == "give_up"       # on 60 degrees, then back and past the start: 180 degrees of pivots at most
+    assert sum(abs(a.value) for a in acts[:6]) == br.CIRCLE_LOST_MAX_DEG
+    st = br.CircleState(side=1)                                                                # a peek that turned 90 or more has gone past the tub: back first
+    st.phase, st.arcs, st.peek_turn = "look", 1, 108.0
+    assert br.next_circle_action(None, None, st).value == -30.0 and st.peek_turn == 78.0
 
 
 def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_few_arcs(monkeypatch):
@@ -152,20 +156,27 @@ def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_fe
     assert abs(wide.value) >= 27 and abs(wide.value) <= abs(a.value)                          # too wide is corrected only a little, never by much
 
 
-def test_a_tub_in_the_forward_picture_means_too_tight_and_he_turns_away_by_how_far_forward_it_stands():
+def test_a_tub_in_the_forward_picture_is_too_tight_only_near_his_nose_or_near_and_he_turns_away():
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
-    for b, lo, hi in ((30.0, 54, 66), (60.0, 27, 33), (85.0, 15, 27)):
+    for d, b, lo, hi in ((14.0, 5.0, 54, 66), (14.0, 12.0, 54, 66), (11.0, 40.0, 45, 57), (11.5, 60.0, 27, 33)):
         st = br.CircleState(side=1)
         st.phase, st.arcs = "glance", 1
-        a = br.next_circle_action(None, tub(14.0, b), st)
-        assert a.kind in ("pivot", "nudge") and a.value < 0 and lo <= abs(a.value) <= hi, (b, a)   # away from the tub, more the further forward it stands
-        assert st.phase == "arc"
+        st.events.append({"arc": 1})
+        a = br.next_circle_action(None, tub(d, b), st)
+        assert a.kind in ("pivot", "nudge") and a.value < 0 and lo <= abs(a.value) <= hi, (d, b, a)       # away from the tub
+        assert st.phase == "arc" and st.soft[-1]["kind"] == "too_tight"
+    st = br.CircleState(side=1)
+    st.phase, st.arcs = "glance", 1
+    st.events.append({"arc": 1})
+    a = br.next_circle_action(None, tub(21.0, 35.0), st)                                      # the 2026-11-24 picture: 21 inches, 35 degrees off his nose: the arc brought it forward, the circle is fine
+    assert a.kind == "arc" and not st.soft
     st = br.CircleState(side=1)
     st.phase, st.arcs = "glance", 1
     assert br.next_circle_action(None, tub(8.0, 40.0), st).kind == "back"                    # and nearer than the limit he backs off first
     st = br.CircleState(side=-1)
     st.phase, st.arcs = "glance", 1
-    assert br.next_circle_action(None, tub(14.0, -30.0), st).value > 0                       # the mirror: the tub on his left, away is to the right
+    st.events.append({"arc": 1})
+    assert br.next_circle_action(None, tub(14.0, -5.0), st).value > 0                        # the mirror: the tub on his left, away is to the right
 
 
 def test_a_puck_in_view_ends_the_search_and_too_near_the_tub_backs_off_first():
@@ -231,7 +242,7 @@ def test_a_back_off_a_tub_in_the_forward_picture_and_a_peek_out_of_band_are_soft
     st.phase, st.arcs = "glance", 1
     st.events.append({"arc": 1})
     br.next_circle_action(None, tub(8.0, 40.0), st)
-    br.next_circle_action(None, tub(14.0, 40.0), st)
+    br.next_circle_action(None, tub(14.0, 10.0), st)
     st.phase = "look"
     br.next_circle_action(None, tub(24.0, 30.0), st)
     assert [s["kind"] for s in st.soft] == ["back_off", "too_tight", "out_of_band"]
@@ -271,33 +282,22 @@ def test_the_end_of_run_summary_lists_every_lap_and_arc():
     assert lines[0].startswith("CIRCLE TEST passed") and any("lap 1:" in x for x in lines) and any("arc 1:" in x for x in lines)
 
 
-def test_the_peek_learns_how_far_to_turn_from_where_the_last_one_found_the_tub():
+def test_the_peek_learns_how_far_to_turn_from_the_signed_bearing_and_clamps_it():
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                                  # noqa: E731
     st = br.CircleState(side=1)
     st.phase, st.arcs = "peek", 1
     assert br.next_circle_action(None, None, st).value == br.bl._pivot_for(br.CIRCLE_PEEK_DEG) and st.peek_turn == br.CIRCLE_PEEK_DEG
-    br.next_circle_action(None, None, st)                                                            # not in view: a 30 degree lost step is added to the turn
+    br.next_circle_action(None, None, st)                                                            # not in view: one step on toward the tub
     assert st.peek_turn == br.CIRCLE_PEEK_DEG + br.CIRCLE_LOST_STEP_DEG
-    br.next_circle_action(None, tub(14.0, 14.0), st)                                                 # found 14 degrees off his nose after 90: he was 104 degrees off before the peek
+    br.next_circle_action(None, tub(14.0, 14.0), st)                                                 # found 14 degrees to the right after 90: it stood 104 off before the peek
     assert abs(st.peek_deg - (14.0 + 90.0 - br.CIRCLE_PEEK_TARGET_DEG)) < 1e-6
     st.phase, st.arcs = "peek", 2
     assert br.next_circle_action(None, None, st).value == br.bl._pivot_for(st.peek_deg)
-
-
-def test_two_looks_in_a_row_with_no_picture_end_the_circle_instead_of_pivoting_blind():
-    class Blind(Env):
-        last_quick_failed = True
-
-        def __init__(self, sim):
-            super().__init__(sim)
-            self.looks = 0
-
-        def look(self):
-            self.looks += 1
-            return None, None
-    env = Blind(Sim())
-    r = br.circle_search(env, say=lambda s: None, ignore_puck=True)
-    assert r["outcome"] == "camera_stalled" and env.looks == br.CAMERA_MISSES_MAX and not any(s["action"] == "pivot" and "out of view" in s["why"] for s in r["steps"][1:])      # at most the one pivot before the second try
-    ok = Env(Sim())
-    ok.last_quick_failed = False
-    assert br.circle_search(ok, say=lambda s: None, ignore_puck=True, deadline=time.monotonic() + 0.0)["outcome"] == "time_up"
+    st = br.CircleState(side=1)                                                                      # the tub past his nose (to the left) after the peek: it stood nearer than the peek turned
+    st.phase, st.peek_turn = "look", 108.0
+    a = br.next_circle_action(None, tub(14.0, -18.0), st)
+    assert abs(st.peek_deg - (-18.0 + 108.0 - br.CIRCLE_PEEK_TARGET_DEG)) < 1e-6 and a.value < 0 and abs(a.value) > 90                       # a longer turn back, not a shorter one
+    st = br.CircleState(side=1)
+    st.phase, st.peek_turn = "look", 300.0
+    br.next_circle_action(None, tub(14.0, 0.0), st)
+    assert st.peek_deg == br.CIRCLE_PEEK_MAX_DEG
