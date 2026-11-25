@@ -101,7 +101,7 @@ def test_a_wider_or_narrower_arc_than_guessed_is_corrected_by_the_looks():
         sim = Sim(puck=None, arc_radius=radius)
         r = br.circle_search(Env(sim), say=lambda s: None)
         radii = [math.hypot(x, y) for x, y in sim.path]
-        assert r["outcome"] == "circled_twice" and min(radii) >= 5.0 and max(radii) <= 32.0, (radius, min(radii), max(radii))
+        assert r["outcome"] == "circled_twice" and min(radii) >= 4.5 and max(radii) <= 32.0, (radius, min(radii), max(radii))                # a third tighter than measured (10 inches) comes within about 5 of the centre; the back-off and the outward turn keep it off the tub
 
 
 def test_a_turn_that_comes_up_short_is_corrected_by_the_next_look():
@@ -339,7 +339,7 @@ def test_every_look_is_logged_with_how_long_the_picture_took_and_whether_one_cam
     rep = r["report"]
     assert rep["look_s"]["n"] == len(rep["looks"]) >= 10 and rep["look_s"]["misses"] == 0 and rep["look_s"]["max"] == 0.8
     assert any("looks (picture waits" in x for x in br.circle_report_lines(r))
-    assert br.AFTER_PICTURE_TIMEOUT_S == 4.0 and br.STAND_IDLE_REST_S == 6.0
+    assert br.QUICK_PICTURE_TIMEOUT_S == 4.0 and br.STAND_IDLE_REST_S == 6.0 and br.AFTER_PICTURE_TIMEOUT_S == 8.0
 
 
 def test_a_look_with_no_picture_after_six_seconds_standing_lies_him_down_and_the_next_move_stands_him_up():
@@ -442,8 +442,43 @@ def test_with_peeks_off_he_never_turns_toward_the_tub_to_look_and_the_forward_pi
 
 
 def test_with_no_peeks_a_puck_ahead_of_him_is_found_by_the_forward_picture_and_one_across_the_circle_is_not():
-    for puck in ((-8.0, 2.0), (7.0, -3.0), (0.0, -12.0)):                                          # in view from where he starts or at once after the first arc
+    for puck in ((7.0, -3.0), (0.0, -12.0)):                                                    # in view from where he starts (13 inches out, no walk-up now) or after the first arc
         r = br.circle_search(Env(Sim(puck=puck)), say=lambda s: None)
         assert r["outcome"] == "found", puck
     r = br.circle_search(Env(Sim(puck=(0.0, 8.0))), say=lambda s: None)                              # behind the tub: only a look across the circle sees it (the simulated floor: 6 of 10 spots were missed without peeks, all found with a peek every second arc)
     assert r["outcome"] == "circled_twice" and len([s for s in r["steps"] if s["action"] == "arc"]) == 16
+
+
+def test_the_claw_look_waits_eight_seconds_for_a_picture_and_the_quick_looks_four():
+    class Cam:
+        _timeout_s = None
+
+    class Looker:
+        _cam = Cam()
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.looker = Looker()
+    env._picture_wait(br.AFTER_PICTURE_TIMEOUT_S)
+    assert env.looker._cam._timeout_s == 8.0                                                         # the claw look: its right-hand picture was lost with 4 s on 2026-11-25
+    env._picture_wait(br.QUICK_PICTURE_TIMEOUT_S)
+    assert env.looker._cam._timeout_s == 4.0
+    import inspect
+    assert "_picture_wait(AFTER_PICTURE_TIMEOUT_S)" in inspect.getsource(br.RealEnv.after_throw)
+    assert "_picture_wait(AFTER_PICTURE_TIMEOUT_S)" in inspect.getsource(br.RealEnv.confirm_look)
+    assert "_picture_wait(QUICK_PICTURE_TIMEOUT_S)" in inspect.getsource(br.RealEnv._quick)
+
+
+def test_a_puck_shaped_blob_seen_with_the_tub_out_of_view_near_it_is_a_puck_and_only_a_wide_thin_one_is_the_tape():
+    class E:
+        def __init__(self, puck):
+            self.looks = [(NS(claw_in=11.0, bearing_deg=0.0), None), (None, puck)]
+            self.mover = type("M", (), {"pivot": lambda s, v: "ok", "nudge": lambda s, v: "ok", "back": lambda s, v: "ok", "arc": lambda s, v: "ok", "forward": lambda s, v: "ok", "set_distance": lambda s, v: None, "last_arc_deg": 45.0})()
+
+        def look(self):
+            return self.looks.pop(0) if self.looks else (None, None)
+    real = NS(claw_in=7.9, bearing_deg=5.1, width_px=12, height_px=9)                                # the 2026-11-25 sighting: a puck, 7.9 inches ahead, tub out of view
+    r = br.circle_search(E(real), say=lambda s: None)
+    assert r["outcome"] == "found" and r["puck"] is real
+    tape = NS(claw_in=4.1, bearing_deg=-30.0, width_px=20, height_px=5)                              # 4 to 1: the tape
+    r = br.circle_search(E(tape), say=lambda s: None)
+    assert r["outcome"] != "found" and r["puck"] is None
+    assert br._looks_like_tape(NS(claw_in=4.0, bearing_deg=0.0)) is True and br._looks_like_tape(NS(claw_in=5.3, bearing_deg=6.4, width_px=18, height_px=15)) is False

@@ -24,8 +24,8 @@ PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
 SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's centre (the goal learns it): the basket is lined up at this far left of straight ahead, so it reads at minus this bearing
 MAX_CORRECTIONS = 30
-CONFIRM_READING_IN = 9.8       # the confirm look's walk-up target, as the finder READS it (8 inches from the claw tip really: the finder reads 1.8 inches long at 8 inches in the attention pose); a look from 8 to 10 inches is fine (owner, 2026-11-24)
-CONFIRM_TOL_IN = 1.5
+CONFIRM_READING_IN = 10.0      # the confirm look's walk-up target, as the finder READS it (8 inches from the claw tip really: the finder reads 1.8 inches long at 8 inches in the attention pose); a look from 7 to 13 inches is fine (owner, 2026-11-24)
+CONFIRM_TOL_IN = 3.0           # 7 to 13 inches: a forward walk moves him 5 to 10 inches (about 8) whatever is asked, 12 logged walks (2026-11-25), so a window narrower than that overshot, backed up and re-aligned; a puck inside the tub read 49 coloured pixels at 12.6 inches
 CONFIRM_ALIGN_TOL_DEG = 8.0     # the tub only has to be well inside the frame at 8 inches (89 pixels wide, 3 degrees is 7 pixels)
 
 

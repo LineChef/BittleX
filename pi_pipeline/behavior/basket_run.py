@@ -54,7 +54,7 @@ CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
 CIRCLE_SEEN_TURN_DEG = 15.0        # the tub in the forward picture after an arc at all (owner, 2026-11-24: he plowed through the tub): turn outward this much; nearer his nose or near, by how far forward it stands (CIRCLE_TIGHT_MIN_TURN_DEG up to CIRCLE_TIGHT_MAX_TURN_DEG)
 CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
 CIRCLE_TIGHT_NEAR_IN = 12.0
-CIRCLE_START_IN, CIRCLE_START_TOL_IN, CIRCLE_START_MIN_IN, CIRCLE_START_WALKS, CIRCLE_START_STEP_IN = 11.0, 1.5, 8.0, 5, 3.0   # the circle starts close (owner, 2026-11-24): face the tub, walk up to about CIRCLE_START_IN of it (within 10 to 12.5 inches), then pivot 90 degrees away and arc toward it; nearer than CIRCLE_START_MIN_IN (the finder's limit) at the start he backs off
+CIRCLE_START_IN, CIRCLE_START_TOL_IN, CIRCLE_START_MIN_IN, CIRCLE_START_WALKS, CIRCLE_START_STEP_IN = 11.0, 3.0, 8.0, 5, 3.0   # the circle starts close (owner, 2026-11-24): face the tub, walk up to about CIRCLE_START_IN of it (within 10 to 12.5 inches), then pivot 90 degrees away and arc toward it; nearer than CIRCLE_START_MIN_IN (the finder's limit) at the start he backs off
 CIRCLE_FIND_FAR_IN, CIRCLE_FIND_BACK_IN = 22.0, 4.0     # the tub lost at the start after being read at or under this many inches: back up this far and look (walking forward closer to a tub that is too near rammed it on 2026-11-24); over it or never seen: walk forward
 CIRCLE_FIND_FORWARD_IN, CIRCLE_FIND_FORWARD_MAX = 6.0, 3   # the tub not in view at the start: walk forward this far and look again, up to this many times, before any pivoting (owner, 2026-11-24)
 CIRCLE_LOST_MAX_DEG = 180.0          # the most he pivots looking for a tub that is out of view (owner, 2026-11-24: no spinning round; 360 degrees of blind pivots ended two test runs), then he lies down
@@ -63,6 +63,7 @@ CIRCLE_RADIUS_GAIN = 2.0             # degrees of extra turn away from (or towar
 CIRCLE_CORRECTION_MAX_DEG = 25.0   # outward (too near); a circle too wide is corrected by at most CIRCLE_WIDE_MAX_DEG the other way
 CIRCLE_WIDE_MAX_DEG = 8.0
 CIRCLE_LOST_STEP_DEG = 30.0          # the tub out of view: pivot this much toward its side
+CIRCLE_TAPE_ASPECT = 2.5             # the tub's tape seen from close up is a wide thin red blob (about 4 to 1 or wider, 20 by 5 pixels on 2026-11-25); a puck is about 1 to 1 (12 by 9 and 18 by 15 pixels): only a blob this wide for its height is taken for the tape
 CIRCLE_TAPE_GUARD_IN = 12.0          # a "puck" in view with the tub out of view, when the tub was last read nearer than this, is the tub's own red tape seen from too close, not a puck (the first goal run chased it for 22 scans)
 CIRCLE_MAX_LAPS = 2.0                # more than two laps without the puck ends the session (owner, 2026-11-24)
 CIRCLE_MAX_STEPS = 150
@@ -74,7 +75,8 @@ CIRCLE_TEST_LAPS_IN_A_ROW = 3        # the circle test passes when this many cle
 STAND_IDLE_REST_S = 6.0               # a look that gets no picture while he has stood this long with no leg move lies him down instead of waiting for the next try (owner, 2026-11-24: standing still more than about 10 s sags the legs; the camera stalls left him standing 12 to 13 s); the next look or move stands him up from rest
 CIRCLE_TEST_MINUTES = 4.0            # the circle test's first time cap (owner, 2026-11-24)
 LOG_DIR = "~/g2_runs/basket_run"
-AFTER_PICTURE_TIMEOUT_S = 4.0          # the camera's wait for one picture during the run, once warm (owner, 2026-11-24: 8 s waits while standing sagged the legs; the camera USB stalls left him standing 12 to 13 s a time in the circle test; each look's own time is logged (`look_s`) to refit this). The warm-up before the run waits longer for the first picture after a cold start (about 10 s)
+AFTER_PICTURE_TIMEOUT_S = 8.0          # the camera's wait for one picture of the claw look (after the throw, the confirm look): the first picture after the claw pans or moves can take 4 to 6 s, and with 4 s the look's right-hand picture was lost in both goal runs of 2026-11-25 (owner saw no picture on the right)
+QUICK_PICTURE_TIMEOUT_S = 4.0          # the wait for a quick claw-down picture while he walks or circles (owner, 2026-11-24: an 8 s wait standing sagged the legs; each look's own time is logged as `look_s`)
 
 
 @dataclass
@@ -177,6 +179,14 @@ class CircleState:
 
     def cur(self) -> dict:
         return self.events[-1] if self.events else {}
+
+
+def _looks_like_tape(puck) -> bool:
+    """The tub's own red tape read as a puck: a blob much wider than it is tall. A reading with no size (a test's stand-in) is taken for the tape, as before. A puck on the floor is about as tall as it is wide (2026-11-25: two real pucks at 7.9 and 5.3 inches were ignored as tape and he circled on past a puck right in front of him)."""
+    w, h = getattr(puck, "width_px", None), getattr(puck, "height_px", None)
+    if not w or not h:
+        return True
+    return float(w) / float(h) >= CIRCLE_TAPE_ASPECT
 
 
 def pivot_chunks(degrees: float) -> list:
@@ -385,8 +395,8 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
                 puck = None
             if basket is not None:
                 st.last_d = float(basket.claw_in)
-            elif puck is not None and st.last_d is not None and st.last_d < CIRCLE_TAPE_GUARD_IN:
-                say("circle: a 'puck' with the tub out of view this near it is the tub's own tape: ignored")
+            elif puck is not None and st.last_d is not None and st.last_d < CIRCLE_TAPE_GUARD_IN and _looks_like_tape(puck):
+                say("circle: a wide thin 'puck' with the tub out of view this near it is the tub's own tape: ignored")
                 puck = None
         act = next_circle_action(puck, basket, st)
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "angle_deg": round(st.angle_deg), "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
@@ -782,7 +792,14 @@ class RealEnv:
         self.last_walkup = None
         self.last_quick, self.last_quick_failed = None, False
         try:
-            looker._cam._timeout_s = AFTER_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
+            looker._cam._timeout_s = QUICK_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _picture_wait(self, seconds: float) -> None:
+        """How long the next picture request waits for the camera: AFTER_PICTURE_TIMEOUT_S for the claw look (its right-hand picture needs the longer wait), QUICK_PICTURE_TIMEOUT_S for the quick pictures between moves."""
+        try:
+            self.looker._cam._timeout_s = seconds
         except Exception:  # noqa: BLE001
             pass
 
@@ -819,6 +836,7 @@ class RealEnv:
         from . import claw_survey
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
+        self._picture_wait(AFTER_PICTURE_TIMEOUT_S)
         cam, seen = self._camera(), {}
         left = chase.CLAW_PAN_DEG if chase.CLAW_PAN_SIGN == "left" else -chase.CLAW_PAN_DEG
         self.picture_ok = False
@@ -855,6 +873,7 @@ class RealEnv:
         from . import claw_survey
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
+        self._picture_wait(AFTER_PICTURE_TIMEOUT_S)
         cam, got = self._camera(), {}
         self.confirm_picture_ok = False
 
@@ -930,6 +949,7 @@ class RealEnv:
         from ..vision import basket_finder as bf
         from ..vision import puck_finder as pf
         self._ready_to_move()
+        self._picture_wait(QUICK_PICTURE_TIMEOUT_S)
         cam = self._camera()
         t_look = time.monotonic()
         jpeg = cam.look()                                                # no forced re-metering: the warm-up metered the light
