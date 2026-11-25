@@ -70,3 +70,22 @@ def test_tape_that_comes_as_two_thin_pieces_on_the_same_rows_is_one_strip_and_a_
     assert bf.find_basket_array(pic([(96, 111, 88, 90), (160, 176, 88, 91)])) is None               # a gap of 49 columns is two things, not one strip
     r2 = bf.find_basket_array(pic([(96, 111, 88, 90), (119, 136, 88, 91), (114, 122, 92, 104)]))     # a puck-shaped red blob below the tape (8 by 12) is not joined to it
     assert r2 is not None and 38 <= r2.width_px <= 44
+
+
+def test_the_dim_light_tape_is_found_by_the_second_try_and_the_strict_readings_are_unchanged():
+    """2026-11-25: the tape read (169, 103, 87) at 22 inches in the morning light, red minus green 66 under the seed test's 70; a second, looser seed finds it, and only when the strict one found nothing."""
+    import numpy as np
+    from pi_pipeline.vision import basket_finder as bf
+
+    def pic(color, x0=96, x1=140, y0=88, y1=91):
+        a = np.full((240, 240, 3), 90, dtype=np.uint8)
+        a[y0:y1, x0:x1] = color
+        return a
+    dim = bf.find_basket_array(pic((169, 103, 87)))
+    assert dim is not None and 40 <= dim.width_px <= 48 and 20.0 < dim.claw_in < 26.0                  # found only by the dim test
+    assert bf._find_basket(pic((169, 103, 87)), bf.TAPE_STRICT) is None
+    strict_pic = pic((240, 115, 105))
+    a, b = bf.find_basket_array(strict_pic), bf._find_basket(strict_pic, bf.TAPE_STRICT)
+    assert a is not None and a == b                                                                      # the calibrated colour: the same reading as before
+    assert bf.find_basket_array(pic((140, 120, 110))) is None                                            # a brownish strip (floor, wood) is still not tape
+    assert bf.find_basket_array(pic((169, 103, 87), x0=96, x1=108)) is None                              # and a short one is not a tub

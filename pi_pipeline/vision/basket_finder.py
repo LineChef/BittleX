@@ -18,6 +18,7 @@ import numpy as np
 from .ball_finder import IGNORE_BOTTOM_PX, _blobs, _decode
 
 TAPE_STRICT = (140, 70, 60)          # a pixel is tape when red is above the first and above green and blue by the others (the tape's core)
+TAPE_DIM = (130, 50, 45)             # the second try, when the strict seed finds no tape: the tape is paler in dim or washed light (it read 169, 103, 87 at 22 inches on 2026-11-25, red minus green 66, against 240, 115, 105 at calibration). On the 34 tub pictures it reads the same 34; on 163 pictures with no tub it added 2 false tubs to the strict test's 39 (mostly pictures of the old cup); on the 10 morning pictures it found the tub in 7
 TAPE_LOOSE = (110, 40, 30)           # the same test for finding the tape's ends along its rows
 MIN_SEED_PX = 30                     # the seed blob's size (50 pixels at 22 inches, about 300 at 8)
 MIN_WIDTH_PX, MAX_WIDTH_PX = 20, 200
@@ -89,8 +90,13 @@ def _tape_groups(blobs) -> list:
 
 
 def find_basket_array(rgb: np.ndarray) -> BasketReading | None:
+    """The tub in a picture: the strict tape test first (the calibrated colour: every reading it gave is unchanged), and only when that finds no tape the dimmer test (TAPE_DIM), under the same shape rules (a thin wide strip)."""
+    return _find_basket(rgb, TAPE_STRICT) or _find_basket(rgb, TAPE_DIM)
+
+
+def _find_basket(rgb: np.ndarray, seed_thr: tuple) -> BasketReading | None:
     h, w_img = rgb.shape[:2]
-    m = _tape_mask(rgb, TAPE_STRICT)
+    m = _tape_mask(rgb, seed_thr)
     m[h - IGNORE_BOTTOM_PX:, :] = False
     m[:HORIZON_Y, :] = False
     best = None
