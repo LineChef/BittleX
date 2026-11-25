@@ -12,6 +12,7 @@ Paces (hardwood, the arm fitted, the claw at its carry height):
 """
 from __future__ import annotations
 
+from ..link import opencat
 from . import ball_chase as chase
 from . import chase_pace
 
@@ -21,7 +22,8 @@ BACK_MIN_S = BACK_POINTS[0][0]                           # the shortest back-up 
 BACK_MAX_IN = 12.0                                       # a safety cap on one back-up step (the line-up asks for 6 at most)
 FWD_MAX_IN = 12.0
 PIVOT_MIN_IN, PIVOT_MAX_IN, PIVOT_DISTANCE_IN = 8.0, 40.0, 20.0    # every basket-run turn is the in-place pivot: a distance outside 8 to 40 inches, or none at all (a scan with nothing in view), would pick the walking arc, which creeps forward (2026-11-23: a scan and a turn toward a puck 5.6 inches away walked him from 16 inches to 7 inches of the basket)
-ARC_MAX_DEG = 90.0                                       # a safety cap on one wide arc (the circling search asks for 45)
+ARC_RATE_DEG_S = 9.5                                     # the walking arc's real turn rate, the same each way (measured 2026-11-24 with a ruler, five arcs of 90 degrees asked: about 90 degrees in 10 s)
+ARC_MAX_DEG = 57.0                                       # a safety cap on one wide arc (the circling search asks for 45): 57 degrees is 6 s, the longest turn the robot runs
 TURN_MAX_DEG = 60.0                                      # a safety cap on one turn step (the line-up asks for 54 at most: two pivot cycles)
 
 
@@ -90,17 +92,26 @@ class BasketMover:
         return self._turn(degrees, pulse=abs(degrees) < chase.PIVOT_MIN_DEG)
 
     def arc(self, degrees: float) -> str:
-        """A wide turn: the firmware's walking arc (`kwkL` / `kwkR`), gyro-stopped after `degrees` of heading change, which curves FORWARD while it turns (the circling search, owner 2026-11-24). `lineup_ball_in` is cleared so the robot picks the arc skills, not the in-place pivot.
-        `last_arc_deg` is what the gyro says he turned (the lap is counted from it, not from what was asked). The forward speed and radius of the arc are NOT measured yet (the arc calibration is the next hardware session's job): a first guess is about 4 inches a second at about 28 degrees a second, a radius near 9 inches."""
+        """A wide turn: the firmware's walking arc (`kwkL` / `kwkR`), TIMED, not gyro-stopped (the circling search, owner 2026-11-24). Measured the same day with a ruler (g2turncal, two 90 degree arcs a run): the arc turns about ARC_RATE_DEG_S degrees a second on a radius near 15 inches and about 2.5 inches a second,
+        the same to the right and to the left, while the gyro counted 0.13 to 0.16 of a real right turn and 1.8 times a real left turn, so a gyro stop never fired on the right and cut the left short. The arc runs `degrees / ARC_RATE_DEG_S` seconds (the whole-cycle stop may add a little), with the firmware walking-turn skills forced
+        (never the pivot). `last_arc_deg` is what was ASKED (the lap is counted from it), `last_arc_s` the commanded seconds, `last_arc_gyro_deg` what the gyro said (logged, not used)."""
         want = min(abs(degrees), ARC_MAX_DEG)
         if want <= 0:
             return self.state
         self.robot.lineup_ball_in = None
-        rate = self._rate(degrees, pulse=False)
         signed = want if degrees > 0 else -want
-        self.state = self.robot.turn(signed, max(chase.MIN_MOVE_S, want / rate), stop_deg=want)
+        secs = want / ARC_RATE_DEG_S
+        saved = getattr(self.robot, "turn_tokens", None)
+        if saved is not None:
+            self.robot.turn_tokens = tuple(opencat.ARCS)                  # (right, left): the firmware arcs, whatever G2_TURN_GAIT says
+        try:
+            self.state = self.robot.turn(signed, secs, stop_deg=0.0)
+        finally:
+            if saved is not None:
+                self.robot.turn_tokens = saved
         done = getattr(self.robot, "last_turn_deg", None)
-        self.last_arc_deg = abs(float(done)) if done else want
+        self.last_arc_gyro_deg = None if not done else abs(float(done))
+        self.last_arc_deg, self.last_arc_s = want, round(secs, 2)
         return self.state
 
     def forward(self, inches: float) -> str:

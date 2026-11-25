@@ -43,7 +43,7 @@ CIRCLE_RADIUS_IN = 16.0              # the circle's radius as the finder reads i
 CIRCLE_MIN_IN = 10.0                 # nearer than this (as read) he backs off before anything else (the first goal run ended a leg 4.5 inches from the tub)
 CIRCLE_ARC_DEG = 45.0                # one wide arc's heading change: 8 arcs a lap
 CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
-CIRCLE_STRAIGHT_IN = 6.0             # a straight walk after every arc widens the circle: an arc of 45 degrees on a guessed 9 inch radius is 7 inches of path, with 6 straight it is about 13 inches of path for 45 degrees, a radius near 16 (the arc's real radius is not measured yet)
+CIRCLE_STRAIGHT_IN = 0.0             # no straight walk after an arc (owner, 2026-11-24): the arc is measured at about 15 inches of radius, already the circle we want, and on the simulated floor the 6 inches that widened a guessed 9 inch arc threw it out to 11 to 28 inches and lost the tub (without it 12.5 to 18); a number above 0 brings the walk back
 CIRCLE_PEEK_EVERY = 3                # a peek (turn toward the tub, read its distance and scan the floor round it) only after this many arcs (every 4 missed a puck in the simulated floor, every 3 found all four spots); between arcs the forward picture alone says whether the circle is tight
 CIRCLE_TIGHT_MIN_TURN_DEG, CIRCLE_TIGHT_MAX_TURN_DEG = 15.0, 60.0   # the tub in the forward picture means the circle is too tight: turn away by how far forward it stands (it should be beside him), at least and at most this
 CIRCLE_PEEK_DEG = 60.0               # the first peek: turn this far toward the tub, look, and turn back; after that the peek turns by where the last one found the tub (CIRCLE_PEEK_TARGET_DEG off his nose), because on the simulated floor 60 degrees left the tub out of the picture on almost every peek
@@ -59,7 +59,7 @@ CIRCLE_MAX_LAPS = 2.0                # more than two laps without the puck ends 
 CIRCLE_MAX_STEPS = 150
 CIRCLE_STRAIGHT_GAIN = 0.0           # inches of straight walk added per inch the last peek read the radius under CIRCLE_RADIUS_IN (taken away when over). Off: on the simulated floor 0.5 and 0.8 made the circle worse with a peek every third arc (nearest 3.3 and 2.1 inches against 11) and gained nothing with a peek every arc, because the turn back after each peek (CIRCLE_RADIUS_GAIN) already steers; turn it on only if the circle test's log shows the turn back is not enough
 CIRCLE_STRAIGHT_MIN_IN, CIRCLE_STRAIGHT_MAX_IN = 2.0, 14.0
-CIRCLE_ANGLE_SCALE = 1.0             # the lap is counted from the gyro's heading change times this (the first run's gyro said about half of what was asked: fit it from the circle test's log)
+CIRCLE_ANGLE_SCALE = 1.0             # the lap is counted from each arc's counted degrees times this: the degrees ASKED now (the arc is timed; the gyro read 0.15 of a real right turn and 1.8 of a left one, 2026-11-24), the real turn fitted from the circle test's log
 CIRCLE_BAND_IN = (12.0, 22.0)        # a peek's distance outside this is a soft failure of the circle test (22 is the finder's far limit)
 CIRCLE_TEST_LAPS_IN_A_ROW = 3        # the circle test passes when this many clean laps follow one another (owner, 2026-11-24)
 CIRCLE_TEST_MINUTES = 4.0            # the circle test's first time cap (owner, 2026-11-24)
@@ -181,7 +181,7 @@ def clean_streak(st: CircleState) -> int:
 
 def straight_for(last_d) -> float:
     """The straight walk after an arc (inches): CIRCLE_STRAIGHT_IN at the right radius, longer when the last read radius was under CIRCLE_RADIUS_IN (the circle widens), shorter when over it."""
-    if last_d is None:
+    if last_d is None or CIRCLE_STRAIGHT_GAIN == 0.0:
         return CIRCLE_STRAIGHT_IN
     return max(CIRCLE_STRAIGHT_MIN_IN, min(CIRCLE_STRAIGHT_MAX_IN, CIRCLE_STRAIGHT_IN + CIRCLE_STRAIGHT_GAIN * (CIRCLE_RADIUS_IN - float(last_d))))
 
@@ -193,10 +193,12 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
     if st.streak_target and clean_streak(st) >= st.streak_target:
         return RAction("give_up", 0.0, "passed")
     if st.phase == "arc":
-        st.phase = "straight"
+        st.phase = "straight" if straight_for(st.last_d if st.d_arc >= st.arcs else None) > 0 else "glance"
         st.arcs += 1
         st.steps += 1
         st.events.append({"arc": st.arcs, "lap": st.lap_now(), "angle_before": round(st.angle_deg, 1), "asked_deg": CIRCLE_ARC_DEG, "last_d": st.last_d})
+        if st.phase == "glance":
+            st.cur()["straight_in"] = 0.0
         return RAction("arc", st.side * CIRCLE_ARC_DEG, "circling: wide arc round the tub")
     if st.phase == "straight":
         st.phase = "glance"
@@ -270,8 +272,8 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
 
 def circle_report(st: CircleState) -> dict:
     """What a circling run did, for the log and the end-of-run summary: the laps (clean or not and why), the gyro's reading against what was asked, the arc time, the distances read."""
-    asked = sum(e.get("asked_deg", 0.0) for e in st.events if "gyro_deg" in e)
-    gyro = sum(e["gyro_deg"] for e in st.events if "gyro_deg" in e)
+    asked = sum(e.get("asked_deg", 0.0) for e in st.events if e.get("gyro_deg"))
+    gyro = sum(e["gyro_deg"] for e in st.events if e.get("gyro_deg"))
     reads = [r[0] for e in st.events for r in (e.get("glance"), e.get("peek")) if r]
     times = [e["arc_s"] for e in st.events if "arc_s" in e]
     return {"laps": lap_table(st), "streak": clean_streak(st), "arcs": len(st.events), "angle_deg": round(st.angle_deg),
@@ -344,7 +346,8 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
             gyro = abs(getattr(env.mover, "last_arc_deg", abs(act.value)))
             st.angle_deg += gyro * CIRCLE_ANGLE_SCALE
             ev = st.cur()
-            ev.update({"gyro_deg": round(gyro, 1), "arc_s": took, "t_s": round(time.monotonic() - t_start, 1), "pack_pct": getattr(env, "pack_pct", None)})
+            g = getattr(env.mover, "last_arc_gyro_deg", None)
+            ev.update({"counted_deg": round(gyro, 1), "gyro_deg": None if g is None else round(g, 1), "arc_s": took, "t_s": round(time.monotonic() - t_start, 1), "pack_pct": getattr(env, "pack_pct", None)})
         elif act.kind == "forward" and st.events:
             st.cur()["straight_s"] = took
 

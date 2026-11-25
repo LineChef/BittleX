@@ -171,16 +171,19 @@ def test_the_line_up_tells_the_mover_how_far_the_target_is_so_a_turn_can_be_a_pi
     assert w.dist_at_turn and all(x is not None for x in w.dist_at_turn)                  # every turn step was told the distance
 
 
-def test_a_wide_arc_is_a_gyro_stopped_walking_turn_with_no_pivot_distance_and_reports_what_was_turned():
+def test_a_wide_arc_is_a_timed_walking_turn_with_no_pivot_distance_and_reports_what_was_asked():
     r = FakeRobot()
     r.lineup_ball_in = 20.0                                                                    # an earlier turn left a pivot distance behind
+    r.turn_tokens = ("kvtR", "kvtL")                                                           # G2_TURN_GAIT=pivot would have set these
     m = bm.BasketMover(r)
     assert m.arc(45.0) == "ok" and r.lineup_ball_in is None                                    # no distance: the robot picks the firmware arc skills, not the in-place pivot
     name, args, kw = r.calls[-1]
-    assert name == "turn" and args[0] == 45.0 and kw["stop_deg"] == 45.0 and args[1] >= chase.MIN_MOVE_S
-    r.last_turn_deg = 52.0                                                                    # the gyro says he turned more than asked
+    assert name == "turn" and args[0] == 45.0 and kw["stop_deg"] == 0.0                         # timed: the gyro read 0.15 of a real right turn and 1.8 of a left one
+    assert abs(args[1] - 45.0 / bm.ARC_RATE_DEG_S) < 1e-9 and m.last_arc_deg == 45.0 and m.last_arc_s == round(45.0 / bm.ARC_RATE_DEG_S, 2)
+    assert r.turn_tokens == ("kvtR", "kvtL")                                                   # put back after the arc
+    r.last_turn_deg = 52.0                                                                    # the gyro says something else: logged, never used
     m.arc(-45.0)
-    assert r.calls[-1][1][0] == -45.0 and m.last_arc_deg == 52.0
+    assert r.calls[-1][1][0] == -45.0 and m.last_arc_deg == 45.0 and m.last_arc_gyro_deg == 52.0
     m.arc(500.0)
-    assert r.calls[-1][2]["stop_deg"] == bm.ARC_MAX_DEG                                        # a safety cap on one arc
+    assert r.calls[-1][1][0] == bm.ARC_MAX_DEG and r.calls[-1][1][1] <= 6.0                       # a safety cap on one arc: never longer than the 6 s turn limit
     assert bm.BasketMover(FakeRobot(fall_on="turn")).arc(45.0) == "fell"

@@ -9,7 +9,7 @@ TUB_R = 2.75                                                        # the tub's 
 
 
 class Sim:
-    ARC_RADIUS_IN = 8.6                                             # a first guess: about 4 inches a second at about 28 degrees a second
+    ARC_RADIUS_IN = 15.0                                            # measured 2026-11-24: a radius near 15 inches
 
     def __init__(self, puck=None, start=(0.0, -13.0), heading=0.0, turn_gain=1.0, arc_radius=None):
         self.x, self.y, self.h, self.puck, self.turn_gain = start[0], start[1], heading, puck, turn_gain
@@ -62,6 +62,7 @@ class Sim:
             done += step
         self.legs += 1
         self.last_arc_deg = done * self.turn_gain
+        self.last_arc_gyro_deg = self.last_arc_deg
         return "ok"
 
     def back(self, v):
@@ -96,7 +97,7 @@ def test_with_no_puck_anywhere_it_ends_after_two_laps_of_wide_arcs_and_stays_rou
 
 
 def test_a_wider_or_narrower_arc_than_guessed_is_corrected_by_the_looks():
-    for radius in (6.0, 12.0):                                                                # the true arc radius is not measured: the circle must not depend on the guess
+    for radius in (10.0, 20.0):                                                               # the arc was measured near 15 inches: the circle must still hold if it is a third off either way
         sim = Sim(puck=None, arc_radius=radius)
         r = br.circle_search(Env(sim), say=lambda s: None)
         radii = [math.hypot(x, y) for x, y in sim.path]
@@ -120,7 +121,8 @@ def test_the_tub_out_of_view_makes_him_pivot_toward_its_side_and_a_full_turn_end
     assert kinds[:12] == ["pivot"] * 12 and kinds[12] == "give_up"                            # 12 x 30 degrees is a full turn
 
 
-def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_few_arcs():
+def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_few_arcs(monkeypatch):
+    monkeypatch.setattr(br, "CIRCLE_STRAIGHT_IN", 6.0)                                           # the straight walk is off by default; this is the walk when it is on
     st = br.CircleState(side=1)
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
     assert br.next_circle_action(None, tub(16.0, 20.0), st).why == "circling: face the tub"
@@ -236,7 +238,17 @@ def test_a_back_off_a_tub_in_the_forward_picture_and_a_peek_out_of_band_are_soft
     assert st.events[0]["peek"] == (24.0, 30.0)
 
 
+def test_there_is_no_straight_walk_by_default_and_the_arc_goes_straight_to_the_glance():
+    assert br.CIRCLE_STRAIGHT_IN == 0.0
+    st = br.CircleState(side=1)
+    st.phase = "arc"
+    assert br.next_circle_action(None, None, st).kind == "arc" and st.phase == "glance" and st.events[0]["straight_in"] == 0.0     # no 'forward 0 inches': a zero walk still walks (the slow start)
+    r = _test_run(Sim(puck=None), streak_target=1)
+    assert all(s["action"] != "forward" for s in r["steps"])
+
+
 def test_the_straight_walk_is_the_default_unless_the_gain_is_on_and_the_reading_is_fresh(monkeypatch):
+    monkeypatch.setattr(br, "CIRCLE_STRAIGHT_IN", 6.0)
     assert br.straight_for(None) == br.CIRCLE_STRAIGHT_IN and br.straight_for(10.0) == br.CIRCLE_STRAIGHT_IN                 # gain 0: off
     monkeypatch.setattr(br, "CIRCLE_STRAIGHT_GAIN", 0.5)
     assert br.straight_for(10.0) == br.CIRCLE_STRAIGHT_IN + 3.0 and br.straight_for(30.0) == br.CIRCLE_STRAIGHT_MIN_IN
