@@ -561,7 +561,8 @@ class SerialLink:
             if len(rows) < 2:
                 return None
             med = lambda v: sorted(v)[len(v) // 2]       # noqa: E731
-            return {"roll": round(med([math.degrees(r[0]) for r in rows]), 1), "pitch": round(med([math.degrees(r[1]) for r in rows]), 1), "n": len(rows)}
+            return {"roll": round(med([math.degrees(r[0]) for r in rows]), 1), "pitch": round(med([math.degrees(r[1]) for r in rows]), 1), "n": len(rows),
+                    "samples": [(round(math.degrees(r[0]), 1), round(math.degrees(r[1]), 1)) for r in rows[:8]]}      # every frame's (roll, pitch), so a tilt of -89 / 173 after a stand-up that reached (2026-11-25, no fall recorded) can be told from a real flip
         except Exception:  # noqa: BLE001
             return None
 

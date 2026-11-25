@@ -266,3 +266,39 @@ def test_metering_waits_for_auto_exposure_to_settle_before_judging_the_light():
     before = cam.invokes
     snap = c.snapshot()
     assert cam.invokes - before == 1 and exposure_stats(snap.jpeg).clip_high < 0.2
+
+
+def test_a_request_the_camera_drops_is_asked_again_after_a_couple_of_seconds_instead_of_waiting_the_full_timeout():
+    """2026-11-25: the module dropped the first request after a pause and answered the second in about half a second; every picture waited 8 s for the first. The request is repeated once after reask_s."""
+    jpeg = make_jpeg([115.0] * 1024)
+    t = [0.0]
+
+    class Dropper:
+        def __init__(self, drop_first):
+            self.drop, self.invokes, self.lines = drop_first, 0, []
+
+        def reset_input_buffer(self):
+            self.lines = []
+
+        def write(self, b):
+            if b.startswith(b"AT+INVOKE"):
+                self.invokes += 1
+                if self.invokes > self.drop:
+                    self.lines = [b'{"type": 1, "name": "INVOKE", "code": 0, "data": {"count": 1, "image": "' + base64.b64encode(jpeg) + b'", "boxes": []}}\n']
+
+        def readline(self):
+            if self.lines:
+                return self.lines.pop(0)
+            t[0] += 1.0                                                                         # a serial read that times out takes the port's 1 s
+            return b""
+    for reask, want_invokes, max_t in ((2.5, 2, 4.0), (0.0, 1, 8.0)):
+        t[0] = 0.0
+        cam = Dropper(drop_first=1)
+        c = CameraSnapshotter("x", exposure_check=False, serial_factory=lambda: cam, sleep=lambda s: None, clock=lambda: t[0], idle_close_s=0, timeout_s=8.0, reask_s=reask, click=False)
+        c._open()
+        t[0] = 0.0
+        snap = c._grab_one()
+        if reask:
+            assert snap is not None and cam.invokes == want_invokes and t[0] <= max_t, (snap, cam.invokes, t[0])      # asked again at 2.5 s, answered by about 3 s
+        else:
+            assert snap is None and cam.invokes == 1 and t[0] >= 8.0                                 # no re-ask: the first request is dropped and nothing comes in 8 s

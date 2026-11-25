@@ -23,6 +23,9 @@ MIN_SEED_PX = 30                     # the seed blob's size (50 pixels at 22 inc
 MIN_WIDTH_PX, MAX_WIDTH_PX = 20, 200
 MIN_ASPECT = 3.5                     # width / height of the seed (the tape is 10 to 1 or thinner; the puck's red is about 1 to 2)
 HORIZON_Y = 50                       # blobs above this row are not on the floor
+FRAG_MIN_PX = 10                     # a thin piece of tape: at least this many strict pixels, thin and wide (below), and it can join its neighbours on the same rows into the seed
+FRAG_MAX_H, FRAG_MIN_ASPECT = 4, 3.0
+FRAG_ROW_TOL, FRAG_GAP_PX = 3.0, 12  # pieces whose rows differ by at most this and whose gap is at most this many columns are one strip of tape (2026-11-25: at about 24 inches the tape came as two pieces of 15 and 17 pixels with an 8 pixel gap, each too short to seed, and the look called it no basket with the tub right in front of him)
 BAND_UP, BAND_DOWN = 4, 3            # the loose test looks on these rows around the seed's rows
 MIN_COL_PX = 2                       # a column is tape when the loose test holds on this many of the band's rows
 BASKET_IN = 5.0                      # the tub's width across (an estimate; the tape's width carries the distance)
@@ -60,13 +63,38 @@ def _tape_mask(rgb: np.ndarray, thr: tuple) -> np.ndarray:
     return (r > thr[0]) & (r - g > thr[1]) & (r - b > thr[2])
 
 
+def _tape_groups(blobs) -> list:
+    """The strict-red blobs as (ys, xs), with thin wide pieces of tape on the same rows (within FRAG_ROW_TOL rows, FRAG_GAP_PX columns apart) joined into one strip. Anything else stays as it is, so a puck's red is never joined to the tape."""
+    out, frags = [], []
+    for ys, xs in blobs:
+        bw, bh = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
+        if len(xs) >= FRAG_MIN_PX and bh <= FRAG_MAX_H and bw / bh >= FRAG_MIN_ASPECT:
+            frags.append((ys, xs))
+        else:
+            out.append((ys, xs))
+    frags.sort(key=lambda f: int(f[1].min()))
+    groups: list = []
+    for ys, xs in frags:
+        for g in groups:
+            gy = np.concatenate([y for y, _x in g])
+            gx = np.concatenate([x for _y, x in g])
+            if abs(float(ys.mean()) - float(gy.mean())) <= FRAG_ROW_TOL and (int(xs.min()) - int(gx.max()) <= FRAG_GAP_PX) and (int(gx.min()) - int(xs.max()) <= FRAG_GAP_PX):
+                g.append((ys, xs))
+                break
+        else:
+            groups.append([(ys, xs)])
+    for g in groups:
+        out.append((np.concatenate([y for y, _x in g]), np.concatenate([x for _y, x in g])))
+    return out
+
+
 def find_basket_array(rgb: np.ndarray) -> BasketReading | None:
     h, w_img = rgb.shape[:2]
     m = _tape_mask(rgb, TAPE_STRICT)
     m[h - IGNORE_BOTTOM_PX:, :] = False
     m[:HORIZON_Y, :] = False
     best = None
-    for ys, xs in _blobs(m):
+    for ys, xs in _tape_groups(_blobs(m)):
         n = len(xs)
         if n < MIN_SEED_PX:
             continue

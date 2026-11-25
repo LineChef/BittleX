@@ -52,3 +52,21 @@ def test_at_eight_inches_a_puck_inside_is_read_inside_and_every_other_case_is_no
         else:
             assert floor is not None, label                                                               # a puck outside the tub is found on the floor
     assert n >= 13
+
+
+def test_tape_that_comes_as_two_thin_pieces_on_the_same_rows_is_one_strip_and_a_puck_is_never_joined_to_it():
+    """2026-11-25: at about 24 inches the tape came as two pieces (15 and 17 pixels, a gap of 8), each too short to seed: the look said no basket with the tub in front of him."""
+    import numpy as np
+    from pi_pipeline.vision import basket_finder as bf
+
+    def pic(pieces):
+        a = np.full((240, 240, 3), 90, dtype=np.uint8)
+        for (x0, x1, y0, y1) in pieces:
+            a[y0:y1, x0:x1] = (200, 60, 50)
+        return a
+    r = bf.find_basket_array(pic([(96, 111, 88, 90), (119, 136, 88, 91)]))
+    assert r is not None and 38 <= r.width_px <= 44 and abs(r.bearing_deg) < 5 and 22.0 < r.claw_in < 26.0
+    assert bf.find_basket_array(pic([(96, 111, 88, 90)])) is None                                    # one short piece alone is still not a tub
+    assert bf.find_basket_array(pic([(96, 111, 88, 90), (160, 176, 88, 91)])) is None               # a gap of 49 columns is two things, not one strip
+    r2 = bf.find_basket_array(pic([(96, 111, 88, 90), (119, 136, 88, 91), (114, 122, 92, 104)]))     # a puck-shaped red blob below the tape (8 by 12) is not joined to it
+    assert r2 is not None and 38 <= r2.width_px <= 44
