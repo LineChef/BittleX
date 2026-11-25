@@ -52,7 +52,8 @@ CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
 CIRCLE_SEEN_TURN_DEG = 15.0        # the tub in the forward picture after an arc at all (owner, 2026-11-24: he plowed through the tub): turn outward this much; nearer his nose or near, by how far forward it stands (CIRCLE_TIGHT_MIN_TURN_DEG up to CIRCLE_TIGHT_MAX_TURN_DEG)
 CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
 CIRCLE_TIGHT_NEAR_IN = 12.0
-CIRCLE_START_IN, CIRCLE_START_TOL_IN, CIRCLE_START_MIN_IN, CIRCLE_START_WALKS = 11.0, 1.5, 8.0, 3   # the circle starts close (owner, 2026-11-24): face the tub, walk up to about CIRCLE_START_IN of it (within 10 to 12.5 inches), then pivot 90 degrees away and arc toward it; nearer than CIRCLE_START_MIN_IN (the finder's limit) at the start he backs off
+CIRCLE_START_IN, CIRCLE_START_TOL_IN, CIRCLE_START_MIN_IN, CIRCLE_START_WALKS, CIRCLE_START_STEP_IN = 11.0, 1.5, 8.0, 5, 3.0   # the circle starts close (owner, 2026-11-24): face the tub, walk up to about CIRCLE_START_IN of it (within 10 to 12.5 inches), then pivot 90 degrees away and arc toward it; nearer than CIRCLE_START_MIN_IN (the finder's limit) at the start he backs off
+CIRCLE_FIND_FAR_IN, CIRCLE_FIND_BACK_IN = 22.0, 4.0     # the tub lost at the start after being read at or under this many inches: back up this far and look (walking forward closer to a tub that is too near rammed it on 2026-11-24); over it or never seen: walk forward
 CIRCLE_FIND_FORWARD_IN, CIRCLE_FIND_FORWARD_MAX = 6.0, 3   # the tub not in view at the start: walk forward this far and look again, up to this many times, before any pivoting (owner, 2026-11-24)
 CIRCLE_LOST_MAX_DEG = 180.0          # the most he pivots looking for a tub that is out of view (owner, 2026-11-24: no spinning round; 360 degrees of blind pivots ended two test runs), then he lies down
 CIRCLE_FACE_TOL_DEG = 8.0            # facing the tub: its bearing inside this before the circle starts
@@ -153,6 +154,7 @@ class CircleState:
     events: list = field(default_factory=list)   # one record per arc: asked and gyro degrees, the straight walk, what the forward picture and the peek read
     lost_first: int = 1                  # which way the lost-tub sweep goes first (+1 toward the tub's side, -1 back the way he came)
     start_walks: int = 0                 # walks made up to the tub at the start
+    find_back: int = 0                   # back-ups made at the start after the tub was seen and then lost near
     find_forward: int = 0                # forward steps made so far looking for the tub at the start
     peek_deg: float = CIRCLE_PEEK_DEG    # how far the next peek turns toward the tub (learned from the last one)
     peek_turn: float = 0.0               # the turn made toward the tub in this peek so far (the peek plus any lost-tub steps)
@@ -246,7 +248,11 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
         return next_circle_action(None, None, st)
     if basket is None:
-        if st.phase == "face" and st.find_forward < CIRCLE_FIND_FORWARD_MAX and st.lost_deg == 0.0:
+        if st.phase == "face" and st.lost_deg == 0.0 and st.last_d is not None and st.last_d <= CIRCLE_FIND_FAR_IN and st.find_back < 2:
+            st.find_back += 1                                                 # seen a moment ago and not now: it is too near (or off to the side), never walk forward into it
+            st.steps += 1
+            return RAction("back", CIRCLE_FIND_BACK_IN, "tub lost near the start: back up and look again")
+        if st.phase == "face" and st.find_forward < CIRCLE_FIND_FORWARD_MAX and st.lost_deg == 0.0 and (st.last_d is None or st.last_d > CIRCLE_FIND_FAR_IN):
             st.find_forward += 1
             st.steps += 1
             return RAction("forward", CIRCLE_FIND_FORWARD_IN, "tub not in view at the start: walk forward and look again")
@@ -287,7 +293,7 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
         if d > CIRCLE_START_IN + CIRCLE_START_TOL_IN and st.start_walks < CIRCLE_START_WALKS:
             st.start_walks += 1                                               # facing it: walk up to about CIRCLE_START_IN of it, look again (the walk's length is a guess, the next look corrects it)
             st.steps += 1
-            return RAction("forward", min(bl.FWD_STEP_MAX_IN if hasattr(bl, "FWD_STEP_MAX_IN") else 12.0, d - CIRCLE_START_IN), "circling: walk up to the tub")
+            return RAction("forward", min(CIRCLE_START_STEP_IN, d - CIRCLE_START_IN), "circling: walk up to the tub")           # short steps: a 5.8 inch walk moved him 9 inches on 2026-11-24
         st.phase = "arc"
         st.steps += 1
         return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: close enough: turn so the tub is beside him")
@@ -847,6 +853,21 @@ class RealEnv:
         chase.ensure_rest(self.link)
         self.robot.posture, self.robot._claw = "rest", (0.0, 0.0)
 
+    def stand_up_warm(self) -> str:
+        """The eased stand-up from rest while the camera takes a throwaway picture on its own thread: the first picture after a quiet spell can take 5 s, and he stood still through it (2026-11-24: the legs sagged before the first move). "ok" or "fell"."""
+        import threading
+
+        def warm():
+            try:
+                self._camera().look()
+            except Exception:  # noqa: BLE001
+                pass
+        t = threading.Thread(target=warm, daemon=True)
+        t.start()
+        res = self.robot.stand_up_from_rest()
+        t.join(timeout=8.0)
+        return res
+
     def idle_stand_s(self) -> float | None:
         """How long he has stood with no leg move (since the last move or stand-up ended), or None when that is not known or he is not standing."""
         moved = getattr(self.robot, "_moved_at", None)
@@ -986,7 +1007,7 @@ def main(argv: list | None = None) -> None:
             return
         if a.circle_test:
             env.attempt = 0
-            if robot.stand_up_from_rest() == "fell":
+            if env.stand_up_warm() == "fell":
                 raise Fell()
             c = circle_search(env, say=print, max_laps=1000, peek_every=a.peek_every, deadline=time.monotonic() + 60.0 * a.minutes, streak_target=a.laps, ignore_puck=True)
             ok2, pct_end, _v = battery.motion_gate(link)
@@ -998,7 +1019,7 @@ def main(argv: list | None = None) -> None:
             return
         if a.confirm_only or a.circle_only:
             env.attempt = 0
-            if robot.stand_up_from_rest() == "fell":
+            if env.stand_up_warm() == "fell":
                 raise Fell()
             rec = {"attempt": 0, "after": {}}
             if a.confirm_only:

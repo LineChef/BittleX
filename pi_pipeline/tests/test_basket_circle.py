@@ -151,7 +151,7 @@ def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_fe
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
     assert br.next_circle_action(None, tub(16.0, 20.0), st).why == "circling: face the tub"
     a = br.next_circle_action(None, tub(19.0, 2.0), st)                                       # facing it at 19 inches: walk up to about 11
-    assert a.kind == "forward" and abs(a.value - min(8.0, getattr(br.bl, "FWD_STEP_MAX_IN", 12.0))) < 1e-9 and st.phase == "face"
+    assert a.kind == "forward" and a.value == br.CIRCLE_START_STEP_IN == 3.0 and st.phase == "face"                 # short steps
     a = br.next_circle_action(None, tub(11.0, 2.0), st)
     assert a.kind == "pivot" and a.value < 0 and abs(a.value) >= 54 and st.phase == "arc"     # the tub goes to his right: a turn to the left of about 90
     a = br.next_circle_action(None, None, st)
@@ -379,3 +379,35 @@ def test_the_circle_stands_him_up_before_a_move_when_a_look_laid_him_down():
     env = Ready(Sim())
     r = br.circle_search(env, say=lambda s: None, ignore_puck=True, max_laps=1000, streak_target=1, deadline=time.monotonic() + 20.0)
     assert env.ready >= len([s for s in r["steps"] if s["action"] not in ("give_up", "found")])
+
+
+def test_the_tub_lost_near_the_start_makes_him_back_up_never_walk_into_it():
+    tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                                  # noqa: E731
+    st = br.CircleState(side=1)
+    st.last_d = 7.9                                                                                  # seen at 7.9 inches a moment ago, not in view now (too near the finder's limit)
+    a = br.next_circle_action(None, None, st)
+    assert a.kind == "back" and a.value == br.CIRCLE_FIND_BACK_IN and "back up" in a.why
+    assert br.next_circle_action(None, None, st).kind == "back"
+    assert br.next_circle_action(None, None, st).kind == "pivot"                                       # two back-ups, then the sweep (no forward step near the tub)
+    st = br.CircleState(side=1)
+    st.last_d = 30.0                                                                                 # last seen far: walk forward
+    assert br.next_circle_action(None, None, st).kind == "forward"
+    st = br.CircleState(side=1)                                                                      # a walk-up goes in 3 inch steps, up to five
+    assert [br.next_circle_action(None, tub(25.0, 0.0), st).kind for _ in range(br.CIRCLE_START_WALKS + 1)] == ["forward"] * br.CIRCLE_START_WALKS + ["pivot"]
+
+
+def test_he_stands_up_while_the_camera_takes_a_throwaway_picture_so_the_first_look_is_quick():
+    import threading
+
+    class Cam:
+        def look(self):
+            self.thread = threading.current_thread()
+            return b"x"
+
+    class Robot:
+        def stand_up_from_rest(self):
+            self.main = threading.current_thread()
+            return "ok"
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.robot, env._cam = Robot(), Cam()
+    assert env.stand_up_warm() == "ok" and env._cam.thread is not env.robot.main                     # the picture was taken on its own thread, while he stood up
