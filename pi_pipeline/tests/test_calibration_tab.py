@@ -113,3 +113,12 @@ def test_the_tub_set_has_its_own_object_and_sections_never_lumped_under_the_cyli
                                                           "8 in: empty tub": 1, "8 in: puck inside the tub": 2, "8 in: puck outside the tub": 1, "Other pictures": 1}
     assert all(s["protected"] and "clear tub" in s["note"] for s in sets)
     assert rv.cal_image_ok("recognition_sets/tub/shot_000.jpg", tmp_path) is not None
+
+
+def test_the_claw_pan_pictures_are_titled_by_what_the_test_was_and_when(tmp_path):
+    rv = load("g2_review")
+    for d in ("20261101_150353", "sit_20261101", "two_20261101_151514"):
+        jpg(tmp_path / "claw" / d / "a.jpg")
+    titles = {s["key"]: s["title"] for s in rv.calibration_sets(tmp_path)}
+    assert titles == {"claw/20261101_150353": "Claw pan sign test (straight, pan + and pan -), 2026-11-01 3:03 PM", "claw/sit_20261101": "Claw pan sign test from the sit pose (home, pan +35 and -35), 2026-11-01",
+                      "claw/two_20261101_151514": "Claw pan -35 repeat, 2026-11-01 3:15 PM"}

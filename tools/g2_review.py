@@ -60,6 +60,7 @@ RECOG_ROOT = PICS_ROOT / "recognition_sets"          # hash-checked, read-only s
 CAL_ROOTS = ("wall", "wall_calibration", "wall_new1", "claw", "recognition_sets")     # the only folders the Calibration tab shows and serves (nothing else under g2_pictures, people pictures included)
 CAL_NOTES = {"recog": "Attention pose with the claw raised to 120 degrees (the standing camera view). Distances are in inches from the claw tip (the lens is 2 in behind it, so add 2 in); the basket distance is to its centre. Cylinder faces A to D are approximate quarter turns.",
              "tub": "The clear tub with red tape on its rim (the basket goal's target), attention pose with the claw raised to 120 degrees. Distances are in inches from the claw tip to the tub's centre (the lens is 2 in behind the claw tip). The 16 in series and the 8 in series (the confirm look's distance) each have a puck inside, outside and out of view, and an empty tub.",
+             "claw": "The claw pan sign test of 2026-11-01 (`g2armcalibrate`): pictures taken after each pan move, which showed that a positive pan turns the camera left (CLAW_PAN_SIGN = left: pan +35 put the ball 73 px to the right). The setting is still used by the claw look; the pictures themselves are kept as its evidence.",
              "wall": "Distances are in inches from the camera lens to the base of the wall."}
 
 
@@ -145,6 +146,16 @@ def _ball_sets(root: Path) -> list:
     return sets
 
 
+def _claw_title(name: str) -> str:
+    """A claw pan test folder's section title from its name (`20261101_150353`, `sit_20261101`, `two_20261101_151514`): what the test was and when, never the bare timestamp."""
+    m = re.search(r"(\d{4})(\d{2})(\d{2})(?:_(\d{2})(\d{2})\d{2})?", name)
+    when = ""
+    if m:
+        when = f", {m.group(1)}-{m.group(2)}-{m.group(3)}" + (f" {int(m.group(4)) % 12 or 12}:{m.group(5)} {'AM' if int(m.group(4)) < 12 else 'PM'}" if m.group(4) else "")
+    kind = "Claw pan sign test from the sit pose (home, pan +35 and -35)" if name.startswith("sit_") else "Claw pan -35 repeat" if name.startswith("two_") else "Claw pan sign test (straight, pan + and pan -)"
+    return kind + when
+
+
 def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -> list:
     """The Calibration tab: every picture set that exists to calibrate or recognise something, read-only. Each set is {key, object, kind, title, note, protected, items}: the object (Cylinder, Basket, Tub, Ball, Wall, Claw) is the first dropdown,
     the set the second. Ordinary look pictures stay on the Walls tab; the auto-saved ball chase pictures stay with the object pictures."""
@@ -186,7 +197,7 @@ def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -
     if claw.is_dir():
         for d in sorted(p for p in claw.iterdir() if p.is_dir()):
             if any(d.glob("*.jpg")):
-                sets.append({"key": "claw/" + d.name, "object": "Claw", "kind": "Claw", "title": "claw " + d.name, "note": "", "protected": True, "items": _cal_items(d, root)})
+                sets.append({"key": "claw/" + d.name, "object": "Claw", "kind": "Claw", "title": _claw_title(d.name), "note": CAL_NOTES["claw"], "protected": True, "items": _cal_items(d, root)})
     return sets
 
 
