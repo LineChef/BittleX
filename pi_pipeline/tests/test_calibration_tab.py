@@ -97,3 +97,19 @@ def test_the_groom_refuses_a_recognition_set_and_the_ball_sessions_and_the_verif
     p.write_bytes(b"\xff\xd8\x00\xff\xd9")
     res = dict(cv.check(root))["cylinder_basket"]
     assert res["ok"] is False and res["changed"] == ["shot_001.jpg"]                                                       # a changed picture shows
+
+
+def test_the_tub_set_has_its_own_object_and_sections_never_lumped_under_the_cylinder(tmp_path):
+    rv = load("g2_review")
+    tub = tmp_path / "recognition_sets" / "tub"
+    labels = {}
+    for i, label in enumerate(("tub_empty", "tub_empty_left", "puck_inside_middle", "puck_beside_left", "puck_outside_touching_left", "tub_8in_empty", "tub_8in_inside_far", "tub_8in_inside_middle_offset_left", "tub_8in_front_3in", "something_new")):
+        jpg(tub / f"shot_{i:03d}.jpg")
+        labels[f"shot_{i:03d}"] = {"label": label, "distance_in": 16}
+    (tub / "labels.json").write_text(json.dumps(labels))
+    sets = rv.calibration_sets(tmp_path)
+    assert {s["object"] for s in sets} == {"Tub"}
+    assert {s["title"]: len(s["items"]) for s in sets} == {"16 in series: empty tub (12 to 22 in, and 16 in left and right)": 2, "16 in: puck inside the tub": 1, "16 in: puck outside the tub or out of view": 2,
+                                                          "8 in: empty tub": 1, "8 in: puck inside the tub": 2, "8 in: puck outside the tub": 1, "Other pictures": 1}
+    assert all(s["protected"] and "clear tub" in s["note"] for s in sets)
+    assert rv.cal_image_ok("recognition_sets/tub/shot_000.jpg", tmp_path) is not None

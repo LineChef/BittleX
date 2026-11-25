@@ -59,6 +59,7 @@ PICS_ROOT = Path(os.path.expanduser("~/Desktop/G2Memory/g2_pictures"))
 RECOG_ROOT = PICS_ROOT / "recognition_sets"          # hash-checked, read-only sets of recognition pictures (tools/g2_cal_verify.py --root); never synced over
 CAL_ROOTS = ("wall", "wall_calibration", "wall_new1", "claw", "recognition_sets")     # the only folders the Calibration tab shows and serves (nothing else under g2_pictures, people pictures included)
 CAL_NOTES = {"recog": "Attention pose with the claw raised to 120 degrees (the standing camera view). Distances are in inches from the claw tip (the lens is 2 in behind it, so add 2 in); the basket distance is to its centre. Cylinder faces A to D are approximate quarter turns.",
+             "tub": "The clear tub with red tape on its rim (the basket goal's target), attention pose with the claw raised to 120 degrees. Distances are in inches from the claw tip to the tub's centre (the lens is 2 in behind the claw tip). The 16 in series and the 8 in series (the confirm look's distance) each have a puck inside, outside and out of view, and an empty tub.",
              "wall": "Distances are in inches from the camera lens to the base of the wall."}
 
 
@@ -92,6 +93,12 @@ RECOG_GROUPS = (                                       # (label starts with, obj
     ("cylinder_A", "Cylinder", "Flat on the floor, face A (distance series)"),
     ("held_good", "Cylinder", "Held in the claw, good grip"),
     ("bad_grab", "Cylinder", "Held in the claw, bad grip"),
+    ("tub_8in_inside", "Tub", "8 in: puck inside the tub"),
+    ("tub_8in_empty", "Tub", "8 in: empty tub"),
+    ("tub_8in_", "Tub", "8 in: puck outside the tub"),
+    ("tub_empty", "Tub", "16 in series: empty tub (12 to 22 in, and 16 in left and right)"),
+    ("puck_inside", "Tub", "16 in: puck inside the tub"),
+    ("puck_", "Tub", "16 in: puck outside the tub or out of view"),
     ("basket_left", "Basket", "Bearing check (6 in left and right)"),
     ("basket_right", "Basket", "Bearing check (6 in left and right)"),
     ("basket", "Basket", "Distance series (centre, 12 to 36 in)"),
@@ -100,7 +107,7 @@ BALL_DIRS = ("greenball", "greenball-noball")           # under explore/named: o
 BALL_FILE = re.compile(r"session_\d+_greenball[^/]*\.jpg")
 
 
-def _recog_split(items: list, root_key: str, kind: str, note: str) -> list:
+def _recog_split(items: list, root_key: str, kind: str, note: str, default_obj: str = "Cylinder") -> list:
     """Split one recognition set into groups by what the picture shows (the label), each under the object it is about, so the cylinder and the basket are never lumped together."""
     groups: dict = {}
     for it in items:
@@ -109,7 +116,7 @@ def _recog_split(items: list, root_key: str, kind: str, note: str) -> list:
                 groups.setdefault((obj, title), []).append(it)
                 break
         else:
-            groups.setdefault(("Cylinder", "Other pictures"), []).append(it)
+            groups.setdefault((default_obj, "Other pictures"), []).append(it)
     return [{"key": root_key + "#" + title, "object": obj, "kind": kind, "title": title, "note": note, "protected": True, "items": its} for (obj, title), its in groups.items()]
 
 
@@ -139,7 +146,7 @@ def _ball_sets(root: Path) -> list:
 
 
 def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -> list:
-    """The Calibration tab: every picture set that exists to calibrate or recognise something, read-only. Each set is {key, object, kind, title, note, protected, items}: the object (Cylinder, Basket, Ball, Wall, Claw) is the first dropdown,
+    """The Calibration tab: every picture set that exists to calibrate or recognise something, read-only. Each set is {key, object, kind, title, note, protected, items}: the object (Cylinder, Basket, Tub, Ball, Wall, Claw) is the first dropdown,
     the set the second. Ordinary look pictures stay on the Walls tab; the auto-saved ball chase pictures stay with the object pictures."""
     root = Path(root) if root else PICS_ROOT
     wall = Path(wall_cache) if wall_cache else root / "wall"
@@ -149,7 +156,8 @@ def calibration_sets(root: Path | None = None, wall_cache: Path | None = None) -
     if rec.is_dir():
         for d in sorted(p for p in rec.iterdir() if p.is_dir() and not p.name.startswith("_")):
             have_recog = True
-            sets += _recog_split(_cal_items(d, root, _read_json(d / "labels.json")), "recognition_sets/" + d.name, "Recognition (hash-checked, read-only)", CAL_NOTES["recog"])
+            tub = d.name == "tub"
+            sets += _recog_split(_cal_items(d, root, _read_json(d / "labels.json")), "recognition_sets/" + d.name, "Recognition (hash-checked, read-only)", CAL_NOTES["tub" if tub else "recog"], "Tub" if tub else "Cylinder")
     wcal = root / "wall_calibration"
     if wcal.is_dir():
         for d in sorted(p for p in wcal.iterdir() if p.is_dir() and not p.name.startswith("_")):
@@ -1418,7 +1426,7 @@ function renderWalls(list,f){if(window.picSelect)picSelect.begin(true,"walls");c
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));if(p.src==="roam"&&window.picSelect)picSelect.attach(c,p,items.filter(q=>q.src==="roam"));grid.append(c)}list.append(grid);if(window.picSelect)picSelect.end()}
 function renderCalibration(list,f){if(window.picSelect)picSelect.leave();if(!data.length){list.append(el("div","empty","No calibration or recognition pictures on this Mac yet."));return}
- const order=["Cylinder","Basket","Ball","Wall","Claw"];const objs=[...new Set(data.map(s=>s.object))].sort((a,b)=>(order.indexOf(a)<0?99:order.indexOf(a))-(order.indexOf(b)<0?99:order.indexOf(b)));
+ const order=["Cylinder","Basket","Tub","Ball","Wall","Claw"];const objs=[...new Set(data.map(s=>s.object))].sort((a,b)=>(order.indexOf(a)<0?99:order.indexOf(a))-(order.indexOf(b)<0?99:order.indexOf(b)));
  if(!objs.includes(window.calObj))window.calObj=objs[0];const mine=data.filter(s=>s.object===window.calObj);
  let cur=mine.find(s=>s.key===window.calSet)||mine[0];window.calSet=cur.key;
  const bar=el("div","labelsum");bar.append(el("b","","Object: "));const so=el("select");for(const o of objs){const n=data.filter(s=>s.object===o).reduce((a,s)=>a+s.items.length,0);const op=el("option","",o+" ("+n+")");op.value=o;if(o===window.calObj)op.selected=true;so.append(op)}
