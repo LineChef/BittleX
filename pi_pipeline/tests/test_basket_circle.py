@@ -411,3 +411,18 @@ def test_he_stands_up_while_the_camera_takes_a_throwaway_picture_so_the_first_lo
     env = br.RealEnv.__new__(br.RealEnv)
     env.robot, env._cam = Robot(), Cam()
     assert env.stand_up_warm() == "ok" and env._cam.thread is not env.robot.main                     # the picture was taken on its own thread, while he stood up
+
+
+def test_a_big_pivot_is_made_of_moves_of_at_most_two_cycles_one_after_the_other():
+    assert br.pivot_chunks(108.0) == [54.0, 54.0] and br.pivot_chunks(-108.0) == [-54.0, -54.0] and br.pivot_chunks(54.0) == [54.0] and br.pivot_chunks(81.0) == [40.5, 40.5]
+    assert br.pivot_chunks(30.0) == [30.0] and br.CIRCLE_SQUARE_ASK_DEG == 108.0 and br.bl._pivot_for(br.CIRCLE_SQUARE_ASK_DEG) == 108.0
+    calls = []
+
+    class Rec(Env):
+        def look(self):
+            return NS(claw_in=11.0, bearing_deg=0.0), None
+    sim = Sim(start=(0.0, -11.0))
+    orig = sim.pivot
+    sim.pivot = lambda deg: (calls.append(deg), orig(deg))[1]
+    br.circle_search(Rec(sim), say=lambda s: None, ignore_puck=True, max_laps=1000, streak_target=1, deadline=time.monotonic() + 0.5)
+    assert calls[:2] == [-54.0, -54.0]                                                              # the first turn, to put the tub beside him, is two moves

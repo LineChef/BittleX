@@ -42,6 +42,8 @@ CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answe
 CIRCLE_RADIUS_IN = 16.0              # the circle's radius as the finder reads it, used at the peeks (too tight was the problem on the first arc run, never too wide: owner, 2026-11-24)
 CIRCLE_MIN_IN = 10.0                 # nearer than this (as read) he backs off before anything else (the first goal run ended a leg 4.5 inches from the tub)
 CIRCLE_ARC_DEG = 45.0                # one wide arc's heading change: 8 arcs a lap
+CIRCLE_PIVOT_CHUNK_DEG = 54.0         # one pivot move is two cycles at most (ball_chase.PIVOT_MAX_CYCLES, about 45 to 52 degrees by the owner's eye) and the mover caps an ask at 60: a bigger ask is made of moves this size, one after the other (owner, 2026-11-25: the 81 degree turn to put the tub beside him only turned 45, and the arc was too tight; the peek and the turn back asked for 108 and got 54 too)
+CIRCLE_SQUARE_ASK_DEG = 108.0          # what the first pivot asks for to turn him about 90 degrees: four cycles of about 22 each (two moves of two cycles; one move of two turned only about 45)
 CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
 CIRCLE_STRAIGHT_IN = 0.0             # no straight walk after an arc (owner, 2026-11-24): the arc is measured at about 15 inches of radius, already the circle we want, and on the simulated floor the 6 inches that widened a guessed 9 inch arc threw it out to 11 to 28 inches and lost the tub (without it 12.5 to 18); a number above 0 brings the walk back
 CIRCLE_PEEK_EVERY = 2                # a peek (turn toward the tub, read its distance and scan the floor round it) only after this many arcs (every 4 missed a puck in the simulated floor, every 3 found all four spots); between arcs the forward picture alone says whether the circle is tight
@@ -177,6 +179,12 @@ class CircleState:
         return self.events[-1] if self.events else {}
 
 
+def pivot_chunks(degrees: float) -> list:
+    """A pivot of `degrees` as moves of at most CIRCLE_PIVOT_CHUNK_DEG each, equal and in the same direction (one pivot move turns two cycles at most, and the mover caps an ask at 60 degrees: a 108 degree ask used to turn about 50)."""
+    n = max(1, int(-(-abs(degrees) // CIRCLE_PIVOT_CHUNK_DEG)))
+    return [degrees / n] * n
+
+
 def lap_table(st: CircleState) -> list:
     """One row per COMPLETED lap: {"lap", "clean", "soft": [kinds]}. A lap is clean when nothing spoiled it."""
     return [{"lap": n, "clean": not [s for s in st.soft if s["lap"] == n], "soft": [s["kind"] for s in st.soft if s["lap"] == n]} for n in range(st.lap_now())]
@@ -296,7 +304,7 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
             return RAction("forward", min(CIRCLE_START_STEP_IN, d - CIRCLE_START_IN), "circling: walk up to the tub")           # short steps: a 5.8 inch walk moved him 9 inches on 2026-11-24
         st.phase = "arc"
         st.steps += 1
-        return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_DEG), "circling: close enough: turn so the tub is beside him")
+        return RAction("pivot", bl._pivot_for(-st.side * CIRCLE_SQUARE_ASK_DEG), "circling: close enough: turn so the tub is beside him")
     # phase "look": he has turned toward the tub; turn back so the tub ends up beside him, more away from it when he is too near and only a little less when too far
     correction = max(-CIRCLE_WIDE_MAX_DEG, min(CIRCLE_CORRECTION_MAX_DEG, CIRCLE_RADIUS_GAIN * (CIRCLE_RADIUS_IN - d)))
     turn_back = CIRCLE_SQUARE_DEG + correction - st.side * b                         # signed: a tub he has turned past (on the other side of his nose) needs the longer turn back
@@ -391,7 +399,16 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
         if act.kind != "arc" and hasattr(env.mover, "set_distance"):
             env.mover.set_distance(None if basket is None else float(basket.claw_in))
         t0 = time.monotonic()
-        if getattr(env.mover, act.kind)(act.value) == "fell":
+        if act.kind == "pivot":
+            moves = pivot_chunks(act.value)
+        else:
+            moves = [act.value]
+        failed = False
+        for mv in moves:
+            if getattr(env.mover, act.kind)(mv) == "fell":
+                failed = True
+                break
+        if failed:
             return done("fell")
         took = round(time.monotonic() - t0, 1)
         if act.kind == "arc":
