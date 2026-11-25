@@ -30,7 +30,7 @@ say "3. code waiting to be deployed?"
 dep="$($SSH -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" 'cat ~/bittleX/pi_pipeline/.deployed_commit' 2>/dev/null | tr -d '[:space:]')"
 if [ -z "$dep" ] || ! git cat-file -e "$dep^{commit}" 2>/dev/null; then
   echo "the Pi's deployed commit is unknown ('$dep'): deploying HEAD"; need=1
-elif git diff --quiet "$dep" HEAD -- pi_pipeline; then
+elif git diff --quiet "$dep" HEAD -- pi_pipeline ':(exclude)pi_pipeline/tests'; then
   echo "nothing to deploy: the Pi has $dep and pi_pipeline/ has not changed since (docs commits are not deployed)"; need=0
 else
   echo "the Pi has $dep; pi_pipeline/ changed since: deploying HEAD $(git rev-parse --short HEAD)"; need=1
