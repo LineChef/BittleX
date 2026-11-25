@@ -199,7 +199,7 @@ class BasketGoal:
             return AttemptResult("stopped", 0.0, [], {"rec": rec})
         with applied(settings), env_restored():
             try:
-                why, self.holding = br.attempt_once(self.env, rec, self.holding, ctx.say)
+                why, self.holding = br.attempt_once(self.env, rec, self.holding, ctx.say, announce=ctx.announce)
             except br.Fell:
                 why = "fell"
         self._log_attempt(rec, why, ctx)

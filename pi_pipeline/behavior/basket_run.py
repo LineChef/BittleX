@@ -363,13 +363,16 @@ def circle_report_lines(c: dict) -> list:
     return lines
 
 
-def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: float = CIRCLE_MAX_LAPS, peek_every: int = CIRCLE_PEEK_EVERY, deadline: float | None = None, streak_target: int = 0, ignore_puck: bool = False) -> dict:
+def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: float = CIRCLE_MAX_LAPS, peek_every: int = CIRCLE_PEEK_EVERY, deadline: float | None = None, streak_target: int = 0, ignore_puck: bool = False, announce=None) -> dict:
     """Search round the tub for the puck. Returns {"outcome": "found" | "circled_twice" | "tub_lost" | "fell" | "passed" | "time_up" | "camera_stalled" | "battery", "puck", "basket", "steps", "arcs", "report"}; `puck` and `basket` are the last readings when it is found. Uses the environment's quick look and the movers: pivots, a wide `arc`, a back-off.
     The goal calls it with the defaults. The circle test (`--circle-test`) calls the same function with `ignore_puck` (nothing to find), a high `max_laps`, a peek every arc, a `deadline` (time.monotonic) and `streak_target` clean laps in a row; everything else, the rules included, is shared."""
     st = CircleState(side=start_side, max_laps=max_laps, peek_every=peek_every, streak_target=streak_target, max_steps=CIRCLE_MAX_STEPS if streak_target == 0 and not ignore_puck else 100000)
     basket = puck = None
     t_start = time.monotonic()
     misses = 0
+    said_basket = False                                                       # "searching for the basket" once per time the tub is lost
+    if not ignore_puck:
+        _say_searching(announce, "searching for the puck")
 
     def done(outcome, puck_=None, basket_=None):
         return {"outcome": outcome, "puck": puck_, "basket": basket_, "steps": st.log, "arcs": st.events, "report": circle_report(st)}
@@ -405,12 +408,19 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
                 say("circle: a wide thin 'puck' with the tub out of view this near it is the tub's own tape: ignored")
                 puck = None
         act = next_circle_action(puck, basket, st)
+        if act.why.startswith("tub out of view") or act.why.startswith("tub not in view") or act.why.startswith("tub lost"):
+            if not said_basket:
+                said_basket = True
+                _say_searching(announce, "searching for the basket")
+        elif basket is not None:
+            said_basket = False
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "angle_deg": round(st.angle_deg), "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                        "basket": None if basket is None else (round(basket.claw_in, 1), round(basket.bearing_deg, 1))})
         say(f"circle: {act.why}" + (f" ({act.kind} {act.value:.1f}, {st.angle_deg:.0f} degrees round)" if act.kind not in ("found", "give_up") else ""))
         if on_step is not None:
             on_step(st.log)
         if act.kind == "found":
+            _say_target(announce)
             return done("found", puck, basket)
         if act.kind == "give_up":
             return done(act.why, basket_=basket)
@@ -524,9 +534,10 @@ def merge_looks(seen: dict, offsets: dict):
     return basket, puck
 
 
-def retrieve(env, say=print, on_step=None, first=None) -> dict:
+def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
     """Search for the puck, walk to it and pick it up. Returns {"outcome": "retrieved" | a give-up reason | "fell", "steps": [...]}."""
     st = RState()
+    lost = False                                   # he was scanning for the puck: when it comes back into view he says so
     while True:
         if first is not None:                      # the first step uses what the look after the throw just saw: no picture, no pause (owner, 2026-11-23)
             (basket, puck), first = first, None
@@ -536,6 +547,13 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             except Fell:
                 return {"outcome": "fell", "steps": st.log}
         act = next_retrieval_action(puck, basket, st)
+        if act.kind == "scan":
+            if not lost:
+                _say_searching(announce, "searching for the puck")
+            lost = True
+        elif lost and puck is not None and act.kind != "give_up":
+            lost = False
+            _say_target(announce)
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "puck": None if puck is None else (round(puck.claw_in, 1), round(puck.bearing_deg, 1)),
                        "basket_in": None if basket is None else round(basket.claw_in, 1)})
         say(f"retrieve: {act.why}" + (f" ({act.kind} {act.value:.1f})" if act.kind != "give_up" else ""))
@@ -569,8 +587,27 @@ def retrieve(env, say=print, on_step=None, first=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
-def find_tub_ahead(env, say=print) -> tuple:
+def _say_searching(announce, text: str) -> None:
+    """"Searching for the puck" / "searching for the basket" aloud when a search begins (owner, 2026-11-25). Never raises."""
+    if announce is not None:
+        try:
+            announce(text)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _say_target(announce) -> None:
+    """"Target acquired" aloud when he finds the puck (owner, 2026-11-25; the ball goal says it too). Never raises."""
+    if announce is not None:
+        try:
+            announce("target acquired")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def find_tub_ahead(env, say=print, announce=None) -> tuple:
     """The after-throw look did not read the tub: walk forward in short bursts, a quick picture after each, until it is read (owner, 2026-11-25: it is always right in front of him, he may just need to get closer). Returns (reading or None after BLIND_BURSTS, how many bursts it took). Raises Fell if a walk ends in a fall."""
+    _say_searching(announce, "searching for the basket")
     for n in range(1, BLIND_BURSTS + 1):
         say(f"no tub in view after the throw: walking forward and looking again ({n} of {BLIND_BURSTS})")
         if env.mover.forward(BLIND_BURST_IN) == "fell":
@@ -589,7 +626,7 @@ def _rest(env, rec: dict) -> None:
     rec["rested"] = True
 
 
-def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None, first=None, look: str | None = None) -> dict:
+def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": None, first=None, look: str | None = None, announce=None) -> dict:
     """The confirm look (owner, 2026-11-24): the after-throw look from about 16 inches cannot see into the clear tub (a puck inside is 0 to 5 coloured pixels there, 10 to 90 at 8 inches), so when it did not see the puck he walks up to about 8 inches of the tub (the line-up's own steps and
     buffer, aimed at CONFIRM_READING_IN). In the default "quick" mode the walk-up's last picture (claw down, taken at once) IS the confirm picture, read for a puck inside the tub the moment it is taken: nothing waits, a make lies down at once and a miss keeps moving, so he never stands idle (owner: the legs sag after about 10 seconds). In the "claw_up" mode he goes
     into the attention pose, raises the claw and takes ONE centred picture (`env.confirm_look()`: the shared claw look, centre only). Returns {"stop": a reason or None, "code", "basket", "puck"}: a puck inside is MADE (he lies down: the run ends), the tub not seen is NO_BASKET (lies down),
@@ -609,7 +646,7 @@ def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": Non
         return reading
     try:
         n0 = getattr(env, "quick_count", 0)
-        lu = bl.lineup(walk_look, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG, first=first)
+        lu = bl.lineup(walk_look, env.mover, say=say, target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG, first=first, announce=announce)
         if lu["outcome"] == "aligned" and quick and getattr(env, "quick_count", 0) == n0:
             walk_look()                                                          # he was already in place on the first reading: the confirm picture is taken now
     except CameraStalled:
@@ -652,7 +689,7 @@ def confirm_throw(env, rec: dict, say=print, persist=lambda state="running": Non
     return {"stop": None, "code": code, "basket": basket, "puck": floor}
 
 
-def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
+def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None, announce=None) -> tuple[str | None, bool]:
     """ONE attempt: the throw, the look, and after a miss the retrieval and the line-up for the next throw. `rec` is the attempt's record (filled in as it goes). Returns (why it must stop or None to go on, whether he is holding the puck
     for the next throw). The stop reasons are those of `run_sequence`; "made" (a puck seen inside the tub from close up) and the other after-throw codes end a run for the owner's reset. The goal (goals/basket.py) and `run_sequence` both call this."""
     n = rec.get("attempt", 1)
@@ -686,7 +723,7 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
     persist()
     if code == bo.NO_BASKET and hasattr(env, "confirm_look") and hasattr(env, "quick_basket"):
         try:
-            found, bursts = find_tub_ahead(env, say)
+            found, bursts = find_tub_ahead(env, say, announce)
         except Fell:
             return "fell", holding
         rec["after"]["tub_found_after_bursts"] = bursts if found is not None else None
@@ -694,10 +731,12 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
             basket, code = found, bo.NOT_SEEN                                      # the tub is in view now: look into it as for any throw whose puck was not seen
             say(f"tub in view after {bursts} walk(s) forward: looking into it")
         persist()
+    if puck is not None:
+        _say_target(announce)                                                      # the puck seen on the floor right after the throw
     confirm = code == bo.NOT_SEEN                                                  # a puck seen on the floor outside the tub is a certain miss: no confirm, straight to the pick-up (owner, 2026-11-24)
     if confirm and hasattr(env, "confirm_look"):
         # The puck was not seen from about 16 inches: inside the clear tub it is 0 to 5 coloured pixels there. Walk up to about 8 inches, look into it from the attention pose and read the picture (owner, 2026-11-24).
-        res = confirm_throw(env, rec, say, persist, first=basket)
+        res = confirm_throw(env, rec, say, persist, first=basket, announce=announce)
         if res["stop"]:
             return res["stop"], holding
         code, basket, puck = res["code"], res["basket"], res["puck"]
@@ -713,7 +752,7 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
         def on_circle(log, rec=rec):
             rec["circle"] = {"outcome": "running", "steps": list(log)}
             persist()
-        c = circle_search(env, say=say, on_step=on_circle)
+        c = circle_search(env, say=say, on_step=on_circle, announce=announce)
         rec["circle"] = {"outcome": c["outcome"], "steps": c["steps"]}
         persist()
         if c["outcome"] != "found":
@@ -722,12 +761,12 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
                 _rest(env, rec)                                                   # two laps without the puck (or the tub lost): the session ends at rest
             return ("fell" if c["outcome"] == "fell" else c["outcome"]), holding
         basket, puck = c["basket"], c["puck"]
-    r = retrieve(env, say=say, on_step=on_step, first=(basket, puck))
+    r = retrieve(env, say=say, on_step=on_step, first=(basket, puck), announce=announce)
     rec["retrieval"] = r
     persist()
     if r["outcome"] != "retrieved":
         return r["outcome"], holding
-    lu = bl.lineup(env.quick_basket, env.mover, say=say)
+    lu = bl.lineup(env.quick_basket, env.mover, say=say, announce=announce)
     rec["lineup"] = {"outcome": lu["outcome"], "steps": lu["steps"]}
     persist()
     if lu["outcome"] != "aligned":
@@ -735,10 +774,10 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
     return None, True
 
 
-def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None) -> tuple[str | None, bool]:
+def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state="running": None, announce=None) -> tuple[str | None, bool]:
     """ONE attempt (see `_attempt_once`). Whatever stops it, other than a fall, he is laid down in rest before this returns: a retrieval that gave up, a line-up that could not align, a camera that stalled, the battery. Standing idle after the attempt let the legs sag and he fell on the next move
     (2026-11-24). Returns (why it must stop or None to go on, whether he is holding the puck)."""
-    why, holding = _attempt_once(env, rec, holding, say, persist)
+    why, holding = _attempt_once(env, rec, holding, say, persist, announce)
     if why and why != "fell":
         _rest(env, rec)
     return why, holding

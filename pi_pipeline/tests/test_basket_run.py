@@ -696,3 +696,49 @@ def test_every_way_an_attempt_can_stop_but_a_fall_ends_with_him_lying_down():
         assert r["outcome"] == why and lies == [1], (why, lies)                                                  # once: never standing about with the legs sagging, never twice
     lies.clear()
     assert br.run_sequence(E([ok()], fell_in_look=True), say=lambda s: None)["outcome"] == "fell" and lies == []   # a fall is the guards' to handle: no command is sent to a fallen G2
+
+
+def test_he_says_target_acquired_when_he_finds_the_puck_and_only_then():
+    said = []
+    env = Env([ok()], puck_after=[(14.0, 0.0)])                                                               # the puck seen on the floor right after the throw
+    r = br.attempt_once(env, {"attempt": 1}, False, say=lambda s: None, announce=said.append)
+    assert said and said.count("target acquired") == 1 and "target acquired" in said
+    said.clear()
+    env = Env([ok()], puck_after=["behind"])                                                                  # not seen: the circle finds it
+    env.w.hidden = (14.0, 20.0)
+    r = br.attempt_once(env, {"attempt": 1}, False, say=lambda s: None, announce=said.append)
+    assert said.count("target acquired") == 1                                                                 # once, not again when the retrieval starts from that very reading
+    env = Env([ok()], puck_after=[(14.0, 0.0)])
+    br.attempt_once(env, {"attempt": 1}, False, say=lambda s: None)                                           # no announce given: nothing said, nothing breaks
+    env = Env([ok()], puck_after=[(14.0, 0.0)])
+
+    def boom(text):
+        raise RuntimeError("no speaker")
+    br.attempt_once(env, {"attempt": 1}, False, say=lambda s: None, announce=boom)                           # a speaker that fails never stops the attempt
+    # a puck lost during the retrieval and found again after a scan is announced when it comes back
+    said2 = []
+    looks = iter([(None, None), (None, P(10.0, 0.0))])
+    env = Env([ok()], puck_after=[(14.0, 0.0)])
+    env.look = lambda: next(looks, (None, P(10.0, 0.0)))
+    br.retrieve(env, say=lambda s: None, announce=said2.append)
+    assert said2 == ["searching for the puck", "target acquired"]
+
+
+def test_he_says_which_thing_he_is_searching_for_when_a_search_begins():
+    said = []
+    env = Env([ok()], puck_after=["behind"])                                                                  # not in the tub, not on the floor in view: the circle searches for the puck
+    env.w.hidden = (14.0, 20.0)
+    br.attempt_once(env, {"attempt": 1}, False, say=lambda s: None, announce=said.append)
+    assert said[0] == "searching for the puck" and said[-1] == "target acquired" and said.count("searching for the puck") == 1
+    said.clear()
+    env = Env([ok()], puck_after=["in"])
+    env.w.basket = None                                                                                       # no tub in the look: the bursts search for the basket, once
+    br.attempt_once(env, {"attempt": 1}, False, say=lambda s: None, announce=said.append)
+    assert said.count("searching for the basket") == 1
+    from types import SimpleNamespace as NS
+    from pi_pipeline.behavior import basket_lineup as bl
+    said.clear()
+    looks = iter([None, None, NS(claw_in=16.0, bearing_deg=10.0), None, None, NS(claw_in=16.0, bearing_deg=0.0)])
+    m = type("M", (), {"scan": lambda s, v: "ok", "pivot": lambda s, v: "ok", "nudge": lambda s, v: "ok", "forward": lambda s, v: "ok", "back": lambda s, v: "ok"})()
+    bl.lineup(lambda: next(looks), m, say=lambda s: None, announce=said.append, max_steps=7)
+    assert said == ["searching for the basket", "searching for the basket"]                                    # once per search (a second search after the tub was seen again), not once per scan step
