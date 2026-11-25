@@ -16,7 +16,7 @@
  "guides/feature-flags": "Feature flags",
  "guides/attachments": "Attachments",
  "guides/punt": "Punt test",
- "guides/goals": "Goals",
+ "guides/goals": "Running goals",
  "guides/shell-helpers": "Shell helpers",
  "guides/swappable-llm": "Swappable LLM",
  "guides/api-setup": "Claude API setup",
@@ -75,5 +75,8 @@
  "specification/behavior": "Behavior",
  "specification/goals": "Goals",
  "specification/power": "Power",
- "blueprints/wiring": "Wiring"
+ "blueprints/wiring": "Wiring",
+ "goals": "Goals",
+ "goals/ball-punt": "Ball punt",
+ "goals/basket": "Basket"
 }

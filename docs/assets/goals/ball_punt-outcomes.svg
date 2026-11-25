@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">The ball punt: how attempts ended</title>
+<desc id="d">Horizontal bars: the number of attempts for each outcome code. never_found 53, hit_unseen 49, never_reached 44, fell 40, align_stuck 32, never_punted 27, aborted 21, missed_off_line 16, missed 13, pushed_away 12.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">The ball punt: how attempts ended</text>
+<text class="tx" x="182" y="63.6" text-anchor="end">never_found</text>
+<rect class="b3" x="190" y="51.8" width="410.0" height="17.6"/>
+<text class="sm" x="606.0" y="63.6">53</text>
+<text class="tx" x="182" y="88.8" text-anchor="end">hit_unseen</text>
+<rect class="b1" x="190" y="77.0" width="379.1" height="17.6"/>
+<text class="sm" x="575.1" y="88.8">49</text>
+<text class="tx" x="182" y="114.0" text-anchor="end">never_reached</text>
+<rect class="b3" x="190" y="102.2" width="340.4" height="17.6"/>
+<text class="sm" x="536.4" y="114.0">44</text>
+<text class="tx" x="182" y="139.2" text-anchor="end">fell</text>
+<rect class="b3" x="190" y="127.4" width="309.4" height="17.6"/>
+<text class="sm" x="505.4" y="139.2">40</text>
+<text class="tx" x="182" y="164.4" text-anchor="end">align_stuck</text>
+<rect class="b3" x="190" y="152.6" width="247.5" height="17.6"/>
+<text class="sm" x="443.5" y="164.4">32</text>
+<text class="tx" x="182" y="189.6" text-anchor="end">never_punted</text>
+<rect class="b3" x="190" y="177.8" width="208.9" height="17.6"/>
+<text class="sm" x="404.9" y="189.6">27</text>
+<text class="tx" x="182" y="214.8" text-anchor="end">aborted</text>
+<rect class="b3" x="190" y="203.0" width="162.5" height="17.6"/>
+<text class="sm" x="358.5" y="214.8">21</text>
+<text class="tx" x="182" y="240.0" text-anchor="end">missed_off_line</text>
+<rect class="b3" x="190" y="228.2" width="123.8" height="17.6"/>
+<text class="sm" x="319.8" y="240.0">16</text>
+<text class="tx" x="182" y="265.2" text-anchor="end">missed</text>
+<rect class="b3" x="190" y="253.4" width="100.6" height="17.6"/>
+<text class="sm" x="296.6" y="265.2">13</text>
+<text class="tx" x="182" y="290.4" text-anchor="end">pushed_away</text>
+<rect class="b3" x="190" y="278.6" width="92.8" height="17.6"/>
+<text class="sm" x="288.8" y="290.4">12</text>
+</svg>

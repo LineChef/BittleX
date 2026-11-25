@@ -9,6 +9,11 @@
 #   walls      30    72   wall pictures and the wall estimator's log -> ~/Desktop/G2Memory/g2_pictures/wall
 #   memorydb   1440  48   a snapshot of the memory DB, conversations and facts (tools/g2_memory_backup.sh; read-only on the Pi); keeps 14 daily and 8 weekly copies
 #   logs       1440  72   the command, noise, API call and power logs and the diag sessions (~/g2_logs) -> ~/Desktop/G2Memory/logs
+#   groom      never 336  after the copies: tidy the picture galleries (tools/g2_groom.py --session: it only applies what ~/.local/share/g2/groom.json says)
+#   charts     never 336  after the copies: redraw the goal charts for the docs site (tools/gen_goal_charts.py -> docs/assets/goals; commit them with the docs)
+#   groom and charts are never due in the background loop: they run only when a sync is forced (the review page's "Sync from the Pi" button runs `--force all`), so a hardware session starts with no
+#   grooming wait (owner, 2026-11-25). STALE shows when the button has not been pressed for 14 days.
+# While a forced or due run goes, ~/Desktop/G2Memory/sync_progress.json says which step it is on, what that step copies and when it started; the review page shows it live.
 # Runs from the background loop (tools/g2_bg_jobs.sh, every 30 min), after every deploy and after every `g2goal run`. Skipped when the Pi does not answer, or while an
 # exploration, a goal session, a walk or a hardware test is running (the Pi is memory-tight then). One task failing does not stop the others. Nothing is downloaded from
 # the internet: everything comes from the Pi on the local network. Status: ~/Desktop/G2Memory/sync_status.json; log: ~/g2_logs/sync.log.
@@ -18,7 +23,8 @@ MEM="$HOME/Desktop/G2Memory"
 STATUS="$MEM/sync_status.json"
 LOG="$HOME/g2_logs/sync.log"
 mkdir -p "$HOME/g2_logs" "$MEM"
-TASKS="goals:30:24 pictures:30:48 walklogs:30:72 walls:30:72 memorydb:1440:48 logs:1440:72"
+TASKS="goals:30:24 pictures:30:48 walklogs:30:72 walls:30:72 memorydb:1440:48 logs:1440:72 groom:100000000:336 charts:100000000:336"
+PROGRESS="$MEM/sync_progress.json"
 
 LASTFILE="$(dirname "$STATUS")/sync_last.json"
 last() {   # what the latest run did, for the review page's Sync button: ok | partial | offline | busy | running | no_pi
@@ -28,6 +34,41 @@ json.dump({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "outcome": sys.argv[2], "
 PY
 }
 say() { echo "$(date '+%Y-%m-%d %I:%M:%S %p')  $*" >> "$LOG"; echo "$*"; }
+
+what_of() {   # what a step copies or does, in words, for the review page's progress line
+  case "$1" in
+    edits)    echo "sending the edits made on this Mac to the Pi" ;;
+    goals)    echo "the goal journal, what he learned and his lessons" ;;
+    pictures) echo "exploration pictures and the curated library" ;;
+    walklogs) echo "the automatic walk logs and the calibration step" ;;
+    walls)    echo "wall pictures, the wall estimator's log and the calibration sets (checked against their pins)" ;;
+    memorydb) echo "a snapshot of his memory database" ;;
+    logs)     echo "the command, noise, API and power logs" ;;
+    groom)    echo "tidying the picture galleries (the groom)" ;;
+    charts)   echo "redrawing the goal charts for the docs site" ;;
+    *)        echo "$1" ;;
+  esac
+}
+progress() {   # progress STEP INDEX TOTAL | progress done : the live line for the review page (a step, which one of how many, what it does, when it started)
+  python3 - "$PROGRESS" "$1" "${2:-0}" "${3:-0}" "$(what_of "$1")" <<'PY'
+import json, sys, time
+p, step, idx, total, what = sys.argv[1:6]
+try:
+    d = json.load(open(p))
+except (OSError, ValueError):
+    d = {}
+now = time.time()
+if step == "done":
+    d.update({"running": False, "finished": now, "step": "", "what": ""})
+else:
+    if not d.get("running"):
+        d = {"started": now, "done": []}
+    elif d.get("step") and d["step"] != step:
+        d.setdefault("done", []).append(d["step"])
+    d.update({"running": True, "step": step, "what": what, "index": int(idx), "total": int(total), "step_started": now})
+json.dump(d, open(p, "w"))
+PY
+}
 
 if [ -z "${G2_PI:-}" ]; then                     # a background loop has no shell profile: take the one line that sets it (the value is never printed)
   for f in "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.zprofile"; do
@@ -108,6 +149,8 @@ do_task() {
       python3 "$ROOT/tools/g2_cal_verify.py" --quiet --root "$MEM/g2_pictures/recognition_sets" || say "A RECOGNITION SET DIFFERS from its pinned copy: run python3 tools/g2_cal_verify.py --root ~/Desktop/G2Memory/g2_pictures/recognition_sets"
       true ;;
     memorydb) G2_PI="$G2_PI" bash "$ROOT/tools/g2_memory_backup.sh" && prune_memorydb ;;
+    groom)    python3 "$ROOT/tools/g2_groom.py" --session ;;
+    charts)   python3 "$ROOT/tools/gen_goal_charts.py" ;;
     logs)
       mkdir -p "$MEM/logs/diag"
       for f in command_log.jsonl noise.jsonl api_calls.jsonl power_log.jsonl; do
@@ -139,15 +182,21 @@ case "${1:-status}" in
     ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" true 2>/dev/null || { say "the Pi does not answer: nothing synced"; last offline "the Pi does not answer (it is off, or not reachable from this Mac): nothing was copied; edits you made stay queued"; exit 0; }
     busy="$(pi_busy)"
     if [ -n "$busy" ]; then say "the Pi is busy ($busy): nothing synced, the next run tries again"; last busy "the Pi is busy ($busy): try again when it is done"; exit 0; fi
+    todo=""
+    for spec in $TASKS; do
+      name="${spec%%:*}"; rest="${spec#*:}"; every="${rest%%:*}"
+      if [ -n "$force" ]; then { [ "$force" = all ] || [ "$force" = "$name" ]; } || continue      # --force TASK: only that task
+      else [ "$(minutes_since_ok "$name")" -lt "$((every - 2))" ] && continue; fi                  # not due yet
+      todo="$todo $name"
+    done
+    total=$(( $(echo $todo | wc -w | tr -d ' ') + 1 )); step=1
+    trap 'rm -rf "$LOCK"; progress done' EXIT
+    progress edits "$step" "$total"
     python3 "$ROOT/tools/g2_review_queue.py" apply 2>&1 | sed 's/^/review edits: /' >> "$LOG"         # edits made in the review page wait on this Mac: they go to the Pi before anything is copied down
     python3 "$ROOT/tools/g2_goal_edits.py" apply 2>&1 | sed 's/^/goal edits: /' >> "$LOG"
     nfail=0; ndone=0
-    for spec in $TASKS; do
-      name="${spec%%:*}"; rest="${spec#*:}"; every="${rest%%:*}"
-      if [ -z "$force" ] || { [ "$force" != all ] && [ "$force" != "$name" ]; }; then
-        [ -n "$force" ] && continue                                                 # --force TASK: only that task
-        [ "$(minutes_since_ok "$name")" -lt "$((every - 2))" ] && continue          # not due yet
-      fi
+    for name in $todo; do
+      step=$((step + 1)); progress "$name" "$step" "$total"
       out="$(do_task "$name" 2>&1)"; rc=$?
       echo "$out" >> "$LOG"
       if [ $rc = 0 ]; then stamp "$name" ok "$(printf '%s' "$out" | tail -1)"; say "$name: ok"; ndone=$((ndone + 1))

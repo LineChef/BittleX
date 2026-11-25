@@ -14,6 +14,7 @@
    "Build and operate",
    [
     "guides",
+    "goals",
     "hardware",
     "blueprints",
     "vision"
@@ -174,6 +175,15 @@
     "specification/behavior",
     "specification/goals",
     "specification/power"
+   ]
+  ]
+ ],
+ "goals": [
+  [
+   "How goals work",
+   [
+    "goals/ball-punt",
+    "goals/basket"
    ]
   ]
  ]

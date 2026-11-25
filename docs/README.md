@@ -21,6 +21,7 @@ Build and operate G2
 
 - Build G2 and bring up its software, from parts to a walking robot: [Reproducing G2](guides/reproduce-g2.md)
 - Run G2 day to day, stop it safely and handle the batteries: [Operating G2](guides/operating-g2.md)
+- Learn how G2 practises a task and see what each goal has done: [Goals](goals/README.md)
 - Look up a command: [Cheat sheet](guides/cheatsheet.md)
 - See every spoken command: [Voice commands](guides/voice-commands.md)
 - Set up the Raspberry Pi: [Pi bring-up](guides/pi-bring-up.md)

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">The ball punt: time per attempt</title>
+<desc id="d">For each of the last 24 sessions, the median seconds an attempt took (bar) and the shortest and longest (line). Medians from 40 to 85 seconds.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">The ball punt: time per attempt</text>
+<line class="gr" x1="64" y1="264.0" x2="620" y2="264.0"/>
+<text class="sm" x="58" y="268.0" text-anchor="end">0</text>
+<line class="gr" x1="64" y1="211.0" x2="620" y2="211.0"/>
+<text class="sm" x="58" y="215.0" text-anchor="end">29</text>
+<line class="gr" x1="64" y1="158.0" x2="620" y2="158.0"/>
+<text class="sm" x="58" y="162.0" text-anchor="end">59</text>
+<line class="gr" x1="64" y1="105.0" x2="620" y2="105.0"/>
+<text class="sm" x="58" y="109.0" text-anchor="end">88</text>
+<line class="gr" x1="64" y1="52.0" x2="620" y2="52.0"/>
+<text class="sm" x="58" y="56.0" text-anchor="end">118</text>
+<line class="ax" x1="64" y1="264" x2="620" y2="264"/><line class="ax" x1="64" y1="264" x2="64" y2="52"/>
+<text class="sm" x="16" y="158" transform="rotate(-90 16 158)" text-anchor="middle">seconds</text>
+<rect class="b2" x="67.5" y="127.6" width="16.2" height="136.4"/>
+<line class="ax" x1="75.6" y1="183.0" x2="75.6" y2="120.0"/>
+<rect class="b2" x="90.6" y="117.3" width="16.2" height="146.7"/>
+<line class="ax" x1="98.8" y1="174.9" x2="98.8" y2="64.3"/>
+<rect class="b2" x="113.8" y="125.2" width="16.2" height="138.8"/>
+<line class="ax" x1="121.9" y1="144.0" x2="121.9" y2="111.4"/>
+<rect class="b2" x="137.0" y="123.0" width="16.2" height="141.0"/>
+<line class="ax" x1="145.1" y1="228.6" x2="145.1" y2="115.7"/>
+<rect class="b2" x="160.1" y="123.3" width="16.2" height="140.7"/>
+<line class="ax" x1="168.2" y1="123.3" x2="168.2" y2="123.3"/>
+<rect class="b2" x="183.3" y="123.9" width="16.2" height="140.1"/>
+<line class="ax" x1="191.4" y1="185.2" x2="191.4" y2="116.8"/>
+<rect class="b2" x="206.5" y="190.9" width="16.2" height="73.1"/>
+<line class="ax" x1="214.6" y1="190.9" x2="214.6" y2="190.9"/>
+<rect class="b2" x="229.6" y="177.4" width="16.2" height="86.6"/>
+<line class="ax" x1="237.8" y1="214.6" x2="237.8" y2="140.2"/>
+<rect class="b2" x="252.8" y="109.9" width="16.2" height="154.1"/>
+<line class="ax" x1="260.9" y1="121.5" x2="260.9" y2="109.2"/>
+<rect class="b2" x="276.0" y="128.1" width="16.2" height="135.9"/>
+<line class="ax" x1="284.1" y1="172.2" x2="284.1" y2="52.0"/>
+<rect class="b2" x="299.1" y="121.0" width="16.2" height="143.0"/>
+<line class="ax" x1="307.3" y1="210.1" x2="307.3" y2="85.9"/>
+<rect class="b2" x="322.3" y="121.9" width="16.2" height="142.1"/>
+<line class="ax" x1="330.4" y1="129.2" x2="330.4" y2="115.0"/>
+<rect class="b2" x="345.5" y="123.8" width="16.2" height="140.2"/>
+<line class="ax" x1="353.6" y1="166.8" x2="353.6" y2="88.4"/>
+<rect class="b2" x="368.6" y="118.6" width="16.2" height="145.4"/>
+<line class="ax" x1="376.8" y1="236.0" x2="376.8" y2="88.8"/>
+<rect class="b2" x="391.8" y="118.0" width="16.2" height="146.0"/>
+<line class="ax" x1="399.9" y1="174.3" x2="399.9" y2="93.3"/>
+<rect class="b2" x="415.0" y="140.1" width="16.2" height="123.9"/>
+<line class="ax" x1="423.1" y1="198.5" x2="423.1" y2="81.8"/>
+<rect class="b2" x="438.1" y="126.5" width="16.2" height="137.5"/>
+<line class="ax" x1="446.3" y1="247.2" x2="446.3" y2="124.2"/>
+<rect class="b2" x="461.3" y="122.9" width="16.2" height="141.1"/>
+<line class="ax" x1="469.4" y1="186.1" x2="469.4" y2="87.4"/>
+<rect class="b2" x="484.5" y="121.3" width="16.2" height="142.7"/>
+<line class="ax" x1="492.6" y1="218.7" x2="492.6" y2="82.0"/>
+<rect class="b2" x="507.6" y="113.2" width="16.2" height="150.8"/>
+<line class="ax" x1="515.8" y1="149.6" x2="515.8" y2="111.7"/>
+<rect class="b2" x="530.8" y="122.1" width="16.2" height="141.9"/>
+<line class="ax" x1="538.9" y1="139.5" x2="538.9" y2="109.2"/>
+<rect class="b2" x="554.0" y="126.3" width="16.2" height="137.7"/>
+<line class="ax" x1="562.1" y1="132.1" x2="562.1" y2="115.5"/>
+<rect class="b2" x="577.1" y="127.1" width="16.2" height="136.9"/>
+<line class="ax" x1="585.3" y1="207.0" x2="585.3" y2="117.1"/>
+<rect class="b2" x="600.3" y="112.4" width="16.2" height="151.6"/>
+<line class="ax" x1="608.4" y1="207.0" x2="608.4" y2="98.5"/>
+<text class="sm" x="342" y="306" text-anchor="middle">sessions, oldest to newest</text>
+</svg>

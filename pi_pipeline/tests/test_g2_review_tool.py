@@ -574,3 +574,32 @@ def test_observation_cleanup_drops_near_duplicates_keeping_the_better_labelled_a
     out = {s["id"]: s["why"] for s in G.App.observations_tidy(stub)["suggestions"]}
     assert set(out) == {1, 4}                                    # 1 repeats 2 (the labelled one stays); 4 is two words
     assert "#2" in out[1] and "short" in out[4]
+
+
+def test_the_sync_progress_line_says_which_step_what_it_does_and_how_long_it_has_been_on_it(tmp_path):
+    path = tmp_path / "sync_progress.json"
+    assert G.App.sync_progress(str(path), 1000.0) is None                                                       # no file: nothing running
+    path.write_text(json.dumps({"running": True, "started": 900.0, "step": "pictures", "what": "exploration pictures and the curated library", "index": 3, "total": 9, "step_started": 960.0, "done": ["edits", "goals"]}))
+    p = G.App.sync_progress(str(path), 1000.0)
+    assert p["step"] == "pictures" and p["index"] == 3 and p["total"] == 9 and p["step_elapsed_s"] == 40 and p["elapsed_s"] == 100 and p["done"] == ["edits", "goals"]
+    assert "pictures" in p["what"]
+    path.write_text(json.dumps({"running": False, "step": "", "step_started": 960.0}))
+    assert G.App.sync_progress(str(path), 1000.0) is None                                                       # finished
+    path.write_text(json.dumps({"running": True, "started": 0.0, "step": "walls", "what": "x", "index": 1, "total": 2, "step_started": 0.0}))
+    assert G.App.sync_progress(str(path), 5000.0) is None                                                       # left behind by a killed run: ignored after 30 minutes
+
+
+def test_the_sync_script_lists_the_groom_and_the_charts_as_steps_that_only_a_forced_run_does():
+    import subprocess
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "tools" / "g2_sync.sh").read_text()
+    assert "groom:100000000:336" in text and "charts:100000000:336" in text and "g2_groom.py\" --session" in text and "gen_goal_charts.py" in text      # never due in the background loop
+    assert "progress edits" in text and "progress \"$name\"" in text and "progress done" in text
+    out = subprocess.run(["bash", "-n", str(root / "tools" / "g2_sync.sh")], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert "groom" in V_SYNC_TASKS() and "charts" in V_SYNC_TASKS()
+
+
+def V_SYNC_TASKS():
+    import g2_goals_view as V
+    return V.SYNC_STALE_H

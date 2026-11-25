@@ -129,7 +129,7 @@ def _memory(path: str) -> dict:
             "oom_kills": (rows[-1].get("oom_kills", 0) or 0) - (rows[0].get("oom_kills", 0) or 0)}
 
 
-SYNC_STALE_H = {"goals": 24, "pictures": 48, "walklogs": 72, "walls": 72, "memorydb": 48, "logs": 72}     # the same limits as tools/g2_sync.sh
+SYNC_STALE_H = {"goals": 24, "pictures": 48, "walklogs": 72, "walls": 72, "memorydb": 48, "logs": 72, "groom": 336, "charts": 336}     # the same limits as tools/g2_sync.sh
 
 
 def sync_status(path: str, now: float | None = None) -> list[dict]:

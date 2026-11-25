@@ -724,6 +724,20 @@ class App:
         """G2's wake word: {"paused", "minutes_left", "until"}; `turn_on` ends a "mic off" pause early (voice/wake_pause.py)."""
         return self.remote.call(["pi_pipeline.voice.wake_pause", "on" if turn_on else "status", "--json"])
 
+    @staticmethod
+    def sync_progress(path: str | None = None, now: float | None = None) -> dict | None:
+        """The live line of a running sync (tools/g2_sync.sh writes ~/Desktop/G2Memory/sync_progress.json before every step): {"step", "what", "index", "total", "step_elapsed_s", "elapsed_s", "done": [steps finished]}, or None when nothing is running (a file left behind by a killed run is ignored after 30 minutes)."""
+        path = path or os.path.expanduser("~/Desktop/G2Memory/sync_progress.json")
+        try:
+            d = json.loads(Path(path).read_text())
+        except (OSError, ValueError):
+            return None
+        now = time.time() if now is None else now
+        if not d.get("running") or not d.get("step") or now - float(d.get("step_started", 0)) > 1800:
+            return None
+        return {"step": d["step"], "what": d.get("what", ""), "index": d.get("index", 0), "total": d.get("total", 0), "done": d.get("done", []),
+                "step_elapsed_s": max(0, int(now - float(d["step_started"]))), "elapsed_s": max(0, int(now - float(d.get("started", d["step_started"]))))}
+
     def sync_status(self) -> list:
         """When each copy from the Pi last worked, for the line under the title (tools/g2_sync.sh status)."""
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -1202,7 +1216,7 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                 if u.path == "/api/list":
                     return self._json(app.list(qs.get("kind", [""])[0], qs.get("q", [""])[0]))
                 if u.path == "/api/sync":
-                    return self._json({"tasks": app.sync_status(), **app.sync_now(start=False)})
+                    return self._json({"tasks": app.sync_status(), "progress": app.sync_progress(), **app.sync_now(start=False)})
                 if u.path == "/api/goals":
                     return self._json(app.goals())
                 if u.path == "/api/observations/tidy":
@@ -1398,14 +1412,18 @@ function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Tra
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 const TAB=Math.random().toString(36).slice(2);const beat=()=>{api("/api/hb",{id:TAB}).catch(()=>{})};beat();setInterval(beat,5000);       // tells the server this tab is open; closing the tab stops the server
 addEventListener("pageshow",beat);addEventListener("pagehide",()=>{try{navigator.sendBeacon("/api/bye?t="+encodeURIComponent(TOKEN)+"&id="+TAB)}catch(e){}});
+function fmtS(s){return s<60?s+" s":Math.floor(s/60)+" min "+(s%60)+" s"}
 async function showSync(){try{const r=await api("/api/sync");const ls=$("#lastsync");ls.replaceChildren(document.createTextNode(r.running?"Syncing from the Pi… ":"Last copy from the Pi: "));
+  clearInterval(window.syncTick);
+  if(r.progress){const p=r.progress,t0=Date.now()-p.step_elapsed_s*1000;const w=el("div","","");w.id="syncprog";w.style.cssText="font-weight:600;margin:2px 0";
+   const draw=()=>{w.textContent="Step "+p.index+" of "+p.total+": "+p.what+" ("+fmtS(Math.max(0,Math.round((Date.now()-t0)/1000)))+" on this step)"+(p.done.length?"   done: "+p.done.join(", "):"")};draw();ls.append(w);window.syncTick=setInterval(draw,1000)}
   for(const t of r.tasks){const sp=el("span","",t.task+" "+t.last_ok+(t.failed?" (failed)":"")+"   ");if(t.stale||t.failed){sp.style.color="var(--x)";sp.style.fontWeight="600";sp.title="older than it should be"}ls.append(sp)}
   if(r.last&&r.last.outcome!=="ok"&&!r.running){const w=el("div","","Last try "+r.last.when+": "+r.last.message);w.style.cssText="color:var(--x);font-weight:600;margin-top:2px";ls.append(w)}
   const b=$("#syncnow");b.disabled=r.running;b.textContent=r.running?"Syncing…":"Sync from the Pi";return r}catch(e){return null}}
 async function showMic(){try{const m=await api("/api/mic",{on:false});$("#micstate").textContent=m.paused?"Wake word off: "+Math.ceil(m.minutes_left)+" min left (until "+m.until+")":"";$("#micon").style.display=m.paused?"":"none"}catch(e){$("#micstate").textContent=""}}
 async function micOn(){try{await api("/api/mic",{on:true});toast("Wake word back on");showMic()}catch(e){toast("Failed: "+e.message)}}
-async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r.started?"Sync started: a few minutes if the Pi is on":"A sync is already running");await showSync();
-  const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,4000);return}const l=s&&s.last;
+async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r.started?"Sync started: the copies, the gallery tidy-up and the chart redraw, a few minutes if the Pi is on":"A sync is already running");await showSync();
+  const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,2000);return}const l=s&&s.last;
    const say=!l?"Sync finished: see ~/g2_logs/sync.log":l.outcome==="ok"?"Sync done: "+l.message:l.outcome==="partial"?"Sync finished with a problem: "+l.message:"Sync did not run: "+l.message;
    toast(say);load()};setTimeout(tick,3000)}catch(e){toast("Failed: "+e.message)}}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));

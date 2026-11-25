@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">The basket: how attempts ended</title>
+<desc id="d">Horizontal bars: the number of attempts for each outcome code. made 7, basket_not_found 7, puck_not_found 4, fell 2, missed 1, too_near_the_basket 1.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">The basket: how attempts ended</text>
+<text class="tx" x="182" y="74.0" text-anchor="end">made</text>
+<rect class="b1" x="190" y="54.3" width="410.0" height="29.4"/>
+<text class="sm" x="606.0" y="74.0">7</text>
+<text class="tx" x="182" y="116.0" text-anchor="end">basket_not_found</text>
+<rect class="b3" x="190" y="96.3" width="410.0" height="29.4"/>
+<text class="sm" x="606.0" y="116.0">7</text>
+<text class="tx" x="182" y="158.0" text-anchor="end">puck_not_found</text>
+<rect class="b3" x="190" y="138.3" width="234.3" height="29.4"/>
+<text class="sm" x="430.3" y="158.0">4</text>
+<text class="tx" x="182" y="200.0" text-anchor="end">fell</text>
+<rect class="b3" x="190" y="180.3" width="117.1" height="29.4"/>
+<text class="sm" x="313.1" y="200.0">2</text>
+<text class="tx" x="182" y="242.0" text-anchor="end">missed</text>
+<rect class="b3" x="190" y="222.3" width="58.6" height="29.4"/>
+<text class="sm" x="254.6" y="242.0">1</text>
+<text class="tx" x="182" y="284.0" text-anchor="end">too_near_the_basket</text>
+<rect class="b3" x="190" y="264.3" width="58.6" height="29.4"/>
+<text class="sm" x="254.6" y="284.0">1</text>
+</svg>
