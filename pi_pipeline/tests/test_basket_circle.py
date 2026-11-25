@@ -426,3 +426,14 @@ def test_a_big_pivot_is_made_of_moves_of_at_most_two_cycles_one_after_the_other(
     sim.pivot = lambda deg: (calls.append(deg), orig(deg))[1]
     br.circle_search(Rec(sim), say=lambda s: None, ignore_puck=True, max_laps=1000, streak_target=1, deadline=time.monotonic() + 0.5)
     assert calls[:2] == [-54.0, -54.0]                                                              # the first turn, to put the tub beside him, is two moves
+
+
+def test_with_peeks_off_he_never_turns_toward_the_tub_to_look_and_the_forward_picture_is_the_only_check():
+    r = _test_run(Sim(puck=None), peek_every=0, streak_target=1, deadline=time.monotonic() + 5.0)
+    assert not any("turn toward the tub to look" in s["why"] for s in r["steps"])
+    assert all(e.get("peek") is None for e in r["arcs"]) and r["outcome"] in ("passed", "time_up")
+    st = br.CircleState(side=1, peek_every=0)
+    st.phase, st.arcs = "glance", 4
+    assert br.next_circle_action(None, None, st).kind == "arc"                                      # no tub in the picture: he is still circling it, on to the next arc
+    st.phase, st.arcs = "glance", 4
+    assert br.next_circle_action(None, NS(claw_in=14.0, bearing_deg=30.0), st).kind in ("pivot", "nudge") and st.phase == "arc"      # seen: a little outward, then the next arc, no peek

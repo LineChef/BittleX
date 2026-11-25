@@ -42,7 +42,7 @@ CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answe
 CIRCLE_RADIUS_IN = 16.0              # the circle's radius as the finder reads it, used at the peeks (too tight was the problem on the first arc run, never too wide: owner, 2026-11-24)
 CIRCLE_MIN_IN = 10.0                 # nearer than this (as read) he backs off before anything else (the first goal run ended a leg 4.5 inches from the tub)
 CIRCLE_ARC_DEG = 45.0                # one wide arc's heading change: 8 arcs a lap
-CIRCLE_PIVOT_CHUNK_DEG = 54.0         # one pivot move is two cycles at most (ball_chase.PIVOT_MAX_CYCLES, about 45 to 52 degrees by the owner's eye) and the mover caps an ask at 60: a bigger ask is made of moves this size, one after the other (owner, 2026-11-25: the 81 degree turn to put the tub beside him only turned 45, and the arc was too tight; the peek and the turn back asked for 108 and got 54 too)
+CIRCLE_PIVOT_CHUNK_DEG = 54.0         # one pivot move is two cycles at most and turns him about 45 degrees (owner, 2026-11-25: about 22 a cycle; docs/rl/real-walk-log.md) (ball_chase.PIVOT_MAX_CYCLES, about 45 to 52 degrees by the owner's eye) and the mover caps an ask at 60: a bigger ask is made of moves this size, one after the other (owner, 2026-11-25: the 81 degree turn to put the tub beside him only turned 45, and the arc was too tight; the peek and the turn back asked for 108 and got 54 too)
 CIRCLE_SQUARE_ASK_DEG = 108.0          # what the first pivot asks for to turn him about 90 degrees: four cycles of about 22 each (two moves of two cycles; one move of two turned only about 45)
 CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
 CIRCLE_STRAIGHT_IN = 0.0             # no straight walk after an arc (owner, 2026-11-24): the arc is measured at about 15 inches of radius, already the circle we want, and on the simulated floor the 6 inches that widened a guessed 9 inch arc threw it out to 11 to 28 inches and lost the tub (without it 12.5 to 18); a number above 0 brings the walk back
@@ -150,7 +150,7 @@ class CircleState:
     last_d: float | None = None      # the last tub distance read
     log: list = field(default_factory=list)
     max_laps: float = CIRCLE_MAX_LAPS    # the goal ends the session after this many laps; the circle test sets it high and ends on the clock or a streak
-    peek_every: int = CIRCLE_PEEK_EVERY  # the circle test peeks every arc for the data; the goal's own is a setting to fit from it
+    peek_every: int = CIRCLE_PEEK_EVERY  # 0 = never peek (the forward picture is the only check); the goal's own is a setting to fit from the circle test
     max_steps: int = CIRCLE_MAX_STEPS
     streak_target: int = 0               # clean laps in a row that end the search as "passed" (the circle test only; 0 = off)
     events: list = field(default_factory=list)   # one record per arc: asked and gyro degrees, the straight walk, what the forward picture and the peek read
@@ -245,7 +245,7 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
                 st.steps += 1
                 st.note_soft("back_off", d=round(d, 1))
                 return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
-            st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
+            st.phase = "peek" if st.peek_every > 0 and st.arcs % st.peek_every == 0 else "arc"
             if abs(b) >= CIRCLE_TIGHT_BEARING_DEG and d >= CIRCLE_TIGHT_NEAR_IN:
                 turn_away = CIRCLE_SEEN_TURN_DEG                             # in view but well off his nose and not near: a little outward (the owner saw him plow through the tub with no turn at all)
             else:
@@ -253,7 +253,7 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
             st.note_soft("too_tight", d=round(d, 1), b=round(b, 1))
             st.steps += 1
             return RAction("pivot" if turn_away >= bl.PIVOT_MIN_DEG else "nudge", -st.side * (bl._pivot_for(turn_away) if turn_away >= bl.PIVOT_MIN_DEG else turn_away), "circling: the tub is in view, the turn was too tight: turn away")
-        st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
+        st.phase = "peek" if st.peek_every > 0 and st.arcs % st.peek_every == 0 else "arc"
         return next_circle_action(None, None, st)
     if basket is None:
         if st.phase == "face" and st.lost_deg == 0.0 and st.last_d is not None and st.last_d <= CIRCLE_FIND_FAR_IN and st.find_back < 2:
@@ -985,6 +985,7 @@ def main(argv: list | None = None) -> None:
     ap.add_argument("--circle-test", action="store_true", help="the circle test: stand up from rest and circle the tub over and over (no puck, nothing thrown; the tub about 16 inches out, four feet of clear floor round it) until --minutes run out or --laps clean laps follow one another, then lie down; logs every arc and picture, prints a lap table")
     ap.add_argument("--minutes", type=float, default=CIRCLE_TEST_MINUTES, help="with --circle-test: the time cap")
     ap.add_argument("--peek-every", type=int, default=CIRCLE_PEEK_EVERY, help="with --circle-test: a peek every this many arcs (default CIRCLE_PEEK_EVERY, the goal's own: owner, 2026-11-24; 1 = every arc, for more data; on the simulated floor every arc held the 12 to 22 inch band worse than every third)")
+    ap.add_argument("--no-peek", action="store_true", help="with --circle-test: no peeks at all (the same as --peek-every 0): the tub not in the forward picture means he is still circling it (owner, 2026-11-25)")
     ap.add_argument("--laps", type=int, default=CIRCLE_TEST_LAPS_IN_A_ROW, help="with --circle-test: clean laps in a row that pass the test")
     ap.add_argument("--show-picture", action="store_true", help="after each throw print the picture of the floor (JPEG, base64, one line) for the person running it; never saved on the Pi")
     a = ap.parse_args(argv)
@@ -1026,7 +1027,7 @@ def main(argv: list | None = None) -> None:
             env.attempt = 0
             if env.stand_up_warm() == "fell":
                 raise Fell()
-            c = circle_search(env, say=print, max_laps=1000, peek_every=a.peek_every, deadline=time.monotonic() + 60.0 * a.minutes, streak_target=a.laps, ignore_puck=True)
+            c = circle_search(env, say=print, max_laps=1000, peek_every=0 if a.no_peek else a.peek_every, deadline=time.monotonic() + 60.0 * a.minutes, streak_target=a.laps, ignore_puck=True)
             ok2, pct_end, _v = battery.motion_gate(link)
             env.lie_down() if c["outcome"] != "fell" else None
             for line in circle_report_lines(c):
