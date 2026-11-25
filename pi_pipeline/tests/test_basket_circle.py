@@ -185,8 +185,8 @@ def test_a_tub_in_the_forward_picture_is_too_tight_only_near_his_nose_or_near_an
     st = br.CircleState(side=1)
     st.phase, st.arcs = "glance", 1
     st.events.append({"arc": 1})
-    a = br.next_circle_action(None, tub(21.0, 35.0), st)                                      # the 2026-11-24 picture: 21 inches, 35 degrees off his nose: the arc brought it forward, the circle is fine
-    assert a.kind == "arc" and not st.soft
+    a = br.next_circle_action(None, tub(21.0, 35.0), st)                                      # the 2026-11-24 picture: 21 inches, 35 degrees off his nose: in view at all = a little outward (15 degrees), as the owner asked
+    assert a.kind in ("pivot", "nudge") and a.value < 0 and 10 <= abs(a.value) <= 30 and st.soft[-1]["kind"] == "too_tight" and st.phase == "arc"
     st = br.CircleState(side=1)
     st.phase, st.arcs = "glance", 1
     assert br.next_circle_action(None, tub(8.0, 40.0), st).kind == "back"                    # and nearer than the limit he backs off first
@@ -235,7 +235,7 @@ def test_the_test_ignores_a_puck_and_the_goals_own_defaults_are_unchanged():
     r = br.circle_search(Env(Sim(puck=None)), say=lambda s: None)                                    # the goal's call: two laps end it
     assert r["outcome"] == "circled_twice" and len(r["arcs"]) <= 18
     st = br.CircleState()
-    assert (st.max_laps, st.peek_every, st.streak_target) == (br.CIRCLE_MAX_LAPS, br.CIRCLE_PEEK_EVERY, 0)
+    assert (st.max_laps, st.peek_every, st.streak_target) == (br.CIRCLE_MAX_LAPS, br.CIRCLE_PEEK_EVERY, 0) and br.CIRCLE_PEEK_EVERY == 2
 
 
 def test_the_clock_ends_the_test_and_a_spoiled_lap_resets_the_streak():

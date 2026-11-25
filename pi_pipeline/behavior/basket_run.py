@@ -44,11 +44,12 @@ CIRCLE_MIN_IN = 10.0                 # nearer than this (as read) he backs off b
 CIRCLE_ARC_DEG = 45.0                # one wide arc's heading change: 8 arcs a lap
 CIRCLE_SQUARE_DEG = 90.0             # facing the tub, this pivot puts it beside him (checked by the gyro: the tub is out of the picture at 90 degrees)
 CIRCLE_STRAIGHT_IN = 0.0             # no straight walk after an arc (owner, 2026-11-24): the arc is measured at about 15 inches of radius, already the circle we want, and on the simulated floor the 6 inches that widened a guessed 9 inch arc threw it out to 11 to 28 inches and lost the tub (without it 12.5 to 18); a number above 0 brings the walk back
-CIRCLE_PEEK_EVERY = 3                # a peek (turn toward the tub, read its distance and scan the floor round it) only after this many arcs (every 4 missed a puck in the simulated floor, every 3 found all four spots); between arcs the forward picture alone says whether the circle is tight
+CIRCLE_PEEK_EVERY = 2                # a peek (turn toward the tub, read its distance and scan the floor round it) only after this many arcs (every 4 missed a puck in the simulated floor, every 3 found all four spots); between arcs the forward picture alone says whether the circle is tight
 CIRCLE_TIGHT_MIN_TURN_DEG, CIRCLE_TIGHT_MAX_TURN_DEG = 15.0, 60.0   # the tub in the forward picture means the circle is too tight: turn away by how far forward it stands (it should be beside him), at least and at most this
 CIRCLE_PEEK_DEG = 60.0               # the first peek: turn this far toward the tub, look, and turn back; after that the peek turns by where the last one found the tub (CIRCLE_PEEK_TARGET_DEG off his nose), because on the simulated floor 60 degrees left the tub out of the picture on almost every peek
 CIRCLE_PEEK_TARGET_DEG = 25.0        # where the peek aims to put the tub, off his nose (the camera sees about 35 degrees each side)
 CIRCLE_PEEK_MIN_DEG, CIRCLE_PEEK_MAX_DEG = 30.0, 90.0
+CIRCLE_SEEN_TURN_DEG = 15.0        # the tub in the forward picture after an arc at all (owner, 2026-11-24: he plowed through the tub): turn outward this much; nearer his nose or near, by how far forward it stands (CIRCLE_TIGHT_MIN_TURN_DEG up to CIRCLE_TIGHT_MAX_TURN_DEG)
 CIRCLE_TIGHT_BEARING_DEG = 15.0      # the tub in the forward picture is too tight only when it is this near his nose (an arc toward the tub brings it to about 35 degrees on a good circle: 2026-11-24) or nearer than CIRCLE_TIGHT_NEAR_IN
 CIRCLE_TIGHT_NEAR_IN = 12.0
 CIRCLE_FIND_FORWARD_IN, CIRCLE_FIND_FORWARD_MAX = 6.0, 3   # the tub not in view at the start: walk forward this far and look again, up to this many times, before any pivoting (owner, 2026-11-24)
@@ -233,8 +234,9 @@ def next_circle_action(puck, basket, st: CircleState) -> RAction:
                 return RAction("back", min(bl.BACK_STEP_MAX_IN, CIRCLE_RADIUS_IN - d), "circling: too near the tub, back off")
             st.phase = "peek" if st.arcs % st.peek_every == 0 else "arc"
             if abs(b) >= CIRCLE_TIGHT_BEARING_DEG and d >= CIRCLE_TIGHT_NEAR_IN:
-                return next_circle_action(None, None, st)                    # in view but well off his nose and not near: the arc brought it forward, the circle is not tight
-            turn_away = max(CIRCLE_TIGHT_MIN_TURN_DEG, min(CIRCLE_TIGHT_MAX_TURN_DEG, 90.0 - abs(b)))
+                turn_away = CIRCLE_SEEN_TURN_DEG                             # in view but well off his nose and not near: a little outward (the owner saw him plow through the tub with no turn at all)
+            else:
+                turn_away = max(CIRCLE_TIGHT_MIN_TURN_DEG, min(CIRCLE_TIGHT_MAX_TURN_DEG, 90.0 - abs(b)))
             st.note_soft("too_tight", d=round(d, 1), b=round(b, 1))
             st.steps += 1
             return RAction("pivot" if turn_away >= bl.PIVOT_MIN_DEG else "nudge", -st.side * (bl._pivot_for(turn_away) if turn_away >= bl.PIVOT_MIN_DEG else turn_away), "circling: the tub is in view, the turn was too tight: turn away")
