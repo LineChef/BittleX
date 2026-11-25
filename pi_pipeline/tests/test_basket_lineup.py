@@ -64,8 +64,9 @@ def test_the_decisions_for_distance_bearing_and_the_buffer():
 
 def test_the_pivot_scan_runs_up_to_a_full_circle_and_gives_up_and_a_found_basket_resets_it():
     st = bl.LineupState()
-    kinds = [bl.next_action(None, st).kind for _ in range(15)]
-    assert kinds[:14] == ["scan"] * 14 and kinds[14] == "give_up"                                             # 14 x 27 degrees (378) covers a full circle
+    n = int(bl.SCAN_MAX_DEG // bl.SCAN_STEP_DEG)
+    kinds = [bl.next_action(None, st).kind for _ in range(n + 1)]
+    assert n == 8 and kinds[:n] == ["scan"] * n and kinds[n] == "give_up"                                       # 8 x 54 degrees asked (432): about 45 each really, a full circle
     st = bl.LineupState()
     bl.next_action(None, st)
     bl.next_action(Read(16.0, 0.0), st)
@@ -196,3 +197,20 @@ def test_a_reading_he_already_has_decides_the_first_step_with_no_picture():
     looks.clear()
     bl.lineup(look, Mover(), target_in=bl.CONFIRM_READING_IN, dist_tol=bl.CONFIRM_TOL_IN, align_tol=bl.CONFIRM_ALIGN_TOL_DEG)
     assert len(looks) == 1                                                                                  # without it the first decision takes a picture, as before
+
+
+def test_after_a_back_up_he_squares_up_to_the_tub_before_walking_forward():
+    from types import SimpleNamespace as NS
+    st = bl.LineupState()
+    back = bl.next_action(NS(claw_in=5.0, bearing_deg=3.0), st)
+    assert back.kind == "back" and st.backed
+    a = bl.next_action(NS(claw_in=22.0, bearing_deg=12.0), st)                                       # backed up, now too far and 12 degrees off: a small turn first
+    assert a.kind == "nudge" and a.value == 12.0 and "re-align" in a.why and st.backed
+    a = bl.next_action(NS(claw_in=22.0, bearing_deg=-24.0), st)                                      # 24 degrees off: a pivot
+    assert a.kind == "pivot" and a.value < 0                                                         # (the line-up already pivots at 18 degrees or more)
+    a = bl.next_action(NS(claw_in=22.0, bearing_deg=2.0), st)                                        # squared up: now the walk forward
+    assert a.kind == "forward" and not st.backed
+    st2 = bl.LineupState()                                                                           # no back-up first: a small bearing error does not stop the walk
+    assert bl.next_action(NS(claw_in=22.0, bearing_deg=6.0), st2).kind == "forward"
+    st3 = bl.LineupState()
+    assert bl.next_action(NS(claw_in=10.0, bearing_deg=0.0), st3).kind == "back" and st3.backed      # too close also counts

@@ -796,6 +796,15 @@ class RealEnv:
         except Exception:  # noqa: BLE001
             pass
 
+    def _premeter(self, cam) -> None:
+        """Meter the light in the camera's own background thread while the claw rises and pans, so the look's pictures do not meter (up to four throwaway grabs, each a chance to stall) while he stands waiting for them. Never raises."""
+        try:
+            fn = getattr(cam, "premeter", None)
+            if callable(fn):
+                fn()
+        except Exception:  # noqa: BLE001
+            pass
+
     def _picture_wait(self, seconds: float) -> None:
         """How long the next picture request waits for the camera: AFTER_PICTURE_TIMEOUT_S for the claw look (its right-hand picture needs the longer wait), QUICK_PICTURE_TIMEOUT_S for the quick pictures between moves."""
         try:
@@ -838,6 +847,7 @@ class RealEnv:
         from ..vision import puck_finder as pf
         self._picture_wait(AFTER_PICTURE_TIMEOUT_S)
         cam, seen = self._camera(), {}
+        self._premeter(cam)
         left = chase.CLAW_PAN_DEG if chase.CLAW_PAN_SIGN == "left" else -chase.CLAW_PAN_DEG
         self.picture_ok = False
         self.look_readings = {}
@@ -875,6 +885,7 @@ class RealEnv:
         from ..vision import puck_finder as pf
         self._picture_wait(AFTER_PICTURE_TIMEOUT_S)
         cam, got = self._camera(), {}
+        self._premeter(cam)
         self.confirm_picture_ok = False
 
         def snapshot(label):

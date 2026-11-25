@@ -155,7 +155,7 @@ def next_bump(bump: int, s: ExposureStats) -> int | None:
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
                  ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, click: bool = True, save_dir: str | None = None, keep_days: float = 0.0, exposure_check: bool = True,
-                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, wait_still=None, serial_factory=None, reask_s: float = 2.5,
+                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, wait_still=None, serial_factory=None, reask_s: float = 1.5,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
         self._sensor_opt, self._ae_bump, self._timeout_s = sensor_opt, ae_bump, timeout_s
@@ -269,19 +269,22 @@ class CameraSnapshotter:
         self._ser.write(_ONE_SHOT)
         deadline = t0 + self._timeout_s
         reask_at = t0 + self._reask_s if 0 < self._reask_s < self._timeout_s else None
+        heard = []                                                        # what came in that was not a picture: (length, start), for the log when none does
         while self._clock() < deadline:
             if reask_at is not None and self._clock() >= reask_at:
-                reask_at = None
+                reask_at = self._clock() + self._reask_s                  # and again every reask_s until the timeout (a normal answer takes 0.5 s)
                 log.info("camera: no answer after %.1f s: asking again", self._clock() - t0)
-                self._ser.write(_ONE_SHOT)                               # the buffer is not cleared: a late answer to the first request still counts
+                self._ser.write(_ONE_SHOT)                               # the buffer is not cleared: a late answer to an earlier request still counts
             raw = self._ser.readline()
             if not raw:
                 continue
             snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
+            if snap is None and len(heard) < 6:
+                heard.append((len(raw), raw[:60].decode("utf-8", "replace")))
             if snap is not None:
                 log.info("camera grab took %.2f s", self._clock() - t0)         # how long one request-to-picture takes (2026-11-10: pictures are slow in the chase)
                 return snap
-        log.warning("camera gave no picture within %.0f s", self._timeout_s)
+        log.warning("camera gave no picture within %.0f s%s", self._timeout_s, f" (lines that were not a picture: {heard})" if heard else " (nothing came in)")
         return None
 
     def _balance_exposure(self, first: Snapshot, finish: bool = True) -> Snapshot:

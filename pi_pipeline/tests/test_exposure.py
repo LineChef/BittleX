@@ -291,7 +291,7 @@ def test_a_request_the_camera_drops_is_asked_again_after_a_couple_of_seconds_ins
                 return self.lines.pop(0)
             t[0] += 1.0                                                                         # a serial read that times out takes the port's 1 s
             return b""
-    for reask, want_invokes, max_t in ((2.5, 2, 4.0), (0.0, 1, 8.0)):
+    for reask, want_invokes, max_t in ((1.5, 2, 3.0), (0.0, 1, 8.0)):
         t[0] = 0.0
         cam = Dropper(drop_first=1)
         c = CameraSnapshotter("x", exposure_check=False, serial_factory=lambda: cam, sleep=lambda s: None, clock=lambda: t[0], idle_close_s=0, timeout_s=8.0, reask_s=reask, click=False)
@@ -299,6 +299,44 @@ def test_a_request_the_camera_drops_is_asked_again_after_a_couple_of_seconds_ins
         t[0] = 0.0
         snap = c._grab_one()
         if reask:
-            assert snap is not None and cam.invokes == want_invokes and t[0] <= max_t, (snap, cam.invokes, t[0])      # asked again at 2.5 s, answered by about 3 s
+            assert snap is not None and cam.invokes == want_invokes and t[0] <= max_t, (snap, cam.invokes, t[0])      # asked again at 1.5 s, answered by about 3 s
         else:
             assert snap is None and cam.invokes == 1 and t[0] >= 8.0                                 # no re-ask: the first request is dropped and nothing comes in 8 s
+
+
+def test_a_request_is_repeated_every_reask_seconds_until_one_is_answered_and_what_came_in_is_logged(caplog):
+    import logging
+    jpeg = make_jpeg([115.0] * 1024)
+    t = [0.0]
+
+    class Slow:
+        def __init__(self):
+            self.invokes, self.lines = 0, []
+
+        def reset_input_buffer(self):
+            self.lines = []
+
+        def write(self, b):
+            if b.startswith(b"AT+INVOKE"):
+                self.invokes += 1
+                if self.invokes >= 3:                                                           # the first two requests are lost
+                    self.lines = [b'{"type": 1, "name": "INVOKE", "code": 0, "data": {"count": 1, "image": "' + base64.b64encode(jpeg) + b'", "boxes": []}}\n']
+
+        def readline(self):
+            if self.lines:
+                return self.lines.pop(0)
+            t[0] += 1.0
+            return b""
+    cam = Slow()
+    c = CameraSnapshotter("x", exposure_check=False, serial_factory=lambda: cam, sleep=lambda s: None, clock=lambda: t[0], idle_close_s=0, timeout_s=8.0, reask_s=1.5, click=False)
+    c._open()
+    t[0] = 0.0
+    assert c._grab_one() is not None and cam.invokes == 3 and t[0] <= 5.0                                 # asked at 0, 2 and 4 s (the serial read's 1 s steps), answered by 5 s
+    cam2 = Slow()
+    cam2.write = lambda b: None                                                                          # nothing ever answers
+    cam2.readline = lambda: (t.__setitem__(0, t[0] + 1.0), b"")[1]
+    c2 = CameraSnapshotter("x", exposure_check=False, serial_factory=lambda: cam2, sleep=lambda s: None, clock=lambda: t[0], idle_close_s=0, timeout_s=8.0, reask_s=1.5, click=False)
+    c2._open()
+    with caplog.at_level(logging.WARNING):
+        assert c2._grab_one() is None
+    assert any("gave no picture within 8 s" in r.message and "nothing came in" in r.message for r in caplog.records)

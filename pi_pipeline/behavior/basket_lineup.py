@@ -21,7 +21,7 @@ BACK_DRIFT_RATIO = 0.33       # a backward walk drifts to his right by this frac
 MIN_STEP_IN = 1.5
 ALIGN_TOL_DEG = 3.0          # about 0.8 inch sideways at 16 inches, the sideways spread of the lob
 PIVOT_MIN_DEG, PIVOT_CYCLE_DEG = 18.0, 27.0
-SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
+SCAN_STEP_DEG, SCAN_MAX_DEG = 54.0, 432.0            # the line-up's pivot scan for the tub: two pivot cycles a step (about 45 degrees really, inside the camera's 70 degree view; 27 degrees took 14 steps and 2 minutes to find it on 2026-11-25) and 8 steps, a full circle really (one pivot move turns about 0.83 of what is asked)
 AIM_OFFSET_DEG = 0.0           # + = aim this far to the right of the basket's centre (the goal learns it): the basket is lined up at this far left of straight ahead, so it reads at minus this bearing
 MAX_CORRECTIONS = 30
 CONFIRM_READING_IN = 10.0      # the confirm look's walk-up target, as the finder READS it (8 inches from the claw tip really: the finder reads 1.8 inches long at 8 inches in the attention pose); a look from 7 to 13 inches is fine (owner, 2026-11-24)
@@ -40,6 +40,7 @@ class Action:
 class LineupState:
     scanned_deg: float = 0.0
     corrections: int = 0
+    backed: bool = False             # he just backed up: the tub must be squared up again (a back-up drifts him sideways) before he walks forward (owner, 2026-11-25)
     log: list = field(default_factory=list)
 
 
@@ -79,18 +80,24 @@ def next_action(reading, st: LineupState, target_in: float = TARGET_IN, dist_tol
         return Action("give_up", 0.0, "could_not_align")
     if d < BUFFER_IN + CLOSE_MARGIN_IN:
         st.corrections += 1
+        st.backed = True
         return Action("back", back_inches_to_target(d, b, target_in), "inside the buffer: back up first")
     if abs(b) >= PIVOT_MIN_DEG:
         st.corrections += 1
         return Action("pivot", _pivot_for(b), "basket far off to the side: pivot toward it")
+    if st.backed and d - target_in > dist_tol and abs(b) > align_tol:
+        st.corrections += 1                                                    # backed up, now too far and not squared up: turn to the tub first (a pivot when it is 18 degrees or more off, else a small turn), then walk forward
+        return Action("pivot", _pivot_for(b), "re-align after the back-up before walking forward") if abs(b) >= PIVOT_MIN_DEG else Action("nudge", b, "re-align after the back-up before walking forward")
     if d - target_in > dist_tol:
         cap = FAR_STEP_MAX_IN if d > FAR_IN else FWD_STEP_MAX_IN
         step = min(cap, d - target_in, d - BUFFER_IN - CLOSE_MARGIN_IN)                   # never ends inside the buffer
         if step >= MIN_STEP_IN:
             st.corrections += 1
+            st.backed = False
             return Action("forward", step, "too far: walk closer")
     if target_in - d > dist_tol:
         st.corrections += 1
+        st.backed = True
         return Action("back", back_inches_to_target(d, b, target_in), "too close: back up")
     if abs(b) > align_tol:
         st.corrections += 1

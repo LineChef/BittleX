@@ -482,3 +482,17 @@ def test_a_puck_shaped_blob_seen_with_the_tub_out_of_view_near_it_is_a_puck_and_
     r = br.circle_search(E(tape), say=lambda s: None)
     assert r["outcome"] != "found" and r["puck"] is None
     assert br._looks_like_tape(NS(claw_in=4.0, bearing_deg=0.0)) is True and br._looks_like_tape(NS(claw_in=5.3, bearing_deg=6.4, width_px=18, height_px=15)) is False
+
+
+def test_the_claw_looks_meter_the_light_in_the_background_before_the_first_picture():
+    import inspect
+    calls = []
+
+    class Cam:
+        def premeter(self, force=False):
+            calls.append(force)
+    env = br.RealEnv.__new__(br.RealEnv)
+    env._premeter(Cam())
+    env._premeter(object())                                                                          # a camera with no premeter: nothing happens
+    assert calls == [False]
+    assert "self._premeter(cam)" in inspect.getsource(br.RealEnv.after_throw) and "self._premeter(cam)" in inspect.getsource(br.RealEnv.confirm_look)
