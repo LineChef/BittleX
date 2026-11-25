@@ -587,6 +587,24 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
             return {"outcome": "fell", "steps": st.log}
 
 
+AGREE_X, AGREE_Y = 0.15, 0.25          # two pictures agree on a puck inside the tub when it sits within this fraction of the tape's width of the same spot (sideways, up and down)
+
+
+def tub_puck_agrees(a, b) -> bool:
+    """Do two quick pictures (basket, floor puck, puck inside) both show a puck inside the tub in the same place, measured against the tub's own tape (so the walk between them does not matter)? One bad frame is not a make (owner approved 2026-11-25)."""
+    if a is None or b is None or a[2] is None or b[2] is None or a[0] is None or b[0] is None:
+        return False
+
+    def rel(r):
+        bk, tp = r[0], r[2]
+        w = float(getattr(bk, "width_px", 0) or 0)
+        if w <= 0:
+            return None
+        return (tp.x - (bk.left + bk.right) / 2.0) / w, (tp.y - bk.rim_row) / w
+    ra, rb = rel(a), rel(b)
+    return ra is not None and rb is not None and abs(ra[0] - rb[0]) <= AGREE_X and abs(ra[1] - rb[1]) <= AGREE_Y
+
+
 def _say_searching(announce, text: str) -> None:
     """"Searching for the puck" / "searching for the basket" aloud when a search begins (owner, 2026-11-25). Never raises."""
     if announce is not None:
@@ -858,6 +876,7 @@ class RealEnv:
         self.confirm_picture_ok = True
         self.last_walkup = None
         self.last_quick, self.last_quick_failed = None, False
+        self.quick_hist: list = []                                       # the last few quick pictures' readings: the confirm needs two that agree
         try:
             looker._cam._timeout_s = QUICK_PICTURE_TIMEOUT_S              # a stalled camera ends a look in a few seconds, not eight a request
         except Exception:  # noqa: BLE001
@@ -1041,6 +1060,7 @@ class RealEnv:
         puck = pf.find_puck(jpeg, basket, by=by)
         tub_puck = pf.find_puck_in_tub(jpeg, basket)
         self.last_quick = (basket, puck, tub_puck)                       # what the confirm step reads when this was its picture (`quick_confirm`)
+        self.quick_hist = (getattr(self, "quick_hist", []) + [self.last_quick])[-3:]
         n = len(self.quick_log) + 1
         d = os.path.join(os.path.expanduser(LOG_DIR), "quick", self.run_stamp)
         try:
@@ -1062,7 +1082,17 @@ class RealEnv:
 
     def quick_confirm(self):
         """The confirm step's reading from the last quick picture (claw down, taken at the end of the walk-up): (tub, puck on the floor, puck inside the tub), read when the picture was taken, so nothing waits."""
-        return self.last_quick if self.last_quick is not None else (None, None, None)
+        cur = self.last_quick if self.last_quick is not None else (None, None, None)
+        if cur[2] is None:
+            return cur
+        hist = getattr(self, "quick_hist", [])
+        if len(hist) >= 2 and tub_puck_agrees(hist[-2], cur):            # the walk-up's last two pictures both show it in the same place
+            return cur
+        self._quick("width")                                              # one more picture: a puck in the tub stays put, a glint or a stale frame does not
+        again = self.last_quick
+        if again is not None and tub_puck_agrees(cur, again):
+            return again
+        return (cur[0], cur[1], None)                                     # not confirmed: nothing inside
 
     def look(self):
         """The retrieval's look: a quick claw-down picture, as the ball goal takes while it walks up (the puck's distance from its width)."""

@@ -108,3 +108,14 @@ def test_the_glare_and_specks_are_not_the_puck_and_a_far_puck_is_seen_in_a_claw_
     far = pf.find_puck_array(picture((130, 86, 136, 92, RED)), by="width")                  # at the wall's base in a claw-down picture (rows 84 to 93)
     assert far is not None and far.claw_in >= pf.FAR_ZONE_IN
     assert pf.find_puck_array(picture((130, 86, 136, 92, RED))) is None                     # the claw-120 picture's floor starts at row 94
+
+
+def test_a_sliver_or_a_blob_the_wrong_size_for_the_tub_is_not_a_puck_inside():
+    """2026-11-25: a 14 by 1 sliver and a 1 by 8 sliver were read as pucks inside the tub (a glint, a tape edge)."""
+    for box in ((98, 114, 112, 115, RED), (100, 112, 101, 120, RED)):                  # 14 by 1, 1 by 8
+        img = tub_picture(box)
+        assert pf.find_puck_in_tub_array(img, bf.find_basket_array(img)) is None, box
+    big = tub_picture((92, 110, 160, 130, RED))                                         # wider than a puck can be on this tape (68 of 89)
+    assert pf.find_puck_in_tub_array(big, bf.find_basket_array(big)) is None
+    ok = tub_picture((105, 112, 115, 121, RED))                                        # 10 by 9: a puck
+    assert pf.find_puck_in_tub_array(ok, bf.find_basket_array(ok)) is not None

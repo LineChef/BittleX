@@ -13,8 +13,10 @@ MADE, MISSED, NOT_SEEN, NO_BASKET = "made", "missed", "not_seen", "no_basket"
 def classify_throw(basket, floor_puck=None, tub_puck=None, confirm: bool = False) -> tuple[str, str]:
     """(code, plain words) for one throw. `basket`: the basket finder's reading (or None); `floor_puck`: the puck finder's reading of a puck on the floor outside the tub (or None); `tub_puck`: `puck_finder.find_puck_in_tub_array`'s reading of a puck inside it (or None; only a close picture can see one).
     `confirm` is True for the close confirm look, where nothing seen inside the tub means it is not there."""
-    if basket is not None and tub_puck is not None:
+    if basket is not None and tub_puck is not None and floor_puck is None:
         return MADE, "The puck is in the basket."
+    if basket is not None and tub_puck is not None:
+        return MISSED, "Something coloured inside the basket, and a puck on the floor beside it: the puck is outside (seen through the clear wall), not a make."
     if floor_puck is not None:                                                  # a puck seen on the floor is outside the tub, with or without the tub in view
         near = f", about {abs(floor_puck.bearing_deg - basket.bearing_deg):.0f} degrees off its bearing" if basket is not None else ""
         return MISSED, f"The puck is on the floor outside the basket{near}."

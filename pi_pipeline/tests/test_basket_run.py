@@ -756,3 +756,48 @@ def test_after_the_back_up_he_looks_then_turns_onto_the_puck_before_any_walk():
     a = br.next_retrieval_action(P(br.PICK_STAND_IN, 2.0), None, st)                                          # squared up: now the last walk and the pick-up
     assert a.kind == "pick"
     assert br.PICK_STAND_IN - br.PICK_STAND_TOL_IN >= 6.0                                                    # the stand sits inside the finder's floor window at row 89 or so, never at its upper edge
+
+
+def _tp(x, y, w=10, h=9):
+    from types import SimpleNamespace as NS
+    return NS(x=x, y=y, count=60, width_px=w, height_px=h)
+
+
+def _bk(width=89, left=80, right=168, rim=104.0):
+    from types import SimpleNamespace as NS
+    return NS(width_px=width, left=left, right=right, rim_row=rim, claw_in=9.8, bearing_deg=0.0)
+
+
+def test_two_pictures_must_agree_on_a_puck_inside_the_tub_before_it_is_a_make():
+    a = (_bk(), None, _tp(120.0, 116.0))
+    assert br.tub_puck_agrees(a, (_bk(), None, _tp(123.0, 118.0)))                                    # the same spot, as a fraction of the tape
+    assert br.tub_puck_agrees(a, (_bk(width=60, left=95, right=155, rim=90.0), None, _tp(125.0, 100.0)))   # taken from farther: the same relative spot
+    assert not br.tub_puck_agrees(a, (_bk(), None, _tp(160.0, 116.0)))                                # another place in the tub: not the same blob
+    assert not br.tub_puck_agrees(a, (_bk(), None, None)) and not br.tub_puck_agrees(None, a) and not br.tub_puck_agrees(a, (None, None, _tp(120.0, 116.0)))
+
+    env = br.RealEnv.__new__(br.RealEnv)
+    env.last_quick = (_bk(), None, _tp(120.0, 116.0))
+    env.quick_hist = [(_bk(), None, _tp(121.0, 117.0)), env.last_quick]
+    taken = []
+    env._quick = lambda by: taken.append(by)
+    assert env.quick_confirm() is env.last_quick and not taken                                         # the last two pictures agree: no extra picture
+    env.quick_hist = [env.last_quick]
+    seconds = (_bk(), None, _tp(122.0, 117.0))
+    env._quick = lambda by: (taken.append(by), setattr(env, "last_quick", seconds))[0]
+    assert env.quick_confirm() is seconds and taken == ["width"]                                       # only one picture so far: he takes one more, and it agrees
+    cur = (_bk(), None, _tp(120.0, 116.0))
+    env.last_quick, env.quick_hist = cur, [cur]
+    env._quick = lambda by: setattr(env, "last_quick", (_bk(), None, None))                            # the second picture shows nothing inside: not a make
+    b, f, t = env.quick_confirm()
+    assert t is None and b is cur[0]
+    env.last_quick = (_bk(), None, None)
+    assert env.quick_confirm()[2] is None                                                              # nothing inside to begin with: unchanged
+
+
+def test_a_puck_inside_and_another_on_the_floor_is_not_a_make():
+    from types import SimpleNamespace as NS
+    from pi_pipeline.goals import basket_outcome as bo
+    b = NS(claw_in=9.8, bearing_deg=0.0)
+    assert bo.classify_throw(b, None, NS(x=1, y=1), confirm=True)[0] == bo.MADE
+    code, words = bo.classify_throw(b, NS(claw_in=9.0, bearing_deg=20.0), NS(x=1, y=1), confirm=True)
+    assert code == bo.MISSED and "outside" in words                                                    # a puck seen through the clear wall from outside is not a make
