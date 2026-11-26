@@ -195,7 +195,10 @@ def shot(args) -> int:
             lk.send("kup", read_reply=False, settle=0.0)             # the eased stand-up
             stood_at = time.monotonic()
             from .. import motion_feel
-            time.sleep(motion_feel.get("STAND_WAIT_S"))              # the whole rise (3.4 s): the picture used to be taken at 1.5 s plus the stillness check, which passes at once, so some were taken mid-rise with the camera still low (owner, 2026-11-26: "we took the picture too early")
+            rise_end = stood_at + motion_feel.get("STAND_WAIT_S")
+            while time.monotonic() < rise_end:                       # keep the camera answering through the rise: it drops the first request after a pause, which made the picture take about 4 seconds after the rise (stood 8.4 s on 2026-11-26)
+                if cam.snapshot() is None:
+                    time.sleep(0.2)
         if args.stay:
             still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
             snap, retaken = best_picture(lambda prep: cam.snapshot())
