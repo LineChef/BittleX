@@ -27,6 +27,7 @@ BLUE_K, BLUE_C = 409.0, 3.91         # claw tip to the tub's centre in inches = 
 BLUE_MIN_ROW = 67                    # the blue band's bottom row. 104 to 114 in the first session's 12 pictures, 82 to 87 in the 10 tub-at-8-inches pictures, but 71 to 75 for the tub 12 to 18 inches out in the 2026-11-26 goal run (the band rises as the tub goes back; the wall's base sits at row 70). 85 and then 82 hid every tub farther than about 9 inches. The grey-blue wall and sofa blobs end at rows 0 to 66 and are told from the tape by colour below
 BLUE_BLOB_PURITY = 0.24              # the whole blue blob's mean (blue - red) / blue, at least this: the tape reads 0.26 to 0.39 (darker light gives the lower numbers), the pale pet bed and wall 0.22 to 0.26 but BRIGHT
 BLUE_BLOB_MAX_BLUE = 140.0           # and its mean blue channel at most this: the tape is dark (78 to 126 over every tub picture), the pale grey-blue things 133 to 171
+BLUE_MIN_HEIGHT = 4                  # the blue band's seed is at least this many rows tall (2026-11-26)
 BLUE_MIN_ASPECT = 1.6                # the blue band is thicker than the red tape was: 3.1 to 1 at 8 inches, 3.3 at 16
 MIN_SEED_PX = 30                     # the seed blob's size (50 pixels at 22 inches, about 300 at 8)
 MIN_WIDTH_PX, MAX_WIDTH_PX = 20, 200
@@ -125,6 +126,8 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
                 continue                                                 # a pale grey-blue pet bed or sofa: the tape is dark and deep blue (purity 0.31 to 0.39 over 14 tub pictures), those read 0.22 to 0.26 and are bright
         if bw < MIN_WIDTH_PX or bw / bh < (BLUE_MIN_ASPECT if blue else MIN_ASPECT):
             continue
+        if blue and bh < BLUE_MIN_HEIGHT:
+            continue                                                     # a thin blue line at the wall's base (3 rows tall, 24 to 33 wide), static room clutter read as a tub 16 to 21 inches out in 3 goal-run pictures; the far tub's band is 5 rows or more
         if best is None or n > best[0]:
             best = (n, xs, ys, bw, bh)
     if best is None:

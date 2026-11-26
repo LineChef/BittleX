@@ -59,3 +59,10 @@ def test_the_blue_tub_reads_its_base_further_down_and_a_puck_inside_it_is_read_t
     inside = pf.find_puck_in_tub_array(img, tub)
     assert inside is not None and 108 <= inside.x <= 124
     assert pf.find_puck_in_tub_array(with_band(floor(), 90, 152, 70, 83, (71, 88, 115)), tub) is None      # empty
+
+
+def test_a_thin_blue_line_at_the_walls_base_is_not_the_tub_but_a_far_band_is():
+    """2026-11-26 goal run: a 3 row tall blue line 24 to 33 wide at rows 66 to 68 read as a tub 16 to 21 inches out in 3 pictures; the far tub's band is 5 rows or more."""
+    tape = (71, 89, 105)
+    assert bf.find_basket_array(with_band(floor(), 0, 32, 66, 68, tape)) is None
+    assert bf.find_basket_array(with_band(floor(), 128, 149, 64, 70, (54, 65, 77))) is not None
