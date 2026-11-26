@@ -56,6 +56,21 @@ def test_the_picture_tools_refuse_a_calibration_folder(tmp_path, monkeypatch):
     assert wp.delete(ordinary, [1]) == []                                              # an ordinary shot folder still works as before
 
 
+def test_the_owner_can_have_a_calibration_picture_trashed_and_the_set_is_resealed(tmp_path, monkeypatch):
+    monkeypatch.setattr(wcs, "CAL_ROOT", str(tmp_path / "g2_wall_calibration"))
+    d = _set(tmp_path)
+    wcs.write_manifest(d)
+    wcs.lock(d)
+    assert wp.trash(d, ["shot_001"], owner_instructed=True) == ["shot_001"]
+    assert not (d / "shot_001.jpg").exists() and (d / "_trash" / "shot_001.jpg").exists()          # moved, not erased
+    assert wcs.verify(d)["ok"]                                                                       # manifest rewritten
+    assert not os.stat(d / "labels.json").st_mode & stat.S_IWUSR                                     # locked again
+    for call in (lambda: wp.delete(d, [2]), lambda: wp.empty_trash(d)):                             # a permanent delete stays refused even on instruction
+        with pytest.raises(SystemExit, match="calibration set"):
+            call()
+    assert wp.restore(d, ["shot_001"], owner_instructed=True) == ["shot_001"] and (d / "shot_001.jpg").exists() and wcs.verify(d)["ok"]
+
+
 def test_a_set_name_is_plain_and_the_mac_mirror_counts_as_a_calibration_folder():
     assert wcs.set_dir("claw-walk-2026-11-19").name == "claw-walk-2026-11-19"
     with pytest.raises(ValueError):

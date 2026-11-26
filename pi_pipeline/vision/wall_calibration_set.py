@@ -3,7 +3,7 @@
 A set is a folder `~/g2_wall_calibration/<name>/` on the Pi (`G2_WALL_CAL_DIR` moves the root) holding `shot_NNN.jpg` pictures, a `labels.json` (label, true distance in inches, angle, exposure, camera and arm state) and a
 `MANIFEST.json` of SHA-256 hashes. Nothing else writes there: the roam pictures G2 keeps on its own go to `~/.local/share/g2/wall_pics` (a ring of 20) and the ordinary shots to `~/g2_wall_pics`, so a calibration picture
 is never mixed with them, trashed with them, groomed with them or replaced by one. The files are read-only once written, `verify` re-hashes them and says what changed, the delete / trash / restore commands of
-`wall_pictures` refuse a calibration folder, and the Mac copy (`~/Desktop/G2Memory/g2_pictures/wall_calibration/`) is pinned by `tools/g2_cal_verify.py`. Pure file work: no hardware."""
+`wall_pictures` refuse a calibration folder (delete and empty-trash always; trash and restore only on the owner's instruction, `--owner-instructed`, which moves the picture to the set's `_trash`, rewrites the manifest and locks the set again; owner, 2026-11-26), and the Mac copy (`~/Desktop/G2Memory/g2_pictures/wall_calibration/`) is pinned by `tools/g2_cal_verify.py`. Pure file work: no hardware."""
 from __future__ import annotations
 
 import hashlib

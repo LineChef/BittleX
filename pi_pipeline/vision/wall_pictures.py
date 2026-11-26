@@ -42,14 +42,31 @@ def record(folder, n: int, info: dict) -> None:
     (Path(folder) / "labels.json").write_text(json.dumps(labels, indent=1))
 
 
-def _refuse_calibration(folder) -> None:
+def _refuse_calibration(folder, owner_instructed: bool = False) -> bool:
+    """Refuse a calibration set unless the owner instructed this move (owner, 2026-11-26: trash and restore are allowed on his instruction, `--owner-instructed`; delete and empty-trash never are).
+    Returns True when the set is a calibration set and the move is allowed: the caller then unlocks the set's files first and re-seals it (manifest and read-only) after."""
     from .wall_calibration_set import is_calibration_dir
-    if is_calibration_dir(folder):
-        raise SystemExit(f"{folder} is a wall calibration set: its pictures are never deleted, trashed or restored by this tool (they are what the calibration is built from)")
+    if not is_calibration_dir(folder):
+        return False
+    if not owner_instructed:
+        raise SystemExit(f"{folder} is a wall calibration set: its pictures are never deleted by this tool, and are trashed or restored only on the owner's instruction (--owner-instructed); they are what the calibration is built from")
+    return True
+
+
+def _unseal(folder) -> None:
+    from .wall_calibration_set import unlock_file
+    for f in (Path(folder) / "labels.json", Path(folder) / "_trash" / "labels.json"):
+        unlock_file(f)
+
+
+def _reseal(folder) -> None:
+    from . import wall_calibration_set as wcs
+    wcs.write_manifest(folder)
+    wcs.lock(folder)
 
 
 def delete(folder, numbers) -> list:
-    _refuse_calibration(folder)
+    _refuse_calibration(folder)                      # never on a calibration set, even on instruction: a delete is permanent
     labels = load_labels(folder)
     gone = []
     for n in numbers:
@@ -69,9 +86,12 @@ def _ring_dir() -> Path:
     return Path(PICS_DIR)
 
 
-def trash(folder, names) -> list:
-    """Move wall pictures to a trash folder (nothing is erased): `shot_021` (a recognition shot: the picture, its sidecar and its labels entry) or `ring/wall_....jpg` (a roam picture). Returns the names moved."""
-    _refuse_calibration(folder)
+def trash(folder, names, owner_instructed: bool = False) -> list:
+    """Move wall pictures to a trash folder (nothing is erased): `shot_021` (a recognition shot: the picture, its sidecar and its labels entry) or `ring/wall_....jpg` (a roam picture). Returns the names moved.
+    A calibration set only on the owner's instruction (`owner_instructed`): the move is made, then the set's manifest is rewritten and its files locked again."""
+    cal = _refuse_calibration(folder, owner_instructed)
+    if cal:
+        _unseal(folder)
     folder, ring = Path(folder), _ring_dir()
     labels, moved = load_labels(folder), []
     tdir = folder / "_trash"
@@ -107,11 +127,15 @@ def trash(folder, names) -> list:
     if tdir.exists():
         (tdir / "labels.json").write_text(json.dumps(tl, indent=1))
     (folder / "labels.json").write_text(json.dumps(labels, indent=1))
+    if cal:
+        _reseal(folder)
     return moved
 
 
-def restore(folder, names) -> list:
-    _refuse_calibration(folder)
+def restore(folder, names, owner_instructed: bool = False) -> list:
+    cal = _refuse_calibration(folder, owner_instructed)
+    if cal:
+        _unseal(folder)
     folder, ring = Path(folder), _ring_dir()
     labels, back = load_labels(folder), []
     tdir = folder / "_trash"
@@ -138,6 +162,8 @@ def restore(folder, names) -> list:
     if tdir.exists():
         (tdir / "labels.json").write_text(json.dumps(tl, indent=1))
     (folder / "labels.json").write_text(json.dumps(labels, indent=1))
+    if cal:
+        _reseal(folder)
     return back
 
 
@@ -300,6 +326,7 @@ def main(argv=None) -> int:
     for nm in ("trash", "restore"):
         t = sub.add_parser(nm)
         t.add_argument("names", nargs="+")
+        t.add_argument("--owner-instructed", action="store_true", help="the owner told me to move pictures of a calibration set (use --dir ~/g2_wall_calibration/SET); the set is re-hashed and locked after")
     a = ap.parse_args(argv)
     if a.cmd == "shot":
         if a.calibration and a.inches is None:
@@ -319,7 +346,7 @@ def main(argv=None) -> int:
         print(json.dumps({"removed": empty_trash(a.dir)}))
         return 0
     if a.cmd in ("trash", "restore"):
-        print(json.dumps({"moved" if a.cmd == "trash" else "restored": (trash if a.cmd == "trash" else restore)(a.dir, a.names)}))
+        print(json.dumps({"moved" if a.cmd == "trash" else "restored": (trash if a.cmd == "trash" else restore)(a.dir, a.names, owner_instructed=a.owner_instructed)}))
         return 0
     print("deleted:", ", ".join(delete(a.dir, a.numbers)) or "nothing")
     return 0
