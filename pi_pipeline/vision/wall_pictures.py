@@ -221,7 +221,7 @@ def shot(args) -> int:
             if snap is not None:
                 try:
                     from ..voice import shutter
-                    shutter.play(wait=False)                         # no waiting: he lies down at once while the click plays; the click means the picture is taken, so it sounds BEFORE he lies down (owner, 2026-11-26: it came after the rest and looked like a late picture)
+                    shutter.play(wait=True)                          # the click is about 0.13 s: played to the end so it is always heard (the background version was not heard on 2026-11-26); the click means the picture is taken, so it sounds BEFORE he lies down (owner, 2026-11-26: it came after the rest and looked like a late picture)
                 except Exception:  # noqa: BLE001
                     pass
             lk.send("krest", read_reply=False, settle=0.0)           # the lie-down starts NOW (ensure_rest first read the joints for about 8 seconds before sending it: command log 2026-11-26 11:18:43 stand, 11:18:55 krest); the finally block below confirms the rest pose
