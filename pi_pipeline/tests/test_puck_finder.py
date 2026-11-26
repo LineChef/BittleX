@@ -148,3 +148,10 @@ def test_a_sliver_or_a_blob_the_wrong_size_for_the_tub_is_not_a_puck_inside():
     assert pf.find_puck_in_tub_array(big, bf.find_basket_array(big)) is None
     ok = tub_picture((105, 112, 115, 121, RED))                                        # 10 by 9: a puck
     assert pf.find_puck_in_tub_array(ok, bf.find_basket_array(ok)) is not None
+
+
+def test_a_clear_puck_a_little_under_the_strict_saturation_is_read_compactly_by_the_first_relaxed_pass():
+    """2026-11-26 goal run: pucks at 4 to 8 inches read 0.34 to 0.39 mean saturation against the strict 0.40, and the pixel threshold of the last pass grew them past the size limit; 6 of 8 were missed."""
+    DULL = (123, 96, 78)                                                         # saturation 0.37, hue 24
+    p = pf.find_puck_array(picture((112, 120, 126, 138, DULL)), by="width")      # 14 by 18 pixels
+    assert p is not None and p.relaxed and p.width_px == 14 and p.height_px == 18

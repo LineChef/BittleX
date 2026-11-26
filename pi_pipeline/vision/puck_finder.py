@@ -21,7 +21,7 @@ MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6   # FIRST PASS: the puck's blob: a
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
 TOP_ROW_CLAW_DOWN = 84                       # a claw-down picture sees the floor further out (the puck at the wall's base, about 25 inches, sits at row 91): the floor part starts higher there
 BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN = 0.40, 0.50   # FIRST PASS: the blob's own colour: the puck is strongly saturated (mean 0.42 to 0.54 and 90th percentile 0.55 to 0.70 over the recognition pictures), the hardwood's glare and grain are not (mean 0.33 to 0.39, 90th percentile 0.35 to 0.46 over the false blobs of 2026-11-23)
-RELAXED_PASS = (0.22, 5, 0.26, 0.28)       # SECOND PASS (2026-11-26), tried only when the first finds nothing: (pixel saturation, minimum pixels, blob mean saturation, blob 90th percentile). The puck seen from G2's own height is only 0.29 to 0.42 saturated and 6 to 50 pixels beyond 9 inches (the 28 calibration pictures of that day); a lower pixel threshold also grows a blob into the neighbouring wood, so the strict pass keeps its old reads and this one only adds
+RELAXED_PASSES = ((0.30, 5, 0.30, 0.34), (0.22, 5, 0.26, 0.28))   # (pixel saturation, minimum pixels, blob mean saturation, blob 90th percentile), tried in order when the first pass finds nothing (2026-11-26). The first keeps the strict pass's compact blob and only relaxes the blob's own colour test (a puck at 8 inches in the goal run read 0.34 to 0.39 against 0.40; 6 of 8 clear pucks in that run's pictures were missed on it); the second also lowers the pixel threshold for the small, pale pucks beyond 9 inches, which grows a blob into the neighbouring wood (a 14 by 18 puck read as 29 by 28), so it comes last
 BLUE_REJECT = 8.0                           # a blob whose mean blue exceeds both red and green by this much is the basket's blue tape, not the puck
 FAR_ZONE_IN = 24.0                          # the puck seen above row 94 in a claw-down picture is at least this far
 MIN_WIDTH_RATIO = 0.4                       # by row: a blob narrower than this fraction of the width its row predicts (WIDTH_K / distance) is a speck, not the puck (a 4 pixel false blob at a row that means 6 inches)
@@ -123,7 +123,7 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
     mx, mn = a.max(2), a.min(2)
     sat = (mx - mn) / (mx + 1)
     best, relaxed = None, False
-    passes = [(SAT_MIN, MIN_PX, BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN)] + ([RELAXED_PASS] if by == "width" else [])      # the relaxed pass is for the claw-down quick picture the 28 calibration pictures were taken in; the claw-120 look keeps the strict one
+    passes = [(SAT_MIN, MIN_PX, BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN)] + (list(RELAXED_PASSES) if by == "width" else [])      # the relaxed pass is for the claw-down quick picture the 28 calibration pictures were taken in; the claw-120 look keeps the strict one
     for i, (sat_min, min_px, blob_mean_min, blob_p90_min) in enumerate(passes):
         best = _best_blob(a, mx, sat, basket, by, sat_min, min_px, blob_mean_min, blob_p90_min, relaxed=i > 0)
         if best is not None:

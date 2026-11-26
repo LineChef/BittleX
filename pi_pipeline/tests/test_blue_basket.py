@@ -40,13 +40,15 @@ def test_the_puck_finder_never_reads_the_blue_tape_but_still_reads_the_puck():
     assert pf.find_puck_array(orange, None, by="width") is not None
 
 
-def test_a_blue_band_ending_at_row_82_to_87_is_the_basket_but_a_pale_grey_blue_one_there_is_not():
-    """2026-11-26: the 10 tub pictures taken at the room's far end put the band's bottom row at 82 to 87 (the gate was 85); a pale grey-blue pet bed at the same rows read as a tub in an old picture."""
+def test_a_blue_band_up_to_row_67_is_the_basket_but_the_wall_and_a_pale_grey_blue_one_are_not():
+    """2026-11-26: the tub 12 to 18 inches out sits at rows 65 to 75 in the goal run's pictures, the tub at 8 inches at 82 to 87 (the gate was 85, then 82, and hid every tub beyond about 9 inches); a pale grey-blue pet bed or wall read as a tub in old pictures."""
     tape = (71, 88, 115)                                                       # the tape as the camera showed it: dark, purity 0.38
-    assert bf.find_basket_array(with_band(floor(), 90, 152, 70, 82, tape)) is not None
-    assert bf.find_basket_array(with_band(floor(), 90, 152, 70, 87, tape)) is not None
-    assert bf.find_basket_array(with_band(floor(), 90, 152, 70, 81, tape)) is None          # still the sofa's rows
-    assert bf.find_basket_array(with_band(floor(), 90, 152, 70, 84, (127, 158, 171))) is None   # the pale pet bed: purity 0.26
+    for bottom in (87, 82, 75, 67):
+        assert bf.find_basket_array(with_band(floor(), 90, 152, bottom - 12, bottom, tape)) is not None, bottom
+    assert bf.find_basket_array(with_band(floor(), 90, 152, 54, 66, tape)) is None          # still the wall's rows
+    assert bf.find_basket_array(with_band(floor(), 90, 152, 72, 84, (127, 158, 171))) is None   # the pale pet bed: bright, purity 0.26
+    dark_far = (57, 63, 78)                                                    # the far tub in dim light: purity 0.27
+    assert bf.find_basket_array(with_band(floor(), 112, 150, 65, 75, dark_far)) is not None
 
 
 def test_the_blue_tub_reads_its_base_further_down_and_a_puck_inside_it_is_read_through_the_plastic():
