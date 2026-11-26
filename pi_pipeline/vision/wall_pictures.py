@@ -194,7 +194,8 @@ def shot(args) -> int:
             cam.snapshot()                                           # warm the camera up while he is still lying down (the first request after a pause is dropped and the exposure needs a frame to settle): the picture below is then quick, and he stands as short a time as possible (standing legs sag after about 10 s)
             lk.send("kup", read_reply=False, settle=0.0)             # the eased stand-up
             stood_at = time.monotonic()
-            time.sleep(1.5)
+            from .. import motion_feel
+            time.sleep(motion_feel.get("STAND_WAIT_S"))              # the whole rise (3.4 s): the picture used to be taken at 1.5 s plus the stillness check, which passes at once, so some were taken mid-rise with the camera still low (owner, 2026-11-26: "we took the picture too early")
         still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
         snap, retaken = best_picture(lambda prep: cam.snapshot())
         stood_s = None
