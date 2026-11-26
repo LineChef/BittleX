@@ -2,7 +2,7 @@
 
 `puck_finder.find_puck` cannot read a puck this near (it drops any blob wider than 26 pixels and any below row 200: at the pick-up spot the puck is about 40 pixels wide and its base sits near row 192). This reads it by colour, whatever face is toward the camera
 (a loose saturation test: the red, green and yellow faces differ a lot), and says how far it is from the spot the owner's four 2 inch calibration pictures (2026-11-26, the `puck-near` set, one per quarter turn) put it.
-The owner's measure (2026-11-26): at this spot the puck is 1 inch from the claw tip with G2 standing; the rows table below is built on those distances (the picture first labelled 1 inch is really 2 inches out: owner, 2026-11-26).
+The owner's measure (2026-11-26): at this spot the puck is on the floor line, 1 inch from the claw tip with G2 standing (the claw stands about 1 inch behind the line it rests at); the rows table below is built on those distances (the picture first labelled 1 inch is really 2 inches out: owner, 2026-11-26).
 The spot: base row 191 to 196 (mean 192), centre column 115 to 120, width 38 to 46 pixels. G2 stood a little differently after each stand-up (the base row of the same face spread 183 to 196), so the tolerances are rough on purpose."""
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ TOP_ROW, BOTTOM_ROW = 140, 212           # the floor rows the puck at the pick-u
 PICK_ROW, PICK_COL = 192, 118            # where the puck's base and centre sit at the pick-up spot
 ROW_TOL_PX, COL_TOL_PX = 8, 10
 WIDTH_PX = (30, 52)
-ROW_TABLE = ((133, 6.0), (153, 4.0), (164, 3.0), (183, 2.0), (192, 1.0))   # (base row, inches from the claw tip by the owner's measure), the puck centred: 6, 4 and 3 inches from `puck-align`, 2 inches the picture labelled 1 inch (the owner: it is really 2 inches out), 1 inch the `puck-near` pick-up spot. A table, not a formula: a 1/distance fit missed by 0.7 inch because the rows crowd together at the claw. Valid 1 to 6 inches
+ROW_TABLE = ((133, 6.0), (153, 4.0), (164, 3.0), (183, 1.0), (192, 0.0))   # (base row, inches past the FLOOR LINE), the puck centred. Every calibration picture was lined up from the floor line, where the claw tip sits in the rest position; standing, the claw stands about 1 inch BEHIND that line (owner, 2026-11-26). So these are 'labelled' distances, the frame the finders and the goal constants use; add 1 inch for the distance from the standing claw tip. The pick-up spot (the `puck-near` pictures) is the puck ON the line: 0 here, 1 inch from the standing claw tip. The picture labelled 1 inch is 2 inches from the standing claw tip. About 10 rows an inch all the way. Valid 0 to 6 inches
 FOCAL_PX = 140.0                         # the same horizontal focal length the finders use for a bearing
 
 
@@ -39,7 +39,7 @@ class CloseReading:
 
     @property
     def distance_in(self) -> float:
-        """Inches from the claw tip by the base row, interpolated in ROW_TABLE (1 to 6 inches; rows beyond the table clamp to its ends)."""
+        """Inches past the floor line by the base row, interpolated in ROW_TABLE (0 to 6 inches; rows beyond the table clamp to its ends). The pick-up spot reads 0."""
         rows, inches = zip(*ROW_TABLE)
         return float(np.interp(self.base_row, rows, inches))
 
