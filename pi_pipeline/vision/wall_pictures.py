@@ -191,14 +191,24 @@ def shot(args) -> int:
         cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump,
                                 exposure_check=True, idle_close_s=0)
         if not args.stay:
-            cam.snapshot()                                           # warm the camera up while he is still lying down (the first request after a pause is dropped and the exposure needs a frame to settle): the picture below is then quick, and he stands as short a time as possible (standing legs sag after about 10 s)
-            lk.send("kup", read_reply=False, settle=0.0)             # the eased stand-up
+            import threading
+            cam.snapshot()                                           # warm the camera up while he is still lying down
+            keep = threading.Event()
+
+            def _keep_answering():                                   # the camera drops the first request after a pause: `send("kup")` below plays the whole eased stand-up (about 5 seconds, it returns when he is up), so throwaway frames keep it answering and the real picture follows at once
+                while not keep.is_set():
+                    if cam.snapshot() is None:
+                        time.sleep(0.2)
+            th = threading.Thread(target=_keep_answering, daemon=True)
+            th.start()
+            sent_at = time.monotonic()
+            try:
+                lk.send("kup", read_reply=False, settle=0.0)         # the eased K-skill stand-up, played by the link: it returns when he stands (a wait added after it was extra standing: owner, 2026-11-26, the servos sagged before the picture)
+            finally:
+                keep.set()
             stood_at = time.monotonic()
-            from .. import motion_feel
-            rise_end = stood_at + motion_feel.get("STAND_WAIT_S")
-            while time.monotonic() < rise_end:                       # keep the camera answering through the rise: it drops the first request after a pause, which made the picture take about 4 seconds after the rise (stood 8.4 s on 2026-11-26)
-                if cam.snapshot() is None:
-                    time.sleep(0.2)
+            print(f"the stand-up call took {stood_at - sent_at:.1f} s")
+            th.join(timeout=1.5)
         if args.stay:
             still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
             snap, retaken = best_picture(lambda prep: cam.snapshot())
