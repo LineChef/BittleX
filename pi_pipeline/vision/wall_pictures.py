@@ -201,6 +201,12 @@ def shot(args) -> int:
         stood_s = None
         if not args.stay:                                            # standard protocol for a standing picture (owner, 2026-11-26): start from rest, warm the camera up, stand, take the picture, lie down at once; everything after this (saving, the estimator, the beep) happens with him at rest
             stood_s = round(time.monotonic() - stood_at, 1)
+            if snap is not None:
+                try:
+                    from ..voice import shutter
+                    shutter.play(wait=True)                          # the click means the picture is taken, so it sounds BEFORE he lies down (owner, 2026-11-26: it came after the rest and looked like a late picture)
+                except Exception:  # noqa: BLE001
+                    pass
             from ..behavior.ball_chase import ensure_rest
             ensure_rest(lk)
             rested = True
@@ -231,11 +237,12 @@ def shot(args) -> int:
             wcs.write_manifest(folder)
             wcs.lock(folder)
         at = f" at {args.inches} in" if args.inches is not None else ""
-        try:
-            from ..voice import shutter
-            shutter.play(wait=True)                                    # you hear the picture was taken (user, 2026-11-01: "I didn't hear a beep")
-        except Exception:  # noqa: BLE001
-            pass
+        if args.stay:
+            try:
+                from ..voice import shutter
+                shutter.play(wait=True)                                # you hear the picture was taken (user, 2026-11-01: "I didn't hear a beep")
+            except Exception:  # noqa: BLE001
+                pass
         if args.label == "look" and args.inches is None:
             print("NOTE: saved with the default label 'look' and no distance. For a calibration picture run e.g. `g2look wall_straight 12`.")
         print(f"saved {path.name}: {args.label}{at}; still={still} retaken={retaken} exposure={info['exposure']} stood_s={info['stood_s']}")
