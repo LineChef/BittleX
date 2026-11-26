@@ -187,12 +187,14 @@ def shot(args) -> int:
     cam = None
     try:
         lk.send("gP", read_reply=False, settle=0.0)                  # the 5 Hz IMU print the stillness wait reads
-        if not args.stay:
-            lk.send("kup", read_reply=False, settle=0.0)             # the eased stand-up
-            time.sleep(1.5)
-        still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
         cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump,
                                 exposure_check=True, idle_close_s=0)
+        if not args.stay:
+            cam.snapshot()                                           # warm the camera up while he is still lying down (the first request after a pause is dropped and the exposure needs a frame to settle): the picture below is then quick, and he stands as short a time as possible (standing legs sag after about 10 s)
+            lk.send("kup", read_reply=False, settle=0.0)             # the eased stand-up
+            stood_at = time.monotonic()
+            time.sleep(1.5)
+        still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
         snap, retaken = best_picture(lambda prep: cam.snapshot())
         if snap is None:
             print("no picture (the camera did not answer)")
@@ -201,7 +203,7 @@ def shot(args) -> int:
         path.write_bytes(snap.jpeg)
         st = exposure_stats(snap.jpeg)
         info = {"label": args.label, "distance_in": args.inches, "angle_deg": args.angle, "note": args.note or "", "set": (f"calibration:{args.calibration}" if args.calibration else args.set), "still": still, "retaken": retaken,
-                "exposure": None if st is None else {"mean": round(st.mean, 1), "clip_high": round(st.clip_high, 4)}, "time": time.strftime("%Y-%m-%d %H:%M:%S")}
+                "exposure": None if st is None else {"mean": round(st.mean, 1), "clip_high": round(st.clip_high, 4)}, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "stood_s": None if args.stay else round(time.monotonic() - stood_at, 1)}
         try:
             from .embedder import to_image
             from .wall_distance import base_rows
@@ -228,7 +230,7 @@ def shot(args) -> int:
             pass
         if args.label == "look" and args.inches is None:
             print("NOTE: saved with the default label 'look' and no distance. For a calibration picture run e.g. `g2look wall_straight 12`.")
-        print(f"saved {path.name}: {args.label}{at}; still={still} retaken={retaken} exposure={info['exposure']}")
+        print(f"saved {path.name}: {args.label}{at}; still={still} retaken={retaken} exposure={info['exposure']} stood_s={info['stood_s']}")
         return 0
     finally:
         try:
