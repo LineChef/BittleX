@@ -91,7 +91,7 @@ def test_the_switch_and_an_env_without_a_close_reading_leave_the_pick_up_as_it_w
     assert br.close_align(e, br.RState(), say=lambda s: None) == "unread" and e.looks == 0
 
 
-def test_the_base_row_gives_the_distance_from_the_claw_tip_between_2_and_6_inches():
-    for row, inches in ((192, 2.0), (164, 3.0), (153, 4.0), (133, 6.0)):                # the owner's pictures
-        r = pc.CloseReading(40, 30, row, 118)
-        assert abs(r.distance_in - inches) <= 0.4, (row, r.distance_in)
+def test_the_base_row_gives_the_distance_from_the_claw_tip_between_1_and_6_inches():
+    for row, inches in ((192, 1.0), (183, 2.0), (164, 3.0), (153, 4.0), (133, 6.0)):                # the owner's pictures
+        assert abs(pc.CloseReading(40, 30, row, 118).distance_in - inches) <= 0.05, row
+    assert 1.0 < pc.CloseReading(40, 30, 188, 118).distance_in < 2.0 and pc.CloseReading(40, 30, 215, 118).distance_in == 1.0

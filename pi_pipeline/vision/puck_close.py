@@ -2,6 +2,7 @@
 
 `puck_finder.find_puck` cannot read a puck this near (it drops any blob wider than 26 pixels and any below row 200: at the pick-up spot the puck is about 40 pixels wide and its base sits near row 192). This reads it by colour, whatever face is toward the camera
 (a loose saturation test: the red, green and yellow faces differ a lot), and says how far it is from the spot the owner's four 2 inch calibration pictures (2026-11-26, the `puck-near` set, one per quarter turn) put it.
+The owner's measure (2026-11-26): at this spot the puck is 1 inch from the claw tip with G2 standing; the rows table below is built on those distances (the picture first labelled 1 inch is really 2 inches out: owner, 2026-11-26).
 The spot: base row 191 to 196 (mean 192), centre column 115 to 120, width 38 to 46 pixels. G2 stood a little differently after each stand-up (the base row of the same face spread 183 to 196), so the tolerances are rough on purpose."""
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ TOP_ROW, BOTTOM_ROW = 140, 212           # the floor rows the puck at the pick-u
 PICK_ROW, PICK_COL = 192, 118            # where the puck's base and centre sit at the pick-up spot
 ROW_TOL_PX, COL_TOL_PX = 8, 10
 WIDTH_PX = (30, 52)
-ROW_HORIZON_PX, ROW_K = 98.5, 206.3       # distance from the claw tip = ROW_K / (the base row - ROW_HORIZON_PX): fitted to the owner's pictures with the puck centred at 2, 3, 4 and 6 inches (base rows 192, 164, 153, 133), within 0.25 inch; valid from 2 to about 6 inches. At 1 inch the base row reads 183 (the puck is partly behind the claw tip), so a row nearer than the 2 inch spot is not a distance
+ROW_TABLE = ((133, 6.0), (153, 4.0), (164, 3.0), (183, 2.0), (192, 1.0))   # (base row, inches from the claw tip by the owner's measure), the puck centred: 6, 4 and 3 inches from `puck-align`, 2 inches the picture labelled 1 inch (the owner: it is really 2 inches out), 1 inch the `puck-near` pick-up spot. A table, not a formula: a 1/distance fit missed by 0.7 inch because the rows crowd together at the claw. Valid 1 to 6 inches
 FOCAL_PX = 140.0                         # the same horizontal focal length the finders use for a bearing
 
 
@@ -38,8 +39,9 @@ class CloseReading:
 
     @property
     def distance_in(self) -> float:
-        """Inches from the claw tip by the base row (2 to about 6 inches; see ROW_K)."""
-        return ROW_K / (self.base_row - ROW_HORIZON_PX) if self.base_row > ROW_HORIZON_PX + 1 else float("inf")
+        """Inches from the claw tip by the base row, interpolated in ROW_TABLE (1 to 6 inches; rows beyond the table clamp to its ends)."""
+        rows, inches = zip(*ROW_TABLE)
+        return float(np.interp(self.base_row, rows, inches))
 
     @property
     def bearing_err_deg(self) -> float:
