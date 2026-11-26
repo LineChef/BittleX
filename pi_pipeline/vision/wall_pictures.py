@@ -196,15 +196,19 @@ def shot(args) -> int:
             stood_at = time.monotonic()
             from .. import motion_feel
             time.sleep(motion_feel.get("STAND_WAIT_S"))              # the whole rise (3.4 s): the picture used to be taken at 1.5 s plus the stillness check, which passes at once, so some were taken mid-rise with the camera still low (owner, 2026-11-26: "we took the picture too early")
-        still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
-        snap, retaken = best_picture(lambda prep: cam.snapshot())
+        if args.stay:
+            still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
+            snap, retaken = best_picture(lambda prep: cam.snapshot())
+        else:                                                        # standing picture: at most 1 second after the rise (a short stillness check), ONE picture (no retake: more standing), then he lies down at once
+            still = StillnessWaiter(lk.poll_imu).wait(timeout_s=1.0)
+            snap, retaken = cam.snapshot(), False
         stood_s = None
         if not args.stay:                                            # standard protocol for a standing picture (owner, 2026-11-26): start from rest, warm the camera up, stand, take the picture, lie down at once; everything after this (saving, the estimator, the beep) happens with him at rest
             stood_s = round(time.monotonic() - stood_at, 1)
             if snap is not None:
                 try:
                     from ..voice import shutter
-                    shutter.play(wait=True)                          # the click means the picture is taken, so it sounds BEFORE he lies down (owner, 2026-11-26: it came after the rest and looked like a late picture)
+                    shutter.play(wait=False)                         # no waiting: he lies down at once while the click plays; the click means the picture is taken, so it sounds BEFORE he lies down (owner, 2026-11-26: it came after the rest and looked like a late picture)
                 except Exception:  # noqa: BLE001
                     pass
             from ..behavior.ball_chase import ensure_rest
