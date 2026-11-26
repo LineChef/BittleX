@@ -538,8 +538,8 @@ def merge_looks(seen: dict, offsets: dict):
 
 
 def close_align_on() -> bool:
-    """G2_PICK_CLOSE_ALIGN=1 turns on the closed-loop alignment before the pick-up. OFF by default (owner, 2026-11-26, the same evening it was built): the pick-up distance is 1 inch from the claw tip, not the 2 inches it was aligned to; it stays off until the pick-up spot is recalibrated from pictures at 1 inch."""
-    return os.environ.get("G2_PICK_CLOSE_ALIGN", "0") == "1"
+    """G2_PICK_CLOSE_ALIGN=0 puts the pick-up back to the blind last walk and pick (the closed-loop alignment is the default: owner, 2026-11-26)."""
+    return os.environ.get("G2_PICK_CLOSE_ALIGN", "1") != "0"
 
 
 def next_close_action(reading) -> RAction | None:
