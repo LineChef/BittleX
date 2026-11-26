@@ -9,7 +9,7 @@ import sys
 import numpy as np
 from PIL import Image
 
-WIDTH_PX = (28, 48)
+WIDTH_PX = (30, 52)        # measured with a loose colour threshold (0.22) so a green or yellow face is not undercounted
 BASE_ROW = (180, 199)
 CENTRE_COL = (100, 135)
 
@@ -18,8 +18,8 @@ def measure(path) -> dict | None:
     im = np.asarray(Image.open(path).convert("RGB"), float) / 255
     mx, mn = im.max(2), im.min(2)
     sat = (mx - mn) / np.maximum(mx, 1e-6)
-    m = (sat > 0.38) & (mx > 0.3)
-    m[:110] = False
+    m = (sat > 0.22) & (mx > 0.25)
+    m[:140] = False
     m[212:] = False
     cols = m.sum(0)
     if cols.max() < 3:
