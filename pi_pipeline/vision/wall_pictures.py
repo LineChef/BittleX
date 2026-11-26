@@ -185,6 +185,7 @@ def shot(args) -> int:
         print("could not open the serial port")
         return 2
     cam = None
+    rested = False
     try:
         lk.send("gP", read_reply=False, settle=0.0)                  # the 5 Hz IMU print the stillness wait reads
         cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump,
@@ -196,6 +197,12 @@ def shot(args) -> int:
             time.sleep(1.5)
         still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
         snap, retaken = best_picture(lambda prep: cam.snapshot())
+        stood_s = None
+        if not args.stay:                                            # standard protocol for a standing picture (owner, 2026-11-26): start from rest, warm the camera up, stand, take the picture, lie down at once; everything after this (saving, the estimator, the beep) happens with him at rest
+            stood_s = round(time.monotonic() - stood_at, 1)
+            from ..behavior.ball_chase import ensure_rest
+            ensure_rest(lk)
+            rested = True
         if snap is None:
             print("no picture (the camera did not answer)")
             return 1
@@ -203,7 +210,7 @@ def shot(args) -> int:
         path.write_bytes(snap.jpeg)
         st = exposure_stats(snap.jpeg)
         info = {"label": args.label, "distance_in": args.inches, "angle_deg": args.angle, "note": args.note or "", "set": (f"calibration:{args.calibration}" if args.calibration else args.set), "still": still, "retaken": retaken,
-                "exposure": None if st is None else {"mean": round(st.mean, 1), "clip_high": round(st.clip_high, 4)}, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "stood_s": None if args.stay else round(time.monotonic() - stood_at, 1)}
+                "exposure": None if st is None else {"mean": round(st.mean, 1), "clip_high": round(st.clip_high, 4)}, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "stood_s": stood_s}
         try:
             from .embedder import to_image
             from .wall_distance import base_rows
@@ -238,9 +245,9 @@ def shot(args) -> int:
                 cam.close()
         except Exception:  # noqa: BLE001
             pass
-        if not args.stay:
+        if not args.stay and not rested:
             from ..behavior.ball_chase import ensure_rest
-            ensure_rest(lk)                                          # lie down in the rest position, confirmed, servos relaxed
+            ensure_rest(lk)                                          # lie down in the rest position, confirmed, servos relaxed (already done right after the picture when it was taken)
         lk.send("gp", read_reply=False, settle=0.0)
         lk.close()
 
