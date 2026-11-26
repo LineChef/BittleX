@@ -2,7 +2,8 @@
 
 `puck_finder.find_puck` cannot read a puck this near (it drops any blob wider than 26 pixels and any below row 200: at the pick-up spot the puck is about 40 pixels wide and its base sits near row 192). This reads it by colour, whatever face is toward the camera
 (a loose saturation test: the red, green and yellow faces differ a lot), and says how far it is from the spot the owner's four 2 inch calibration pictures (2026-11-26, the `puck-near` set, one per quarter turn) put it.
-The spot: base row 191 to 196 (mean 192), centre column 115 to 120, width 38 to 46 pixels. G2 stood a little differently after each stand-up (the base row of the same face spread 183 to 196), so the tolerances are rough on purpose."""
+NOTE (owner, 2026-11-26, after this was built): the pick-up distance is 1 inch from the claw tip, not 2. The `puck-near` pictures are a puck 2 inches out, so PICK_ROW below is the 2 inch spot, not the pick-up spot; the alignment that uses it is off by default until the 1 inch spot is calibrated.
+The 2 inch spot: base row 191 to 196 (mean 192), centre column 115 to 120, width 38 to 46 pixels. G2 stood a little differently after each stand-up (the base row of the same face spread 183 to 196), so the tolerances are rough on purpose."""
 from __future__ import annotations
 
 import math

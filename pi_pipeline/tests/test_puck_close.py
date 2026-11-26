@@ -61,7 +61,8 @@ class Env:
         return self.readings.pop(0) if len(self.readings) > 1 else self.readings[0]
 
 
-def test_the_close_align_corrects_then_stops_at_the_spot():
+def test_the_close_align_corrects_then_stops_at_the_spot(monkeypatch):
+    monkeypatch.setenv("G2_PICK_CLOSE_ALIGN", "1")
     ok = pc.find_close_array(picture())
     off = pc.find_close_array(picture(left=118, right=158))
     st = br.RState()
@@ -71,7 +72,8 @@ def test_the_close_align_corrects_then_stops_at_the_spot():
     assert br.close_align(e, br.RState(), say=lambda s: None) == "aligned" and e.mover.moves == []
 
 
-def test_the_close_align_gives_up_after_its_tries_and_goes_on_when_nothing_is_read():
+def test_the_close_align_gives_up_after_its_tries_and_goes_on_when_nothing_is_read(monkeypatch):
+    monkeypatch.setenv("G2_PICK_CLOSE_ALIGN", "1")
     off = pc.find_close_array(picture(top=170, bottom=208))                    # too near: a back-up each time
     e = Env([off])
     assert br.close_align(e, br.RState(), say=lambda s: None) == "tries" and len(e.mover.moves) == br.CLOSE_ALIGN_TRIES and e.looks == br.CLOSE_ALIGN_TRIES + 1
@@ -86,9 +88,10 @@ def test_the_switch_and_an_env_without_a_close_reading_leave_the_pick_up_as_it_w
         def look(self):
             raise AssertionError("must not look")
     assert br.close_align(Plain(), br.RState(), say=lambda s: None) == "unread"
-    monkeypatch.setenv("G2_PICK_CLOSE_ALIGN", "0")
     e = Env([pc.find_close_array(picture(left=118, right=158))])
-    assert br.close_align(e, br.RState(), say=lambda s: None) == "unread" and e.looks == 0
+    assert br.close_align(e, br.RState(), say=lambda s: None) == "unread" and e.looks == 0      # off by default: the pick-up spot is 1 inch, not the 2 inches it was built on
+    monkeypatch.setenv("G2_PICK_CLOSE_ALIGN", "1")
+    assert br.close_align(e, br.RState(), say=lambda s: None) != "unread" or e.looks > 0
 
 
 def test_the_base_row_gives_the_distance_from_the_claw_tip_between_2_and_6_inches():
