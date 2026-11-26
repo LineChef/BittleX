@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 from . import basket_lineup as bl
 from ..goals import basket_outcome as bo
+from ..vision import puck_close
 from ..vision.object_finder import ObjectReading
 
 MAX_ATTEMPTS = 5
@@ -36,6 +37,8 @@ PICK_AT_TIP_IN = 3.0
 APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
+CLOSE_ALIGN_TRIES = 2               # after the last walk: look at the puck against the pick-up spot (vision/puck_close.py, from the owner's 2 inch pictures) and correct at most this many times before the pick-up (each look is time on his feet; owner, 2026-11-26: "this is how he should try to get aligned")
+CLOSE_FORWARD_IN, CLOSE_BACK_IN = 2.0, 1.0   # the corrections for a puck farther or nearer than the spot (a back-up of 1 second moves about 2 inches; the forward step is a guess to measure)
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
@@ -534,6 +537,52 @@ def merge_looks(seen: dict, offsets: dict):
     return basket, puck
 
 
+def close_align_on() -> bool:
+    """G2_PICK_CLOSE_ALIGN=0 puts the pick-up back to the blind last walk and pick (the closed-loop alignment is the default: owner, 2026-11-26)."""
+    return os.environ.get("G2_PICK_CLOSE_ALIGN", "1") != "0"
+
+
+def next_close_action(reading) -> RAction | None:
+    """Pure: what to do about a puck read by `puck_close` before the pick-up: None when it sits at the pick-up spot (or cannot be read: the pick-up goes on as it always did), else the correction, the column first (a turn), then the distance."""
+    if reading is None or reading.at_spot:
+        return None
+    if abs(reading.col_err_px) > puck_close.COL_TOL_PX:
+        return RAction("nudge", reading.bearing_err_deg, f"the puck is {reading.col_err_px:+d} px off the pick-up spot sideways: turn onto it")
+    if reading.row_err_px < -puck_close.ROW_TOL_PX:
+        return RAction("forward", CLOSE_FORWARD_IN, f"the puck sits {-reading.row_err_px} px beyond the pick-up spot: a short step")
+    if reading.row_err_px > puck_close.ROW_TOL_PX:
+        return RAction("back", CLOSE_BACK_IN, f"the puck sits {reading.row_err_px} px nearer than the pick-up spot: a short back-up")
+    return None
+
+
+def close_align(env, st, say=print) -> str:
+    """After the last walk and before the pick-up: look, compare the puck with the pick-up spot, correct (up to CLOSE_ALIGN_TRIES times). Returns "aligned", "unread" (no close reading: the pick-up goes on), "tries" (corrected as often as allowed) or "fell". Needs an env with `close_reading()` (the real one; the made-up ones in tests have none and skip this)."""
+    if not close_align_on() or not hasattr(env, "close_reading"):
+        return "unread"
+    for n in range(CLOSE_ALIGN_TRIES + 1):
+        try:
+            env.look()
+        except Fell:
+            return "fell"
+        reading = env.close_reading()
+        act = next_close_action(reading)
+        st.log.append({"action": "close_look", "value": float(n), "why": "no close reading" if reading is None else f"base row {reading.base_row}, column {reading.centre_col}, width {reading.width_px}" + (": at the pick-up spot" if act is None else ": " + act.why), "puck": None})
+        if reading is None:
+            say("close look: no puck read near the claw tip: the pick-up goes on")
+            return "unread"
+        if act is None:
+            say("close look: the puck is at the pick-up spot")
+            return "aligned"
+        if n >= CLOSE_ALIGN_TRIES:
+            say("close look: corrected as often as allowed: the pick-up goes on")
+            return "tries"
+        say(f"close look: {act.why}")
+        st.steps += 1
+        if getattr(env.mover, act.kind)(act.value) == "fell":
+            return "fell"
+    return "tries"
+
+
 def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
     """Search for the puck, walk to it and pick it up. Returns {"outcome": "retrieved" | a give-up reason | "fell", "steps": [...]}."""
     st = RState()
@@ -564,6 +613,8 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
         if act.kind == "pick":
             state = env.mover.forward(act.value) if act.value >= 0.5 else "ok"
             if state == "fell":
+                return {"outcome": "fell", "steps": st.log}
+            if close_align(env, st, say) == "fell":
                 return {"outcome": "fell", "steps": st.log}
             got = env.pick()
             st.picks += 1
@@ -1059,6 +1110,10 @@ class RealEnv:
         basket = bf.find_basket(jpeg)
         puck = pf.find_puck(jpeg, basket, by=by)
         tub_puck = pf.find_puck_in_tub(jpeg, basket)
+        try:
+            self._last_close = puck_close.find_close(jpeg)             # the puck at the pick-up spot (the floor finder above cannot read one this near)
+        except Exception:  # noqa: BLE001
+            self._last_close = None
         self.last_quick = (basket, puck, tub_puck)                       # what the confirm step reads when this was its picture (`quick_confirm`)
         self.quick_hist = (getattr(self, "quick_hist", []) + [self.last_quick])[-3:]
         n = len(self.quick_log) + 1
@@ -1097,6 +1152,10 @@ class RealEnv:
     def look(self):
         """The retrieval's look: a quick claw-down picture, as the ball goal takes while it walks up (the puck's distance from its width)."""
         return self._quick("width")
+
+    def close_reading(self):
+        """The last quick picture's puck against the pick-up spot (`puck_close.CloseReading`), or None."""
+        return getattr(self, "_last_close", None)
 
     def quick_basket(self):
         """The line-up's look: a quick claw-down picture, the basket's reading or None."""

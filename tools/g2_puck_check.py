@@ -4,34 +4,26 @@
 Measured by colour (a saturated blob on the floor part of the picture), not by the puck finder (which reads nothing this close). The ranges come from the one picture the owner accepted
 (2026-11-26: width 36 px, height 30 px, base row 191, centre column 117) with room for the feet landing a little differently each time; they are rough on purpose.
 Usage: python tools/g2_puck_check.py PICTURE.jpg [...]   (exit 1 when any picture is outside the ranges)"""
+import os
 import sys
 
 import numpy as np
 from PIL import Image
 
-WIDTH_PX = (30, 52)        # measured with a loose colour threshold (0.22) so a green or yellow face is not undercounted
-BASE_ROW = (180, 199)
-CENTRE_COL = (100, 135)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from pi_pipeline.vision import puck_close as pc
+
+WIDTH_PX = pc.WIDTH_PX
+BASE_ROW = (pc.PICK_ROW - pc.ROW_TOL_PX - 4, 199)
+CENTRE_COL = (pc.PICK_COL - 18, pc.PICK_COL + 17)
 
 
 def measure(path) -> dict | None:
-    im = np.asarray(Image.open(path).convert("RGB"), float) / 255
-    mx, mn = im.max(2), im.min(2)
-    sat = (mx - mn) / np.maximum(mx, 1e-6)
-    m = (sat > 0.22) & (mx > 0.25)
-    m[:140] = False
-    m[212:] = False
-    cols = m.sum(0)
-    if cols.max() < 3:
+    r = pc.find_close_array(np.asarray(Image.open(path).convert("RGB")))
+    if r is None:
         return None
-    c0 = int(np.argmax(np.convolve(cols, np.ones(9), "same")))
-    lo = hi = c0
-    while lo > 0 and cols[lo - 1] >= 3:
-        lo -= 1
-    while hi < len(cols) - 1 and cols[hi + 1] >= 3:
-        hi += 1
-    rr = np.nonzero(m[:, lo:hi + 1].sum(1) >= 3)[0]
-    return {"width": hi - lo + 1, "height": int(rr.max() - rr.min() + 1), "base_row": int(rr.max()), "centre_col": (lo + hi) // 2}
+    return {"width": r.width_px, "height": r.height_px, "base_row": r.base_row, "centre_col": r.centre_col}
 
 
 def check(path) -> tuple[bool, str]:
