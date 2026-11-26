@@ -801,3 +801,23 @@ def test_a_puck_inside_and_another_on_the_floor_is_not_a_make():
     assert bo.classify_throw(b, None, NS(x=1, y=1), confirm=True)[0] == bo.MADE
     code, words = bo.classify_throw(b, NS(claw_in=9.0, bearing_deg=20.0), NS(x=1, y=1), confirm=True)
     assert code == bo.MISSED and "outside" in words                                                    # a puck seen through the clear wall from outside is not a make
+
+
+def test_a_relaxed_puck_reading_in_the_retrieval_look_needs_a_second_picture_that_agrees(monkeypatch):
+    """2026-11-26: a puck found only by the relaxed pass (small or pale) is trusted when a second quick picture puts it in the same place; `G2_PUCK_RELAXED_CONFIRM=0` takes the first picture."""
+    from pi_pipeline.vision import puck_finder as pf
+    env = object.__new__(br.RealEnv)
+    mk = lambda b, d, relaxed: pf.PuckReading(120.0, 108.0, 8, 6, 40, b, d, relaxed=relaxed)        # noqa: E731
+    seq = []
+    monkeypatch.setattr(br.RealEnv, "_quick", lambda self, by: seq.pop(0))
+    seq[:] = [(None, mk(0.0, 12.0, True)), (None, mk(2.0, 12.5, True))]
+    assert env.look()[1].claw_in == 12.5 and not seq                                                 # agreed: trusted
+    seq[:] = [(None, mk(0.0, 12.0, True)), (None, mk(25.0, 12.0, True))]
+    assert env.look()[1] is None                                                                     # a different place: not seen
+    seq[:] = [(None, mk(0.0, 12.0, True)), (None, None)]
+    assert env.look()[1] is None
+    seq[:] = [(None, mk(0.0, 12.0, False))]
+    assert env.look()[1].claw_in == 12.0                                                             # a strict reading is taken at once, one picture
+    monkeypatch.setenv("G2_PUCK_RELAXED_CONFIRM", "0")
+    seq[:] = [(None, mk(0.0, 12.0, True))]
+    assert env.look()[1].claw_in == 12.0

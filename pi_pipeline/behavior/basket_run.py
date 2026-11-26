@@ -1150,8 +1150,16 @@ class RealEnv:
         return (cur[0], cur[1], None)                                     # not confirmed: nothing inside
 
     def look(self):
-        """The retrieval's look: a quick claw-down picture, as the ball goal takes while it walks up (the puck's distance from its width)."""
-        return self._quick("width")
+        """The retrieval's look: a quick claw-down picture, as the ball goal takes while it walks up (the puck's distance from its row). A puck read only by the relaxed second pass (a small or pale one, `PuckReading.relaxed`) is trusted when a second picture puts it in the same place: a speck of the room's clutter does not stay put in the same spot relative to G2 as he moves.
+        `G2_PUCK_RELAXED_CONFIRM=0` takes the first picture as it is."""
+        from ..vision import puck_finder as pf
+        basket, puck = self._quick("width")
+        if puck is None or not getattr(puck, "relaxed", False) or os.environ.get("G2_PUCK_RELAXED_CONFIRM", "1") == "0":
+            return basket, puck
+        basket2, puck2 = self._quick("width")
+        if pf.readings_agree(puck, puck2):
+            return basket2, puck2
+        return basket2, None                                              # not confirmed: not seen
 
     def close_reading(self):
         """The last quick picture's puck against the pick-up spot (`puck_close.CloseReading`), or None."""

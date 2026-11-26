@@ -87,12 +87,41 @@ def test_the_distance_curve_is_steady_and_the_biggest_blob_wins():
     assert both is not None and both.area > 100
 
 
-def test_a_quick_claw_down_picture_reads_the_distance_from_the_width():
-    p = pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="width")                   # 14 pixels wide: about 6.8 inches
-    assert p is not None and 6.0 <= p.claw_in <= 7.6
-    q = pf.find_puck_array(picture((113, 124, 122, 134, RED)), by="width")                   # 9 pixels wide: about 10.6 inches
-    assert q is not None and 9.5 <= q.claw_in <= 11.5 and q.claw_in > p.claw_in
-    assert pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="row").claw_in != p.claw_in
+def test_a_quick_claw_down_picture_reads_the_distance_from_the_row():
+    """2026-11-26: the claw-down picture's distance is read from the blob's centre row (72 + 288 / distance, fitted to the puck centred at 6 to 20 inches); the old width formula read 8 inches as 5."""
+    near = pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="width")                # centre row 133: 288 / (133.5 - 72) = 4.7 inches
+    assert near is not None and 4.0 <= near.claw_in <= 5.5
+    mid = pf.find_puck_array(picture((113, 104, 125, 113, RED)), by="width")                 # centre row 108: 8 inches
+    assert mid is not None and 7.2 <= mid.claw_in <= 8.8 and mid.claw_in > near.claw_in
+    far = pf.find_puck_array(picture((115, 85, 122, 88, RED)), by="width")                   # centre row 86: 20 inches
+    assert far is not None and 17.0 <= far.claw_in <= 24.0
+
+
+def test_a_small_pale_puck_is_found_by_the_relaxed_pass_and_marked_relaxed():
+    PALE = (116, 92, 78)                                                                      # a puck 12 inches out as the camera showed it: saturation 0.33, hue 19
+    img = picture((114, 94, 122, 100, PALE))                                                  # 8 by 6 pixels
+    assert pf.find_puck_array(img, by="row") is None                                          # the claw-120 look keeps the strict pass
+    p = pf.find_puck_array(img, by="width")
+    assert p is not None and p.relaxed and 10.0 <= p.claw_in <= 14.0
+    strong = pf.find_puck_array(picture((113, 124, 127, 143, RED)), by="width")
+    assert strong is not None and not strong.relaxed                                          # a clear puck is read by the strict pass, as before
+
+
+def test_the_hardwood_grain_is_not_a_puck_by_hue_and_a_bright_yellow_face_is():
+    GRAIN = (96, 86, 63)                                                                      # hue 40, dark: the false reads on the puck-free tub pictures
+    assert pf.find_puck_array(picture((113, 104, 125, 113, GRAIN)), by="width") is None
+    YELLOW_FACE = (153, 144, 102)                                                             # a yellow face at 6 inches in an older picture: hue 49, bright
+    assert pf.find_puck_array(picture((113, 124, 127, 143, YELLOW_FACE)), by="width") is not None
+    GREEN = (77, 109, 83)                                                                     # a green face 9 inches out
+    assert pf.find_puck_array(picture((113, 104, 125, 113, GREEN)), by="width") is not None
+
+
+def test_a_relaxed_reading_must_be_confirmed_by_a_second_picture_that_agrees():
+    a = pf.PuckReading(120, 108, 12, 9, 80, 0.0, 8.0, relaxed=True)
+    assert pf.readings_agree(a, pf.PuckReading(124, 106, 11, 9, 80, 4.0, 9.0))
+    assert not pf.readings_agree(a, pf.PuckReading(150, 106, 11, 9, 80, 12.0, 8.0))            # 12 degrees off
+    assert not pf.readings_agree(a, pf.PuckReading(120, 96, 8, 6, 40, 0.0, 14.0))              # 6 inches farther
+    assert not pf.readings_agree(a, None) and not pf.readings_agree(None, a)
 
 
 def test_a_puck_cut_off_at_the_bottom_of_the_floor_rows_is_marked_clipped():
@@ -102,11 +131,11 @@ def test_a_puck_cut_off_at_the_bottom_of_the_floor_rows_is_marked_clipped():
 
 
 def test_the_glare_and_specks_are_not_the_puck_and_a_far_puck_is_seen_in_a_claw_down_picture():
-    GLARE = (150, 110, 92)                                                                  # hardwood glare: saturation 0.39 and below
+    GLARE = (150, 125, 92)                                                                  # hardwood glare: saturation 0.38, hue 34 (yellow-brown)
     assert pf.find_puck_array(picture((112, 124, 128, 143, GLARE))) is None                 # a puck-sized blob of it
     assert pf.find_puck_array(picture((124, 134, 128, 138, RED))) is None                   # 4 pixels wide at a row that means 6 inches: a speck
     far = pf.find_puck_array(picture((130, 86, 136, 92, RED)), by="width")                  # at the wall's base in a claw-down picture (rows 84 to 93)
-    assert far is not None and far.claw_in >= pf.FAR_ZONE_IN
+    assert far is not None and far.claw_in >= 14.0
     assert pf.find_puck_array(picture((130, 86, 136, 92, RED))) is None                     # the claw-120 picture's floor starts at row 94
 
 

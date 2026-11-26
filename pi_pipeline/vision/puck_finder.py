@@ -15,16 +15,21 @@ import numpy as np
 
 from .ball_finder import _blobs, _decode
 
-SAT_MIN, VALUE_MIN = 0.30, 100            # a pixel counts when its saturation and brightest channel are at least this (the floor and the wall are grey)
+SAT_MIN, VALUE_MIN = 0.30, 100            # FIRST PASS: a pixel counts when its saturation and brightest channel are at least this (the floor and the wall are grey)
 TOP_ROW, BOTTOM_ROW, EDGE_COLS = 94, 200, 12   # the floor part of a 240 x 240 picture: below the wall's base, above the jaws, away from the side edges
-MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6  # the puck's blob: at least this many pixels, no side longer than this, not a long sliver
+MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6   # FIRST PASS: the puck's blob: at least this many pixels, no side longer than this, not a long sliver
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
 TOP_ROW_CLAW_DOWN = 84                       # a claw-down picture sees the floor further out (the puck at the wall's base, about 25 inches, sits at row 91): the floor part starts higher there
-BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN = 0.40, 0.50   # the blob's own colour: the puck is strongly saturated (mean 0.42 to 0.54 and 90th percentile 0.55 to 0.70 over the recognition pictures), the hardwood's glare and grain are not (mean 0.33 to 0.39, 90th percentile 0.35 to 0.46 over the false blobs of 2026-11-23)
+BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN = 0.40, 0.50   # FIRST PASS: the blob's own colour: the puck is strongly saturated (mean 0.42 to 0.54 and 90th percentile 0.55 to 0.70 over the recognition pictures), the hardwood's glare and grain are not (mean 0.33 to 0.39, 90th percentile 0.35 to 0.46 over the false blobs of 2026-11-23)
+RELAXED_PASS = (0.22, 5, 0.26, 0.28)       # SECOND PASS (2026-11-26), tried only when the first finds nothing: (pixel saturation, minimum pixels, blob mean saturation, blob 90th percentile). The puck seen from G2's own height is only 0.29 to 0.42 saturated and 6 to 50 pixels beyond 9 inches (the 28 calibration pictures of that day); a lower pixel threshold also grows a blob into the neighbouring wood, so the strict pass keeps its old reads and this one only adds
 BLUE_REJECT = 8.0                           # a blob whose mean blue exceeds both red and green by this much is the basket's blue tape, not the puck
 FAR_ZONE_IN = 24.0                          # the puck seen above row 94 in a claw-down picture is at least this far
 MIN_WIDTH_RATIO = 0.4                       # by row: a blob narrower than this fraction of the width its row predicts (WIDTH_K / distance) is a speck, not the puck (a 4 pixel false blob at a row that means 6 inches)
 WIDTH_K = 95.0                             # the other reading, for a picture with the claw DOWN (the row means another distance there): distance = WIDTH_K / the blob's width in pixels (14, 11, 9 pixels at 6, 9, 12 inches, face-on); good to about 15 percent inside 12 inches
+HUE_RANGES = ((0.0, 31.0), (90.0, 160.0), (340.0, 360.0))   # degrees: the puck's red face reads orange to red (16 to 31 in the camera) and its green face 98 to 137; the hardwood's grain and glare read 33 to 70 and dark (2026-11-26: 6 of 13 puck-free tub pictures gave a false puck without this)
+RELAXED_WIDTH_RATIO = 0.5                   # the relaxed pass keeps a blob only when it is at least this fraction of the width WIDTH_K / distance predicts (the puck's width falls with its distance: 16 pixels at 6 inches, 8 at 12)
+YELLOW_HUES, YELLOW_MIN_BRIGHT = (31.0, 60.0), 125.0   # the puck's yellow face reads 30 to 49 in the camera, the same hues as the grain, but bright (brightest channel 150 or more; the grain's false blobs peak at 88 to 105): accepted only when this bright
+ROW_HORIZON_CD, ROW_K_CD = 72.0, 288.0      # a picture with the claw DOWN (the quick picture the basket goal takes): distance past the floor line = ROW_K_CD / (the blob's centre row - ROW_HORIZON_CD). Fitted to the puck centred at 6, 8, 9, 10, 12 and 20 inches (rows 120, 108, 104, 100, 96, 86), within 1 inch; the old width formula read 8 inches as 5
 BEARING_FOCAL_PX = 140.0                   # the basket finder's horizontal focal length
 
 
@@ -37,11 +42,31 @@ class PuckReading:
     area: int
     bearing_deg: float          # + = to G2's right
     claw_in: float              # distance from the claw tip along the floor (by the blob's row)
+    relaxed: bool = False       # found only by the relaxed second pass (a small or pale puck): the basket goal's look asks a second picture to agree before it trusts such a reading (`readings_agree`)
     clipped: bool = False       # the blob runs down to the picture's lowest floor row: the puck is at the claw tip, partly hidden by the jaws, so its width and row understate how near it is
 
 
 def distance_from_row(row: float) -> float:
     return ROW_K / (row - ROW_HORIZON_PX) if row > ROW_HORIZON_PX + 1 else float("inf")
+
+
+def _hue_ok(rgb_patch: np.ndarray, sat_patch: np.ndarray) -> bool:
+    """Is the blob's colour the puck's (red to orange, or green) and not the hardwood's yellow-brown? The hue is read from the blob's most saturated 40 percent of pixels."""
+    k = max(1, int(round(len(sat_patch) * 0.4)))
+    top = rgb_patch[np.argsort(sat_patch)[-k:]].mean(0)
+    mx, mn = float(top.max()), float(top.min())
+    if mx - mn < 1e-6:
+        return False
+    r, g, b = (float(v) for v in top)
+    if mx == r:
+        h = 60.0 * (((g - b) / (mx - mn)) % 6.0)
+    elif mx == g:
+        h = 60.0 * ((b - r) / (mx - mn) + 2.0)
+    else:
+        h = 60.0 * ((r - g) / (mx - mn) + 4.0)
+    if any(lo <= h <= hi for lo, hi in HUE_RANGES):
+        return True
+    return YELLOW_HUES[0] <= h <= YELLOW_HUES[1] and mx >= YELLOW_MIN_BRIGHT
 
 
 def _inside(basket, x: float, y: float, margin: float = 6.0) -> bool:
@@ -57,13 +82,8 @@ def _on_tape(basket, x: float, y: float, pad: float = 4.0) -> bool:
     return basket.left - pad <= x <= basket.right + pad and basket.rim_row - basket.height_px - pad <= y <= basket.rim_row + pad
 
 
-def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReading | None:
-    """The puck in a decoded picture, or None. `basket`: the basket finder's reading in the same picture (a BasketReading or None); blobs inside its box are the basket, not the puck. `by`: "row" for a picture taken with the claw
-    raised to 120 in the attention pose (the fit above), "width" for a quick picture with the claw down."""
-    a = rgb.astype(float)
-    mx, mn = a.max(2), a.min(2)
-    sat = (mx - mn) / (mx + 1)
-    m = (sat > SAT_MIN) & (mx > VALUE_MIN)
+def _best_blob(a, mx, sat, basket, by, sat_min, min_px, blob_mean_min, blob_p90_min, relaxed=False):
+    m = (sat > sat_min) & (mx > VALUE_MIN)
     m[:(TOP_ROW_CLAW_DOWN if by == "width" else TOP_ROW), :] = False
     m[BOTTOM_ROW:, :] = False
     m[:, :EDGE_COLS] = False
@@ -71,7 +91,7 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
     best = None
     for ys, xs in _blobs(m):
         n = len(xs)
-        if n < MIN_PX:
+        if n < min_px:
             continue
         w, h = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
         if max(w, h) > MAX_SIDE_PX or max(w / h, h / w) > MAX_ASPECT:
@@ -80,22 +100,47 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
         if _inside(basket, cx, cy) or _on_tape(basket, cx, cy):
             continue
         blob_sat = sat[ys, xs]
-        if float(blob_sat.mean()) < BLOB_SAT_MEAN_MIN or float(np.percentile(blob_sat, 90)) < BLOB_SAT_P90_MIN:
+        if float(blob_sat.mean()) < blob_mean_min or float(np.percentile(blob_sat, 90)) < blob_p90_min:
             continue                                                                   # glare or grain on the hardwood, not the puck's colour
         mean_rgb = a[ys, xs].mean(0)
         if mean_rgb[2] - max(mean_rgb[0], mean_rgb[1]) > BLUE_REJECT:
             continue                                                                   # blue: the new basket's tape (2026-11-26), never the puck (red, green and yellow bands)
+        if not _hue_ok(a[ys, xs], blob_sat):
+            continue                                                                   # the hardwood's yellow-brown grain, not the puck's red, orange or green
         if by != "width" and w < MIN_WIDTH_RATIO * WIDTH_K / max(distance_from_row(cy), 1.0):
             continue                                                                   # a speck far smaller than a puck at that row's distance
+        if by == "width" and relaxed and w < RELAXED_WIDTH_RATIO * WIDTH_K / max(ROW_K_CD / max(cy - ROW_HORIZON_CD, 1.0), 1.0):
+            continue                                                                   # the relaxed pass: a speck narrower than half a puck at its row's distance (the room's clutter, 6 by 4 pixels at 7.6 inches, read as a puck in 8 of the red tub's pictures)
         if best is None or n > best[0]:
             best = (n, cx, cy, w, h, bool(ys.max() >= BOTTOM_ROW - 1))
+    return best
+
+
+def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReading | None:
+    """The puck in a decoded picture, or None. `basket`: the basket finder's reading in the same picture (a BasketReading or None); blobs inside its box are the basket, not the puck. `by`: "row" for a picture taken with the claw
+    raised to 120 in the attention pose (the fit above), "width" for a quick picture with the claw down."""
+    a = rgb.astype(float)
+    mx, mn = a.max(2), a.min(2)
+    sat = (mx - mn) / (mx + 1)
+    best, relaxed = None, False
+    passes = [(SAT_MIN, MIN_PX, BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN)] + ([RELAXED_PASS] if by == "width" else [])      # the relaxed pass is for the claw-down quick picture the 28 calibration pictures were taken in; the claw-120 look keeps the strict one
+    for i, (sat_min, min_px, blob_mean_min, blob_p90_min) in enumerate(passes):
+        best = _best_blob(a, mx, sat, basket, by, sat_min, min_px, blob_mean_min, blob_p90_min, relaxed=i > 0)
+        if best is not None:
+            relaxed = i > 0
+            break
     if best is None:
         return None
     n, cx, cy, w, h, clipped = best
-    dist = WIDTH_K / max(w, 1) if by == "width" else distance_from_row(cy)
-    if by == "width" and cy < TOP_ROW:
-        dist = max(dist, FAR_ZONE_IN)                                                  # in the extra rows a claw-down picture adds, the puck is far, whatever a speck merged with the wall's base makes of its width
-    return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), dist, clipped)
+    dist = (min(ROW_K_CD / (cy - ROW_HORIZON_CD), 60.0) if cy > ROW_HORIZON_CD + 4 else 60.0) if by == "width" else distance_from_row(cy)
+    return PuckReading(cx, cy, w, h, n, math.degrees(math.atan2(cx - rgb.shape[1] / 2, BEARING_FOCAL_PX)), dist, relaxed=relaxed, clipped=clipped)
+
+
+def readings_agree(a, b, bearing_deg: float = 8.0) -> bool:
+    """Do two readings of the puck from two pictures put it in the same place? Same side within `bearing_deg` and a distance within a quarter or 2 inches, whichever is larger. None never agrees."""
+    if a is None or b is None:
+        return False
+    return abs(a.bearing_deg - b.bearing_deg) <= bearing_deg and abs(a.claw_in - b.claw_in) <= max(2.0, 0.25 * max(a.claw_in, b.claw_in))
 
 
 def find_puck(jpeg: bytes, basket=None, by: str = "row") -> PuckReading | None:
@@ -104,6 +149,7 @@ def find_puck(jpeg: bytes, basket=None, by: str = "row") -> PuckReading | None:
 
 
 INSIDE_SAT_MIN = 45                          # a pixel inside the tub counts when its max-minus-min channel spread is above this (the floor seen through the clear walls is grey). 2026-11-24 first run on G2: a puck inside read a spread of at most 52 in a darker picture, so the first 55 missed it; at 45 the empty and outside cases hold 0 to 2 such pixels (the past case 2) and every puck inside 25 or more (the far wall 35, the dark run 25)
+INSIDE_SAT_MIN_BLUE = 28                     # for the blue-banded clear tub (2026-11-26): a puck seen through its clear plastic is washed out to a channel spread of 28 to 40, so 45 missed all 5 on the tub's 5 inside pictures (28 finds 2 and no empty or outside one; on the red-taped tub's pictures 28 gave 5 false reads, so that tub keeps 45)
 MIN_INSIDE_PX = 8                            # the puck inside the tub: at least this many such pixels in one blob (8 against 0 to 2 for no puck, 25 or more with one: a margin both ways)
 INSIDE_SIDE_COLS = 5                         # the window reaches this far outside the tape's ends and this far under the base, so a blob's centre is read whole
 INSIDE_BELOW_ROWS = 30
@@ -131,7 +177,7 @@ def find_puck_in_tub_array(rgb: np.ndarray, basket) -> PuckInTub | None:
         return None
     a = rgb.astype(np.int16)
     spread = a.max(2) - a.min(2)
-    m = spread > INSIDE_SAT_MIN
+    m = spread > (INSIDE_SAT_MIN_BLUE if getattr(basket, "blue", False) else INSIDE_SAT_MIN)
     h, w = m.shape
     y0, y1 = max(int(basket.rim_row) + 3, 0), min(int(basket.base_row) + INSIDE_BELOW_ROWS, h - 24)
     x0, x1 = max(basket.left - INSIDE_SIDE_COLS, 0), min(basket.right + INSIDE_SIDE_COLS + 1, w)

@@ -24,7 +24,8 @@ BLUE_STRICT = (14, 55, 16)           # the new basket's BLUE tape (owner, 2026-1
 BLUE_LOOSE = (10, 50, 10)            # the same test for the tape's ends along its rows
 BLUE_PURITY = 0.2                    # blue exceeds red by at least this fraction of blue: the tape is 0.37 (79, 100, 126), the pale blue-grey of the wall, the window and the sky is 0.11 to 0.17 (187, 201, 211 and 136, 148, 159 on the saved negatives)
 BLUE_K, BLUE_C = 409.0, 3.91         # claw tip to the tub's centre in inches = BLUE_K / the tape's width in pixels + BLUE_C (least squares over the 8 face-on distances and 3 of the 4 off-centre pictures: within 1.5 inches everywhere; the owner's distances run from the claw tip to the tub's centre). A first fit: to be checked against the pictures still to come
-BLUE_MIN_ROW = 85                    # the blue band's bottom row: 104 to 114 on all 12 calibration pictures (the claw-down view); the saved negatives' false blobs are at rows 55 to 81 (a grey-blue sofa)
+BLUE_MIN_ROW = 82                    # the blue band's bottom row: 104 to 114 on the 12 calibration pictures of the first session and 82 to 87 on the 10 tub-at-8-inches pictures of 2026-11-26 taken from the room's far end (85 before: it dropped 6 of them); the saved negatives' false blobs are at rows 55 to 81 (a grey-blue sofa)
+BLUE_BLOB_PURITY = 0.28              # the whole blue blob's mean (blue - red) / blue, at least this (2026-11-26)
 BLUE_MIN_ASPECT = 1.6                # the blue band is thicker than the red tape was: 3.1 to 1 at 8 inches, 3.3 at 16
 MIN_SEED_PX = 30                     # the seed blob's size (50 pixels at 22 inches, about 300 at 8)
 MIN_WIDTH_PX, MAX_WIDTH_PX = 20, 200
@@ -39,6 +40,7 @@ BASKET_IN = 5.0                      # the tub's width across (an estimate; the 
 LENS_OFFSET_IN = 2.0                 # the lens sits this far behind the claw tip (owner, 2026-11-22)
 BEARING_FOCAL_PX = 140.0             # horizontal focal length in pixels
 TUB_K = 1050.0                       # lens distance in inches = TUB_K / the tape's width in pixels (fitted 2026-11-24, see the module docstring)
+BLUE_BASE_RATIO = 0.53               # the blue-banded tub is deeper than the red-taped one was: its base sat 34 to 35 rows under the band's bottom at a band 62 to 65 wide (the 10 tub pictures of 2026-11-26, the base read by eye from the pictures)
 BASE_RATIO = 0.27                    # the base row sits this fraction of the tape's width under the rim row
 FOOT_MARGIN_X = 10                   # the footprint starts this many columns inside the tape's ends: a puck touching the tub's outer wall sits on the tape's end column (80 against the tape's 80 at 8 inches), one inside against the wall 15 to 20 columns in
 FOOT_TOP, FOOT_BOTTOM = 3, 3         # and from this many rows under the rim to this many above the base row: a puck on the floor against the near wall sat at row 131.7 against a base of 131, one inside against it at 122
@@ -58,6 +60,7 @@ class BasketReading:
     right: int = 0
     rim_row: float = 0.0        # the tape's bottom row
     base_row: float = 0.0       # where the tub's base is expected (rim row plus BASE_RATIO times the width)
+    blue: bool = False          # read from the blue band (the clear tub of 2026-11-26), not the red tape
 
 
 def distance_from_width(width_px: float) -> float:
@@ -115,6 +118,10 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
         bw, bh = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
         if blue and int(ys.max()) < BLUE_MIN_ROW:
             continue                                                     # a grey-blue sofa or wall up the picture, not tape on the floor
+        if blue:
+            mean = rgb[ys, xs].astype(float).mean(0)
+            if (mean[2] - mean[0]) / max(mean[2], 1.0) < BLUE_BLOB_PURITY:
+                continue                                                 # a pale grey-blue pet bed or sofa: the tape is dark and deep blue (purity 0.31 to 0.39 over 14 tub pictures), those read 0.22 to 0.26 and are bright
         if bw < MIN_WIDTH_PX or bw / bh < (BLUE_MIN_ASPECT if blue else MIN_ASPECT):
             continue
         if best is None or n > best[0]:
@@ -140,7 +147,7 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
     lens = (BLUE_K / width + BLUE_C + LENS_OFFSET_IN) if blue else distance_from_width(width)
     edge = bool(left <= 0 or right >= w_img - 1)
     return BasketReading(cx, cy, width, bh, math.degrees(math.atan2(cx - w_img / 2, BEARING_FOCAL_PX)), lens, lens - LENS_OFFSET_IN, edge,
-                         left, right, float(bottom), float(bottom + BASE_RATIO * width))
+                         left, right, float(bottom), float(bottom + (BLUE_BASE_RATIO if blue else BASE_RATIO) * width), blue)
 
 
 def in_footprint(basket: BasketReading | None, x: float, y: float) -> bool:
