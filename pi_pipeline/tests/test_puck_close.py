@@ -34,7 +34,7 @@ def test_the_correction_is_a_turn_first_then_a_short_step_or_back_up_and_nothing
     a = br.next_close_action(mk(left=118, right=158))
     assert a.kind == "nudge" and a.value > 0
     assert br.next_close_action(mk(left=78, right=118)).value < 0
-    assert br.next_close_action(mk(top=140, bottom=172)).kind == "forward"
+    assert br.next_close_action(mk(top=140, bottom=172)) is None               # too far: no forward correction yet (a walk moves about 8 inches)
     assert br.next_close_action(mk(top=170, bottom=208)).kind == "back"
 
 
@@ -72,7 +72,7 @@ def test_the_close_align_corrects_then_stops_at_the_spot():
 
 
 def test_the_close_align_gives_up_after_its_tries_and_goes_on_when_nothing_is_read():
-    off = pc.find_close_array(picture(top=140, bottom=172))
+    off = pc.find_close_array(picture(top=170, bottom=208))                    # too near: a back-up each time
     e = Env([off])
     assert br.close_align(e, br.RState(), say=lambda s: None) == "tries" and len(e.mover.moves) == br.CLOSE_ALIGN_TRIES and e.looks == br.CLOSE_ALIGN_TRIES + 1
     e = Env([None])

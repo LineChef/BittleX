@@ -38,7 +38,7 @@ APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
 CLOSE_ALIGN_TRIES = 2               # after the last walk: look at the puck against the pick-up spot (vision/puck_close.py, from the owner's 2 inch pictures) and correct at most this many times before the pick-up (each look is time on his feet; owner, 2026-11-26: "this is how he should try to get aligned")
-CLOSE_FORWARD_IN, CLOSE_BACK_IN = 2.0, 1.0   # the corrections for a puck farther or nearer than the spot (a back-up of 1 second moves about 2 inches; the forward step is a guess to measure)
+CLOSE_FORWARD_IN, CLOSE_BACK_IN = 0.0, 1.0   # the corrections for a puck farther or nearer than the spot. A back-up of 1 second moves about 2 inches. No forward correction yet (0): a forward walk moves about 8 inches whatever is asked, which would push the puck away; it needs the rows-to-inches pictures (1, 3, 4 and 6 inches) and a measured short step
 BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
 EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
@@ -548,7 +548,7 @@ def next_close_action(reading) -> RAction | None:
         return None
     if abs(reading.col_err_px) > puck_close.COL_TOL_PX:
         return RAction("nudge", reading.bearing_err_deg, f"the puck is {reading.col_err_px:+d} px off the pick-up spot sideways: turn onto it")
-    if reading.row_err_px < -puck_close.ROW_TOL_PX:
+    if reading.row_err_px < -puck_close.ROW_TOL_PX and CLOSE_FORWARD_IN > 0:
         return RAction("forward", CLOSE_FORWARD_IN, f"the puck sits {-reading.row_err_px} px beyond the pick-up spot: a short step")
     if reading.row_err_px > puck_close.ROW_TOL_PX:
         return RAction("back", CLOSE_BACK_IN, f"the puck sits {reading.row_err_px} px nearer than the pick-up spot: a short back-up")
