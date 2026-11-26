@@ -21,6 +21,7 @@ MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6  # the puck's blob: at least this 
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
 TOP_ROW_CLAW_DOWN = 84                       # a claw-down picture sees the floor further out (the puck at the wall's base, about 25 inches, sits at row 91): the floor part starts higher there
 BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN = 0.40, 0.50   # the blob's own colour: the puck is strongly saturated (mean 0.42 to 0.54 and 90th percentile 0.55 to 0.70 over the recognition pictures), the hardwood's glare and grain are not (mean 0.33 to 0.39, 90th percentile 0.35 to 0.46 over the false blobs of 2026-11-23)
+BLUE_REJECT = 8.0                           # a blob whose mean blue exceeds both red and green by this much is the basket's blue tape, not the puck
 FAR_ZONE_IN = 24.0                          # the puck seen above row 94 in a claw-down picture is at least this far
 MIN_WIDTH_RATIO = 0.4                       # by row: a blob narrower than this fraction of the width its row predicts (WIDTH_K / distance) is a speck, not the puck (a 4 pixel false blob at a row that means 6 inches)
 WIDTH_K = 95.0                             # the other reading, for a picture with the claw DOWN (the row means another distance there): distance = WIDTH_K / the blob's width in pixels (14, 11, 9 pixels at 6, 9, 12 inches, face-on); good to about 15 percent inside 12 inches
@@ -81,6 +82,9 @@ def find_puck_array(rgb: np.ndarray, basket=None, by: str = "row") -> PuckReadin
         blob_sat = sat[ys, xs]
         if float(blob_sat.mean()) < BLOB_SAT_MEAN_MIN or float(np.percentile(blob_sat, 90)) < BLOB_SAT_P90_MIN:
             continue                                                                   # glare or grain on the hardwood, not the puck's colour
+        mean_rgb = a[ys, xs].mean(0)
+        if mean_rgb[2] - max(mean_rgb[0], mean_rgb[1]) > BLUE_REJECT:
+            continue                                                                   # blue: the new basket's tape (2026-11-26), never the puck (red, green and yellow bands)
         if by != "width" and w < MIN_WIDTH_RATIO * WIDTH_K / max(distance_from_row(cy), 1.0):
             continue                                                                   # a speck far smaller than a puck at that row's distance
         if best is None or n > best[0]:

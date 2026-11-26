@@ -17,6 +17,7 @@ TOP_ROW, BOTTOM_ROW = 140, 212           # the floor rows the puck at the pick-u
 PICK_ROW, PICK_COL = 192, 118            # where the puck's base and centre sit at the pick-up spot
 ROW_TOL_PX, COL_TOL_PX = 8, 10
 WIDTH_PX = (30, 52)
+ROW_HORIZON_PX, ROW_K = 98.5, 206.3       # distance from the claw tip = ROW_K / (the base row - ROW_HORIZON_PX): fitted to the owner's pictures with the puck centred at 2, 3, 4 and 6 inches (base rows 192, 164, 153, 133), within 0.25 inch; valid from 2 to about 6 inches. At 1 inch the base row reads 183 (the puck is partly behind the claw tip), so a row nearer than the 2 inch spot is not a distance
 FOCAL_PX = 140.0                         # the same horizontal focal length the finders use for a bearing
 
 
@@ -34,6 +35,11 @@ class CloseReading:
     @property
     def row_err_px(self) -> int:
         return self.base_row - PICK_ROW              # + = nearer than the spot (lower in the picture), - = farther
+
+    @property
+    def distance_in(self) -> float:
+        """Inches from the claw tip by the base row (2 to about 6 inches; see ROW_K)."""
+        return ROW_K / (self.base_row - ROW_HORIZON_PX) if self.base_row > ROW_HORIZON_PX + 1 else float("inf")
 
     @property
     def bearing_err_deg(self) -> float:

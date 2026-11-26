@@ -89,3 +89,9 @@ def test_the_switch_and_an_env_without_a_close_reading_leave_the_pick_up_as_it_w
     monkeypatch.setenv("G2_PICK_CLOSE_ALIGN", "0")
     e = Env([pc.find_close_array(picture(left=118, right=158))])
     assert br.close_align(e, br.RState(), say=lambda s: None) == "unread" and e.looks == 0
+
+
+def test_the_base_row_gives_the_distance_from_the_claw_tip_between_2_and_6_inches():
+    for row, inches in ((192, 2.0), (164, 3.0), (153, 4.0), (133, 6.0)):                # the owner's pictures
+        r = pc.CloseReading(40, 30, row, 118)
+        assert abs(r.distance_in - inches) <= 0.4, (row, r.distance_in)

@@ -20,6 +20,12 @@ from .ball_finder import IGNORE_BOTTOM_PX, _blobs, _decode
 TAPE_STRICT = (140, 70, 60)          # a pixel is tape when red is above the first and above green and blue by the others (the tape's core)
 TAPE_DIM = (130, 50, 45)             # the second try, when the strict seed finds no tape: the tape is paler in dim or washed light (it read 169, 103, 87 at 22 inches on 2026-11-25, red minus green 66, against 240, 115, 105 at calibration). On the 34 tub pictures it reads the same 34; on 163 pictures with no tub it added 2 false tubs to the strict test's 39 (mostly pictures of the old cup); on the 10 morning pictures it found the tub in 7
 TAPE_LOOSE = (110, 40, 30)           # the same test for finding the tape's ends along its rows
+BLUE_STRICT = (14, 55, 16)           # the new basket's BLUE tape (owner, 2026-11-26: red is too close to the puck's colour; the puck is red, green and yellow, never blue). A pixel is tape when blue exceeds the mean of red and green by the first, blue is at least the second and exceeds red by the third. The tape is dark and uneven in average light, about (79, 100, 126) on its bright side and (70, 90, 85) on its far side at 12 inches: a fixed difference from red failed on the dim side, blue over the other two together found the whole band on all 8 face-on distances (8 to 22 inches, `basket-blue`)
+BLUE_LOOSE = (10, 50, 10)            # the same test for the tape's ends along its rows
+BLUE_PURITY = 0.2                    # blue exceeds red by at least this fraction of blue: the tape is 0.37 (79, 100, 126), the pale blue-grey of the wall, the window and the sky is 0.11 to 0.17 (187, 201, 211 and 136, 148, 159 on the saved negatives)
+BLUE_K, BLUE_C = 409.0, 3.91         # claw tip to the tub's centre in inches = BLUE_K / the tape's width in pixels + BLUE_C (least squares over the 8 face-on distances and 3 of the 4 off-centre pictures: within 1.5 inches everywhere; the owner's distances run from the claw tip to the tub's centre). A first fit: to be checked against the pictures still to come
+BLUE_MIN_ROW = 85                    # the blue band's bottom row: 104 to 114 on all 12 calibration pictures (the claw-down view); the saved negatives' false blobs are at rows 55 to 81 (a grey-blue sofa)
+BLUE_MIN_ASPECT = 1.6                # the blue band is thicker than the red tape was: 3.1 to 1 at 8 inches, 3.3 at 16
 MIN_SEED_PX = 30                     # the seed blob's size (50 pixels at 22 inches, about 300 at 8)
 MIN_WIDTH_PX, MAX_WIDTH_PX = 20, 200
 MIN_ASPECT = 3.5                     # width / height of the seed (the tape is 10 to 1 or thinner; the puck's red is about 1 to 2)
@@ -59,8 +65,10 @@ def distance_from_width(width_px: float) -> float:
     return TUB_K / width_px if width_px > 0 else float("inf")
 
 
-def _tape_mask(rgb: np.ndarray, thr: tuple) -> np.ndarray:
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+def _tape_mask(rgb: np.ndarray, thr: tuple, blue: bool = False) -> np.ndarray:
+    r, g, b = rgb[..., 0].astype(int), rgb[..., 1].astype(int), rgb[..., 2].astype(int)
+    if blue:
+        return ((b - (r + g) / 2) > thr[0]) & (b > thr[1]) & (b - r > thr[2]) & ((b - r) > BLUE_PURITY * b)
     return (r > thr[0]) & (r - g > thr[1]) & (r - b > thr[2])
 
 
@@ -91,12 +99,12 @@ def _tape_groups(blobs) -> list:
 
 def find_basket_array(rgb: np.ndarray) -> BasketReading | None:
     """The tub in a picture: the strict tape test first (the calibrated colour: every reading it gave is unchanged), and only when that finds no tape the dimmer test (TAPE_DIM), under the same shape rules (a thin wide strip)."""
-    return _find_basket(rgb, TAPE_STRICT) or _find_basket(rgb, TAPE_DIM)
+    return _find_basket(rgb, TAPE_STRICT) or _find_basket(rgb, TAPE_DIM) or _find_basket(rgb, BLUE_STRICT, blue=True)
 
 
-def _find_basket(rgb: np.ndarray, seed_thr: tuple) -> BasketReading | None:
+def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> BasketReading | None:
     h, w_img = rgb.shape[:2]
-    m = _tape_mask(rgb, seed_thr)
+    m = _tape_mask(rgb, seed_thr, blue)
     m[h - IGNORE_BOTTOM_PX:, :] = False
     m[:HORIZON_Y, :] = False
     best = None
@@ -105,7 +113,9 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple) -> BasketReading | None:
         if n < MIN_SEED_PX:
             continue
         bw, bh = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
-        if bw < MIN_WIDTH_PX or bw / bh < MIN_ASPECT:
+        if blue and int(ys.max()) < BLUE_MIN_ROW:
+            continue                                                     # a grey-blue sofa or wall up the picture, not tape on the floor
+        if bw < MIN_WIDTH_PX or bw / bh < (BLUE_MIN_ASPECT if blue else MIN_ASPECT):
             continue
         if best is None or n > best[0]:
             best = (n, xs, ys, bw, bh)
@@ -113,7 +123,7 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple) -> BasketReading | None:
         return None
     _, xs, ys, bw, bh = best
     top, bottom = int(ys.min()), int(ys.max())
-    loose = _tape_mask(rgb, TAPE_LOOSE)
+    loose = _tape_mask(rgb, BLUE_LOOSE if blue else TAPE_LOOSE, blue)
     band = np.zeros_like(loose)
     r0, r1 = max(top - BAND_UP, 0), min(bottom + BAND_DOWN + 1, h)
     band[r0:r1, :] = loose[r0:r1, :]
@@ -127,7 +137,7 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple) -> BasketReading | None:
     if not MIN_WIDTH_PX <= width <= MAX_WIDTH_PX:
         return None
     cx, cy = (left + right) / 2.0, (top + bottom) / 2.0
-    lens = distance_from_width(width)
+    lens = (BLUE_K / width + BLUE_C + LENS_OFFSET_IN) if blue else distance_from_width(width)
     edge = bool(left <= 0 or right >= w_img - 1)
     return BasketReading(cx, cy, width, bh, math.degrees(math.atan2(cx - w_img / 2, BEARING_FOCAL_PX)), lens, lens - LENS_OFFSET_IN, edge,
                          left, right, float(bottom), float(bottom + BASE_RATIO * width))
