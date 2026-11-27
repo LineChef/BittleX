@@ -604,6 +604,18 @@ def close_align(env, st, say=print) -> str:
         except Fell:
             return "fell"
         reading = env.close_reading()
+        side = env.side_puck() if hasattr(env, "side_puck") else None
+        if side is not None and (reading is None or not reading.puck_sized):
+            act = RAction("nudge", side.bearing_deg, f"the puck is beside the claw at the {'right' if side.side == 'R' else 'left'} edge ({side.px} px of it in view): turn toward it")
+            st.log.append({"action": "close_look", "value": float(n), "why": act.why, "puck": None})
+            if n >= CLOSE_ALIGN_TRIES:
+                say("close look: corrected as often as allowed: the pick-up goes on")
+                return "tries"
+            say(f"close look: {act.why}")
+            st.steps += 1
+            if getattr(env.mover, act.kind)(act.value) == "fell":
+                return "fell"
+            continue
         if reading is not None and not reading.puck_sized:
             if reading.base_row >= CLIPPED_UNDER_JAW_ROW_PX and reading.height_px >= CLIPPED_MIN_HEIGHT_PX and st.last_seen_in is not None and st.last_seen_in <= CLIPPED_UNDER_JAW_IN:
                 say(f"close look: a {reading.width_px} px wide blob at row {reading.base_row}, the puck's last reading {st.last_seen_in:.1f} in: the puck is behind the jaw, picking")
@@ -1242,6 +1254,10 @@ class RealEnv:
             self._last_close = puck_close.find_close(jpeg)             # the puck at the pick-up spot (the floor finder above cannot read one this near)
         except Exception:  # noqa: BLE001
             self._last_close = None
+        try:
+            self._last_side = puck_close.find_side(jpeg)                # a puck cut off beside the claw (the close finder rejects its sliver as clutter)
+        except Exception:  # noqa: BLE001
+            self._last_side = None
         self.last_floor_puck = puck                                      # the floor finder's reading in this picture (the close alignment and the line-up's drop watch cross-check against it)
         self.last_quick = (basket, puck, tub_puck)                       # what the confirm step reads when this was its picture (`quick_confirm`)
         self.quick_hist = (getattr(self, "quick_hist", []) + [self.last_quick])[-3:]
@@ -1295,6 +1311,10 @@ class RealEnv:
     def close_reading(self):
         """The last quick picture's puck against the pick-up spot (`puck_close.CloseReading`), or None."""
         return getattr(self, "_last_close", None)
+
+    def side_puck(self):
+        """The last quick picture's puck beside the claw, cut off by the left or right edge (`puck_close.SidePuck`), or None."""
+        return getattr(self, "_last_side", None)
 
     def quick_basket(self):
         """The line-up's look: a quick claw-down picture, the basket's reading or None. The same picture's floor puck is kept in `last_floor_puck` (the line-up watches it for a dropped puck)."""

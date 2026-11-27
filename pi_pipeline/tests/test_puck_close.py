@@ -153,3 +153,53 @@ def test_a_pick_that_leaves_the_puck_beside_him_is_not_called_picked_up():
     r = br.retrieve(e, say=lambda s: None, first=(None, P(8.0, 0.0)))
     assert any("not in the claw" in s["why"] for s in r["steps"] if s["action"] == "picked_check")
     assert e.backs.count(br.HELD_CHECK_BACK_IN) >= 1
+
+
+def _side_picture(col0, col1, row0=200, row1=239, color=(60, 180, 70)):
+    img = np.full((240, 240, 3), 110, dtype=np.uint8)
+    img[row0:row1, col0:col1] = color
+    return img
+
+
+def test_a_puck_cut_off_at_the_left_or_right_edge_is_found_and_the_turn_is_toward_it():
+    """2026-11-27 drill pictures: the puck beside the claw is a sliver the close finder rejects; the strips find it (17 of 265 pictures, all real pucks)."""
+    right = pc.find_side_array(_side_picture(205, 240))
+    left = pc.find_side_array(_side_picture(0, 30))
+    assert right is not None and right.side == "R" and right.bearing_deg >= 20.0 and right.bearing_deg <= pc.SIDE_TURN_MAX_DEG
+    assert left is not None and left.side == "L" and left.bearing_deg <= -20.0 and left.bearing_deg >= -pc.SIDE_TURN_MAX_DEG
+    assert pc.find_side_array(_side_picture(100, 140)) is None                                    # a coloured thing in the middle is the close finder's business
+    assert pc.find_side_array(np.full((240, 240, 3), 110, dtype=np.uint8)) is None               # bare floor
+    assert pc.find_side_array(_side_picture(230, 240, 200, 203)) is None                          # a speck
+    assert pc.find_side_array(_side_picture(205, 240, 100, 150)) is None                          # coloured things up the picture (the wall, the tub's band) are not read
+
+
+def test_the_close_look_turns_toward_a_puck_beside_the_claw_instead_of_backing_up_and_picking_blind():
+    from types import SimpleNamespace as NS
+
+    class Mover:
+        def __init__(self):
+            self.moves = []
+
+        def nudge(self, deg):
+            self.moves.append(("nudge", deg))
+            return "ok"
+
+    class E:
+        def __init__(self, readings, sides):
+            self.mover, self.readings, self.sides, self.looks = Mover(), list(readings), list(sides), 0
+
+        def look(self):
+            self.looks += 1
+
+        def close_reading(self):
+            return self.readings.pop(0)
+
+        def side_puck(self):
+            return self.sides.pop(0)
+    sliver = pc.CloseReading(7, 28, 211, 204)                                                     # the 7 px sliver the log showed
+    side = pc.SidePuck("R", 464, 217)
+    e = E([sliver, pc.CloseReading(45, 40, 192, 118)], [side, None])
+    assert br.close_align(e, br.RState(), say=lambda s: None) == "aligned"
+    assert len(e.mover.moves) == 1 and e.mover.moves[0][0] == "nudge" and e.mover.moves[0][1] > 20.0 and e.looks == 2
+    e = E([None, None, None], [pc.SidePuck("L", 300, 10)] * 3)                                    # still beside the claw after the allowed turns: the pick goes on
+    assert br.close_align(e, br.RState(), say=lambda s: None) == "tries" and all(m[1] < 0 for m in e.mover.moves) and len(e.mover.moves) == br.CLOSE_ALIGN_TRIES

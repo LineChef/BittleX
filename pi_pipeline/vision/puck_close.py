@@ -84,3 +84,47 @@ def find_close_array(rgb: np.ndarray) -> CloseReading | None:
 def find_close(jpeg: bytes) -> CloseReading | None:
     rgb = _decode(jpeg)
     return None if rgb is None else find_close_array(rgb)
+
+
+SIDE_SAT_MIN, SIDE_VALUE_MIN = 0.35, 0.35    # a stricter colour test than the close finder's: the puck's faces are strongly coloured, the hardwood and the jaw are not
+SIDE_TOP_ROW = 165                           # the rows the side strips are read from (to the bottom of the picture: a puck beside the claw sits low, past the close finder's BOTTOM_ROW)
+SIDE_STRIP_PX = 50                           # the left and right strips of the picture, this many columns wide
+SIDE_MIN_PX = 40                             # coloured pixels in a strip that make it a puck, not a speck
+SIDE_TURN_MAX_DEG = 35.0                     # the most one turn toward it asks (the puck's centre is beyond the edge, so the strip's own column under-reads the angle)
+
+
+@dataclass(frozen=True)
+class SidePuck:
+    side: str          # "L" or "R"
+    px: int            # coloured pixels in the strip
+    col: int           # their mean column
+
+    @property
+    def bearing_deg(self) -> float:
+        """Degrees to turn toward it (+ right), by the strip's mean column, at least 20 and at most SIDE_TURN_MAX_DEG: the visible part is a sliver of a puck whose centre is farther out."""
+        ang = math.degrees(math.atan2(self.col - PICK_COL, FOCAL_PX))
+        ang = max(-SIDE_TURN_MAX_DEG, min(SIDE_TURN_MAX_DEG, ang))
+        return math.copysign(max(abs(ang), 20.0), 1.0 if self.side == "R" else -1.0)
+
+
+def find_side_array(rgb: np.ndarray) -> SidePuck | None:
+    """A puck beside the claw, cut off by the left or right edge of the picture (owner pictures, 2026-11-27: the close finder reads a 5 to 7 px sliver there, rejects it as clutter, and the retrieval backed up instead of turning toward it). Looks for strongly coloured pixels in the lower left and right strips; the larger strip wins."""
+    im = rgb.astype(float) / 255.0
+    mx, mn = im.max(2), im.min(2)
+    sat = (mx - mn) / np.maximum(mx, 1e-6)
+    m = (sat > SIDE_SAT_MIN) & (mx > SIDE_VALUE_MIN)
+    m[:SIDE_TOP_ROW] = False
+    best = None
+    w = m.shape[1]
+    for side, (c0, c1) in (("L", (0, SIDE_STRIP_PX)), ("R", (w - SIDE_STRIP_PX, w))):
+        sub = m[:, c0:c1]
+        n = int(sub.sum())
+        if n >= SIDE_MIN_PX and (best is None or n > best.px):
+            _ys, xs = np.nonzero(sub)
+            best = SidePuck(side, n, int(xs.mean()) + c0)
+    return best
+
+
+def find_side(jpeg: bytes) -> SidePuck | None:
+    rgb = _decode(jpeg)
+    return None if rgb is None else find_side_array(rgb)
