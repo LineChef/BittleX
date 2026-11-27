@@ -313,6 +313,8 @@ def main() -> None:
             from ..goals import inprocess as _goals_request
             if _goals_request.enabled():
                 _goals_request.watch(lambda phrase: getattr(wake, "poke", lambda _t: None)(phrase))
+            from ..power import shutdown_request as _power_request        # the wrap-up asks for a power-down the same way: he says "Powering down.", listens for "cancel", rests and shuts the Pi down
+            _power_request.watch(lambda phrase: getattr(wake, "poke", lambda _t: None)(phrase))
 
         sleep_watch_ref = None
         if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)

@@ -24,7 +24,7 @@ def git(repo, *a):
     return subprocess.run([*PREFIX, "git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main", *a], capture_output=True, text=True, check=True).stdout.strip()
 
 
-def setup(tmp_path, pi_hash="head", answers=True, deploy_ok=True, stop_ok=True, dirty=False, docs_after=True):
+def setup(tmp_path, pi_hash="head", answers=True, deploy_ok=True, stop_ok=True, dirty=False, docs_after=True, voice=None):
     repo = tmp_path / "repo"
     (repo / "tools").mkdir(parents=True)
     (repo / "pi_pipeline").mkdir()
@@ -50,6 +50,10 @@ args="$*"
 case "$args" in
   *"sudo shutdown"*) echo SHUTDOWN >> {log}; touch {state}; exit 0;;
   *deployed_commit*) echo "{pi}"; exit 0;;
+  *is-active*) exit {0 if voice else 3};;
+  *"touch "*shutdown_request*) echo ANNOUNCE >> {log}; [ "{voice}" = handled ] && touch {state}; exit 0;;
+  *"test ! -e"*shutdown_request*) if [ "{voice}" = handled ]; then exit 0; fi; exit 1;;
+  *"rm -f"*shutdown_request*) echo CLEARED >> {log}; exit 0;;
   *) if [ -e {state} ] || [ "{1 if answers else 0}" = 0 ]; then exit 255; fi; exit 0;;
 esac
 """)
@@ -120,3 +124,21 @@ def test_a_dry_run_sends_nothing(tmp_path):
     repo, log, env = setup(tmp_path, pi_hash="old")
     r = run(repo, env, "--dry-run")
     assert r.returncode == 0 and calls(log) == [] and r.stdout.count("(dry run) would run") == 3 and "nothing was sent" in r.stdout
+
+
+def test_a_running_voice_service_is_asked_to_power_down_and_nothing_else_is_forced(tmp_path):
+    repo, log, env = setup(tmp_path, pi_hash="head", voice="handled")
+    r = run(repo, env)
+    assert r.returncode == 0 and calls(log) == ["ANNOUNCE"] and "Powering down" in r.stdout and "no longer answers" in r.stdout   # he says it, rests and shuts down himself: no plain stop or shutdown from here
+
+
+def test_a_voice_service_that_does_not_take_the_request_falls_back_to_the_plain_stop_and_shutdown(tmp_path):
+    repo, log, env = setup(tmp_path, pi_hash="head", voice="ignored")
+    r = run(repo, env)
+    assert r.returncode == 0 and calls(log) == ["ANNOUNCE", "CLEARED", "STOP", "SHUTDOWN"] and "will not say anything" in r.stdout
+
+
+def test_a_dry_run_names_the_announced_power_down_and_still_sends_nothing(tmp_path):
+    repo, log, env = setup(tmp_path, pi_hash="old", voice="handled")
+    r = run(repo, env, "--dry-run")
+    assert r.returncode == 0 and calls(log) == [] and "ask the voice service to power down" in r.stdout

@@ -39,7 +39,33 @@ if [ "$need" = 1 ]; then
   run "$DEPLOY" || { echo "the deploy did not verify (exit $?): the Pi was NOT shut down."; exit 4; }
 fi
 
-say "4. rest G2 and stop the voice service (the safe way)"
+say "4. power down through the voice service: he says \"Powering down\", listens 6 s for cancel, rests and shuts the Pi down (owner, 2026-11-27)"
+REQ='~/.local/share/g2/shutdown_request'
+if [ "$DRY" = 1 ]; then
+  echo "(dry run) would ask the voice service to power down (touch $REQ), wait for it to take the request and for the Pi to stop answering; if it is not running or does not take it, the plain stop and shutdown below"
+elif $SSH -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" 'systemctl is-active --quiet g2-voice' 2>/dev/null && $SSH -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" "mkdir -p ~/.local/share/g2 && touch $REQ" 2>/dev/null; then
+  taken=0
+  for i in $(seq 1 15); do
+    sleep 2
+    if $SSH -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" "test ! -e $REQ" 2>/dev/null; then taken=1; break; fi
+  done
+  if [ "$taken" = 1 ]; then
+    echo "the voice service took the request: he says \"Powering down\" and gives a chance to say cancel"
+    for i in $(seq 1 30); do
+      sleep 4
+      if ! $SSH -o ConnectTimeout=4 -o BatchMode=yes "$G2_PI" true 2>/dev/null; then
+        echo "the Pi no longer answers: shut down. Wait for the green light to stop blinking before cutting the power."; exit 0
+      fi
+    done
+    echo "the voice service took the request but the Pi still answers after 2 minutes: the shutdown was cancelled or failed. Nothing was forced; check by hand."; exit 6
+  fi
+  $SSH -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" "rm -f $REQ" 2>/dev/null || true
+  echo "the voice service did not take the request within 30 s (busy or not listening): the plain stop and shutdown follow (he will not say anything)"
+else
+  echo "the voice service is not running: the plain stop and shutdown follow (he will not say anything)"
+fi
+
+say "4b. rest G2 and stop the voice service (the safe way)"
 run "$SAFE_STOP" || { echo "the safe stop failed: the Pi was NOT shut down."; exit 5; }
 
 say "5. shut the Pi down"
