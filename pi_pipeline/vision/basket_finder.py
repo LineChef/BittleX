@@ -28,7 +28,7 @@ BLUE_MIN_ROW = 67                    # the blue band's bottom row. 104 to 114 in
 BLUE_BLOB_PURITY = 0.24              # the whole blue blob's mean (blue - red) / blue, at least this: the tape reads 0.26 to 0.39 (darker light gives the lower numbers), the pale pet bed and wall 0.22 to 0.26 but BRIGHT
 BLUE_PALE_PURITY = 0.33              # the bright-blue limit below applies only to a blob this impure: the pale grey-blue pet bed, wall and sofa read purity 0.22 to 0.26, while the real tub in the brighter light of the 2026-11-27 9:24 run read blue 141 to 151 at purity 0.39 to 0.46 and was missed in 4 clear pictures (after the throw, and during the confirm walk-up)
 BLUE_BLOB_MAX_BLUE = 140.0           # and its mean blue channel at most this: the tape is dark (78 to 126 over every tub picture), the pale grey-blue things 133 to 171
-BLUE_WIDE_MIN_ROW = 100                # a band over BLUE_MAX_WIDTH_PX wide must be low in the picture: a tub that near fills the frame (196 px wide, band ending at row 133 at about 6 inches: 2026-11-27 9:24 run, rejected by a plain width cap), while the false 112 to 143 px bands were the far wall at rows 68 to 74
+BLUE_WIDE_MIN_ROW = 100                # a PALE band (purity under BLUE_PALE_PURITY) over BLUE_MAX_WIDTH_PX wide must be low in the picture (2026-11-27 16:21 run: a tub 3 to 5 inches out read 108 to 116 px wide with its band ending at rows 91 and 92, purity 0.44, blue 68 to 76, and was thrown out by this rule for 19 scans; deep blue tape passes):  a tub that near fills the frame (196 px wide, band ending at row 133 at about 6 inches: 2026-11-27 9:24 run, rejected by a plain width cap), while the false 112 to 143 px bands were the far wall at rows 68 to 74
 BLUE_MIN_THICKNESS, BLUE_MAX_WIDTH_PX = 0.10, 100   # the band is a strip of tape with a thickness: its seed height over its width was 0.125 to 0.25 on every real tub (the 25 labelled calibration pictures 0.21 to 0.25, five goal-run pictures of the real tub 0.125 to 0.19) and 0.03 to 0.07 for the 5 row dark lines of a far table or wall read as a tub 8 to 10 inches off in 6 pictures of the 2026-11-27 goal run; and no real tub reads wider than 100 px (62 to 73 at 8 inches, 80 in the run), where a 112 to 143 px band was the far wall merged with the sofa. (A rule on the band's row was tried and dropped: real tubs read at rows 68 to 77 in claw-down pictures.)
 BLUE_MIN_HEIGHT = 4                  # the blue band's seed is at least this many rows tall (2026-11-26)
 BLUE_MIN_ASPECT = 1.6                # the blue band is thicker than the red tape was: 3.1 to 1 at 8 inches, 3.3 at 16
@@ -151,8 +151,11 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
     width = right - left + 1
     if not MIN_WIDTH_PX <= width <= MAX_WIDTH_PX:
         return None
-    if blue and ((width > BLUE_MAX_WIDTH_PX and bottom < BLUE_WIDE_MIN_ROW) or bh < BLUE_MIN_THICKNESS * width):
-        return None
+    if blue:
+        mean = rgb[ys, xs].astype(float).mean(0)
+        deep = (mean[2] - mean[0]) / max(mean[2], 1.0) >= BLUE_PALE_PURITY and mean[2] <= BLUE_BLOB_MAX_BLUE      # deep, dark blue: the tape itself, not a pale wall or sofa
+        if (width > BLUE_MAX_WIDTH_PX and bottom < BLUE_WIDE_MIN_ROW and not deep) or bh < BLUE_MIN_THICKNESS * width:
+            return None
     cx, cy = (left + right) / 2.0, (top + bottom) / 2.0
     lens = (BLUE_K / width + BLUE_C + LENS_OFFSET_IN) if blue else distance_from_width(width)
     edge = bool(left <= 0 or right >= w_img - 1)

@@ -249,3 +249,11 @@ def test_a_stop_request_ends_the_lineup_the_retrieval_and_the_circle_search_with
     assert bl.lineup(lambda: None, Boom())["outcome"] == "stopped"
     assert br.retrieve(Boom(), say=lambda s: None)["outcome"] == "stopped"
     assert br.circle_search(Boom(), say=lambda s: None)["outcome"] == "stopped"
+
+
+def test_a_tub_3_to_5_inches_out_reads_wide_and_high_up_but_a_pale_wide_band_is_still_the_wall():
+    """2026-11-27 16:21 run: the real tub close up was a deep blue band 108 to 118 px wide ending at row 91 or 92 (purity 0.44), thrown out by the far-wall rule for 19 scans."""
+    deep, pale = (20, 70, 120), (90, 105, 120)                                                    # purity 0.83 and 0.25
+    near = bf.find_basket_array(picture((60, 68, 170, 92, deep)))                                  # 110 px wide, rows 68 to 91
+    assert near is not None and near.width_px >= 108 and near.claw_in < 9.0
+    assert bf.find_basket_array(picture((60, 68, 170, 92, pale))) is None                           # a pale wide band up the picture: the wall merged with the sofa
