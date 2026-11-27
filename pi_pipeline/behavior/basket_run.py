@@ -47,7 +47,7 @@ def pick_direct_max_in() -> float:
 APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
-VANISH_NEAR_IN, VANISH_BACKS_MAX = 5.5, 3        # a puck last read this close that is then not seen is under the claw or beside it (the camera cannot see it): back up and look instead of scanning round (2026-11-27 9:34 run: lost at 3.0 inches after a small turn, then 14 scans and 3 minutes chasing grain, the run ended puck_not_found)
+VANISH_NEAR_IN, VANISH_BACKS_MAX = 22.0, 3       # a puck seen in one look and not in the next (after a turn or a walk) is lost from view, not gone: back up and look again, up to VANISH_BACKS_MAX times a retrieval, before any pivot scan (owner, 2026-11-27: "if he sees the puck, moves forward, then doesn't see the puck, the answer is to back up and re-acquire"). Was 5.5 inches (under the claw, 2026-11-27 9:34 run: lost at 3.0 inches after a small turn, then 14 scans); the 16:18 basket run lost it at 10.4 inches after a nudge and scanned blind seven times, about 45 seconds standing. 22 inches is the finder's far limit; the basket goal and the pick-up drill share this retrieval
 CLOSE_FLOOR_BEARING_DEG = 8.0               # the floor finder's bearing, in the picture the close finder calls "at the spot", is not to be this far off
 CLOSE_REAPPROACH_MAX, CLOSE_REAPPROACH_BACK_IN = 2, 4.0   # the puck is not at the spot after the close look's tries (or not seen there): back up this far and look again instead of picking blind, this many times a retrieval (2026-11-27 run: blind picks left the puck beside the claw)
 HELD_BASE_ROW_MIN, HELD_CHECK_BACK_IN = 200, 3.0   # after the pick-up a puck in the jaw reads 57 to 65 px wide with its base at row 200 or lower; otherwise he backs off this far and looks, and a puck seen on the floor means it was missed
@@ -131,7 +131,7 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
         st.vanish_backs += 1
         st.steps += 1
         seen, st.last_seen_in = st.last_seen_in, None
-        return RAction("back", CLOSE_REAPPROACH_BACK_IN, f"puck lost from {seen:.1f} in out: too close for the camera, back up to see it again")
+        return RAction("back", CLOSE_REAPPROACH_BACK_IN, f"puck lost from {seen:.1f} in out: back up to see it again")
     if puck is None:
         if st.scanned_deg >= SCAN_MAX_DEG or st.scans >= MAX_SCANS:
             return RAction("give_up", 0.0, "puck_not_found")

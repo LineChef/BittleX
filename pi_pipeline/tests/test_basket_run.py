@@ -614,9 +614,11 @@ def test_the_scan_keeps_turning_the_way_the_last_turn_toward_the_puck_went():
     st = br.RState()
     assert act(None, None, st).value == br.SCAN_STEP_DEG                                           # nothing seen yet: to the right
     assert act(P(8.0, -33.0), None, st).kind == "pivot"                                            # a turn left toward it...
+    assert act(None, None, st).kind == "back"                                                       # it drops out of view: back up and look again first (owner, 2026-11-27)
     a = act(None, None, st)
-    assert a.kind == "scan" and a.value == -br.SCAN_STEP_DEG                                        # ...and when it drops out of view the scan goes on to the left, not back
+    assert a.kind == "scan" and a.value == -br.SCAN_STEP_DEG                                        # ...and still nothing: the scan goes on to the left, not back
     act(P(12.0, 14.0), None, st)
+    assert act(None, None, st).kind == "back"
     assert act(None, None, st).value == br.SCAN_STEP_DEG
 
 
@@ -873,11 +875,18 @@ def test_a_puck_lost_from_close_range_is_looked_for_by_backing_up_not_by_scannin
     st = br.RState()
     assert br.next_retrieval_action(P(3.0, 10.9), None, st).kind == "nudge"                         # seen 3 inches out, turned onto
     a = br.next_retrieval_action(None, None, st)                                                    # and now not seen: it is under the claw
-    assert a.kind == "back" and a.value == br.CLOSE_REAPPROACH_BACK_IN and "too close" in a.why
+    assert a.kind == "back" and a.value == br.CLOSE_REAPPROACH_BACK_IN and "lost from 3.0" in a.why
     assert br.next_retrieval_action(None, None, st).kind == "scan"                                  # still nothing after the back-up: the scan as before
     far = br.RState()
     br.next_retrieval_action(P(12.0, 0.0), None, far)
-    assert br.next_retrieval_action(None, None, far).kind == "scan"                                 # lost from far out: it is not under the claw
+    assert br.next_retrieval_action(None, None, far).kind == "back"                                 # seen at 12 inches, then not seen: back up and look again too (owner, 2026-11-27)
+    for _ in range(br.VANISH_BACKS_MAX - 1):                                                        # seen again and lost again, up to VANISH_BACKS_MAX times
+        br.next_retrieval_action(P(12.0, 0.0), None, far)
+        assert br.next_retrieval_action(None, None, far).kind == "back"
+    br.next_retrieval_action(P(12.0, 0.0), None, far)
+    assert br.next_retrieval_action(None, None, far).kind == "scan"                                 # then the scan as before
+    never = br.RState()
+    assert br.next_retrieval_action(None, None, never).kind == "scan"                               # never seen: nothing to back up from
 
 
 def test_a_puck_clipped_at_the_bottom_of_the_picture_is_picked_not_turned_for_or_backed_from():
