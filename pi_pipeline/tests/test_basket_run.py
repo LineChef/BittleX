@@ -30,11 +30,14 @@ def test_the_retrieval_decisions():
     a = act(P(20.0, 2.0))
     assert a.kind == "forward" and a.value == br.APPROACH_STEP_MAX_IN                                 # a long way: the step cap
     a = act(P(14.0, 2.0))
-    assert a.kind == "forward" and abs(a.value - (14.0 - br.PICK_STAND_IN)) < 1e-9
+    assert a.kind == "forward" and abs(a.value - (14.0 - br.FORWARD_LEAVES_IN)) < 1e-9
     a = act(P(8.5, 2.0))
-    assert a.kind == "pick" and abs(a.value - (8.5 - br.PICK_UNDERSHOOT_IN)) < 1e-9                  # inside the window (6.5 to 9.5): the last walk (about 8 inches really)
-    a = act(P(5.3, 1.4))
-    assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 5.3)) < 1e-9                        # the 2026-11-25 pick-up: 5.3 inches is too near for a walk that moves about 8: back up first
+    assert a.kind == "pick" and abs(a.value - (8.5 - br.PICK_UNDERSHOOT_IN)) < 1e-9                  # inside the band (4.5 to 11): the last walk
+    for d in (4.6, 5.3, 6.0, 10.9):                                                                  # the band is 4.5 to 11 inches (2026-11-27: a 3 inch band made him back, turn, walk and back again for 50 steps)
+        a = act(P(d, 1.4))
+        assert a.kind == "pick" and abs(a.value - (d - br.PICK_UNDERSHOOT_IN)) < 1e-9
+    a = act(P(4.2, 1.4))
+    assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 4.2)) < 1e-9                        # the 2026-11-25 pick-up: 5.3 inches is too near for a walk that moves about 8: back up first
     assert act(P(0.2, 0.0)).value == 0.0
     assert act(P(20.0, 0.0), B(7.0, 0.0)).kind == "forward"                                          # a tub close beside him never ends the retrieval (owner, 2026-11-27): the walk goes on
     c = P(7.9, 0.4)
@@ -742,8 +745,8 @@ def test_he_says_which_thing_he_is_searching_for_when_a_search_begins():
 def test_after_the_back_up_he_looks_then_turns_onto_the_puck_before_any_walk():
     """Owner, 2026-11-25: the back-up curves him aside, so the last walk waits for the turn onto the puck."""
     st = br.RState()
-    a = br.next_retrieval_action(P(5.3, 1.4), None, st)                                                       # too near: back up to the stand
-    assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 5.3)) < 1e-9
+    a = br.next_retrieval_action(P(4.2, 1.4), None, st)                                                       # too near: back up to the stand
+    assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 4.2)) < 1e-9
     a = br.next_retrieval_action(P(br.PICK_STAND_IN, 10.0), None, st)                                         # the look after it: the puck drifted 10 degrees: a small turn first
     assert a.kind == "nudge" and a.value == 10.0
     a = br.next_retrieval_action(P(br.PICK_STAND_IN, 22.0), None, st)                                         # 22 degrees: a pivot
@@ -863,7 +866,7 @@ def test_a_centred_puck_a_little_out_is_picked_directly_only_when_the_reach_sett
     assert act(P(4.0, 2.0)).kind == "back"                                                           # today: backed away from, the last walk moves about 8 inches
     monkeypatch.setenv("G2_PICK_DIRECT_MAX_IN", "4.5")
     assert act(P(4.0, 2.0)).kind == "pick" and act(P(4.0, 2.0)).value == br.BLIND_STEP_IN
-    assert act(P(5.5, 2.0)).kind == "back" and act(P(4.0, 9.0)).kind != "pick"                       # farther, or off to the side: as before
+    assert act(P(5.5, 2.0)).kind == "pick" and act(P(5.5, 2.0)).value != br.BLIND_STEP_IN and act(P(4.0, 9.0)).kind != "pick"                       # farther, or off to the side: as before
 
 
 def test_a_puck_lost_from_close_range_is_looked_for_by_backing_up_not_by_scanning():
@@ -875,3 +878,35 @@ def test_a_puck_lost_from_close_range_is_looked_for_by_backing_up_not_by_scannin
     far = br.RState()
     br.next_retrieval_action(P(12.0, 0.0), None, far)
     assert br.next_retrieval_action(None, None, far).kind == "scan"                                 # lost from far out: it is not under the claw
+
+
+def test_a_puck_clipped_at_the_bottom_of_the_picture_is_picked_not_turned_for_or_backed_from():
+    """2026-11-27 run: three last walks left the puck at base row 211 behind the jaw; the close look turned for 20 px, read nothing and backed up each time."""
+    from pi_pipeline.vision.puck_close import CloseReading
+    assert br.next_close_action(CloseReading(45, 72, 211, 98)) is None                                       # 20 px off, clipped: pick
+    assert br.next_close_action(CloseReading(62, 28, 211, 122)) is None                                      # 19 px nearer than the spot, clipped: no back-up
+    assert br.next_close_action(CloseReading(53, 69, 211, 81)).kind == "nudge"                               # 37 px off is still turned for
+    assert br.next_close_action(CloseReading(45, 40, 195, 98)).kind == "nudge"                               # not clipped: the old tolerance
+
+
+def test_a_narrow_tall_blob_at_the_bottom_after_a_last_walk_is_the_puck_behind_the_jaw():
+    from pi_pipeline.vision.puck_close import CloseReading
+
+    class Env:
+        mover = None
+        last_floor_puck = None
+
+        def __init__(self, r):
+            self.r = r
+
+        def look(self):
+            return None, None
+
+        def close_reading(self):
+            return self.r
+    st = br.RState()
+    st.last_seen_in = 7.1
+    assert br.close_align(Env(CloseReading(7, 41, 207, 104)), st, say=lambda s: None) == "aligned"           # the picture of 16:03:54
+    assert br.close_align(Env(CloseReading(5, 4, 211, 93)), st, say=lambda s: None) == "unread"              # a 4 px high glint is not the puck
+    st.last_seen_in = 20.0
+    assert br.close_align(Env(CloseReading(7, 41, 207, 104)), st, say=lambda s: None) == "unread"

@@ -33,6 +33,8 @@ SCAN_STEP_DEG, SCAN_MAX_DEG = 27.0, 360.0
 ALIGN_DEG = 6.0                      # the puck's bearing must be inside this before the last walk (a pick-up window is about 1 inch wide)
 PICK_STAND_IN = 8.0                  # the puck this far from the claw tip (as the finder reads it) is where the last walk starts: a forward walk moves about 8 inches whatever is asked (12 logged walks, 2026-11-25) and the pick-up wants the puck at the claw tip. 8 inches, not 9.5: in the claw-down picture a puck 9 inches off sat at row 85, one row above the finder's floor window (84), and he lost it after the back-up; at 8 inches it is at about row 89, inside. Nearer than PICK_STAND_IN - PICK_STAND_TOL_IN he backs up (back-ups are finer), looks again, squares up to the puck (the back-up curves him aside, so the turn onto it comes before any walk) and only then walks; farther than PICK_STAND_IN + PICK_STAND_TOL_IN he walks up
 PICK_STAND_TOL_IN = 1.5
+PICK_BAND_MIN_IN, PICK_BAND_MAX_IN = 4.5, 11.0     # the last walk and the pick-up from a puck read anywhere in this band (was 6.5 to 9.5, 3 inches wide). 2026-11-27 runs: a back-up moved him 6 to 9 inches and a forward walk 5 to 8 whatever was asked, so no step could land in a 3 inch band and he went back, turn, forward, back for 50 steps until the puck was lost. The last walk's ask is the puck's distance less PICK_UNDERSHOOT_IN and it moves him about 2.4 inches more than asked (a walk of 5.6 left the puck at the jaw in all three tries), so from anywhere in the band it ends in the same place
+FORWARD_LEAVES_IN = 9.5            # a puck beyond the band: walk up so that about this much is left (the walk moves at least 5 inches), which lands inside the band
 PICK_AT_TIP_IN = 3.0
 
 
@@ -51,6 +53,11 @@ CLOSE_REAPPROACH_MAX, CLOSE_REAPPROACH_BACK_IN = 2, 4.0   # the puck is not at t
 HELD_BASE_ROW_MIN, HELD_CHECK_BACK_IN = 200, 3.0   # after the pick-up a puck in the jaw reads 57 to 65 px wide with its base at row 200 or lower; otherwise he backs off this far and looks, and a puck seen on the floor means it was missed
 CLOSE_ALIGN_TRIES = 2               # after the last walk: look at the puck against the pick-up spot (vision/puck_close.py, from the owner's 2 inch pictures) and correct at most this many times before the pick-up (each look is time on his feet; owner, 2026-11-26: "this is how he should try to get aligned")
 CLOSE_FORWARD_IN, CLOSE_BACK_IN = 0.0, 1.0   # the corrections for a puck farther or nearer than the spot. A back-up of 1 second moves about 2 inches. No forward correction yet (0): a forward walk moves about 8 inches whatever is asked, which would push the puck away; it needs the rows-to-inches pictures (1, 3, 4 and 6 inches) and a measured short step
+CLIPPED_ROW_PX = 210                 # a puck whose base reaches the crop (rows past BOTTOM_ROW 212 are not read) is cut off; see CLIPPED_UNDER_JAW_ROW_PX for narrow blobs
+CLIPPED_UNDER_JAW_ROW_PX = 205                 # a puck whose base reaches this row is at the bottom of the picture, partly behind the claw jaw (the jaw tip is near row 205): its base row and column are cut off, so the close look neither backs up for it nor turns for a small offset (2026-11-27 run: three last walks left it at row 211, the close look turned the puck from 98 to 81 px, then read nothing and backed up, and the third try, picked blind from there, got it)
+CLIPPED_COL_TOL_PX = 30              # the sideways offset a clipped puck may have before the close look turns him (the pick-up window is about 1 inch; 20 px there is under half an inch)
+CLIPPED_MIN_HEIGHT_PX = 20          # ... and at least this tall (a glint at the bottom rows is 4 or 5 px high; the puck behind the jaw 41)
+CLIPPED_UNDER_JAW_IN = 8.0           # a narrow blob at the bottom rows after a last walk, with the puck last read within this many inches, is the puck mostly hidden behind the jaw, not clutter
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 CONFIRM_LOOK = "quick"               # "quick": the walk-up's own last picture (claw down, taken at once, read at once: no attention-pose cycle, no standing about) is the confirm picture (owner, 2026-11-24: "he can just walk up and take a fast picture, but he can't be standing idle for a long time afterwards"); "claw_up": the attention-pose look as first built (`env.confirm_look()`)
 CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answer while he stands in the walk-up: he lies down and the attempt stops (a stalled camera must not leave him standing: the legs sag after about 10 s)
@@ -144,12 +151,12 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
         return RAction("nudge", b, "small turn onto the puck")
     if getattr(puck, "clipped", False):                                                   # at the claw tip already (owner, 2026-11-23: line up until one step away, one blind step, then the pick-up)
         return RAction("pick", BLIND_STEP_IN, "puck at the claw tip: one blind step, then the pick-up")
-    if d > PICK_STAND_IN + PICK_STAND_TOL_IN:
+    if d > PICK_BAND_MAX_IN:
         st.steps += 1
-        return RAction("forward", min(APPROACH_STEP_MAX_IN, d - PICK_STAND_IN), "walk up to the puck")
+        return RAction("forward", min(APPROACH_STEP_MAX_IN, d - FORWARD_LEAVES_IN), "walk up to the puck")
     if pick_direct_max_in() > PICK_AT_TIP_IN and d <= pick_direct_max_in():                 # near and centred: the pick-up reaches it (G2_PICK_DIRECT_MAX_IN, off by default: the reach of pickF is still to be measured)
         return RAction("pick", BLIND_STEP_IN, "puck near and centred: the pick-up reaches it, no back-up")
-    if PICK_AT_TIP_IN <= d < PICK_STAND_IN - PICK_STAND_TOL_IN:                             # (nearer than PICK_AT_TIP_IN it is at the claw tip already: no walk, the pick-up)
+    if PICK_AT_TIP_IN <= d < PICK_BAND_MIN_IN:                                              # (nearer than PICK_AT_TIP_IN it is at the claw tip already: no walk, the pick-up)
         st.steps += 1
         return RAction("back", PICK_STAND_IN - d, "too near the puck for the last walk (it moves about 8 inches): back up")
     return RAction("pick", max(0.0, d - PICK_UNDERSHOOT_IN), "centred and close: the last walk, then the pick-up")
@@ -568,11 +575,12 @@ def next_close_action(reading) -> RAction | None:
     """Pure: what to do about a puck read by `puck_close` before the pick-up: None when it sits at the pick-up spot (or cannot be read: the pick-up goes on as it always did), else the correction, the column first (a turn), then the distance."""
     if reading is None or reading.at_spot:
         return None
-    if abs(reading.col_err_px) > puck_close.COL_TOL_PX:
+    clipped = reading.base_row >= CLIPPED_ROW_PX
+    if abs(reading.col_err_px) > (CLIPPED_COL_TOL_PX if clipped else puck_close.COL_TOL_PX):
         return RAction("nudge", reading.bearing_err_deg, f"the puck is {reading.col_err_px:+d} px off the pick-up spot sideways: turn onto it")
     if reading.row_err_px < -puck_close.ROW_TOL_PX and CLOSE_FORWARD_IN > 0:
         return RAction("forward", CLOSE_FORWARD_IN, f"the puck sits {-reading.row_err_px} px beyond the pick-up spot: a short step")
-    if reading.row_err_px > puck_close.ROW_TOL_PX:
+    if reading.row_err_px > puck_close.ROW_TOL_PX and not clipped:
         return RAction("back", CLOSE_BACK_IN, f"the puck sits {reading.row_err_px} px nearer than the pick-up spot: a short back-up")
     return None
 
@@ -588,7 +596,11 @@ def close_align(env, st, say=print) -> str:
             return "fell"
         reading = env.close_reading()
         if reading is not None and not reading.puck_sized:
-            say(f"close look: what it read is {reading.width_px} px wide, not a puck: no puck read at the pick-up spot")
+            if reading.base_row >= CLIPPED_UNDER_JAW_ROW_PX and reading.height_px >= CLIPPED_MIN_HEIGHT_PX and st.last_seen_in is not None and st.last_seen_in <= CLIPPED_UNDER_JAW_IN:
+                say(f"close look: a {reading.width_px} px wide blob at row {reading.base_row}, the puck's last reading {st.last_seen_in:.1f} in: the puck is behind the jaw, picking")
+                st.log.append({"action": "close_look", "value": float(n), "why": f"narrow blob at the bottom rows (width {reading.width_px}, base row {reading.base_row}, column {reading.centre_col}) after a last walk: the puck is behind the jaw: pick-up", "puck": None})
+                return "aligned"
+            say(f"close look: what it read is {reading.width_px} px wide (base row {reading.base_row}, column {reading.centre_col}), not a puck: no puck read at the pick-up spot")
             reading = None                                                                  # clutter or a glint (2026-11-27 run), never a puck to turn by or to call "at the spot"
         act = next_close_action(reading)
         floor = getattr(env, "last_floor_puck", None)
