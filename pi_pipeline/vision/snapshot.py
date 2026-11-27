@@ -155,12 +155,12 @@ def next_bump(bump: int, s: ExposureStats) -> int | None:
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
                  ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, click: bool = True, save_dir: str | None = None, keep_days: float = 0.0, exposure_check: bool = True,
-                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, wait_still=None, serial_factory=None, reask_s: float = 1.5,
+                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, wait_still=None, serial_factory=None, reask_s: float = 0.9,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
         self._sensor_opt, self._ae_bump, self._timeout_s = sensor_opt, ae_bump, timeout_s
         self._factory, self._sleep, self._clock = serial_factory, sleep, clock
-        self._reask_s = reask_s                            # no picture this long after a request: ask once more (the module drops the first request after a pause, and the second answers in about half a second: a full 8 s wait per picture left G2 standing 21 s in one look, 2026-11-25); 0 = never re-ask
+        self._reask_s = reask_s                            # (0.9, was 1.5: the camera port's readline waits up to 1 s, so the first check came at 2 to 2.5 s and 13 pictures in two drill trials took 2.95 s instead of 0.47 s, 2026-11-27; a normal answer takes 0.5 s, so a check at about 1 s re-asks only a dropped request) no picture this long after a request: ask once more (the module drops the first request after a pause, and the second answers in about half a second: a full 8 s wait per picture left G2 standing 21 s in one look, 2026-11-25); 0 = never re-ask
         self._wait_still = wait_still                       # optional callable() -> bool | None: wait until G2's body has stopped swaying (the IMU), right before the shot
         self._ser = None
         self._lock = threading.Lock()

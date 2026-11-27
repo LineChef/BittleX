@@ -340,3 +340,34 @@ def test_a_request_is_repeated_every_reask_seconds_until_one_is_answered_and_wha
     with caplog.at_level(logging.WARNING):
         assert c2._grab_one() is None
     assert any("gave no picture within 8 s" in r.message and "nothing came in" in r.message for r in caplog.records)
+
+
+def test_the_default_reask_asks_again_at_the_first_port_timeout_so_a_dropped_request_costs_about_a_second_and_a_half():
+    """2026-11-27: with 1.5 s the check came at 2 to 2.5 s (the port's readline waits 1 s) and 13 pictures in two drill trials took 2.95 s instead of 0.47 s."""
+    jpeg = make_jpeg([115.0] * 1024)
+    t = [0.0]
+
+    class Dropper:
+        def __init__(self):
+            self.invokes, self.lines = 0, []
+
+        def reset_input_buffer(self):
+            self.lines = []
+
+        def write(self, b):
+            if b.startswith(b"AT+INVOKE"):
+                self.invokes += 1
+                if self.invokes > 1:
+                    self.lines = [b'{"type": 1, "name": "INVOKE", "code": 0, "data": {"count": 1, "image": "' + base64.b64encode(jpeg) + b'", "boxes": []}}\n']
+
+        def readline(self):
+            if self.lines:
+                t[0] += 0.5                                                                     # an answer takes half a second
+                return self.lines.pop(0)
+            t[0] += 1.0
+            return b""
+    cam = Dropper()
+    c = CameraSnapshotter("x", exposure_check=False, serial_factory=lambda: cam, sleep=lambda s: None, clock=lambda: t[0], idle_close_s=0, timeout_s=8.0, click=False)
+    c._open()
+    t[0] = 0.0
+    assert c._grab_one() is not None and cam.invokes == 2 and t[0] <= 1.6, (cam.invokes, t[0])
