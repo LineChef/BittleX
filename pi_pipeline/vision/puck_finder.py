@@ -161,7 +161,8 @@ INSIDE_BELOW_ROWS = 30
 
 INSIDE_MIN_SIDE_PX = 3                      # a puck inside the tub is at least this many pixels each way (a sliver 14 by 1 and one 1 by 8 were read as pucks inside on 2026-11-25: a glint or a tape edge)
 INSIDE_ASPECT = (0.4, 2.6)                  # the blob's width over its height: 0.6 to 1.7 on the calibration pictures
-INSIDE_WIDTH_RATIO = (0.04, 0.28)          # the blob's width over the tape's width: a puck's size follows the tub's at any distance (0.06 to 0.19 on the calibration pictures, 0.10 on the 16 by 16 pixel make)
+INSIDE_WIDTH_RATIO = (0.04, 0.36)          # the blob's width over the tape's width: 0.06 to 0.19 on the calibration pictures, 0.10 on the 16 by 16 pixel make, 0.25 to 0.33 in the 2026-11-27 run's make (the puck 13 pixels wide plus its reflection, on a tape 52 wide: two of its three confirm pictures read 16 and 17 pixels wide and were refused at the old 0.28, so a real make scored as a miss)
+INSIDE_HEIGHT_RATIO_MAX = 0.45             # and its height over the tape's width at most this (the puck 0.12 to 0.23): a glare streak or a leg read 0.67
 
 
 @dataclass(frozen=True)
@@ -201,6 +202,8 @@ def find_puck_in_tub_array(rgb: np.ndarray, basket) -> PuckInTub | None:
             continue                                                       # a sliver: not a puck
         if tape > 0 and not INSIDE_WIDTH_RATIO[0] <= bw / tape <= INSIDE_WIDTH_RATIO[1]:
             continue                                                       # the wrong size for this tub at this distance
+        if tape > 0 and bh / tape > INSIDE_HEIGHT_RATIO_MAX:
+            continue                                                       # too tall for a puck
         if best is None or n > best[0]:
             best = (n, cx, cy, bw, bh)
     if best is None:

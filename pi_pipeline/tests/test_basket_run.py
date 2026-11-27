@@ -856,3 +856,11 @@ def test_the_drop_watch_needs_two_pictures_of_the_last_three():
         assert e.puck.claw_in == 5.0                                                                   # the second near one within the last three
     else:
         raise AssertionError("no drop")
+
+
+def test_a_centred_puck_a_little_out_is_picked_directly_only_when_the_reach_setting_allows_it(monkeypatch):
+    monkeypatch.delenv("G2_PICK_DIRECT_MAX_IN", raising=False)
+    assert act(P(4.0, 2.0)).kind == "back"                                                           # today: backed away from, the last walk moves about 8 inches
+    monkeypatch.setenv("G2_PICK_DIRECT_MAX_IN", "4.5")
+    assert act(P(4.0, 2.0)).kind == "pick" and act(P(4.0, 2.0)).value == br.BLIND_STEP_IN
+    assert act(P(5.5, 2.0)).kind == "back" and act(P(4.0, 9.0)).kind != "pick"                       # farther, or off to the side: as before

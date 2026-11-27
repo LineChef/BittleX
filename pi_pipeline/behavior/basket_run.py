@@ -34,9 +34,20 @@ ALIGN_DEG = 6.0                      # the puck's bearing must be inside this be
 PICK_STAND_IN = 8.0                  # the puck this far from the claw tip (as the finder reads it) is where the last walk starts: a forward walk moves about 8 inches whatever is asked (12 logged walks, 2026-11-25) and the pick-up wants the puck at the claw tip. 8 inches, not 9.5: in the claw-down picture a puck 9 inches off sat at row 85, one row above the finder's floor window (84), and he lost it after the back-up; at 8 inches it is at about row 89, inside. Nearer than PICK_STAND_IN - PICK_STAND_TOL_IN he backs up (back-ups are finer), looks again, squares up to the puck (the back-up curves him aside, so the turn onto it comes before any walk) and only then walks; farther than PICK_STAND_IN + PICK_STAND_TOL_IN he walks up
 PICK_STAND_TOL_IN = 1.5
 PICK_AT_TIP_IN = 3.0
+
+
+def pick_direct_max_in() -> float:
+    """How far from the claw tip a centred puck can be for the pick-up to take it without the back-up and the 8 inch last walk. Default PICK_AT_TIP_IN (no change); `G2_PICK_DIRECT_MAX_IN=4.5` tries it (2026-11-27 run: four times a centred puck 3.4 to 4.7 inches out was backed away from, each cycle 20 seconds and a sideways drift). Measure pickF's reach (picks from 3, 4 and 5 inches) before changing the default."""
+    try:
+        return float(os.environ.get("G2_PICK_DIRECT_MAX_IN", PICK_AT_TIP_IN))
+    except ValueError:
+        return PICK_AT_TIP_IN
 APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
+CLOSE_FLOOR_BEARING_DEG = 8.0               # the floor finder's bearing, in the picture the close finder calls "at the spot", is not to be this far off
+CLOSE_REAPPROACH_MAX, CLOSE_REAPPROACH_BACK_IN = 2, 4.0   # the puck is not at the spot after the close look's tries (or not seen there): back up this far and look again instead of picking blind, this many times a retrieval (2026-11-27 run: blind picks left the puck beside the claw)
+HELD_BASE_ROW_MIN, HELD_CHECK_BACK_IN = 200, 3.0   # after the pick-up a puck in the jaw reads 57 to 65 px wide with its base at row 200 or lower; otherwise he backs off this far and looks, and a puck seen on the floor means it was missed
 CLOSE_ALIGN_TRIES = 2               # after the last walk: look at the puck against the pick-up spot (vision/puck_close.py, from the owner's 2 inch pictures) and correct at most this many times before the pick-up (each look is time on his feet; owner, 2026-11-26: "this is how he should try to get aligned")
 CLOSE_FORWARD_IN, CLOSE_BACK_IN = 0.0, 1.0   # the corrections for a puck farther or nearer than the spot. A back-up of 1 second moves about 2 inches. No forward correction yet (0): a forward walk moves about 8 inches whatever is asked, which would push the puck away; it needs the rows-to-inches pictures (1, 3, 4 and 6 inches) and a measured short step
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
@@ -97,6 +108,7 @@ class RState:
     steps: int = 0
     scans: int = 0
     picks: int = 0
+    reapproach: int = 0              # times he backed off and looked again because the puck was not at the pick-up spot (instead of picking blind)
     log: list = field(default_factory=list)
 
 
@@ -126,6 +138,8 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
     if d > PICK_STAND_IN + PICK_STAND_TOL_IN:
         st.steps += 1
         return RAction("forward", min(APPROACH_STEP_MAX_IN, d - PICK_STAND_IN), "walk up to the puck")
+    if pick_direct_max_in() > PICK_AT_TIP_IN and d <= pick_direct_max_in():                 # near and centred: the pick-up reaches it (G2_PICK_DIRECT_MAX_IN, off by default: the reach of pickF is still to be measured)
+        return RAction("pick", BLIND_STEP_IN, "puck near and centred: the pick-up reaches it, no back-up")
     if PICK_AT_TIP_IN <= d < PICK_STAND_IN - PICK_STAND_TOL_IN:                             # (nearer than PICK_AT_TIP_IN it is at the claw tip already: no walk, the pick-up)
         st.steps += 1
         return RAction("back", PICK_STAND_IN - d, "too near the puck for the last walk (it moves about 8 inches): back up")
@@ -562,10 +576,16 @@ def close_align(env, st, say=print) -> str:
         except Fell:
             return "fell"
         reading = env.close_reading()
+        if reading is not None and not reading.puck_sized:
+            say(f"close look: what it read is {reading.width_px} px wide, not a puck: no puck read at the pick-up spot")
+            reading = None                                                                  # clutter or a glint (2026-11-27 run), never a puck to turn by or to call "at the spot"
         act = next_close_action(reading)
+        floor = getattr(env, "last_floor_puck", None)
+        if act is None and reading is not None and floor is not None and float(floor.claw_in) <= GONE_WITHIN_IN and abs(float(floor.bearing_deg)) > CLOSE_FLOOR_BEARING_DEG:
+            act = RAction("nudge", float(floor.bearing_deg), f"the floor finder reads the puck {float(floor.bearing_deg):+.0f} deg off: turn onto it")   # "at the spot" by the close finder, but 22 deg off by the floor finder in the same picture (2026-11-27 run)
         st.log.append({"action": "close_look", "value": float(n), "why": "no close reading" if reading is None else f"base row {reading.base_row}, column {reading.centre_col}, width {reading.width_px}" + (": at the pick-up spot" if act is None else ": " + act.why), "puck": None})
         if reading is None:
-            say("close look: no puck read near the claw tip: the pick-up goes on")
+            say("close look: no puck read near the claw tip")
             return "unread"
         if act is None:
             say("close look: the puck is at the pick-up spot")
@@ -608,6 +628,20 @@ def watch_for_drop(env):
     return look
 
 
+def held_check(env) -> str:
+    """After the pick-up: "held" when the picture just taken shows a puck-sized blob in the jaw (base row HELD_BASE_ROW_MIN or lower), "not_held" when the puck is seen on the floor after a short back-up, else "held" (nothing seen anywhere: 2026-11-27 run, two misses read as picked up because a puck beside the claw is cropped out of the frame, and one held puck read as a big blob at the bottom centre). "fell" when the back-up ends in a fall."""
+    reading = env.close_reading()
+    if reading is not None and reading.puck_sized and reading.base_row >= HELD_BASE_ROW_MIN and abs(reading.col_err_px) <= 2 * 10:
+        return "held"
+    if env.mover.back(HELD_CHECK_BACK_IN) == "fell":
+        return "fell"
+    try:
+        _b, puck = env.look()
+    except Fell:
+        return "fell"
+    return "not_held" if puck is not None and float(puck.claw_in) <= GONE_WITHIN_IN else "held"
+
+
 def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
     """Search for the puck, walk to it and pick it up. Returns {"outcome": "retrieved" | a give-up reason | "fell", "steps": [...]}."""
     st = RState()
@@ -639,8 +673,18 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
             state = env.mover.forward(act.value) if act.value >= 0.5 else "ok"
             if state == "fell":
                 return {"outcome": "fell", "steps": st.log}
-            if close_align(env, st, say) == "fell":
+            ca = close_align(env, st, say)
+            if ca == "fell":
                 return {"outcome": "fell", "steps": st.log}
+            if ca in ("unread", "tries") and close_align_on() and hasattr(env, "close_reading") and st.reapproach < CLOSE_REAPPROACH_MAX:
+                st.reapproach += 1
+                st.steps += 1
+                why = "corrected as often as allowed and the puck is still off the pick-up spot" if ca == "tries" else "no puck read at the pick-up spot"
+                st.log.append({"action": "reapproach", "value": CLOSE_REAPPROACH_BACK_IN, "why": f"{why}: back up and look again instead of picking blind", "puck": None})
+                say(f"retrieve: {why}: back up and look again instead of picking blind")
+                if env.mover.back(CLOSE_REAPPROACH_BACK_IN) == "fell":
+                    return {"outcome": "fell", "steps": st.log}
+                continue
             got = env.pick()
             st.picks += 1
             if got == "fell":
@@ -650,7 +694,14 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
             except Fell:
                 return {"outcome": "fell", "steps": st.log}
             gone = still is None or still.claw_in > GONE_WITHIN_IN
-            st.log.append({"action": "picked_check", "value": 0.0, "why": "puck gone from the floor" if gone else "puck still on the floor", "puck": None if still is None else (round(still.claw_in, 1), round(still.bearing_deg, 1))})
+            note = "puck gone from the floor" if gone else "puck still on the floor"
+            if gone and close_align_on() and hasattr(env, "close_reading"):
+                held = held_check(env)
+                if held == "fell":
+                    return {"outcome": "fell", "steps": st.log}
+                if held == "not_held":
+                    gone, note = False, "puck gone from the floor but not in the claw: it lies beside him"
+            st.log.append({"action": "picked_check", "value": 0.0, "why": note, "puck": None if still is None else (round(still.claw_in, 1), round(still.bearing_deg, 1))})
             if gone:
                 return {"outcome": "retrieved", "steps": st.log}
             if st.picks >= PICK_TRIES:
@@ -1153,6 +1204,7 @@ class RealEnv:
             self._last_close = puck_close.find_close(jpeg)             # the puck at the pick-up spot (the floor finder above cannot read one this near)
         except Exception:  # noqa: BLE001
             self._last_close = None
+        self.last_floor_puck = puck                                      # the floor finder's reading in this picture (the close alignment and the line-up's drop watch cross-check against it)
         self.last_quick = (basket, puck, tub_puck)                       # what the confirm step reads when this was its picture (`quick_confirm`)
         self.quick_hist = (getattr(self, "quick_hist", []) + [self.last_quick])[-3:]
         n = len(self.quick_log) + 1

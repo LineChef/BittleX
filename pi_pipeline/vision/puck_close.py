@@ -18,6 +18,7 @@ TOP_ROW, BOTTOM_ROW = 140, 212           # the floor rows the puck at the pick-u
 PICK_ROW, PICK_COL = 192, 118            # where the puck's base and centre sit at the pick-up spot
 ROW_TOL_PX, COL_TOL_PX = 8, 10
 WIDTH_PX = (30, 52)
+PUCK_WIDTH_VALID = (28, 66)              # a blob inside this width can be the puck (at the spot 38 to 46, held in the jaw 57 to 65); narrower is clutter
 ROW_TABLE = ((133, 6.0), (153, 4.0), (164, 3.0), (183, 1.0), (192, 0.0))   # (base row, inches past the FLOOR LINE), the puck centred. Every calibration picture was lined up from the floor line, where the claw tip sits in the rest position; standing, the claw stands about 1 inch BEHIND that line (owner, 2026-11-26). So these are 'labelled' distances, the frame the finders and the goal constants use; add 1 inch for the distance from the standing claw tip. The pick-up spot (the `puck-near` pictures) is the puck ON the line: 0 here, 1 inch from the standing claw tip. The picture labelled 1 inch is 2 inches from the standing claw tip. About 10 rows an inch all the way. Valid 0 to 6 inches
 FOCAL_PX = 140.0                         # the same horizontal focal length the finders use for a bearing
 
@@ -46,6 +47,11 @@ class CloseReading:
     @property
     def bearing_err_deg(self) -> float:
         return math.degrees(math.atan2(self.col_err_px, FOCAL_PX))
+
+    @property
+    def puck_sized(self) -> bool:
+        """Is the blob as wide as a puck this near (the spot reads 38 to 46 px, a puck nearer the jaw up to 60)? The loose colour test also reads floor glints and room clutter 6 to 13 px wide (2026-11-27 run: 6 of 9 close looks were such blobs, so he turned by them and picked beside the puck)."""
+        return PUCK_WIDTH_VALID[0] <= self.width_px <= PUCK_WIDTH_VALID[1]
 
     @property
     def at_spot(self) -> bool:

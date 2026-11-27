@@ -95,3 +95,61 @@ def test_the_base_row_gives_the_distance_past_the_floor_line_between_0_and_6_inc
     for row, inches in ((192, 0.0), (183, 1.0), (164, 3.0), (153, 4.0), (133, 6.0)):                # the owner's pictures: lined up from the floor line
         assert abs(pc.CloseReading(40, 30, row, 118).distance_in - inches) <= 0.05, row
     assert 0.0 < pc.CloseReading(40, 30, 188, 118).distance_in < 1.0 and pc.CloseReading(40, 30, 215, 118).distance_in == 0.0
+
+
+def test_a_blob_too_narrow_for_a_puck_is_not_a_close_reading_and_the_floor_finder_can_overrule_at_the_spot():
+    clutter = pc.CloseReading(13, 20, 166, 121)                                # 2026-11-27 run: a 13 px blob "at the pick-up spot"
+    assert not clutter.puck_sized and pc.CloseReading(44, 30, 192, 118).puck_sized and pc.CloseReading(57, 30, 211, 118).puck_sized
+    e = Env([clutter])
+    assert br.close_align(e, br.RState(), say=lambda s: None) == "unread" and e.mover.moves == []              # not turned by, not called "at the spot"
+    from types import SimpleNamespace
+    ok = pc.find_close_array(picture())
+    e = Env([ok, ok])
+    e.last_floor_puck = SimpleNamespace(claw_in=4.7, bearing_deg=22.0)                                       # at the spot by the close finder, 22 degrees off by the floor finder
+    assert br.close_align(e, br.RState(), say=lambda s: None) == "tries" and e.mover.moves[0][0] == "nudge" and e.mover.moves[0][1] == 22.0
+
+
+class Sim(__import__("pi_pipeline.tests.test_basket_run", fromlist=["Env"]).Env):
+    """The basket run's simulated floor, with a close reading: clutter before the pick-up, then what `after` says."""
+    def __init__(self, after, *a, **k):
+        super().__init__(*a, **k)
+        self.after, self.backs = after, []
+        orig = self.mover.back
+        self.mover.back = lambda v: (self.backs.append(round(v, 1)), orig(v))[1]
+
+    def close_reading(self):
+        return pc.CloseReading(13, 20, 166, 121) if self.picks == 0 else self.after
+
+
+def test_the_retrieval_backs_off_instead_of_picking_blind_and_checks_the_puck_is_in_the_jaw():
+    from pi_pipeline.tests.test_basket_run import P
+    e = Sim(pc.CloseReading(57, 30, 211, 118), [{"ok": True}], puck_after=[(8.0, 0.0)])
+    e.w.puck = (8.0, 0.0)
+    r = br.retrieve(e, say=lambda s: None, first=(None, P(8.0, 0.0)))
+    assert r["outcome"] == "retrieved" and e.picks == 1
+    assert e.backs.count(br.CLOSE_REAPPROACH_BACK_IN) == br.CLOSE_REAPPROACH_MAX                                  # twice backed off and looked again, then the pick-up
+    assert not any(b == br.HELD_CHECK_BACK_IN for b in e.backs)                                                   # a puck in the jaw (57 px wide, row 211) needs no check
+
+
+def test_a_pick_that_leaves_the_puck_beside_him_is_not_called_picked_up():
+    from pi_pipeline.tests.test_basket_run import P
+    e = Sim(None, [{"ok": True}], puck_after=[(8.0, 0.0)])                                                        # nothing read after the pick-up: the puck is beside the claw, cropped out of the frame
+    e.w.puck = (8.0, 0.0)
+    real_look, real_pick = e.look, e.pick
+    beside = {"on": False}
+
+    def pick():
+        real_pick()
+        beside["on"] = e.picks == 1                                                                               # the first pick-up misses: the puck lies at 3 inches, 20 degrees off, out of view
+        e.w.puck = None
+        return "ok"
+
+    def look():
+        b, p = real_look()
+        if beside["on"] and e.backs and e.backs[-1] == br.HELD_CHECK_BACK_IN:
+            return b, P(3.0, 20.0)                                                                                # one short back-up and it is in view on the floor
+        return b, p
+    e.pick, e.look = pick, look
+    r = br.retrieve(e, say=lambda s: None, first=(None, P(8.0, 0.0)))
+    assert any("not in the claw" in s["why"] for s in r["steps"] if s["action"] == "picked_check")
+    assert e.backs.count(br.HELD_CHECK_BACK_IN) >= 1
