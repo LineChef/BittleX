@@ -32,22 +32,66 @@ def test_scoring_follows_the_retrieval_and_a_failed_pickup_does_not_end_the_dril
     assert a.score(res("stopped"), s).score is None and a.score(res("fell"), s).code == "fell"
 
 
-def test_a_trial_says_the_setup_waits_runs_the_shared_retrieval_and_lies_down_holding_the_puck(monkeypatch):
-    calls = []
+class Mover:
+    def __init__(self, calls):
+        self.calls = calls
 
-    class Env:
-        def lie_down(self):
-            calls.append("lie")
+    def back(self, inches):
+        self.calls.append(f"back {inches:g}")
+        return "ok"
+
+    def pivot(self, deg):
+        self.calls.append(f"pivot {deg:g}")
+        return "ok"
+
+
+class Env:
+    def __init__(self, calls, drop_state="ok"):
+        self.calls, self.mover, self.drop_state = calls, Mover(calls), drop_state
+
+    def lie_down(self):
+        self.calls.append("lie")
+
+    def ready_to_move(self):
+        self.calls.append("ready")
+
+    def drop(self):
+        self.calls.append("drop")
+        return self.drop_state
+
+
+def test_the_first_trial_asks_for_the_puck_then_each_pickup_ends_with_a_drop_a_back_up_and_a_turn_and_the_next_trial_goes_straight_on(monkeypatch):
+    calls = []
+    outcomes = iter(["retrieved", "retrieved", "puck_not_found", "retrieved"])
 
     def fake_retrieve(env, say=print, on_step=None, first=None, announce=None):
         calls.append("retrieve")
-        return {"outcome": "retrieved", "steps": []}
+        return {"outcome": next(outcomes), "steps": []}
     monkeypatch.setattr(br, "retrieve", fake_retrieve)
     monkeypatch.setattr(pickup, "PLACE_WAIT_S", 0.0)
     said, spoken = [], []
-    a = pickup.PickupDrill(env=Env())
-    r = a.run_attempt(a.base_settings(), AttemptContext(stop=lambda: False, say=said.append, announce=spoken.append))
-    assert r.ended == "retrieved" and calls == ["lie", "retrieve", "lie"]
-    assert spoken[0] == "Put the puck 8 inches ahead of the claw, centred." and "Take it out" in spoken[-1]
+    a = pickup.PickupDrill(env=Env(calls))
+    ctx = AttemptContext(stop=lambda: False, say=said.append, announce=spoken.append)
+    r = a.run_attempt(a.base_settings(), ctx)
+    assert r.ended == "retrieved" and calls == ["lie", "retrieve", "drop", "ready", "back 6"]            # turn 0: no pivot
+    assert spoken == ["Put the puck 8 inches ahead of the claw, centred."]
+    calls.clear()
+    r = a.run_attempt(a.base_settings(), ctx)                                                     # no one touches the puck: straight on
+    assert r.ended == "retrieved" and calls == ["retrieve", "drop", "ready", "back 9", "pivot 15"] and len(spoken) == 1
+    calls.clear()
+    r = a.run_attempt(a.base_settings(), ctx)                                                     # he could not find it: lies down, and the next trial asks again
+    assert r.ended == "puck_not_found" and calls == ["retrieve", "lie"]
+    calls.clear()
+    a.run_attempt(a.base_settings(), ctx)
+    assert calls[:2] == ["lie", "retrieve"] and spoken[-1].startswith("Put the puck")
     r2 = a.run_attempt(a.base_settings(), AttemptContext(stop=lambda: True, say=said.append))
-    assert r2.ended == "stopped"                                                                      # a stop is read before the setup is said
+    assert r2.ended == "stopped"
+
+
+def test_a_fall_in_the_drop_ends_the_trial_as_a_fall(monkeypatch):
+    calls = []
+    monkeypatch.setattr(br, "retrieve", lambda *a, **k: {"outcome": "retrieved", "steps": []})
+    monkeypatch.setattr(pickup, "PLACE_WAIT_S", 0.0)
+    a = pickup.PickupDrill(env=Env(calls, drop_state="fell"))
+    r = a.run_attempt(a.base_settings(), AttemptContext(stop=lambda: False, say=lambda s: None))
+    assert r.ended == "fell" and "back 6" not in calls

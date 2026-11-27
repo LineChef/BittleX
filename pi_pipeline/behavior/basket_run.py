@@ -1291,6 +1291,11 @@ class RealEnv:
         self.last_floor_puck = puck
         return basket
 
+    def drop(self):
+        """Let go of the puck: raise the arm, open then close the claw, lower the arm (behavior/drop.py, the move every way in shares). "ok" or "fell"."""
+        from .drop import drop_puck
+        return drop_puck(self.robot)
+
     def pick(self):
         from .catapult import pick_up
         ok = pick_up(self.link, seen=[])

@@ -1,8 +1,9 @@
 """The pick-up drill: many puck pick-ups in one session, none of the throw, the tub or the line-up (owner, 2026-11-27).
 
-One attempt is one trial. G2 lies at rest and says where to put the puck (claw-tip distance ahead and left, right or centred, from the SPOTS table); the owner puts it there. After a pause he stands, runs the basket goal's own retrieval
-(`behavior/basket_run.retrieve`: scan, turn, last walk, close look, pick, held check, so every fix to the pick-up is shared with the basket goal), lies down holding the puck and says so. The owner takes the puck out of the claw and the
-next trial starts. (Dropping it by himself, backing up and carrying on is the aim; no verified claw-release command exists yet, so the owner takes it for now.)
+The first trial: G2 lies at rest and says where to put the puck (claw-tip distance ahead and left, right or centred, from the SPOTS table); the owner puts it there and after a pause he stands and runs the basket goal's own retrieval
+(`behavior/basket_run.retrieve`: scan, turn, last walk, close look, pick, held check, so every fix to the pick-up is shared with the basket goal). When he has the puck he DROPS it (`behavior/drop.py`: the arm up, the claw open then
+closed, the arm down), backs up and turns a little (the BACKS and TURNS tables, so the next start differs), and goes straight on with the next trial: pick it up again, over and over, with no one touching the puck. The owner only puts the puck
+down again (he lies at rest and says where) when he could not find it. Success is measured by how many pick-ups in a row.
 
 Scoring: retrieved (the finder saw the puck gone from the floor and the held check agreed) is a success (1.0); a pick-up that failed or a puck he could not reach or find is 0. The owner's eyes outrank the code: `g2goal verdict pickup N right|wrong`
 corrects an attempt afterwards. What he learns (judged by the retrieve stage): how far short of the puck the last walk stops, and the last blind step. Nothing here calls an API.
@@ -22,7 +23,9 @@ STAGE_OF = {name: v[8] for name, v in KNOBS.items()}
 
 # (inches from the claw tip ahead, degrees to the right (+) or left (-)): the setups in order, the near middle first, then farther and nearer, then to each side. The owner puts the puck there.
 SPOTS = ((8.0, 0.0), (12.0, 0.0), (6.0, 0.0), (10.0, -15.0), (10.0, 15.0), (14.0, 0.0), (8.0, -10.0), (8.0, 10.0))
-PLACE_WAIT_S = 25.0               # at rest while the owner puts the puck down (and takes the last one out of the claw)
+PLACE_WAIT_S = 25.0               # at rest while the owner puts the puck down (the first trial, and after a puck he could not find)
+BACKS = (6.0, 9.0, 12.0, 5.0, 8.0)       # after a drop he backs up this far (a back-up moves him 6 to 9 inches whatever is asked, 2026-11-27) so the puck lies a different distance ahead each time
+TURNS = (0.0, 15.0, -15.0, 8.0, -8.0)    # and turns this many degrees (+ right) so it lies a little to one side
 
 DIAGNOSIS = {
     "pick_failed": [("pick_undershoot_in", +1), ("blind_step_in", -1)],
@@ -60,22 +63,32 @@ class PickupDrill(BasketGoal):
             time.sleep(min(1.0, max(0.0, end - time.monotonic())))
         return True
 
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self._need_placing = True               # the owner puts the puck down for the first trial and after one he could not find; after a drop it lies in front of him already
+
     def run_attempt(self, settings: dict, ctx: AttemptContext) -> AttemptResult:
         from ..behavior import basket_run as br
         t0 = time.monotonic()
         self.attempt_no += 1
-        spot = SPOTS[(self.attempt_no - 1) % len(SPOTS)]
-        rec: dict = {"attempt": self.attempt_no, "time": time.strftime("%H:%M:%S"), "setup": {"ahead_in": spot[0], "bearing_deg": spot[1]}}
+        n = self.attempt_no
+        rec: dict = {"attempt": n, "time": time.strftime("%H:%M:%S")}
         if ctx.stop():
             return AttemptResult("stopped", 0.0, [], {"rec": rec})
-        words = spot_words(spot)
-        ctx.say(f"pick-up {self.attempt_no}: put the puck {words}")
-        if ctx.announce is not None:
-            ctx.announce(f"Put the puck {words}.")
-        br._rest(self.env, rec)                                                          # at rest while it is put down (a no-op when he already lies)
-        if not self._wait_for_placing(ctx, PLACE_WAIT_S):
-            return AttemptResult("stopped", 0.0, [], {"rec": rec})
-        rec["rested"] = False
+        if self._need_placing:
+            spot = SPOTS[(n - 1) % len(SPOTS)]
+            rec["setup"] = {"placed_ahead_in": spot[0], "placed_bearing_deg": spot[1]}
+            words = spot_words(spot)
+            ctx.say(f"pick-up {n}: put the puck {words}")
+            if ctx.announce is not None:
+                ctx.announce(f"Put the puck {words}.")
+            br._rest(self.env, rec)                                                      # at rest while it is put down (a no-op when he already lies)
+            if not self._wait_for_placing(ctx, PLACE_WAIT_S):
+                return AttemptResult("stopped", 0.0, [], {"rec": rec})
+            rec["rested"] = False
+            self._need_placing = False
+        else:
+            ctx.say(f"pick-up {n}: the puck lies in front of him from the last drop")
         with applied(settings):
             try:
                 def on_step(log, rec=rec):
@@ -83,18 +96,34 @@ class PickupDrill(BasketGoal):
                 r = br.retrieve(self.env, say=ctx.say, on_step=on_step, announce=ctx.announce)
                 why = r["outcome"]
                 rec["retrieval"] = r
+                if why == "retrieved":
+                    why = self._drop_and_back_off(rec, ctx, n)
             except br.Fell:
                 why = "fell"
-        if why == "retrieved":
-            ctx.say("pick-up: the puck is in the claw (the finder says it is off the floor): lying down so it can be taken out")
-            if ctx.announce is not None:
-                ctx.announce("I have it. Take it out of my claw.")
-        br._rest(self.env, rec)
+        if why in ("puck_not_found", "could_not_reach_puck") or ctx.stop():
+            self._need_placing = True                                                    # he cannot find it: lie down and ask for it to be put down again
+        if why != "retrieved" and why != "pick_failed":
+            br._rest(self.env, rec)
         if self._log_path is None:
             import os
             self._log_path = os.path.join(os.path.expanduser(br.LOG_DIR), time.strftime("%Y%m%d_%H%M%S") + "_pickup_drill.json")
         self._log_attempt(rec, why, ctx)
         return AttemptResult(why or "ready", round(time.monotonic() - t0, 1), [], {"rec": rec, "settings": {k: settings.get(k) for k in KNOB_NAMES}})
+
+    def _drop_and_back_off(self, rec: dict, ctx: AttemptContext, n: int) -> str:
+        """He holds the puck: drop it, back up and turn a little. Returns "retrieved", or "fell" when any of it went over."""
+        ctx.say("pick-up: the puck is in the claw: dropping it")
+        if hasattr(self.env, "drop"):
+            if self.env.drop() == "fell":
+                return "fell"
+        back, turn = BACKS[(n - 1) % len(BACKS)], TURNS[(n - 1) % len(TURNS)]
+        rec["after_drop"] = {"back_in": back, "turn_deg": turn}
+        self.env.ready_to_move()
+        if self.env.mover.back(back) == "fell":
+            return "fell"
+        if turn and self.env.mover.pivot(turn) == "fell":
+            return "fell"
+        return "retrieved"
 
     def score(self, result: AttemptResult, settings: dict) -> Outcome:
         rec = result.extra.get("rec") or {}

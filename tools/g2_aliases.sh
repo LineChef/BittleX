@@ -622,6 +622,14 @@ g2pickbisect() {
   ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.pick_bisect$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
   _g2_voice_back
 }
+# g2drop [--no-pick]  -- the drop move: stands him up, picks the puck up from in front of the claw (pickF), raises the arm, opens then closes the claw so the puck falls, lowers the arm and rests him. Hands near; --no-pick when the puck is already in the claw. Voice service stopped and restored.
+g2drop() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  local rest; rest="$(printf ' %q' "$@")"
+  g2stop voice || return 1
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.drop$rest 2>&1 | grep -v 'g2.snapshot exposure unchanged'"
+  _g2_voice_back
+}
 # g2jawrange --to ANGLE [--step N]  -- find the jaw angles for the speed series by eye: stands him up, raises the arm like the claw look (the claw is clear of the floor), steps the jaw from where it is toward ANGLE in small steps (within 60 degrees of the start, at most 12 steps) printing each commanded angle, brings it back, lowers the arm and rests him; then you type which angle looked fully open, fully closed and where it stopped, and it prints the g2armspeed jaw command. Start with a small --to. Runs ONLY on your go, G2 on his feet, hands near; stops the voice service first and starts it again after. Log: ~/g2_runs/jaw_range/.
 g2jawrange() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
