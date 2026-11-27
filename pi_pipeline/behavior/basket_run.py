@@ -1302,6 +1302,18 @@ class RealEnv:
         self.last_drop: dict = {}
         return drop_puck(self.robot, read_arm=read_arm, info=self.last_drop)
 
+    def claw_to(self, lift: float) -> str:
+        """The arm to `lift` (0 is down, centred): "ok" or "fell". The claw look's own move, at its own speed, watching the IMU."""
+        return self.robot.claw_pose(0.0, float(lift))
+
+    def tilt_now(self):
+        """The body's (pitch, roll) in degrees from a fresh IMU read, or None."""
+        try:
+            t = self.robot._tilt(0.3)
+        except Exception:  # noqa: BLE001
+            return None
+        return None if t is None else (round(float(t[0]), 1), round(float(t[1]), 1))
+
     def pick(self):
         from .catapult import pick_up
         ok = pick_up(self.link, seen=[])

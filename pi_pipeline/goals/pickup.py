@@ -98,6 +98,7 @@ class PickupDrill(BasketGoal):
                 rec["retrieval"] = r
                 if why == "retrieved":
                     why = self._drop_and_back_off(rec, ctx, n)
+                    rec.pop("_t0", None)
             except br.Fell:
                 why = "fell"
         if why in ("puck_not_found", "could_not_reach_puck") or ctx.stop():
@@ -110,22 +111,39 @@ class PickupDrill(BasketGoal):
         self._log_attempt(rec, why, ctx)
         return AttemptResult(why or "ready", round(time.monotonic() - t0, 1), [], {"rec": rec, "settings": {k: settings.get(k) for k in KNOB_NAMES}})
 
+    def _tilt_log(self, rec: dict, label: str) -> None:
+        """Pitch and roll after each phase of the drop and back-off, so a fall can be placed in the sequence (owner, 2026-11-27)."""
+        t = self.env.tilt_now() if hasattr(self.env, "tilt_now") else None
+        rec.setdefault("tilts", []).append([label, None if t is None else t[0], None if t is None else t[1], round(time.monotonic() - rec.get("_t0", time.monotonic()), 1)])
+
     def _drop_and_back_off(self, rec: dict, ctx: AttemptContext, n: int) -> str:
-        """He holds the puck: drop it, back up and turn a little. Returns "retrieved", or "fell" when any of it went over."""
+        """He holds the puck: drop it, stand up again with the claw down, raise the claw clear of the floor (the puck lies under it), back up and turn a little, lower the claw. Returns "retrieved", or "fell" when any of it went over."""
+        from ..behavior.drop import DROP_CLEAR_LIFT_DEG
+        rec["_t0"] = time.monotonic()
         ctx.say("pick-up: the puck is in the claw: dropping it")
         if hasattr(self.env, "drop"):
             state = self.env.drop()
             rec["drop"] = getattr(self.env, "last_drop", None)                           # the commands sent, the arm's reads, the phase times and the worst tilt
             if state == "fell":
                 return "fell"
+        self._tilt_log(rec, "after the drop (attention pose)")
         back, turn = BACKS[(n - 1) % len(BACKS)], TURNS[(n - 1) % len(TURNS)]
-        rec["after_drop"] = {"back_in": back, "turn_deg": turn}
-        rec["after_drop"]["pack_pct"] = getattr(self, "last_pack_pct", None)
-        self.env.ready_to_move()
+        rec["after_drop"] = {"back_in": back, "turn_deg": turn, "pack_pct": getattr(self, "last_pack_pct", None), "clear_lift": DROP_CLEAR_LIFT_DEG}
+        self.env.ready_to_move()                                                         # the claw down, rest, the eased stand-up (the firmware stand-up puts the claw lift back to 0)
+        self._tilt_log(rec, "after the stand-up")
+        if hasattr(self.env, "claw_to") and self.env.claw_to(DROP_CLEAR_LIFT_DEG) == "fell":
+            return "fell"
+        self._tilt_log(rec, f"claw at {DROP_CLEAR_LIFT_DEG:g}")
         if self.env.mover.back(back) == "fell":
             return "fell"
+        self._tilt_log(rec, f"after backing {back:g}")
         if turn and self.env.mover.pivot(turn) == "fell":
             return "fell"
+        if turn:
+            self._tilt_log(rec, f"after turning {turn:g}")
+        if hasattr(self.env, "claw_to") and self.env.claw_to(0.0) == "fell":              # down again for the next look (the camera is on the claw)
+            return "fell"
+        self._tilt_log(rec, "claw down")
         return "retrieved"
 
     def score(self, result: AttemptResult, settings: dict) -> Outcome:

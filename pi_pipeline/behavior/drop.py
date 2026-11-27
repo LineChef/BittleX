@@ -13,6 +13,7 @@ DROP_LIFT_DEG = 120.0        # the claw look's height: the claw is clear of the 
 DROP_JAW_OPEN_DEG = 60.0     # the widest the jaw was driven (a puck is about as wide as the jaw's opening at less)
 DROP_OPEN_S = 0.8            # the jaw stays open this long so the puck falls out
 DROP_CLOSE_S = 0.4           # and this long closed before the arm comes down
+DROP_CLEAR_LIFT_DEG = 45.0   # after a drop the puck lies under the claw (owner, 2026-11-27): once he is standing again the arm goes to this height, clear of the floor, for the back-up (backing up with the claw down dragged the puck), then down again for the next look. A first guess to tune by eye
 
 
 def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG, jaw_open: float = DROP_JAW_OPEN_DEG, open_s: float = DROP_OPEN_S, close_s: float = DROP_CLOSE_S,

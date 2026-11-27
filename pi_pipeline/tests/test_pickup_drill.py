@@ -55,6 +55,13 @@ class Env:
     def ready_to_move(self):
         self.calls.append("ready")
 
+    def claw_to(self, lift):
+        self.calls.append(f"claw {lift:g}")
+        return "ok"
+
+    def tilt_now(self):
+        return (1.5, -2.0)
+
     def drop(self):
         self.calls.append("drop")
         return self.drop_state
@@ -73,11 +80,13 @@ def test_the_first_trial_asks_for_the_puck_then_each_pickup_ends_with_a_drop_a_b
     a = pickup.PickupDrill(env=Env(calls))
     ctx = AttemptContext(stop=lambda: False, say=said.append, announce=spoken.append)
     r = a.run_attempt(a.base_settings(), ctx)
-    assert r.ended == "retrieved" and calls == ["lie", "retrieve", "drop", "ready", "back 6"]            # turn 0: no pivot
+    assert r.ended == "retrieved" and calls == ["lie", "retrieve", "drop", "ready", "claw 45", "back 6", "claw 0"]            # turn 0: no pivot; the claw clear of the floor for the back-up (the puck lies under it) then down
     assert spoken == ["Put the puck 8 inches ahead of the claw, centred."]
+    tilts = a._recs[-1]["tilts"] if a._recs else None
+    assert tilts and [t[0] for t in tilts][:3] == ["after the drop (attention pose)", "after the stand-up", "claw at 45"] and tilts[0][1:3] == [1.5, -2.0] and "_t0" not in a._recs[-1]
     calls.clear()
     r = a.run_attempt(a.base_settings(), ctx)                                                     # no one touches the puck: straight on
-    assert r.ended == "retrieved" and calls == ["retrieve", "drop", "ready", "back 9", "pivot 15"] and len(spoken) == 1
+    assert r.ended == "retrieved" and calls == ["retrieve", "drop", "ready", "claw 45", "back 9", "pivot 15", "claw 0"] and len(spoken) == 1
     calls.clear()
     r = a.run_attempt(a.base_settings(), ctx)                                                     # he could not find it: lies down, and the next trial asks again
     assert r.ended == "puck_not_found" and calls == ["retrieve", "lie"]
