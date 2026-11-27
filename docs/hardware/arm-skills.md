@@ -207,3 +207,5 @@ Open questions
 - Whether the claw angle at the release means open or closed in the toss frames (negative values in `tossF` and `hunt`, positive in `pickF`).
 - Whether `toss` throws to the left or the right on G2's claw, since both names play the one motion.
 - Whether the throw clears the pod and the Pi stack, which sit behind the claw.
+
+The drop (2026-11-27): `behavior/drop.py`, the move that lets go of a held puck. The arm goes up first (the claw drags on the floor if the jaw opens in the carry position), the jaw opens to 60 for 0.8 seconds and closes; the board reports jaw 60 while open and 0 after, and the owner saw the claw open. The puck lands under the claw, so the pick-up drill backs up with the arm still raised and lowers it afterwards; lowering the claw onto it and then lying down lifted the claw and flipped him every time. At the claw look's height (120) a plain stand pitched about 18 degrees and the roll reached 23 degrees while lowering; in the attention pose the tilt stayed within 3 degrees but it cannot walk back. The standing drop uses lift 75, not yet run on G2. `g2drop` tests it alone.
