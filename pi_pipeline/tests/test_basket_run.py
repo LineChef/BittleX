@@ -36,7 +36,7 @@ def test_the_retrieval_decisions():
     a = act(P(5.3, 1.4))
     assert a.kind == "back" and abs(a.value - (br.PICK_STAND_IN - 5.3)) < 1e-9                        # the 2026-11-25 pick-up: 5.3 inches is too near for a walk that moves about 8: back up first
     assert act(P(0.2, 0.0)).value == 0.0
-    assert act(P(20.0, 0.0), B(7.0, 0.0)).value == 0.0 and act(P(20.0, 0.0), B(7.0, 0.0)).why == "too_near_the_basket"     # never walks on toward a basket inside the buffer
+    assert act(P(20.0, 0.0), B(7.0, 0.0)).kind == "forward"                                          # a tub close beside him never ends the retrieval (owner, 2026-11-27): the walk goes on
     c = P(7.9, 0.4)
     c.clipped = True
     a = act(c)
@@ -270,8 +270,8 @@ def test_the_stops():
     assert r["outcome"] == "pick_failed" and r["attempts"][0]["retrieval"]["steps"][-1]["why"] == "puck still on the floor"
     r = br.run_sequence(Env([ok(), ok(), ok()], puck_after=[(24.0, 0.0)] * 3), max_attempts=2, say=lambda s: None)
     assert r["outcome"] == "max_attempts" and len(r["attempts"]) == 2
-    r = br.run_sequence(Env([ok()], puck_after=[(20.0, 0.0)], basket_start=(6.0, 0.0)), say=lambda s: None)
-    assert r["outcome"] == "too_near_the_basket"                                                  # a puck lying in front of a basket that close is not walked to
+    r = br.run_sequence(Env([ok()], puck_after=[(20.0, 0.0)], basket_start=(6.0, 0.0)), max_attempts=1, say=lambda s: None)
+    assert r["outcome"] == "max_attempts" and r["attempts"][0]["retrieval"]["steps"][0]["action"] != "give_up"     # a puck in front of a tub that close is still walked to and picked up (owner, 2026-11-27)
 
 
 def test_a_fall_in_a_mover_ends_the_retrieval():
@@ -313,16 +313,12 @@ def test_the_camera_burst_returns_back_to_back_frames_without_exposure_work():
     assert cam.grab_burst(1.0) == []                                                                 # never raises
 
 
-def test_a_basket_cut_off_by_the_frame_is_too_near_to_walk_toward():
-    near = B(11.0, 0.0)
-    near.touches_edge = True
-    assert act(P(20.0, 0.0), near).why == "too_near_the_basket"                                      # clipped and near
-    wide = B(30.0, 0.0)
-    wide.touches_edge, wide.width_px = True, 90
-    assert act(P(20.0, 0.0), wide).why == "too_near_the_basket"                                      # clipped and wide
-    far = B(17.0, 35.6)
-    far.touches_edge, far.width_px = True, 43
-    assert act(P(20.0, 0.0), far).kind != "give_up"                                                  # a small, far basket just out of frame (the run that ended on it, 2026-11-23)
+def test_a_basket_cut_off_by_the_frame_never_ends_the_retrieval():
+    for dist, wpx in ((11.0, 40), (30.0, 90), (17.0, 43)):
+        bsk = B(dist, 0.0)
+        bsk.touches_edge, bsk.width_px = True, wpx
+        assert act(P(20.0, 0.0), bsk).kind == "forward"                                              # the 2026-11-27 runs ended on a tub read 11 inches off and cut by the frame, with the puck 4 to 6 inches from the claw
+        assert act(P(3.6, -4.1), bsk).kind != "give_up"                                              # a puck 3.6 inches from the claw is worked on (here a back-up first), never given up on
 
 
 def test_the_save_hook_sees_the_run_as_it_goes_and_a_retrieval_step_is_saved_when_taken():
@@ -689,7 +685,6 @@ def test_every_way_an_attempt_can_stop_but_a_fall_ends_with_him_lying_down():
         def lie_down(self):
             lies.append(1)
     for kwargs, why in (({"puck_after": [(24.0, 0.0)], "pick_works": False}, "pick_failed"),                  # a retrieval that gave up
-                        ({"puck_after": [(20.0, 0.0)], "basket_start": (6.0, 0.0)}, "too_near_the_basket"),
                         ({"puck_after": [None]}, "circled_twice")):
         lies.clear()
         r = br.run_sequence(E([ok()], **kwargs), say=lambda s: None)

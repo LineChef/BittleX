@@ -39,8 +39,6 @@ APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
 CLOSE_ALIGN_TRIES = 2               # after the last walk: look at the puck against the pick-up spot (vision/puck_close.py, from the owner's 2 inch pictures) and correct at most this many times before the pick-up (each look is time on his feet; owner, 2026-11-26: "this is how he should try to get aligned")
 CLOSE_FORWARD_IN, CLOSE_BACK_IN = 0.0, 1.0   # the corrections for a puck farther or nearer than the spot. A back-up of 1 second moves about 2 inches. No forward correction yet (0): a forward walk moves about 8 inches whatever is asked, which would push the puck away; it needs the rows-to-inches pictures (1, 3, 4 and 6 inches) and a measured short step
-BASKET_GUARD_IN = bl.BUFFER_IN + bl.CLOSE_MARGIN_IN
-EDGE_GUARD_IN, EDGE_GUARD_WIDTH_PX = 12.0, 80    # a basket cut off by the frame's edge counts as right beside him only when it also reads this near (a clipped basket's width is low, so its distance reads long) or is this wide; a far, small, clipped one is just out of frame (2026-11-23: a basket 17 inches out ended a run)
 GONE_WITHIN_IN = 12.0                # after a pick-up a puck still seen on the floor this near means the pick-up missed
 CONFIRM_LOOK = "quick"               # "quick": the walk-up's own last picture (claw down, taken at once, read at once: no attention-pose cycle, no standing about) is the confirm picture (owner, 2026-11-24: "he can just walk up and take a fast picture, but he can't be standing idle for a long time afterwards"); "claw_up": the attention-pose look as first built (`env.confirm_look()`)
 CAMERA_MISSES_MAX = 2                # this many pictures in a row with no answer while he stands in the walk-up: he lies down and the attempt stops (a stalled camera must not leave him standing: the legs sag after about 10 s)
@@ -103,11 +101,10 @@ class RState:
 
 
 def next_retrieval_action(puck, basket, st: RState) -> RAction:
-    """The next step toward the puck from a fresh look (a PuckReading or None, and the basket reading or None in the same picture)."""
+    """The next step toward the puck from a fresh look (a PuckReading or None, and the basket reading or None in the same picture).
+    The tub's nearness never ends the retrieval (owner, 2026-11-27: two runs gave up with the puck a few inches from the claw and the tub 11 inches off; the puck is never dangerously close to it): the basket reading is only logged."""
     if st.steps >= MAX_RETRIEVAL_STEPS:
         return RAction("give_up", 0.0, "could_not_reach_puck")
-    if basket is not None and (basket.claw_in < BASKET_GUARD_IN or (getattr(basket, "touches_edge", False) and (basket.claw_in <= EDGE_GUARD_IN or basket.width_px >= EDGE_GUARD_WIDTH_PX))):
-        return RAction("give_up", 0.0, "too_near_the_basket")
     if puck is None:
         if st.scanned_deg >= SCAN_MAX_DEG or st.scans >= MAX_SCANS:
             return RAction("give_up", 0.0, "puck_not_found")
@@ -854,7 +851,7 @@ def attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state=
 
 def run_sequence(env, max_attempts: int = MAX_ATTEMPTS, say=print, save=None) -> dict:
     """The attempts. Returns {"outcome": ..., "attempts": [...]}; the outcome says why it stopped: "made" (stop for the owner's reset), "max_attempts", "fell", "battery", "throw_failed", "circled_twice", "tub_lost", "no_basket",
-    "basket_not_found", "could_not_align", "puck_not_found", "could_not_reach_puck", "too_near_the_basket", "pick_failed"."""
+    "basket_not_found", "could_not_align", "puck_not_found", "could_not_reach_puck", "pick_failed" (older journal rows also carry "too_near_the_basket", which no longer ends a run)."""
     attempts: list = []
     holding = False
     outcome = "max_attempts"
