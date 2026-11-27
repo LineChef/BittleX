@@ -187,3 +187,41 @@ def test_a_wide_arc_is_a_timed_walking_turn_with_no_pivot_distance_and_reports_w
     m.arc(500.0)
     assert r.calls[-1][1][0] == bm.ARC_MAX_DEG and r.calls[-1][1][1] <= 6.0                       # a safety cap on one arc: never longer than the 6 s turn limit
     assert bm.BasketMover(FakeRobot(fall_on="turn")).arc(45.0) == "fell"
+
+
+class GyroRobot(FakeRobot):
+    """A robot whose gyro-stopped turns report what they turned (`last_turn_deg`), one result per call."""
+
+    def __init__(self, got):
+        super().__init__()
+        self.got = list(got)
+        self.last_turn_deg = None
+
+    def turn(self, degrees, seconds, stop_deg=0.0):
+        self.last_turn_deg = self.got.pop(0)
+        return self._do("turn", degrees, seconds, stop_deg=stop_deg)
+
+
+def test_a_turn_that_got_far_less_than_asked_is_finished_in_the_same_move():
+    r = GyroRobot([2.0, 7.0])                                              # asked 12.9: got 2.0, then the remaining 10.9 turned 7.0 (over 60 percent of what was left: done)
+    m = bm.BasketMover(r)
+    assert m.nudge(12.9) == "ok"
+    turns = [c for c in r.calls if c[0] == "turn"]
+    assert len(turns) == 2 and abs(turns[1][2]["stop_deg"] - 10.9) < 1e-9 and turns[1][1][0] > 0         # the same direction, the rest of it
+    r = GyroRobot([5.0])
+    bm.BasketMover(r).nudge(-6.0)
+    assert len([c for c in r.calls if c[0] == "turn"]) == 1                                                # 5.0 of 6.0: done
+
+
+def test_a_turn_finish_stops_when_it_is_not_moving_and_never_after_a_fall():
+    r = GyroRobot([0.2, 0.1, 5.0])
+    m = bm.BasketMover(r)
+    m.nudge(-12.9)
+    turns = [c for c in r.calls if c[0] == "turn"]
+    assert len(turns) == 2 and turns[1][1][0] < 0                                                          # one finish, it moved 0.1: left to the next look
+    r = GyroRobot([1.0, 1.0])
+    r.fall_on = "turn"
+    assert bm.BasketMover(r).nudge(10.0) == "fell" and len([c for c in r.calls if c[0] == "turn"]) == 1
+    r = FakeRobot()
+    bm.BasketMover(r).nudge(10.0)
+    assert len([c for c in r.calls if c[0] == "turn"]) == 1                                                # a robot that does not report its turn: as before

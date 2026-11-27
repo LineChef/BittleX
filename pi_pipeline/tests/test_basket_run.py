@@ -919,3 +919,25 @@ def test_a_narrow_tall_blob_at_the_bottom_after_a_last_walk_is_the_puck_behind_t
     assert br.close_align(Env(CloseReading(5, 4, 211, 93)), st, say=lambda s: None) == "unread"              # a 4 px high glint is not the puck
     st.last_seen_in = 20.0
     assert br.close_align(Env(CloseReading(7, 41, 207, 104)), st, say=lambda s: None) == "unread"
+
+
+def test_a_wide_near_relaxed_puck_read_is_not_confirmed_with_a_second_picture():
+    from types import SimpleNamespace as NS
+    assert br.relaxed_read_is_clear(NS(width_px=14, claw_in=10.0)) and br.relaxed_read_is_clear(NS(width_px=30, claw_in=4.8))
+    assert not br.relaxed_read_is_clear(NS(width_px=13, claw_in=9.0)) and not br.relaxed_read_is_clear(NS(width_px=20, claw_in=10.5))
+    assert not br.relaxed_read_is_clear(NS())
+
+    class E(br.RealEnv):
+        def __init__(self, reads):
+            self.reads, self.n = reads, 0
+
+        def _quick(self, by):
+            self.n += 1
+            return None, self.reads.pop(0)
+    near = NS(relaxed=True, width_px=16, claw_in=6.0, bearing_deg=0.0)
+    e = E([near])
+    assert e.look()[1] is near and e.n == 1                                                              # one picture
+    far = NS(relaxed=True, width_px=9, claw_in=7.7, bearing_deg=22.0, y=5)
+    e = E([far, far])
+    e.look()
+    assert e.n == 2                                                                                      # a small read is still confirmed

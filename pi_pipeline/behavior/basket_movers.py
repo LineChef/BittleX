@@ -21,6 +21,7 @@ BACK_TAIL_IN_S = 6.0                                     # beyond the last measu
 BACK_MIN_S = BACK_POINTS[0][0]                           # the shortest back-up measured (and the ball goal's own)
 BACK_MAX_IN = 12.0                                       # a safety cap on one back-up step (the line-up asks for 6 at most)
 FWD_MAX_IN = 12.0
+TURN_FINISH_RETRIES, TURN_FINISH_BELOW, TURN_FINISH_MIN_DEG, TURN_FINISH_PROGRESS_DEG = 2, 0.6, 3.0, 0.5   # a turn that got under 60 percent of its ask (and left at least 3 degrees) is finished up to twice in the same move; a finish that moved under 0.5 degrees ends it
 PIVOT_MIN_IN, PIVOT_MAX_IN, PIVOT_DISTANCE_IN = 8.0, 40.0, 20.0    # every basket-run turn is the in-place pivot: a distance outside 8 to 40 inches, or none at all (a scan with nothing in view), would pick the walking arc, which creeps forward (2026-11-23: a scan and a turn toward a puck 5.6 inches away walked him from 16 inches to 7 inches of the basket)
 ARC_RATE_DEG_S = 9.5                                     # the walking arc's real turn rate, the same each way (measured 2026-11-24 with a ruler, five arcs of 90 degrees asked: about 90 degrees in 10 s)
 ARC_MAX_DEG = 57.0                                       # a safety cap on one wide arc (the circling search asks for 45): 57 degrees is 6 s, the longest turn the robot runs
@@ -80,8 +81,24 @@ class BasketMover:
             return self.state
         rate = self._rate(degrees, pulse)
         signed = want if degrees > 0 else -want
-        self.state = self.robot.turn(signed, max(chase.MIN_MOVE_S, want / rate), stop_deg=want)
+        self.state = self._gyro_turn(signed, want, rate)
+        for _ in range(TURN_FINISH_RETRIES):                       # a gyro-stopped turn that ended on its time cap having turned far less than asked (2026-11-27 drill: 12.9 asked, 0.2 got; 16.1 asked, 0.3 got; 19 of 41 turns got under 60 percent) is finished now from where it stopped, not after a new picture and a second decision (about 6 seconds standing each)
+            got = getattr(self.robot, "last_turn_deg", None)
+            if self.state == "fell" or got is None or got >= TURN_FINISH_BELOW * want or want - got < TURN_FINISH_MIN_DEG:
+                break
+            want -= got
+            signed = want if degrees > 0 else -want
+            self.state = self._gyro_turn(signed, want, rate)
+            if (getattr(self.robot, "last_turn_deg", None) or 0.0) < TURN_FINISH_PROGRESS_DEG:
+                break                                                # it is not moving: leave it to the next look
         return self.state
+
+    def _gyro_turn(self, signed: float, want: float, rate: float) -> str:
+        try:
+            self.robot.last_turn_deg = None                          # so a turn that is not gyro-stopped is never read as the last one's result
+        except AttributeError:
+            pass
+        return self.robot.turn(signed, max(chase.MIN_MOVE_S, want / rate), stop_deg=want)
 
     def scan(self, degrees: float) -> str:
         return self._turn(degrees, pulse=abs(degrees) < chase.PIVOT_MIN_DEG)

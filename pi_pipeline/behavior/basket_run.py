@@ -53,6 +53,7 @@ CLOSE_REAPPROACH_MAX, CLOSE_REAPPROACH_BACK_IN = 2, 4.0   # the puck is not at t
 HELD_BASE_ROW_MIN, HELD_CHECK_BACK_IN = 200, 3.0   # after the pick-up a puck in the jaw reads 57 to 65 px wide with its base at row 200 or lower; otherwise he backs off this far and looks, and a puck seen on the floor means it was missed
 CLOSE_ALIGN_TRIES = 2               # after the last walk: look at the puck against the pick-up spot (vision/puck_close.py, from the owner's 2 inch pictures) and correct at most this many times before the pick-up (each look is time on his feet; owner, 2026-11-26: "this is how he should try to get aligned")
 CLOSE_FORWARD_IN, CLOSE_BACK_IN = 0.0, 1.0   # the corrections for a puck farther or nearer than the spot. A back-up of 1 second moves about 2 inches. No forward correction yet (0): a forward walk moves about 8 inches whatever is asked, which would push the puck away; it needs the rows-to-inches pictures (1, 3, 4 and 6 inches) and a measured short step
+RELAXED_CLEAR_WIDTH_PX, RELAXED_CLEAR_WITHIN_IN = 14, 10.0   # a puck read only by the relaxed pass that is at least this wide and within this many inches needs no confirming second picture (2026-11-27: 34 such readings in the day's pictures, 30 real pucks; the 4 false ones (hardwood knots, the tub) read the same in both pictures of a pair, so the confirm never caught them)
 CLIPPED_ROW_PX = 210                 # a puck whose base reaches the crop (rows past BOTTOM_ROW 212 are not read) is cut off; see CLIPPED_UNDER_JAW_ROW_PX for narrow blobs
 CLIPPED_UNDER_JAW_ROW_PX = 205                 # a puck whose base reaches this row is at the bottom of the picture, partly behind the claw jaw (the jaw tip is near row 205): its base row and column are cut off, so the close look neither backs up for it nor turns for a small offset (2026-11-27 run: three last walks left it at row 211, the close look turned the puck from 98 to 81 px, then read nothing and backed up, and the third try, picked blind from there, got it)
 CLIPPED_COL_TOL_PX = 30              # the sideways offset a clipped puck may have before the close look turns him (the pick-up window is about 1 inch; 20 px there is under half an inch)
@@ -569,6 +570,14 @@ def merge_looks(seen: dict, offsets: dict):
 def close_align_on() -> bool:
     """G2_PICK_CLOSE_ALIGN=0 puts the pick-up back to the blind last walk and pick (the closed-loop alignment is the default: owner, 2026-11-26)."""
     return os.environ.get("G2_PICK_CLOSE_ALIGN", "1") != "0"
+
+
+def relaxed_read_is_clear(puck) -> bool:
+    """A puck read by the relaxed pass wide enough and near enough that the confirming second picture is skipped."""
+    try:
+        return int(puck.width_px) >= RELAXED_CLEAR_WIDTH_PX and float(puck.claw_in) <= RELAXED_CLEAR_WITHIN_IN
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 
 def next_close_action(reading) -> RAction | None:
@@ -1276,6 +1285,8 @@ class RealEnv:
         basket, puck = self._quick("width")
         if puck is None or not getattr(puck, "relaxed", False) or os.environ.get("G2_PUCK_RELAXED_CONFIRM", "1") == "0":
             return basket, puck
+        if relaxed_read_is_clear(puck):
+            return basket, puck                                           # near and wide enough to be the puck: no second picture (about 1.5 s standing still)
         basket2, puck2 = self._quick("width")
         if pf.readings_agree(puck, puck2):
             return basket2, puck2
