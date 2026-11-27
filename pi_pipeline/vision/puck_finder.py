@@ -18,6 +18,8 @@ from .ball_finder import _blobs, _decode
 SAT_MIN, VALUE_MIN = 0.30, 100            # FIRST PASS: a pixel counts when its saturation and brightest channel are at least this (the floor and the wall are grey)
 TOP_ROW, BOTTOM_ROW, EDGE_COLS = 94, 200, 12   # the floor part of a 240 x 240 picture: below the wall's base, above the jaws, away from the side edges
 MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6   # FIRST PASS: the puck's blob: at least this many pixels, no side longer than this, not a long sliver
+BIG_PUCK_MAX_IN = 6.0                        # (see below)
+MAX_SIDE_CLAW_DOWN_PX = 40                  # a claw-down quick picture: the puck 4 to 6 inches ahead is 22 by 32 and 32 by 37 pixels (2026-11-27 run: two pictures of it read nothing against MAX_SIDE_PX, then 14 pivot scans never saw it again); every other test (colour, hue, blue, the tub's box) still applies
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
 TOP_ROW_CLAW_DOWN = 84                       # a claw-down picture sees the floor further out (the puck at the wall's base, about 25 inches, sits at row 91): the floor part starts higher there
 BLOB_SAT_MEAN_MIN, BLOB_SAT_P90_MIN = 0.40, 0.50   # FIRST PASS: the blob's own colour: the puck is strongly saturated (mean 0.42 to 0.54 and 90th percentile 0.55 to 0.70 over the recognition pictures), the hardwood's glare and grain are not (mean 0.33 to 0.39, 90th percentile 0.35 to 0.46 over the false blobs of 2026-11-23)
@@ -94,8 +96,10 @@ def _best_blob(a, mx, sat, basket, by, sat_min, min_px, blob_mean_min, blob_p90_
         if n < min_px:
             continue
         w, h = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
-        if max(w, h) > MAX_SIDE_PX or max(w / h, h / w) > MAX_ASPECT:
+        if max(w / h, h / w) > MAX_ASPECT:
             continue
+        if max(w, h) > MAX_SIDE_PX and not (by == "width" and max(w, h) <= MAX_SIDE_CLAW_DOWN_PX and ROW_K_CD / max(float(ys.mean()) - ROW_HORIZON_CD, 1.0) <= BIG_PUCK_MAX_IN):
+            continue                                                                   # a big blob is a puck only close up: a claw-down picture, the puck within BIG_PUCK_MAX_IN by its row (the room's rugs and clothes at 11 to 14 inches were read as one)
         cx, cy = float(xs.mean()), float(ys.mean())
         if _inside(basket, cx, cy) or _on_tape(basket, cx, cy):
             continue

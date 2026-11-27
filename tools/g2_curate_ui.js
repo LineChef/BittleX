@@ -49,6 +49,13 @@ function curatePanel(list){
  box.append(fl);list.append(box)}
 window.curatePanel=curatePanel;
 
+// Change the room of pictures from the Rooms tab (the same call as the Pictures tab's Room button), then redraw with an Undo
+async function roomsEdit(pics,cur,question){let r=prompt(question,cur||"");if(r===null)return;r=r.trim().toLowerCase().replace(/\s+/g," ").slice(0,40);if(r===(cur||""))return;
+ const m={};for(const p of pics)m[p.path]=r;
+ try{const res=await api("/api/pictures/room",{rooms:m});data=await api("/api/rooms");render();
+  toast(r?"Room set to "+r+" for "+pics.length+" picture(s)":"Room cleared for "+pics.length+" picture(s)",async()=>{await api("/api/pictures/room",{rooms:res.previous});data=await api("/api/rooms");render()})}
+ catch(e){toast("Failed: "+e.message)}}
+
 // ---- Rooms: what G2 knows about each room (counts only, no dates) and the pictures tagged with it
 window.renderRooms=function(list,f){
  const d=data||{rooms:[]},rooms=(d.rooms||[]).filter(r=>!f||JSON.stringify(r).toLowerCase().includes(f));
@@ -62,8 +69,15 @@ window.renderRooms=function(list,f){
   if((r.hazards||{}).fall)bits.push((r.hazards.fall)+" falls");if((r.hazards||{}).bump)bits.push((r.hazards.bump)+" bumps");
   main.append(el("div","meta",bits.join(" \u00b7 ")));
   main.append(el("div","meta",r.items.length?"Seen here: "+r.items.map(([k,v])=>k+" ("+v+")").join(", "):"Nothing named here yet."));
-  if(r.pictures.length){const g=el("div","grid");g.style.cssText="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-top:6px";
-   for(const p of r.pictures){const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.name||"";im.style.cssText="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in";
-    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||"")+" \u00b7 "+r.name;lb.style.display="flex"};g.append(im)}main.append(g)}
+  if(r.pictures.length){
+   const bar=el("div");bar.style.cssText="margin-top:6px";
+   bar.append(window.g2btn("Rename room\u2026",()=>roomsEdit(r.pictures,r.name,"Rename the room \u201c"+r.name+"\u201d for all "+r.pictures.length+" pictures shown (an empty name clears their room):")));
+   if(r.tagged>r.pictures.length)bar.append(el("span","meta"," \u00b7 showing "+r.pictures.length+" of "+r.tagged+" tagged pictures"));
+   main.append(bar);
+   const g=el("div","grid");g.style.cssText="grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-top:6px";
+   for(const p of r.pictures){const c=el("div");c.style.cssText="display:flex;flex-direction:column;gap:3px";const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.name||"";im.style.cssText="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in";
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||"")+" \u00b7 "+r.name;lb.style.display="flex"};
+    const eb=el("button","rbtn set","Room: "+r.name);eb.title="Change which room this picture is from (empty clears it)";eb.onclick=(ev)=>{ev.stopPropagation();roomsEdit([p],r.name,"Which room is this picture from? (empty clears it)")};
+    c.append(im,eb);g.append(c)}main.append(g)}
   row.append(main);list.append(row)}};
 })();

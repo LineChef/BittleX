@@ -603,3 +603,21 @@ def test_the_sync_script_lists_the_groom_and_the_charts_as_steps_that_only_a_for
 def V_SYNC_TASKS():
     import g2_goals_view as V
     return V.SYNC_STALE_H
+
+
+def test_the_rooms_tab_lists_every_tagged_picture_and_a_picture_can_be_moved_to_another_room(tmp_path, monkeypatch):
+    """The Rooms tab shows all of a room's tagged pictures (not the first 8), so a mislabelled one can be found; moving or clearing one is the same set_rooms call as the Pictures tab's Room button."""
+    from tools import g2_review as gr
+    monkeypatch.setattr(gr, "CACHE", tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    app = gr.App.__new__(gr.App)
+    pics = [{"path": f"survey/20261010/p_{i}.jpg", "name": f"p_{i}", "pose": None, "group": "survey"} for i in range(12)]
+    app.remote = type("R", (), {"pictures": lambda self, *a: pics})()
+    app.set_rooms({p["path"]: "kitchen" for p in pics})
+    rooms = {r["name"]: r for r in app.rooms()["rooms"]}
+    assert rooms["kitchen"]["tagged"] == 12 and len(rooms["kitchen"]["pictures"]) == 12
+    res = app.set_rooms({pics[3]["path"]: "hallway"})
+    rooms = {r["name"]: r for r in app.rooms()["rooms"]}
+    assert len(rooms["kitchen"]["pictures"]) == 11 and [p["name"] for p in rooms["hallway"]["pictures"]] == ["p_3"]
+    app.set_rooms(res["previous"])                                                                  # the Undo the tab offers
+    assert {r["name"] for r in app.rooms()["rooms"]} == {"kitchen"}

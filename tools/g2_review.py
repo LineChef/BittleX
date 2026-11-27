@@ -871,7 +871,7 @@ class App:
         return out
 
     def rooms(self) -> dict:
-        """The Rooms tab: what G2 knows about each room (his places memory, copied here by tools/g2_places_sync.py; counts only) and the pictures you tagged with that room."""
+        """The Rooms tab: what G2 knows about each room (his places memory, copied here by tools/g2_places_sync.py; counts only) and the pictures you tagged with that room (up to 400 a room; each can be moved to another room or cleared, and a whole room renamed, from this tab)."""
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         try:
             mem = json.loads((Path(os.path.expanduser("~/Desktop/G2Memory")) / "places.json").read_text())
@@ -892,7 +892,7 @@ class App:
                 items[k] = items.get(k, 0) + v
             out.append({"name": name, "floor": e.get("floor"), "sessions": e.get("sessions", 0), "goal_sessions": e.get("goal_sessions", 0), "stops": e.get("stops", 0),
                         "hazards": e.get("hazards") or {}, "items": sorted(items.items(), key=lambda kv: -kv[1])[:8], "tagged": len(by.get(name, [])),
-                        "pictures": by.get(name, [])[:8]})
+                        "pictures": by.get(name, [])[:400]})
         out.sort(key=lambda r: -(r["tagged"] + r["sessions"] + r["goal_sessions"]))
         return {"rooms": out, "synced": mem != {}}
 

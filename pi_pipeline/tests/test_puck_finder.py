@@ -155,3 +155,12 @@ def test_a_clear_puck_a_little_under_the_strict_saturation_is_read_compactly_by_
     DULL = (123, 96, 78)                                                         # saturation 0.37, hue 24
     p = pf.find_puck_array(picture((112, 120, 126, 138, DULL)), by="width")      # 14 by 18 pixels
     assert p is not None and p.relaxed and p.width_px == 14 and p.height_px == 18
+
+
+def test_a_big_blob_is_a_puck_only_close_up_in_a_claw_down_picture():
+    # 2026-11-27 run: the puck 4 to 6 inches ahead was 22 by 32 and 32 by 37 pixels and read nothing against the 26 pixel side limit
+    green = (60, 170, 70)
+    near = pf.find_puck_array(picture((100, 130, 122, 162, green)), None, by="width")                # 22 x 32, centre row 146: about 4 inches
+    assert near is not None and near.claw_in <= 6.0
+    assert pf.find_puck_array(picture((100, 84, 122, 116, green)), None, by="width") is None         # the same size up the picture (a rug, a sofa at 11 inches or more)
+    assert pf.find_puck_array(picture((100, 130, 122, 162, green))) is None                           # the claw-120 look keeps the old limit
