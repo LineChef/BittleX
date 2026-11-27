@@ -26,7 +26,9 @@ BLUE_PURITY = 0.2                    # blue exceeds red by at least this fractio
 BLUE_K, BLUE_C = 409.0, 3.91         # claw tip to the tub's centre in inches = BLUE_K / the tape's width in pixels + BLUE_C (least squares over the 8 face-on distances and 3 of the 4 off-centre pictures: within 1.5 inches everywhere; the owner's distances run from the claw tip to the tub's centre). A first fit: to be checked against the pictures still to come
 BLUE_MIN_ROW = 67                    # the blue band's bottom row. 104 to 114 in the first session's 12 pictures, 82 to 87 in the 10 tub-at-8-inches pictures, but 71 to 75 for the tub 12 to 18 inches out in the 2026-11-26 goal run (the band rises as the tub goes back; the wall's base sits at row 70). 85 and then 82 hid every tub farther than about 9 inches. The grey-blue wall and sofa blobs end at rows 0 to 66 and are told from the tape by colour below
 BLUE_BLOB_PURITY = 0.24              # the whole blue blob's mean (blue - red) / blue, at least this: the tape reads 0.26 to 0.39 (darker light gives the lower numbers), the pale pet bed and wall 0.22 to 0.26 but BRIGHT
+BLUE_PALE_PURITY = 0.33              # the bright-blue limit below applies only to a blob this impure: the pale grey-blue pet bed, wall and sofa read purity 0.22 to 0.26, while the real tub in the brighter light of the 2026-11-27 9:24 run read blue 141 to 151 at purity 0.39 to 0.46 and was missed in 4 clear pictures (after the throw, and during the confirm walk-up)
 BLUE_BLOB_MAX_BLUE = 140.0           # and its mean blue channel at most this: the tape is dark (78 to 126 over every tub picture), the pale grey-blue things 133 to 171
+BLUE_WIDE_MIN_ROW = 100                # a band over BLUE_MAX_WIDTH_PX wide must be low in the picture: a tub that near fills the frame (196 px wide, band ending at row 133 at about 6 inches: 2026-11-27 9:24 run, rejected by a plain width cap), while the false 112 to 143 px bands were the far wall at rows 68 to 74
 BLUE_MIN_THICKNESS, BLUE_MAX_WIDTH_PX = 0.10, 100   # the band is a strip of tape with a thickness: its seed height over its width was 0.125 to 0.25 on every real tub (the 25 labelled calibration pictures 0.21 to 0.25, five goal-run pictures of the real tub 0.125 to 0.19) and 0.03 to 0.07 for the 5 row dark lines of a far table or wall read as a tub 8 to 10 inches off in 6 pictures of the 2026-11-27 goal run; and no real tub reads wider than 100 px (62 to 73 at 8 inches, 80 in the run), where a 112 to 143 px band was the far wall merged with the sofa. (A rule on the band's row was tried and dropped: real tubs read at rows 68 to 77 in claw-down pictures.)
 BLUE_MIN_HEIGHT = 4                  # the blue band's seed is at least this many rows tall (2026-11-26)
 BLUE_MIN_ASPECT = 1.6                # the blue band is thicker than the red tape was: 3.1 to 1 at 8 inches, 3.3 at 16
@@ -123,7 +125,8 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
             continue                                                     # a grey-blue sofa or wall up the picture, not tape on the floor
         if blue:
             mean = rgb[ys, xs].astype(float).mean(0)
-            if (mean[2] - mean[0]) / max(mean[2], 1.0) < BLUE_BLOB_PURITY or mean[2] > BLUE_BLOB_MAX_BLUE:
+            purity = (mean[2] - mean[0]) / max(mean[2], 1.0)
+            if purity < BLUE_BLOB_PURITY or (mean[2] > BLUE_BLOB_MAX_BLUE and purity < BLUE_PALE_PURITY):
                 continue                                                 # a pale grey-blue pet bed or sofa: the tape is dark and deep blue (purity 0.31 to 0.39 over 14 tub pictures), those read 0.22 to 0.26 and are bright
         if bw < MIN_WIDTH_PX or bw / bh < (BLUE_MIN_ASPECT if blue else MIN_ASPECT):
             continue
@@ -148,7 +151,7 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
     width = right - left + 1
     if not MIN_WIDTH_PX <= width <= MAX_WIDTH_PX:
         return None
-    if blue and (width > BLUE_MAX_WIDTH_PX or bh < BLUE_MIN_THICKNESS * width):
+    if blue and ((width > BLUE_MAX_WIDTH_PX and bottom < BLUE_WIDE_MIN_ROW) or bh < BLUE_MIN_THICKNESS * width):
         return None
     cx, cy = (left + right) / 2.0, (top + bottom) / 2.0
     lens = (BLUE_K / width + BLUE_C + LENS_OFFSET_IN) if blue else distance_from_width(width)

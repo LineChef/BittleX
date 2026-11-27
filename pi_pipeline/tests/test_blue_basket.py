@@ -77,3 +77,14 @@ def test_a_thin_or_too_wide_blue_band_is_not_the_tub_but_a_real_near_one_is():
     assert real is not None and real.width_px >= 70
     far = bf.find_basket_array(with_band(floor(), 100, 120, 108, 113, blue))                        # 21 wide, 6 rows: a tub 22 inches out
     assert far is not None
+
+
+def test_a_bright_blue_tub_reads_a_pale_grey_blue_thing_does_not_and_a_tub_filling_the_frame_reads():
+    # 2026-11-27 9:24 run: the real tub in brighter light read blue 141 to 151 (purity 0.39 to 0.46) and was missed in clear pictures; the pale pet bed, wall and sofa read purity 0.22 to 0.26 at blue 133 to 171
+    bright = bf.find_basket_array(with_band(floor(), 100, 150, 76, 86, (82, 102, 151)))
+    assert bright is not None and abs(bright.claw_in - 12.0) <= 2.5
+    for pale in ((150, 165, 190), (140, 150, 171)):
+        assert bf.find_basket_array(with_band(floor(), 100, 150, 76, 86, pale)) is None, pale
+    near = bf.find_basket_array(with_band(floor(), 20, 215, 100, 133, (76, 96, 141)))                # 196 px wide, ending at row 133: a tub about 6 inches off
+    assert near is not None and near.width_px >= 190
+    assert bf.find_basket_array(with_band(floor(), 48, 190, 56, 68, (79, 100, 126))) is None         # the same width up at the far wall's rows is not a tub
