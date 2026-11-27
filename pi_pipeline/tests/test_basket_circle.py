@@ -150,8 +150,9 @@ def test_the_circle_goes_face_square_arc_straight_glance_and_peeks_only_every_fe
     st = br.CircleState(side=1, peek_every=2)
     tub = lambda d, b: NS(claw_in=d, bearing_deg=b)                                           # noqa: E731
     assert br.next_circle_action(None, tub(16.0, 20.0), st).why == "circling: face the tub"
-    a = br.next_circle_action(None, tub(19.0, 2.0), st)                                       # facing it at 19 inches: walk up to about 11
+    a = br.next_circle_action(None, tub(21.0, 2.0), st)                                       # facing it at 21 inches (over 11 + 8): walk up to about 11
     assert a.kind == "forward" and a.value == br.CIRCLE_START_STEP_IN == 3.0 and st.phase == "face"                 # short steps
+    assert br.next_circle_action(None, tub(19.0, 2.0), br.CircleState(side=1)).why == "circling: close enough: turn so the tub is beside him"   # 19 inches: the arc search starts from there (owner, 2026-11-27; it walked up first when over 14)
     a = br.next_circle_action(None, tub(11.0, 2.0), st)
     assert a.kind == "pivot" and a.value < 0 and abs(a.value) >= 54 and st.phase == "arc"     # the tub goes to his right: a turn to the left of about 90
     a = br.next_circle_action(None, None, st)
