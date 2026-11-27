@@ -1,24 +1,25 @@
 """The drop: G2 lets go of the puck he holds, as one shared move (owner, 2026-11-27: "call the new move drop and make it open, then close the claw").
 
-Raise the arm to the claw look's height first (the claw touches the floor in the carry position and opening it there drags it: the owner saw this on 2026-11-20, so no jaw command is ever sent with the arm down), open the jaw (0 is closed,
-positive opens; 0 to 60 was driven on G2 by `g2jawrange`), hold it open long enough for the puck to fall, close it, then lower the arm. From the attention pose (legs straight), which the caller leaves him in: the next move stands him from rest the usual way (`ready_to_move`). Every way in calls `drop_puck`: the pick-up drill
-(`goals/pickup.py` through `RealEnv.drop`) and the `g2drop` test tool (`python -m pi_pipeline.behavior.drop`, which picks a puck up first, then drops it). Not yet run on G2: the numbers below are the ones `g2jawrange` showed
-working for the jaw and the claw look's lift height; the open time is the first guess to tune by eye.
+He stays standing. The arm goes up first (the claw touches the floor in the carry position and opening it there drags it: the owner saw this on 2026-11-20, so no jaw command is ever sent with the arm down), the jaw opens (0 is
+closed, positive opens; 0 to 60 was driven on G2 by `g2jawrange`), stays open long enough for the puck to fall, and closes. By default the arm then comes down; the pick-up drill (`goals/pickup.py` through `RealEnv.drop`) passes
+`lower=False`: the puck lies under the claw, so he backs up with the arm still raised and lowers it afterwards (owner, 2026-11-27: lowering the claw onto the puck, then lying down and standing, lifted the claw and flipped him every
+time). The `g2drop` test tool picks a puck up first, then drops it. Not yet run on G2 at the standing lift below: 120 pitched a standing body about 18 degrees (the move gate's limit is 12), the attention pose (`attention=True`) stayed
+within 3 degrees but cannot walk back, so DROP_LIFT_DEG is a first guess to tune by eye (the jaw must clear the floor) and the tilt log.
 """
 from __future__ import annotations
 
 import time
 
-DROP_LIFT_DEG = 120.0        # the claw look's height: the claw is clear of the floor (the jaw sweep tool raises the arm the same way)
+DROP_LIFT_DEG = 75.0         # standing: low enough that the body does not pitch past the move gate (about 0.15 degrees of pitch per degree of lift: 120 read 18, so about 11 here), high enough for the jaw to clear the floor (to be confirmed by eye)
 DROP_JAW_OPEN_DEG = 60.0     # the widest the jaw was driven (a puck is about as wide as the jaw's opening at less)
 DROP_OPEN_S = 0.8            # the jaw stays open this long so the puck falls out
 DROP_CLOSE_S = 0.4           # and this long closed before the arm comes down
-DROP_CLEAR_LIFT_DEG = 45.0   # after a drop the puck lies under the claw (owner, 2026-11-27): once he is standing again the arm goes to this height, clear of the floor, for the back-up (backing up with the claw down dragged the puck), then down again for the next look. A first guess to tune by eye
+DROP_BACKUP_TILT_MAX_DEG = 11.0   # with the arm up the body must be within this of level for the caller's back-up (the move gate refuses a move past 12 degrees and lays him down)
 
 
 def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG, jaw_open: float = DROP_JAW_OPEN_DEG, open_s: float = DROP_OPEN_S, close_s: float = DROP_CLOSE_S,
-              read_arm=None, info: dict | None = None, clock=time.monotonic) -> str:
-    """Raise the arm, open then close the jaw, lower the arm. "ok" or "fell". `robot` is the `SerialRobot` (claw_pose, _tx). Never sends the jaw anything with the arm down.
+              read_arm=None, info: dict | None = None, clock=time.monotonic, attention: bool = False, lower: bool = True) -> str:
+    """Raise the arm, open then close the jaw, and (`lower`) lower the arm. `attention` enters the attention pose first (stable with the arm up, but it cannot walk). "ok" or "fell". `robot` is the `SerialRobot` (claw_pose, _tx). Never sends the jaw anything with the arm down.
     For dialing it in, `info` collects: `commands` (the jaw commands sent), `arm_reads` (`read_arm()` returns the board's [pan, lift, jaw]: the angles it was last told to hold, so a command it ignored shows as no change; read before
     the open, while open and after the close), `phases` (seconds each took) and `tilt_max_deg` (the worst pitch and roll the IMU saw during the two arm moves). All are said as well. 2026-11-27 run: the claw never opened and nothing recorded why."""
     info = info if info is not None else {}
@@ -48,7 +49,7 @@ def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG
         c = f"i2 {int(round(angle))}"
         info["commands"].append(c)
         robot._tx(c)
-    if hasattr(robot, "sit_down"):                           # the attention pose first, as the claw look does: legs straight, no sag. Raising the arm to 120 on a plain stand pitched him nose-up and he fell about 8 seconds in (g2drop, 2026-11-27 16:40; the arm notes say the same of an 8 second jaw sweep)
+    if attention and hasattr(robot, "sit_down"):             # the attention pose first, as the claw look does: legs straight, no sag. Raising the arm to 120 on a plain stand pitched him nose-up and he fell about 8 seconds in (g2drop, 2026-11-27 16:40; the arm notes say the same of an 8 second jaw sweep)
         say("drop: entering the attention pose")
         if robot.sit_down() == "fell":
             return "fell"
@@ -69,11 +70,15 @@ def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG
     sleep(close_s)
     phase("jaw closed")
     note("after closing")
-    if robot.claw_pose(0.0, 0.0) == "fell":                  # the arm comes down only after the jaw is closed again (he stays in the attention pose)
+    if not lower:
+        info["arm_left_at"] = lift                           # the caller backs up with the arm raised and lowers it itself
+        return "ok"
+    if robot.claw_pose(0.0, 0.0) == "fell":                  # the arm comes down only after the jaw is closed again
         return "fell"
     phase("lowered")
     tilt()
     note("arm down")
+    info["arm_left_at"] = 0.0
     return "ok"
 
 

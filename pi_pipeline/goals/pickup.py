@@ -146,30 +146,31 @@ class PickupDrill(BasketGoal):
         rec.setdefault("tilts", []).append([label, None if t is None else t[0], None if t is None else t[1], round(time.monotonic() - rec.get("_t0", time.monotonic()), 1)])
 
     def _drop_and_back_off(self, rec: dict, ctx: AttemptContext, n: int) -> str:
-        """He holds the puck: drop it, stand up again with the claw down, raise the claw clear of the floor (the puck lies under it), back up and turn a little, lower the claw. Returns "retrieved", or "fell" when any of it went over."""
-        from ..behavior.drop import DROP_CLEAR_LIFT_DEG
+        """He holds the puck: drop it with the arm raised, back up and turn a little WITH THE ARM STILL RAISED (the puck lies under the claw: lowering the claw onto it, then lying down and standing, lifted the claw and flipped him every time, owner 2026-11-27), then lower the arm. He stays standing throughout. Returns "retrieved", or "fell" when any of it went over."""
+        from ..behavior.drop import DROP_BACKUP_TILT_MAX_DEG, DROP_LIFT_DEG
         rec["_t0"] = time.monotonic()
         ctx.say("pick-up: the puck is in the claw: dropping it")
         if hasattr(self.env, "drop"):
-            state = self.env.drop()
+            state = self.env.drop(lower=False)
             rec["drop"] = getattr(self.env, "last_drop", None)                           # the commands sent, the arm's reads, the phase times and the worst tilt
             if state == "fell":
                 return "fell"
-        self._tilt_log(rec, "after the drop (attention pose)")
+        self._tilt_log(rec, f"after the drop (arm up at {DROP_LIFT_DEG:g})")
         back, turn = BACKS[(n - 1) % len(BACKS)], TURNS[(n - 1) % len(TURNS)]
-        rec["after_drop"] = {"back_in": back, "turn_deg": turn, "pack_pct": getattr(self, "last_pack_pct", None), "clear_lift": DROP_CLEAR_LIFT_DEG}
-        self.env.ready_to_move()                                                         # the claw down, rest, the eased stand-up (the firmware stand-up puts the claw lift back to 0)
-        self._tilt_log(rec, "after the stand-up")
-        if hasattr(self.env, "claw_to") and self.env.claw_to(DROP_CLEAR_LIFT_DEG) == "fell":
-            return "fell"
-        self._tilt_log(rec, f"claw at {DROP_CLEAR_LIFT_DEG:g}")
-        if self.env.mover.back(back) == "fell":
-            return "fell"
-        self._tilt_log(rec, f"after backing {back:g}")
-        if turn and self.env.mover.pivot(turn) == "fell":
-            return "fell"
-        if turn:
-            self._tilt_log(rec, f"after turning {turn:g}")
+        rec["after_drop"] = {"back_in": back, "turn_deg": turn, "pack_pct": getattr(self, "last_pack_pct", None), "arm_up_at": DROP_LIFT_DEG}
+        tilt = rec["tilts"][-1] if rec.get("tilts") else None
+        steady = tilt is None or tilt[1] is None or max(abs(tilt[1]), abs(tilt[2] or 0.0)) <= DROP_BACKUP_TILT_MAX_DEG
+        if steady:
+            if self.env.mover.back(back) == "fell":
+                return "fell"
+            self._tilt_log(rec, f"after backing {back:g}")
+            if turn and self.env.mover.pivot(turn) == "fell":
+                return "fell"
+            if turn:
+                self._tilt_log(rec, f"after turning {turn:g}")
+        else:
+            rec["after_drop"]["backup_skipped"] = f"body {tilt[1]:+.0f}/{tilt[2]:+.0f} deg with the arm up, over {DROP_BACKUP_TILT_MAX_DEG:g}: the move gate would lie him down with the claw over the puck"
+            ctx.say("pick-up: " + rec["after_drop"]["backup_skipped"] + "; lowering the arm without backing up")
         if hasattr(self.env, "claw_to") and self.env.claw_to(0.0) == "fell":              # down again for the next look (the camera is on the claw)
             return "fell"
         self._tilt_log(rec, "claw down")

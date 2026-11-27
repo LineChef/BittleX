@@ -1348,8 +1348,8 @@ class RealEnv:
         self.last_floor_puck = puck
         return basket
 
-    def drop(self):
-        """Let go of the puck: raise the arm, open then close the claw, lower the arm (behavior/drop.py, the move every way in shares). "ok" or "fell"."""
+    def drop(self, lower: bool = True):
+        """Let go of the puck: raise the arm, open then close the claw, and (`lower`) lower the arm (behavior/drop.py, the move every way in shares). "ok" or "fell"."""
         from . import ball_chase as bc
         from .drop import drop_puck
 
@@ -1357,7 +1357,7 @@ class RealEnv:
             joints = bc.read_joints(self.link)
             return None if not joints or len(joints) < 3 else list(joints[:3])
         self.last_drop: dict = {}
-        return drop_puck(self.robot, read_arm=read_arm, info=self.last_drop)
+        return drop_puck(self.robot, read_arm=read_arm, info=self.last_drop, lower=lower)
 
     def claw_to(self, lift: float) -> str:
         """The arm to `lift` (0 is down, centred): "ok" or "fell". The claw look's own move, at its own speed, watching the IMU."""
