@@ -104,3 +104,30 @@ def test_a_fall_in_the_drop_ends_the_trial_as_a_fall(monkeypatch):
     a = pickup.PickupDrill(env=Env(calls, drop_state="fell"))
     r = a.run_attempt(a.base_settings(), AttemptContext(stop=lambda: False, say=lambda s: None))
     assert r.ended == "fell" and "back 6" not in calls
+
+
+def test_the_camera_is_warmed_at_rest_before_the_stand_up_and_its_metering_window_is_restored(monkeypatch):
+    calls = []
+
+    class Cam:
+        _meter_every_s = 30.0
+
+    class Looker:
+        _cam = Cam()
+
+        def warm_up(self, tries=3, say=print):
+            calls.append(("warm", tries))
+            return True
+    monkeypatch.setattr(br, "retrieve", lambda *a, **k: calls.append("retrieve") or {"outcome": "puck_not_found", "steps": []})
+    monkeypatch.setattr(pickup, "PLACE_WAIT_S", 0.0)
+    env = Env(calls)
+    a = pickup.PickupDrill(env=env)
+    a._looker = Looker()
+    a._saved_meter = None
+    saved = (a._looker._cam, a._looker._cam._meter_every_s)
+    a._looker._cam._meter_every_s = pickup.METER_EVERY_S                      # what open() does
+    a._saved_meter = saved
+    a.run_attempt(a.base_settings(), AttemptContext(stop=lambda: False, say=lambda s: None))
+    assert calls[:3] == ["lie", ("warm", 2), "retrieve"]                      # at rest, warmed, then the retrieval stands him
+    a.close()
+    assert a._looker._cam._meter_every_s == 30.0                              # the shared camera's own re-metering time is back

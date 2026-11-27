@@ -23,6 +23,7 @@ STAGE_OF = {name: v[8] for name, v in KNOBS.items()}
 
 # (inches from the claw tip ahead, degrees to the right (+) or left (-)): the setups in order, the near middle first, then farther and nearer, then to each side. The owner puts the puck there.
 SPOTS = ((8.0, 0.0), (12.0, 0.0), (6.0, 0.0), (10.0, -15.0), (10.0, 15.0), (14.0, 0.0), (8.0, -10.0), (8.0, 10.0))
+METER_EVERY_S = 120.0             # the camera re-meters the light when its last picture is older than this (its own default is 30 s). Every standing look after a long rest (the placing wait, the 67 s drop and stand-up) metered first: 3 to 4 extra pictures standing still, and he went over about 10 s after the stand-up in two runs in a row (2026-11-27 17:19 and 17:21). The light does not change in that time ("exposure unchanged since it was set" on every look)
 PLACE_WAIT_S = 25.0               # at rest while the owner puts the puck down (the first trial, and after a puck he could not find)
 BACKS = (6.0, 9.0, 12.0, 5.0, 8.0)       # after a drop he backs up this far (a back-up moves him 6 to 9 inches whatever is asked, 2026-11-27) so the puck lies a different distance ahead each time
 TURNS = (0.0, 15.0, -15.0, 8.0, -8.0)    # and turns this many degrees (+ right) so it lies a little to one side
@@ -53,6 +54,31 @@ class PickupDrill(BasketGoal):
 
     def base_settings(self) -> dict:
         return {name: v[2] for name, v in KNOBS.items()}
+
+    def open(self) -> None:
+        super().open()
+        self._saved_meter = None
+        cam = getattr(getattr(self, "_looker", None), "_cam", None)
+        if cam is not None and hasattr(cam, "_meter_every_s"):
+            self._saved_meter = (cam, cam._meter_every_s)
+            cam._meter_every_s = METER_EVERY_S
+
+    def close(self) -> None:
+        saved = getattr(self, "_saved_meter", None)
+        if saved is not None:
+            saved[0]._meter_every_s = saved[1]                       # the shared camera goes back to its own re-metering time
+            self._saved_meter = None
+        super().close()
+
+    def _warm_camera_at_rest(self, ctx: AttemptContext) -> None:
+        """Two throwaway pictures while he still lies at rest, right before the stand-up (the standing-pictures rule: the camera is warm and metered before he stands, so the first look standing is one quick picture)."""
+        looker = getattr(self, "_looker", None)
+        if looker is None or not hasattr(looker, "warm_up"):
+            return
+        try:
+            looker.warm_up(tries=2, say=ctx.say)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _wait_for_placing(self, ctx: AttemptContext, seconds: float) -> bool:
         """Lie at rest while the puck is put down. False when a stop was asked meanwhile."""
@@ -85,6 +111,7 @@ class PickupDrill(BasketGoal):
             br._rest(self.env, rec)                                                      # at rest while it is put down (a no-op when he already lies)
             if not self._wait_for_placing(ctx, PLACE_WAIT_S):
                 return AttemptResult("stopped", 0.0, [], {"rec": rec})
+            self._warm_camera_at_rest(ctx)                                               # metered and warm while he lies, then the stand-up and one quick picture
             rec["rested"] = False
             self._need_placing = False
         else:
