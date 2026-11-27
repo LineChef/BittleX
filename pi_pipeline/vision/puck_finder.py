@@ -18,6 +18,7 @@ from .ball_finder import _blobs, _decode
 SAT_MIN, VALUE_MIN = 0.30, 100            # FIRST PASS: a pixel counts when its saturation and brightest channel are at least this (the floor and the wall are grey)
 TOP_ROW, BOTTOM_ROW, EDGE_COLS = 94, 200, 12   # the floor part of a 240 x 240 picture: below the wall's base, above the jaws, away from the side edges
 MIN_PX, MAX_SIDE_PX, MAX_ASPECT = 12, 26, 2.6   # FIRST PASS: the puck's blob: at least this many pixels, no side longer than this, not a long sliver
+BIG_RELAXED_MAX_TALL = 1.3                   # a big blob found only by the relaxed colour pass must be at most this much taller than wide: a puck seen near is round or cropped at the bottom edge, while the dark knots and grain of the hardwood read 22 by 32 to 21 by 40 (height 1.45 to 2.0 times the width) and were read as a puck 4 to 5 inches off in 25 pictures of the 9:34 run, so he chased them until the retrieval gave up
 BIG_PUCK_MAX_IN = 6.0                        # (see below)
 MAX_SIDE_CLAW_DOWN_PX = 40                  # a claw-down quick picture: the puck 4 to 6 inches ahead is 22 by 32 and 32 by 37 pixels (2026-11-27 run: two pictures of it read nothing against MAX_SIDE_PX, then 14 pivot scans never saw it again); every other test (colour, hue, blue, the tub's box) still applies
 ROW_HORIZON_PX, ROW_K = 90.0, 275.0       # distance from the claw tip = ROW_K / (row - ROW_HORIZON_PX)
@@ -98,7 +99,7 @@ def _best_blob(a, mx, sat, basket, by, sat_min, min_px, blob_mean_min, blob_p90_
         w, h = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
         if max(w / h, h / w) > MAX_ASPECT:
             continue
-        if max(w, h) > MAX_SIDE_PX and not (by == "width" and max(w, h) <= MAX_SIDE_CLAW_DOWN_PX and ROW_K_CD / max(float(ys.mean()) - ROW_HORIZON_CD, 1.0) <= BIG_PUCK_MAX_IN):
+        if max(w, h) > MAX_SIDE_PX and not (by == "width" and max(w, h) <= MAX_SIDE_CLAW_DOWN_PX and ROW_K_CD / max(float(ys.mean()) - ROW_HORIZON_CD, 1.0) <= BIG_PUCK_MAX_IN and (not relaxed or h <= BIG_RELAXED_MAX_TALL * w)):
             continue                                                                   # a big blob is a puck only close up: a claw-down picture, the puck within BIG_PUCK_MAX_IN by its row (the room's rugs and clothes at 11 to 14 inches were read as one)
         cx, cy = float(xs.mean()), float(ys.mean())
         if _inside(basket, cx, cy) or _on_tape(basket, cx, cy):

@@ -864,3 +864,14 @@ def test_a_centred_puck_a_little_out_is_picked_directly_only_when_the_reach_sett
     monkeypatch.setenv("G2_PICK_DIRECT_MAX_IN", "4.5")
     assert act(P(4.0, 2.0)).kind == "pick" and act(P(4.0, 2.0)).value == br.BLIND_STEP_IN
     assert act(P(5.5, 2.0)).kind == "back" and act(P(4.0, 9.0)).kind != "pick"                       # farther, or off to the side: as before
+
+
+def test_a_puck_lost_from_close_range_is_looked_for_by_backing_up_not_by_scanning():
+    st = br.RState()
+    assert br.next_retrieval_action(P(3.0, 10.9), None, st).kind == "nudge"                         # seen 3 inches out, turned onto
+    a = br.next_retrieval_action(None, None, st)                                                    # and now not seen: it is under the claw
+    assert a.kind == "back" and a.value == br.CLOSE_REAPPROACH_BACK_IN and "too close" in a.why
+    assert br.next_retrieval_action(None, None, st).kind == "scan"                                  # still nothing after the back-up: the scan as before
+    far = br.RState()
+    br.next_retrieval_action(P(12.0, 0.0), None, far)
+    assert br.next_retrieval_action(None, None, far).kind == "scan"                                 # lost from far out: it is not under the claw

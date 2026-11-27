@@ -164,3 +164,10 @@ def test_a_big_blob_is_a_puck_only_close_up_in_a_claw_down_picture():
     assert near is not None and near.claw_in <= 6.0
     assert pf.find_puck_array(picture((100, 84, 122, 116, green)), None, by="width") is None         # the same size up the picture (a rug, a sofa at 11 inches or more)
     assert pf.find_puck_array(picture((100, 130, 122, 162, green))) is None                           # the claw-120 look keeps the old limit
+
+
+def test_a_tall_big_blob_of_dull_colour_is_not_a_puck_but_a_flat_one_cropped_at_the_edge_is():
+    # 2026-11-27 9:34 run: dark knots in the hardwood (22 by 32 to 21 by 40, found by the relaxed colour pass) were read as a puck 4 to 5 inches off
+    dull = (160, 130, 100)
+    assert pf.find_puck_array(picture((100, 130, 122, 162, dull)), None, by="width") is None         # 22 x 32: taller than wide by 1.45
+    assert pf.find_puck_array(picture((100, 130, 130, 154, dull)), None, by="width") is not None     # 30 x 24: a puck seen near

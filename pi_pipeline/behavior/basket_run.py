@@ -45,6 +45,7 @@ def pick_direct_max_in() -> float:
 APPROACH_TOL_IN = 1.5
 APPROACH_STEP_MAX_IN = 10.0
 PICK_UNDERSHOOT_IN = 1.5             # the last walk stops this short of the finder's distance: the puck must be at the claw tip, and a puck pushed away is lost
+VANISH_NEAR_IN, VANISH_BACKS_MAX = 5.5, 3        # a puck last read this close that is then not seen is under the claw or beside it (the camera cannot see it): back up and look instead of scanning round (2026-11-27 9:34 run: lost at 3.0 inches after a small turn, then 14 scans and 3 minutes chasing grain, the run ended puck_not_found)
 CLOSE_FLOOR_BEARING_DEG = 8.0               # the floor finder's bearing, in the picture the close finder calls "at the spot", is not to be this far off
 CLOSE_REAPPROACH_MAX, CLOSE_REAPPROACH_BACK_IN = 2, 4.0   # the puck is not at the spot after the close look's tries (or not seen there): back up this far and look again instead of picking blind, this many times a retrieval (2026-11-27 run: blind picks left the puck beside the claw)
 HELD_BASE_ROW_MIN, HELD_CHECK_BACK_IN = 200, 3.0   # after the pick-up a puck in the jaw reads 57 to 65 px wide with its base at row 200 or lower; otherwise he backs off this far and looks, and a puck seen on the floor means it was missed
@@ -108,6 +109,8 @@ class RState:
     steps: int = 0
     scans: int = 0
     picks: int = 0
+    last_seen_in: float | None = None   # the puck's last reading (inches from the claw tip): one lost from close range is under the claw, not gone
+    vanish_backs: int = 0
     reapproach: int = 0              # times he backed off and looked again because the puck was not at the pick-up spot (instead of picking blind)
     log: list = field(default_factory=list)
 
@@ -117,6 +120,11 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
     The tub's nearness never ends the retrieval (owner, 2026-11-27: two runs gave up with the puck a few inches from the claw and the tub 11 inches off; the puck is never dangerously close to it): the basket reading is only logged."""
     if st.steps >= MAX_RETRIEVAL_STEPS:
         return RAction("give_up", 0.0, "could_not_reach_puck")
+    if puck is None and st.last_seen_in is not None and st.last_seen_in <= VANISH_NEAR_IN and st.vanish_backs < VANISH_BACKS_MAX:
+        st.vanish_backs += 1
+        st.steps += 1
+        seen, st.last_seen_in = st.last_seen_in, None
+        return RAction("back", CLOSE_REAPPROACH_BACK_IN, f"puck lost from {seen:.1f} in out: too close for the camera, back up to see it again")
     if puck is None:
         if st.scanned_deg >= SCAN_MAX_DEG or st.scans >= MAX_SCANS:
             return RAction("give_up", 0.0, "puck_not_found")
@@ -125,6 +133,7 @@ def next_retrieval_action(puck, basket, st: RState) -> RAction:
         return RAction("scan", SCAN_STEP_DEG * st.scan_dir, "puck not in view: pivot scan")
     st.scanned_deg = 0.0
     d, b = float(puck.claw_in), float(puck.bearing_deg)
+    st.last_seen_in = d
     if abs(b) > ALIGN_DEG:
         st.scan_dir = 1 if b > 0 else -1
     if abs(b) >= bl.PIVOT_MIN_DEG:
