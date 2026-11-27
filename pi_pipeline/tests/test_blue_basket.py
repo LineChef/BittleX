@@ -68,11 +68,12 @@ def test_a_thin_blue_line_at_the_walls_base_is_not_the_tub_but_a_far_band_is():
     assert bf.find_basket_array(with_band(floor(), 128, 149, 64, 70, (54, 65, 77))) is not None
 
 
-def test_a_wide_blue_band_up_at_the_horizon_rows_is_not_a_near_tub():
-    # 2026-11-27 goal run: a 116 px band ending at row 71 and a 143 px one at row 68 were read as a tub about 7 inches off in pictures with no tub in them
-    for left, right, top, bottom in ((60, 175, 62, 71), (48, 190, 64, 68)):
-        assert bf.find_basket_array(with_band(floor(), left, right, top, bottom, (79, 100, 126))) is None
-    near = bf.find_basket_array(with_band(floor(), 60, 135, 90, 104, (79, 100, 126)))              # the same width low in the picture is a near tub
-    assert near is not None and near.width_px >= 70
-    far = bf.find_basket_array(with_band(floor(), 100, 140, 60, 70, (79, 100, 126)))                # a narrow band at those rows (a tub 14 inches out, 40 px) still reads
+def test_a_thin_or_too_wide_blue_band_is_not_the_tub_but_a_real_near_one_is():
+    # 2026-11-27 goal run: dark 5 row lines of a far table read as a tub 8 to 10 inches off (seed height over width 0.03 to 0.07), and a 116 to 143 px band (the far wall and sofa merged) as one 7 inches off
+    blue = (79, 100, 126)
+    assert bf.find_basket_array(with_band(floor(), 60, 137, 66, 70, blue)) is None                   # 78 wide, 5 rows: a line
+    assert bf.find_basket_array(with_band(floor(), 48, 190, 56, 68, blue)) is None                   # 143 wide: wider than any tub reads
+    real = bf.find_basket_array(with_band(floor(), 60, 133, 60, 72, blue))                           # 74 wide, 13 rows, ending at row 72: the tub of picture 13 (real tubs sit at rows 68 to 77 in claw-down pictures)
+    assert real is not None and real.width_px >= 70
+    far = bf.find_basket_array(with_band(floor(), 100, 120, 108, 113, blue))                        # 21 wide, 6 rows: a tub 22 inches out
     assert far is not None
