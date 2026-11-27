@@ -580,6 +580,34 @@ def close_align(env, st, say=print) -> str:
     return "tries"
 
 
+DROP_NEAR_IN = GONE_WITHIN_IN          # a puck seen on the floor this near during the line-up, while he is holding it
+DROP_PICTURES, DROP_OF_LAST = 2, 3     # in this many of the last DROP_OF_LAST line-up pictures: it was dropped (2026-11-27 run: the first line-up pivot dropped it, the floor puck read 5.7 to 11 inches in the next pictures and the run lined up empty-handed for 11 minutes). Held, the puck is never read on the floor: the pick-up check relies on that
+MAX_DROPS = 2                          # fetches of a dropped puck per attempt; after that the line-up runs unwatched
+
+
+class PuckDropped(Exception):
+    """The line-up's pictures show the puck on the floor again: it is no longer in the claw."""
+
+    def __init__(self, puck):
+        super().__init__("puck dropped")
+        self.puck = puck
+
+
+def watch_for_drop(env):
+    """The line-up's look, watching for the held puck lying on the floor: it takes the picture as `env.quick_basket` does, and raises `PuckDropped` when the same picture's floor puck (`env.last_floor_puck`, set by the real env; a mock without it never trips) read within DROP_NEAR_IN in DROP_PICTURES of the last DROP_OF_LAST pictures."""
+    hist: list = []
+
+    def look():
+        basket = env.quick_basket()
+        puck = getattr(env, "last_floor_puck", None)
+        hist.append(puck if puck is not None and float(puck.claw_in) <= DROP_NEAR_IN else None)
+        del hist[:-DROP_OF_LAST]
+        if sum(x is not None for x in hist) >= DROP_PICTURES:
+            raise PuckDropped(next(x for x in reversed(hist) if x is not None))
+        return basket
+    return look
+
+
 def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
     """Search for the puck, walk to it and pick it up. Returns {"outcome": "retrieved" | a give-up reason | "fell", "steps": [...]}."""
     st = RState()
@@ -832,7 +860,21 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
     persist()
     if r["outcome"] != "retrieved":
         return r["outcome"], holding
-    lu = bl.lineup(env.quick_basket, env.mover, say=say, announce=announce)
+    drops = 0
+    while True:
+        try:
+            lu = bl.lineup(watch_for_drop(env) if drops < MAX_DROPS else env.quick_basket, env.mover, say=say, announce=announce)
+            break
+        except PuckDropped as e:
+            drops += 1
+            rec.setdefault("dropped", []).append({"puck": (round(float(e.puck.claw_in), 1), round(float(e.puck.bearing_deg), 1))})
+            say("line-up: the puck is on the floor again (dropped): fetching it")
+            _say_target(announce)
+            r = retrieve(env, say=say, on_step=on_step, first=(None, e.puck), announce=announce)
+            rec["retrieval"] = r
+            persist()
+            if r["outcome"] != "retrieved":
+                return r["outcome"], holding
     rec["lineup"] = {"outcome": lu["outcome"], "steps": lu["steps"]}
     persist()
     if lu["outcome"] != "aligned":
@@ -1163,8 +1205,10 @@ class RealEnv:
         return getattr(self, "_last_close", None)
 
     def quick_basket(self):
-        """The line-up's look: a quick claw-down picture, the basket's reading or None."""
-        return self._quick("width")[0]
+        """The line-up's look: a quick claw-down picture, the basket's reading or None. The same picture's floor puck is kept in `last_floor_puck` (the line-up watches it for a dropped puck)."""
+        basket, puck = self._quick("width")
+        self.last_floor_puck = puck
+        return basket
 
     def pick(self):
         from .catapult import pick_up

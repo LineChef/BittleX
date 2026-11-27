@@ -27,6 +27,7 @@ BLUE_K, BLUE_C = 409.0, 3.91         # claw tip to the tub's centre in inches = 
 BLUE_MIN_ROW = 67                    # the blue band's bottom row. 104 to 114 in the first session's 12 pictures, 82 to 87 in the 10 tub-at-8-inches pictures, but 71 to 75 for the tub 12 to 18 inches out in the 2026-11-26 goal run (the band rises as the tub goes back; the wall's base sits at row 70). 85 and then 82 hid every tub farther than about 9 inches. The grey-blue wall and sofa blobs end at rows 0 to 66 and are told from the tape by colour below
 BLUE_BLOB_PURITY = 0.24              # the whole blue blob's mean (blue - red) / blue, at least this: the tape reads 0.26 to 0.39 (darker light gives the lower numbers), the pale pet bed and wall 0.22 to 0.26 but BRIGHT
 BLUE_BLOB_MAX_BLUE = 140.0           # and its mean blue channel at most this: the tape is dark (78 to 126 over every tub picture), the pale grey-blue things 133 to 171
+BLUE_NEAR_MIN_ROW, BLUE_NEAR_MAX_WIDTH_PX = 80, 70   # a blue band this wide must sit this low in the picture: a near tub is wide AND low (62 to 73 px wide with its band ending at row 82 to 108 at 8 inches, 41 to 52 px at row 104 to 119 at 12 to 16), a band up at the horizon rows is the far wall or sofa line, however wide the loose test stretches it (2026-11-27 goal run: 116 px at row 71 and 143 px at row 68 were read as a tub 7 inches off in pictures with no tub in them, and made him back up twice; the 25 labelled tub pictures and the far 20 to 22 px bands at row 73 to 75 are unaffected)
 BLUE_MIN_HEIGHT = 4                  # the blue band's seed is at least this many rows tall (2026-11-26)
 BLUE_MIN_ASPECT = 1.6                # the blue band is thicker than the red tape was: 3.1 to 1 at 8 inches, 3.3 at 16
 MIN_SEED_PX = 30                     # the seed blob's size (50 pixels at 22 inches, about 300 at 8)
@@ -146,6 +147,8 @@ def _find_basket(rgb: np.ndarray, seed_thr: tuple, blue: bool = False) -> Basket
         right += 1
     width = right - left + 1
     if not MIN_WIDTH_PX <= width <= MAX_WIDTH_PX:
+        return None
+    if blue and bottom < BLUE_NEAR_MIN_ROW and width > BLUE_NEAR_MAX_WIDTH_PX:
         return None
     cx, cy = (left + right) / 2.0, (top + bottom) / 2.0
     lens = (BLUE_K / width + BLUE_C + LENS_OFFSET_IN) if blue else distance_from_width(width)

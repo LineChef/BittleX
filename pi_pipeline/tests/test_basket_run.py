@@ -816,3 +816,43 @@ def test_a_relaxed_puck_reading_in_the_retrieval_look_needs_a_second_picture_tha
     monkeypatch.setenv("G2_PUCK_RELAXED_CONFIRM", "0")
     seq[:] = [(None, mk(0.0, 12.0, True))]
     assert env.look()[1].claw_in == 12.0
+
+
+def test_a_puck_dropped_during_the_line_up_is_fetched_again():
+    class Drop(Env):
+        """After the first pick-up the line-up's pictures show the puck on the floor 6 inches ahead (dropped); the second pick-up holds it."""
+        def quick_basket(self):
+            if self.picks == 1 and not getattr(self, "did_drop", False):
+                self.did_drop, self.w.puck = True, (8.0, 0.0)                                         # it fell out of the claw
+            super().quick_basket()
+            self.last_floor_puck = P(*self.w.puck) if self.w.puck else None
+            return B(16.0, 0.0) if self.picks >= 2 else B(16.0, 14.0)                                   # off to the side until the second pick-up: the line-up takes several pictures
+    env = Drop([ok(), ok()], puck_after=[(20.0, 0.0)], basket_start=(16.0, 0.0))
+    r = br.run_sequence(env, max_attempts=2, say=lambda s: None)
+    att = r["attempts"][0]
+    assert env.picks == 2 and len(att.get("dropped", [])) == 1                                        # fetched again, once
+    assert att["lineup"]["outcome"] == "aligned" and att["retrieval"]["outcome"] == "retrieved"
+
+
+def test_a_mock_env_without_a_floor_puck_reading_never_trips_the_drop_watch():
+    env = Env([ok(), ok()], puck_after=[(20.0, 0.0)])
+    r = br.run_sequence(env, max_attempts=2, say=lambda s: None)
+    assert "dropped" not in r["attempts"][0]
+
+
+def test_the_drop_watch_needs_two_pictures_of_the_last_three():
+    class E:
+        def __init__(self):
+            self.seq = iter([P(30.0, 0.0), None, P(6.0, 0.0), None, P(5.0, 2.0)])
+        def quick_basket(self):
+            self.last_floor_puck = next(self.seq)
+            return B(16.0, 0.0)
+    look = br.watch_for_drop(E())
+    for _ in range(4):
+        look()                                                                                         # one near puck, then a far one (over 12 inches): not a drop
+    try:
+        look()
+    except br.PuckDropped as e:
+        assert e.puck.claw_in == 5.0                                                                   # the second near one within the last three
+    else:
+        raise AssertionError("no drop")

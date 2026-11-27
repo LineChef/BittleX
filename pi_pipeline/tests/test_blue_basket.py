@@ -66,3 +66,13 @@ def test_a_thin_blue_line_at_the_walls_base_is_not_the_tub_but_a_far_band_is():
     tape = (71, 89, 105)
     assert bf.find_basket_array(with_band(floor(), 0, 32, 66, 68, tape)) is None
     assert bf.find_basket_array(with_band(floor(), 128, 149, 64, 70, (54, 65, 77))) is not None
+
+
+def test_a_wide_blue_band_up_at_the_horizon_rows_is_not_a_near_tub():
+    # 2026-11-27 goal run: a 116 px band ending at row 71 and a 143 px one at row 68 were read as a tub about 7 inches off in pictures with no tub in them
+    for left, right, top, bottom in ((60, 175, 62, 71), (48, 190, 64, 68)):
+        assert bf.find_basket_array(with_band(floor(), left, right, top, bottom, (79, 100, 126))) is None
+    near = bf.find_basket_array(with_band(floor(), 60, 135, 90, 104, (79, 100, 126)))              # the same width low in the picture is a near tub
+    assert near is not None and near.width_px >= 70
+    far = bf.find_basket_array(with_band(floor(), 100, 140, 60, 70, (79, 100, 126)))                # a narrow band at those rows (a tub 14 inches out, 40 px) still reads
+    assert far is not None
