@@ -10,6 +10,8 @@ Start: **"G2, basket goal"** (or `g2goal run basket`), with the arm fitted, G2 a
 A make is the only success. A make on the first shot scores half a point, finding the puck and picking it up after a miss scores a full point, and a make on the follow-up shot (thrown after a retrieval) scores 2 points; a miss that loses the puck scores nothing. After a make the puck is in the tub, so the session ends there for a reset.
 What he learns, one setting at a time: the distance he throws from, which way he aims, how far short of the puck the last walk stops, the last blind step, and how exact the line-up has to be. The throw's strength stays fixed. `g2goal show basket` lists them; `g2goal pin / limit / undo / forget` work as for the ball.
 
+The pick-up drill trains the basket's pick-up on its own, with no throw and no tub. Start: **"G2, pick up drill"** (or `g2goal run pickup`), arm fitted, G2 at rest, voice service running. Each trial he says where to put the puck (inches ahead of the claw tip, centred or to the left or right), waits 25 seconds lying at rest, then stands, finds the puck, walks up and picks it up with the basket goal's own retrieval code, and lies down holding it. Take the puck out of the claw and the next trial starts (up to 8 per session). A pick-up the finder says succeeded scores 1, a failed one 0; correct the count by eye afterwards with `g2goal verdict pickup N wrong`. He learns how far short of the puck the last walk stops and the last blind step.
+
 1\. Before a session
 -------------------
 
