@@ -941,3 +941,25 @@ def test_a_wide_near_relaxed_puck_read_is_not_confirmed_with_a_second_picture():
     e = E([far, far])
     e.look()
     assert e.n == 2                                                                                      # a small read is still confirmed
+
+
+def test_overshoots_are_counted_a_puck_lost_after_a_forward_move_and_found_again_after_the_back_up():
+    """Owner, 2026-11-27: keep track of how many times he overshoots the puck (sees it, moves in, loses it, backs up, sees it again)."""
+    st = br.RState()
+    assert br.next_retrieval_action(P(9.0, 1.0), None, st).kind == "pick"                           # the last walk is decided from a look at 9 inches
+    a = br.next_retrieval_action(None, None, st)                                                    # after the walk the puck is gone: it is under the claw or past it
+    assert a.kind == "back" and st.over["lost_after_forward"] == 1 and st.pending_lost["after"] == "pick"
+    br.next_retrieval_action(P(5.5, 3.0), None, st)                                                 # the back-up's look sees it again
+    assert st.over["refound_after_back"] == 1 and st.pending_lost is None
+    assert [e["event"] for e in st.over_events] == ["lost after pick", "found again after the back-up"] and st.over_events[1]["now_in"] == 5.5
+    t = br.RState()
+    br.next_retrieval_action(P(10.0, 10.0), None, t)                                                # a nudge
+    br.next_retrieval_action(None, None, t)
+    assert t.over["lost_after_turn"] == 1 and t.over["lost_after_forward"] == 0                     # lost after a turn is a different count
+    u = br.RState()
+    assert br.next_retrieval_action(None, None, u).kind == "scan" and sum(u.over.values()) == 0      # never seen: nothing lost
+    v = br.RState()
+    br.next_retrieval_action(P(9.0, 1.0), None, v)
+    br.next_retrieval_action(None, None, v)
+    br.next_retrieval_action(None, None, v)                                                         # still nothing after the back-up: a scan, no recovery counted
+    assert v.over["lost_after_forward"] == 1 and v.over["refound_after_back"] == 0 and v.pending_lost is None

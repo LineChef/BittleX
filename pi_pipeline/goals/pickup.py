@@ -96,6 +96,8 @@ class PickupDrill(BasketGoal):
                 r = br.retrieve(self.env, say=ctx.say, on_step=on_step, announce=ctx.announce)
                 why = r["outcome"]
                 rec["retrieval"] = r
+                if r.get("overshoots") is not None:
+                    ctx.say(f"overshoots this retrieval: {r['overshoots']}")                   # lost after a forward move, lost after a turn, found again after the back-up, picks that missed with the puck still in view
                 if why == "retrieved":
                     why = self._drop_and_back_off(rec, ctx, n)
                     rec.pop("_t0", None)
@@ -149,7 +151,7 @@ class PickupDrill(BasketGoal):
     def score(self, result: AttemptResult, settings: dict) -> Outcome:
         rec = result.extra.get("rec") or {}
         ended = result.ended
-        nums = {"seconds": result.seconds, "setup": rec.get("setup"), "steps": len((rec.get("retrieval") or {}).get("steps") or []), "pack_pct": None}
+        nums = {"seconds": result.seconds, "setup": rec.get("setup"), "steps": len((rec.get("retrieval") or {}).get("steps") or []), "pack_pct": None, "overshoots": (rec.get("retrieval") or {}).get("overshoots")}
         if ended in ("stopped", "battery", "no_picture", "camera_stalled"):
             return Outcome("aborted", None, False, f"the drill ended as {ended}: not counted", nums)
         if ended == "fell":

@@ -120,10 +120,33 @@ class RState:
     last_seen_in: float | None = None   # the puck's last reading (inches from the claw tip): one lost from close range is under the claw, not gone
     vanish_backs: int = 0
     reapproach: int = 0              # times he backed off and looked again because the puck was not at the pick-up spot (instead of picking blind)
+    last_kind: str | None = None     # the kind of the action decided at the previous look (what moved him since)
+    pending_lost: dict | None = None  # the puck was seen, he moved, and it was gone: waits for the back-up's look to say whether it is found again
+    over: dict = field(default_factory=lambda: {"lost_after_forward": 0, "lost_after_turn": 0, "refound_after_back": 0, "pick_missed_puck_seen": 0})   # the overshoot count (owner, 2026-11-27: "keep track of how many times we overshoot")
+    over_events: list = field(default_factory=list)
     log: list = field(default_factory=list)
 
 
 def next_retrieval_action(puck, basket, st: RState) -> RAction:
+    """`_next_retrieval_action` plus the overshoot bookkeeping: a puck seen at one look and gone at the next after a forward walk (the last walk or an approach step) is an overshoot (it is under the claw or past it); gone after a turn is a puck turned out of view; found again at the look after the back-up that followed means the back-up recovered it. Counted in `st.over`, each event kept in `st.over_events`."""
+    prev, seen_before = st.last_kind, st.last_seen_in
+    act = _next_retrieval_action(puck, basket, st)
+    if puck is None and seen_before is not None and prev in ("forward", "pick", "nudge", "pivot", "scan", "back") and act.kind == "back":
+        kind = "forward" if prev in ("forward", "pick") else "turn"
+        st.over[f"lost_after_{kind}"] += 1
+        st.pending_lost = {"after": prev, "from_in": round(float(seen_before), 1)}
+        st.over_events.append({"event": f"lost after {prev}", "last_seen_in": round(float(seen_before), 1), "action": "back"})
+    elif puck is not None and st.pending_lost is not None and prev == "back":
+        st.over["refound_after_back"] += 1
+        st.over_events.append({"event": "found again after the back-up", "after": st.pending_lost["after"], "was_in": st.pending_lost["from_in"], "now_in": round(float(puck.claw_in), 1), "bearing": round(float(puck.bearing_deg), 1)})
+        st.pending_lost = None
+    elif act.kind == "scan":
+        st.pending_lost = None
+    st.last_kind = act.kind
+    return act
+
+
+def _next_retrieval_action(puck, basket, st: RState) -> RAction:
     """The next step toward the puck from a fresh look (a PuckReading or None, and the basket reading or None in the same picture).
     The tub's nearness never ends the retrieval (owner, 2026-11-27: two runs gave up with the puck a few inches from the claw and the tub 11 inches off; the puck is never dangerously close to it): the basket reading is only logged."""
     if st.steps >= MAX_RETRIEVAL_STEPS:
@@ -714,7 +737,7 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
         if on_step is not None:
             on_step(st.log)
         if act.kind == "give_up":
-            return {"outcome": act.why, "steps": st.log}
+            return {"outcome": act.why, "steps": st.log, "overshoots": dict(st.over), "overshoot_events": st.over_events}
         if act.kind == "pick":
             state = env.mover.forward(act.value) if act.value >= 0.5 else "ok"
             if state == "fell":
@@ -748,10 +771,13 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
                 if held == "not_held":
                     gone, note = False, "puck gone from the floor but not in the claw: it lies beside him"
             st.log.append({"action": "picked_check", "value": 0.0, "why": note, "puck": None if still is None else (round(still.claw_in, 1), round(still.bearing_deg, 1))})
+            if not gone and still is not None:
+                st.over["pick_missed_puck_seen"] += 1                                          # the pick closed on nothing and the puck lies in view (pushed aside or never at the claw)
+                st.over_events.append({"event": "pick missed, puck still on the floor", "puck": (round(float(still.claw_in), 1), round(float(still.bearing_deg), 1)), "walk_in": None if act is None else round(float(act.value), 1)})
             if gone:
-                return {"outcome": "retrieved", "steps": st.log}
+                return {"outcome": "retrieved", "steps": st.log, "overshoots": dict(st.over), "overshoot_events": st.over_events}
             if st.picks >= PICK_TRIES:
-                return {"outcome": "pick_failed", "steps": st.log}
+                return {"outcome": "pick_failed", "steps": st.log, "overshoots": dict(st.over), "overshoot_events": st.over_events}
             continue
         if hasattr(env.mover, "set_distance"):
             env.mover.set_distance(None if puck is None else float(puck.claw_in))     # the turn picks pivot or arc by how far the puck is
