@@ -6,7 +6,8 @@
 set -uo pipefail
 : "${G2_PI:?set G2_PI to user@host of the Pi}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-idle() { ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" 'test ! -e ~/.local/share/g2/goal_running && [ "$(systemctl is-active g2-explore g2-punt g2-baseline | grep -vc inactive)" = 0 ]' 2>/dev/null; }
+# goal_running marks only a goal run inside the voice service; a goal run the old stop-and-run way (the g2-goal unit, or `goals run` by hand) has no such file, so it is checked by unit and by process too (2026-11-27: a deploy restarted the voice service under a pick-up drill that ran that way)
+idle() { ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" 'test ! -e ~/.local/share/g2/goal_running && [ "$(systemctl is-active g2-explore g2-punt g2-baseline g2-goal | grep -vc inactive)" = 0 ] && ! pgrep -f "pi_pipeline[.]goals run" >/dev/null' 2>/dev/null; }
 if ! idle; then
   if [ "${1:-}" = "--wait" ]; then bash "$ROOT/tools/g2_wait_goal_end.sh" || exit 2; idle || { echo "still not idle after the wait: not deploying" >&2; exit 2; }
   else echo "the Pi is not idle (a goal, exploration, punt or baseline is running, or it did not answer): not deploying. Use --wait to wait for it." >&2; exit 2; fi
