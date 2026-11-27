@@ -13,16 +13,20 @@ class Robot:
     def _tx(self, cmd):
         self.log.append(("tx", cmd))
 
+    def sit_down(self):
+        self.log.append(("attention", None))
+        return "ok"
+
 
 def test_the_drop_raises_the_arm_opens_then_closes_the_claw_and_lowers_the_arm():
     r = Robot()
     assert drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None) == "ok"
-    assert r.log == [("claw_pose", 120.0), ("tx", "i2 60"), ("tx", "i2 0"), ("claw_pose", 0.0)]
+    assert r.log == [("attention", None), ("claw_pose", 120.0), ("tx", "i2 60"), ("tx", "i2 0"), ("claw_pose", 0.0)]        # the attention pose first: legs straight, no sag
 
 
 def test_a_fall_while_raising_or_lowering_the_arm_stops_the_move_before_any_jaw_command():
     r = Robot(fell_at=120.0)
-    assert drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None) == "fell" and r.log == [("claw_pose", 120.0)]
+    assert drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None) == "fell" and r.log == [("attention", None), ("claw_pose", 120.0)]
     r = Robot(fell_at=0.0)
     assert drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None) == "fell" and ("tx", "i2 0") in r.log
 
@@ -36,4 +40,4 @@ def test_the_drop_records_the_commands_the_arm_reads_the_phase_times_and_the_til
     drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None, read_arm=lambda: next(reads), info=info, clock=lambda: float(next(ticks)))
     assert info["commands"] == ["i2 60", "i2 0"]
     assert info["arm_reads"] == [["before opening", [0, 120, 0]], ["while open", [0, 120, 58]], ["after closing", [0, 120, 0]], ["arm down", [0, 0, 0]]]
-    assert [p[0] for p in info["phases"]] == ["raised", "jaw open", "jaw closed", "lowered"] and info["tilt_max_deg"] == [[7.5, 2.0], [7.5, 2.0]]
+    assert [p[0] for p in info["phases"]] == ["attention pose", "raised", "jaw open", "jaw closed", "lowered"] and info["tilt_max_deg"] == [[7.5, 2.0], [7.5, 2.0]]

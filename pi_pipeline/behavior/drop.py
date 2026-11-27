@@ -1,7 +1,7 @@
 """The drop: G2 lets go of the puck he holds, as one shared move (owner, 2026-11-27: "call the new move drop and make it open, then close the claw").
 
 Raise the arm to the claw look's height first (the claw touches the floor in the carry position and opening it there drags it: the owner saw this on 2026-11-20, so no jaw command is ever sent with the arm down), open the jaw (0 is closed,
-positive opens; 0 to 60 was driven on G2 by `g2jawrange`), hold it open long enough for the puck to fall, close it, then lower the arm. Standing the whole time; the legs stay as they are. Every way in calls `drop_puck`: the pick-up drill
+positive opens; 0 to 60 was driven on G2 by `g2jawrange`), hold it open long enough for the puck to fall, close it, then lower the arm. From the attention pose (legs straight), which the caller leaves him in: the next move stands him from rest the usual way (`ready_to_move`). Every way in calls `drop_puck`: the pick-up drill
 (`goals/pickup.py` through `RealEnv.drop`) and the `g2drop` test tool (`python -m pi_pipeline.behavior.drop`, which picks a puck up first, then drops it). Not yet run on G2: the numbers below are the ones `g2jawrange` showed
 working for the jaw and the claw look's lift height; the open time is the first guess to tune by eye.
 """
@@ -47,6 +47,11 @@ def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG
         c = f"i2 {int(round(angle))}"
         info["commands"].append(c)
         robot._tx(c)
+    if hasattr(robot, "sit_down"):                           # the attention pose first, as the claw look does: legs straight, no sag. Raising the arm to 120 on a plain stand pitched him nose-up and he fell about 8 seconds in (g2drop, 2026-11-27 16:40; the arm notes say the same of an 8 second jaw sweep)
+        say("drop: entering the attention pose")
+        if robot.sit_down() == "fell":
+            return "fell"
+        phase("attention pose")
     say(f"drop: raising the arm to {lift:g}")
     if robot.claw_pose(0.0, lift) == "fell":
         return "fell"
@@ -63,7 +68,7 @@ def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG
     sleep(close_s)
     phase("jaw closed")
     note("after closing")
-    if robot.claw_pose(0.0, 0.0) == "fell":                  # the arm comes down only after the jaw is closed again
+    if robot.claw_pose(0.0, 0.0) == "fell":                  # the arm comes down only after the jaw is closed again (he stays in the attention pose)
         return "fell"
     phase("lowered")
     tilt()
