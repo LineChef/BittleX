@@ -18,20 +18,22 @@ def test_it_is_registered_with_a_goal_and_a_start_phrase():
     assert "basket" in spec.priority()
 
 
-def test_a_make_is_the_only_success_and_a_retrieved_miss_earns_half():
+def test_a_make_is_the_only_success_and_a_retrieved_miss_earns_a_full_point():
     a = basket.BasketGoal()
     s = a.base_settings()
     o = a.score(result({"after": {"code": "not_seen"}}, "made"), s)
-    assert o.success and o.score == 1.0 and o.stages == {"throw": 1.0}
+    assert o.success and o.score == 0.5 and o.stages == {"throw": 1.0}                                   # first shot: half a point
+    o = a.score(result({"after": {"code": "not_seen"}, "holding": True}, "made"), s)
+    assert o.success and o.score == 2.0 and o.stages == {"throw": 1.0}                                   # follow-up shot after a retrieval: 2 points
     miss = {"after": {"code": "missed", "puck": [10.0, 0.0], "basket": [16.0, 0.0]}, "retrieval": {"outcome": "retrieved"}, "lineup": {"outcome": "aligned"}}
     o = a.score(result(miss, None), s)
-    assert not o.success and o.score == 0.5 and o.code == "missed_short" and o.stages == {"throw": 0.0, "retrieve": 1.0, "lineup": 1.0}
+    assert not o.success and o.score == 1.0 and o.code == "missed_short" and o.stages == {"throw": 0.0, "retrieve": 1.0, "lineup": 1.0}
     lost = dict(miss, retrieval={"outcome": "puck_not_found"}, lineup=None)
     o = a.score(result(lost, "puck_not_found"), s)
     assert o.score == 0.0 and o.code == "puck_not_found" and o.stages == {"throw": 0.0, "retrieve": 0.0}
     nolineup = dict(miss, lineup={"outcome": "could_not_align"})
     o = a.score(result(nolineup, "could_not_align"), s)
-    assert o.score == 0.5 and o.code == "could_not_align" and o.stages["lineup"] == 0.0
+    assert o.score == 1.0 and o.code == "could_not_align" and o.stages["lineup"] == 0.0
 
 
 def test_a_fall_a_dead_battery_and_a_missing_picture_are_handled_as_the_ball_goal_does():

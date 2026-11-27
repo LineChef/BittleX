@@ -28,7 +28,7 @@ He says "searching for the puck" when a search for the puck begins, "searching f
 Scoring and learning
 --------------------
 
-A make is the only success. A miss earns half a point when he finds the puck, picks it up and lines up for another throw, and nothing otherwise. He tunes the distance he throws from, which way he aims, how far short of the puck the last walk stops, the last blind step, and how exact the line-up has to be. The strength of the throw stays fixed.
+A make is the only success. A make on the first shot scores half a point, finding the puck and picking it up after a miss scores a full point, and a make on the follow-up shot (thrown after a retrieval) scores 2 points; a miss that loses the puck scores nothing. He tunes the distance he throws from, which way he aims, how far short of the puck the last walk stops, the last blind step, and how exact the line-up has to be. The strength of the throw stays fixed.
 
 What makes it hard
 ------------------

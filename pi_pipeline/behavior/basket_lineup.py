@@ -114,12 +114,23 @@ def next_action(reading, st: LineupState, target_in: float = TARGET_IN, dist_tol
     return Action("shoot", 0.0, "aligned at the shot distance")
 
 
+STOP_FILES = ("~/.local/share/g2/goal_stop", "~/.local/share/g2/ball_chase_stop")      # what `g2goal stop` / `g2ballstop` write; the same files the goal runner reads between attempts
+
+
+def stop_requested() -> bool:
+    """Has the owner asked the basket run to stop? Read at every step of the line-up, the retrieval and the circle search, so a stop lands within one move instead of after the whole attempt (2026-11-27: `g2goal stop` was only read between attempts)."""
+    import os
+    return any(os.path.exists(os.path.expanduser(f)) for f in STOP_FILES)
+
+
 def lineup(look, mover, max_steps: int = 120, say=print, target_in: float = TARGET_IN, dist_tol: float = DIST_TOL_IN, align_tol: float = ALIGN_TOL_DEG, first=None, announce=None) -> dict:
     """Run the line-up. `look()` takes a fresh picture and returns a reading or None; `mover` has scan(deg), pivot(deg), nudge(deg), forward(inches), back(inches) (each one step, then still, and answering "fell" when he went over). Returns
     {"outcome": "aligned" | "basket_not_found" | "could_not_align" | "too_many_steps" | "fell", "steps": [...], "last": reading}."""
     st, reading = LineupState(), None
     searching = False                                                                    # "searching for the basket" aloud once when a search for the tub begins (owner, 2026-11-25)
     for _ in range(max_steps):
+        if stop_requested():
+            return {"outcome": "stopped", "steps": st.log, "last": reading}
         reading, first = (first, None) if first is not None else (look(), None)         # `first`: a reading he already has (the claw look just before), used for the first decision with no picture and no wait: every second standing still is leg sag
         act = next_action(reading, st, target_in, dist_tol, align_tol)
         st.log.append({"action": act.kind, "value": round(act.value, 1), "why": act.why, "claw_in": None if reading is None else round(reading.claw_in, 1),

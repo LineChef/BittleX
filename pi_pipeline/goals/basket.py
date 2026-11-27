@@ -3,7 +3,7 @@
 One attempt is one throw plus what it takes to be ready for the next (`behavior/basket_run.attempt_once`, the same function `g2basket` runs). The shared goal framework does the rest: the session loop, the judge that changes one setting at a time, the journal, the report, the overrides and the
 voice start. Nothing here calls an API.
 
-Scoring (owner, 2026-11-23): a make is the only success (1.0). A miss scores nothing, except that finding the puck and picking it up again for another attempt earns half (0.5): the attempt did the hard part of the next one. A miss that ends in "puck not found", "could not reach it", "too
+Scoring (owner, 2026-11-27): a make is the only success. A make on the first shot scores half a point (0.5), finding the puck and picking it up after a miss scores a full point (1.0), and a make on the follow-up shot (thrown after a retrieval) scores 2 points. A miss that ends in "puck not found", "could not reach it", "too
 near the basket" or "pick-up failed" scores 0. A fall, the battery or a camera that gave no picture is not counted. After a make the puck is in the basket and G2 is at rest, so the session ends there for the owner's reset (`Goal.target_successes` = 1).
 
 What he learns (one setting at a time, each judged by its own stage): the throw stage judges where he throws from (`standoff_in`) and which way he aims (`aim_offset_deg`); the retrieve stage judges how far short of the puck the last walk stops (`pick_undershoot_in`) and the
@@ -30,7 +30,9 @@ STAGE_OF = {name: v[8] for name, v in KNOBS.items()}
 
 SHORT_IN = 3.0            # the puck lay this much nearer to G2 than the basket: a short throw
 SIDE_DEG = 6.0            # the puck lay this far to one side of the basket's bearing: a throw off to that side
-PARTIAL_RETRIEVED = 0.5   # a miss that ended with the puck picked up again for the next attempt
+MADE_FIRST = 0.5          # a make on the first shot (the puck was picked up from the floor for it)
+RETRIEVED = 1.0           # a miss that ended with the puck found and picked up again for the follow-up shot
+MADE_FOLLOWUP = 2.0       # a make on the follow-up shot (thrown after a retrieval)
 
 DIAGNOSIS = {
     "missed_short": [("standoff_in", -1)],
@@ -238,7 +240,8 @@ class BasketGoal:
         if ended == "fell":
             return Outcome("fell", 0.0, False, "I fell", nums)
         if ended == "made":
-            return Outcome("made", 1.0, True, f"in! the puck went into the basket from {settings.get('standoff_in', 16):g} in", nums, stages={"throw": 1.0})
+            followup = bool(rec.get("holding"))                                 # he threw holding the puck he had just retrieved: the follow-up shot
+            return Outcome("made", MADE_FOLLOWUP if followup else MADE_FIRST, True, f"in!{' (the follow-up shot)' if followup else ''} the puck went into the basket from {settings.get('standoff_in', 16):g} in", nums, stages={"throw": 1.0})
         code = miss_code(after) if after.get("code") == "missed" else ended
         if retrieval is None:                                                    # the throw's own result is not a miss (the basket was not seen, ...)
             if ended == "basket_not_found" or after.get("code") == "no_basket":
@@ -251,7 +254,7 @@ class BasketGoal:
             stages["lineup"] = 1.0 if lineup.get("outcome") == "aligned" else 0.0
         if retrieved:
             if lineup is not None and lineup.get("outcome") != "aligned":
-                return Outcome(lineup.get("outcome") or "could_not_align", PARTIAL_RETRIEVED, False, f"I missed ({code}), found and picked up the puck, but could not line up again", nums, stages=stages)
-            return Outcome(code, PARTIAL_RETRIEVED, False, f"I missed ({code.replace('missed_', '').replace('_', ' ')}), found the puck, picked it up and lined up for another throw", nums, stages=stages)
+                return Outcome(lineup.get("outcome") or "could_not_align", RETRIEVED, False, f"I missed ({code}), found and picked up the puck, but could not line up again", nums, stages=stages)
+            return Outcome(code, RETRIEVED, False, f"I missed ({code.replace('missed_', '').replace('_', ' ')}), found the puck, picked it up and lined up for another throw", nums, stages=stages)
         why = retrieval.get("outcome") or "puck_not_found"
         return Outcome(why if why in DIAGNOSIS else "puck_not_found", 0.0, False, f"I missed ({code}) and then could not get the puck back ({why.replace('_', ' ')})", nums, stages=stages)

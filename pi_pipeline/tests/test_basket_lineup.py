@@ -233,3 +233,19 @@ def test_a_strip_that_gets_wider_after_a_back_up_is_a_corner_view_and_he_faces_t
     st = bl.LineupState()
     st.last_width = 51.0                                                                             # no back-up first: not a corner call
     assert "corner" not in bl.next_action(NS(claw_in=14.0, bearing_deg=-14.0, width_px=72), st).why
+
+
+def test_a_stop_request_ends_the_lineup_the_retrieval_and_the_circle_search_within_one_step(tmp_path, monkeypatch):
+    from pi_pipeline.behavior import basket_run as br
+    flag = tmp_path / "goal_stop"
+    monkeypatch.setattr(bl, "STOP_FILES", (str(flag),))
+    assert not bl.stop_requested()
+    flag.write_text("")
+    assert bl.stop_requested()
+
+    class Boom:
+        def __getattr__(self, name):
+            raise AssertionError("nothing may move or look once a stop is asked for")
+    assert bl.lineup(lambda: None, Boom())["outcome"] == "stopped"
+    assert br.retrieve(Boom(), say=lambda s: None)["outcome"] == "stopped"
+    assert br.circle_search(Boom(), say=lambda s: None)["outcome"] == "stopped"

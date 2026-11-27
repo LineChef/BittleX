@@ -400,6 +400,8 @@ def circle_search(env, say=print, on_step=None, start_side: int = 1, max_laps: f
     def done(outcome, puck_=None, basket_=None):
         return {"outcome": outcome, "puck": puck_, "basket": basket_, "steps": st.log, "arcs": st.events, "report": circle_report(st)}
     while True:
+        if bl.stop_requested():
+            return done("stopped", basket_=basket)
         if deadline is not None and time.monotonic() >= deadline:
             return done("time_up", basket_=basket)
         if st.phase == "arc" and hasattr(env, "battery_ok") and not env.battery_ok():
@@ -656,6 +658,8 @@ def retrieve(env, say=print, on_step=None, first=None, announce=None) -> dict:
     st = RState()
     lost = False                                   # he was scanning for the puck: when it comes back into view he says so
     while True:
+        if bl.stop_requested():
+            return {"outcome": "stopped", "steps": st.log}
         if first is not None:                      # the first step uses what the look after the throw just saw: no picture, no pause (owner, 2026-11-23)
             (basket, puck), first = first, None
         else:
@@ -849,6 +853,8 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
     n = rec.get("attempt", 1)
     if not env.battery_ok():
         return "battery", holding
+    if bl.stop_requested():
+        return "stopped", holding
     say(f"attempt {n}: {'throw (holding the puck)' if holding else 'pick up and throw'}")
     t = env.throw(holding)
     rec["throw"] = {k: t.get(k) for k in ("ok", "fell", "path", "pack_pct")}
@@ -885,6 +891,8 @@ def _attempt_once(env, rec: dict, holding: bool, say=print, persist=lambda state
             basket, code = found, bo.NOT_SEEN                                      # the tub is in view now: look into it as for any throw whose puck was not seen
             say(f"tub in view after {bursts} walk(s) forward: looking into it")
         persist()
+    if bl.stop_requested():
+        return "stopped", holding
     if puck is not None:
         _say_target(announce)                                                      # the puck seen on the floor right after the throw
     confirm = code == bo.NOT_SEEN                                                  # a puck seen on the floor outside the tub is a certain miss: no confirm, straight to the pick-up (owner, 2026-11-24)
