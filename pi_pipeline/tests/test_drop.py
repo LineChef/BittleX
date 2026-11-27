@@ -25,3 +25,15 @@ def test_a_fall_while_raising_or_lowering_the_arm_stops_the_move_before_any_jaw_
     assert drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None) == "fell" and r.log == [("claw_pose", 120.0)]
     r = Robot(fell_at=0.0)
     assert drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None) == "fell" and ("tx", "i2 0") in r.log
+
+
+def test_the_drop_records_the_commands_the_arm_reads_the_phase_times_and_the_tilt():
+    r = Robot()
+    r._pitch, r._roll = [3.0, -7.5], [1.0, 2.0]
+    reads = iter([[0, 120, 0], [0, 120, 58], [0, 120, 0], [0, 0, 0]])
+    info = {}
+    ticks = iter(range(0, 100))
+    drop.drop_puck(r, say=lambda s: None, sleep=lambda s: None, read_arm=lambda: next(reads), info=info, clock=lambda: float(next(ticks)))
+    assert info["commands"] == ["i2 60", "i2 0"]
+    assert info["arm_reads"] == [["before opening", [0, 120, 0]], ["while open", [0, 120, 58]], ["after closing", [0, 120, 0]], ["arm down", [0, 0, 0]]]
+    assert [p[0] for p in info["phases"]] == ["raised", "jaw open", "jaw closed", "lowered"] and info["tilt_max_deg"] == [[7.5, 2.0], [7.5, 2.0]]

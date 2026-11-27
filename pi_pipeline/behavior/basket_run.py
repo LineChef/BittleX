@@ -1293,8 +1293,14 @@ class RealEnv:
 
     def drop(self):
         """Let go of the puck: raise the arm, open then close the claw, lower the arm (behavior/drop.py, the move every way in shares). "ok" or "fell"."""
+        from . import ball_chase as bc
         from .drop import drop_puck
-        return drop_puck(self.robot)
+
+        def read_arm():
+            joints = bc.read_joints(self.link)
+            return None if not joints or len(joints) < 3 else list(joints[:3])
+        self.last_drop: dict = {}
+        return drop_puck(self.robot, read_arm=read_arm, info=self.last_drop)
 
     def pick(self):
         from .catapult import pick_up

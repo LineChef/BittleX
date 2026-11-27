@@ -114,10 +114,13 @@ class PickupDrill(BasketGoal):
         """He holds the puck: drop it, back up and turn a little. Returns "retrieved", or "fell" when any of it went over."""
         ctx.say("pick-up: the puck is in the claw: dropping it")
         if hasattr(self.env, "drop"):
-            if self.env.drop() == "fell":
+            state = self.env.drop()
+            rec["drop"] = getattr(self.env, "last_drop", None)                           # the commands sent, the arm's reads, the phase times and the worst tilt
+            if state == "fell":
                 return "fell"
         back, turn = BACKS[(n - 1) % len(BACKS)], TURNS[(n - 1) % len(TURNS)]
         rec["after_drop"] = {"back_in": back, "turn_deg": turn}
+        rec["after_drop"]["pack_pct"] = getattr(self, "last_pack_pct", None)
         self.env.ready_to_move()
         if self.env.mover.back(back) == "fell":
             return "fell"

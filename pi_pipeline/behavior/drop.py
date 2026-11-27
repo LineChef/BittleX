@@ -15,19 +15,59 @@ DROP_OPEN_S = 0.8            # the jaw stays open this long so the puck falls ou
 DROP_CLOSE_S = 0.4           # and this long closed before the arm comes down
 
 
-def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG, jaw_open: float = DROP_JAW_OPEN_DEG, open_s: float = DROP_OPEN_S, close_s: float = DROP_CLOSE_S) -> str:
-    """Raise the arm, open then close the jaw, lower the arm. "ok" or "fell". `robot` is the `SerialRobot` (claw_pose, _tx). Never sends the jaw anything with the arm down."""
+def drop_puck(robot, say=print, sleep=time.sleep, *, lift: float = DROP_LIFT_DEG, jaw_open: float = DROP_JAW_OPEN_DEG, open_s: float = DROP_OPEN_S, close_s: float = DROP_CLOSE_S,
+              read_arm=None, info: dict | None = None, clock=time.monotonic) -> str:
+    """Raise the arm, open then close the jaw, lower the arm. "ok" or "fell". `robot` is the `SerialRobot` (claw_pose, _tx). Never sends the jaw anything with the arm down.
+    For dialing it in, `info` collects: `commands` (the jaw commands sent), `arm_reads` (`read_arm()` returns the board's [pan, lift, jaw]: the angles it was last told to hold, so a command it ignored shows as no change; read before
+    the open, while open and after the close), `phases` (seconds each took) and `tilt_max_deg` (the worst pitch and roll the IMU saw during the two arm moves). All are said as well. 2026-11-27 run: the claw never opened and nothing recorded why."""
+    info = info if info is not None else {}
+    info.update(commands=[], arm_reads=[], phases=[], tilt_max_deg=[])
+    t0 = clock()
+
+    def phase(label):
+        info["phases"].append([label, round(clock() - t0, 2)])
+
+    def tilt():
+        try:
+            info["tilt_max_deg"].append([round(max((abs(x) for x in list(robot._pitch)), default=0.0), 1), round(max((abs(x) for x in list(robot._roll)), default=0.0), 1)])
+        except Exception:  # noqa: BLE001
+            info["tilt_max_deg"].append(None)
+
+    def note(label):
+        if read_arm is None:
+            return
+        try:
+            v = read_arm()
+        except Exception:  # noqa: BLE001
+            v = None
+        info["arm_reads"].append([label, v])
+        say(f"drop: arm reads (pan, lift, jaw) {v} {label}")
+
+    def jaw(angle):
+        c = f"i2 {int(round(angle))}"
+        info["commands"].append(c)
+        robot._tx(c)
     say(f"drop: raising the arm to {lift:g}")
     if robot.claw_pose(0.0, lift) == "fell":
         return "fell"
+    phase("raised")
+    tilt()
+    note("before opening")
     say(f"drop: opening the claw to {jaw_open:g}")
-    robot._tx(f"i2 {int(round(jaw_open))}")
+    jaw(jaw_open)
     sleep(open_s)
-    robot._tx("i2 0")
+    phase("jaw open")
+    note("while open")
+    jaw(0)
     say("drop: closing the claw")
     sleep(close_s)
+    phase("jaw closed")
+    note("after closing")
     if robot.claw_pose(0.0, 0.0) == "fell":                  # the arm comes down only after the jaw is closed again
         return "fell"
+    phase("lowered")
+    tilt()
+    note("arm down")
     return "ok"
 
 
@@ -58,7 +98,12 @@ def main(argv: list | None = None) -> None:
             print("picking the puck up (pickF)")
             catapult.pick_up(link, seen=[])
             time.sleep(0.5)
-        print("drop:", drop_puck(robot))
+        def read_arm():
+            joints = chase.read_joints(link)
+            return None if not joints or len(joints) < 3 else list(joints[:3])
+        info: dict = {}
+        print("drop:", drop_puck(robot, read_arm=read_arm, info=info))
+        print("drop log:", info)
     except KeyboardInterrupt:
         print("ended")
     finally:
