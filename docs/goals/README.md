@@ -12,10 +12,10 @@ The goals today
 
 - [The ball punt](ball-punt.md): G2 finds a green ball on the floor, walks up to it, lines the claw up and punches it, then watches where it went. The goal with the most history.
 - [The basket](basket.md): G2 picks up a puck, throws it into a clear tub 16 inches away, and works out whether it went in. The newest goal, and the one still changing.
-- Turn away from walls: a standing goal that is always on. Every exploration and ball chase that meets a wall adjusts how close he lets himself get.
-- Identify new objects: G2 explores and takes survey pictures of things that match no named object.
+- [Turning away from walls](walls.md): a standing goal that is always on. Every exploration and ball chase that meets a wall adjusts how close he lets himself get.
+- [Identifying new objects](discover-objects.md): G2 roams and takes survey pictures of things that match no named object, so they can be named and learned.
 
-The last two are described in [Goals: running them](../guides/goals.md); the charts here cover the first two.
+Each has its own page with the charts drawn from its journal.
 
 One session
 -----------

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
 <title id="t">The basket: score of every attempt</title>
-<desc id="d">22 attempts in order, oldest left: each score from 0 to 1 as a dot, with a running average of 10. A dashed line shows a change of scoring rule; averages restart there.</desc>
+<desc id="d">23 attempts in order, oldest left: each score from 0 to 1 as a dot, with a running average of 10. A dashed line shows a change of scoring rule; averages restart there.</desc>
 <style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
 <rect class="bg" x="0" y="0" width="640" height="320"/>
 <text class="tt" x="20" y="26">The basket: score of every attempt</text>
@@ -16,28 +16,29 @@
 <text class="sm" x="58" y="56.0" text-anchor="end">1</text>
 <line class="ax" x1="64" y1="264" x2="620" y2="264"/><line class="ax" x1="64" y1="264" x2="64" y2="52"/>
 <text class="sm" x="16" y="158" transform="rotate(-90 16 158)" text-anchor="middle">score (1 = success)</text>
-<circle class="pt" cx="76.6" cy="52.0" r="3"/>
-<circle class="pt" cx="101.9" cy="264.0" r="3"/>
-<circle class="pt" cx="127.2" cy="52.0" r="3"/>
-<circle class="pt" cx="152.5" cy="52.0" r="3"/>
-<circle class="pt" cx="177.7" cy="52.0" r="3"/>
-<circle class="pt" cx="203.0" cy="264.0" r="3"/>
-<circle class="pt" cx="228.3" cy="264.0" r="3"/>
-<circle class="pt" cx="253.5" cy="264.0" r="3"/>
-<circle class="pt" cx="278.8" cy="52.0" r="3"/>
-<circle class="pt" cx="304.1" cy="264.0" r="3"/>
-<circle class="pt" cx="329.4" cy="264.0" r="3"/>
-<circle class="pt" cx="354.6" cy="158.0" r="3"/>
-<circle class="pt" cx="379.9" cy="52.0" r="3"/>
-<circle class="pt" cx="405.2" cy="264.0" r="3"/>
-<circle class="pt" cx="430.5" cy="264.0" r="3"/>
-<circle class="pt" cx="455.7" cy="264.0" r="3"/>
-<circle class="pt" cx="481.0" cy="264.0" r="3"/>
-<circle class="pt" cx="506.3" cy="158.0" r="3"/>
-<circle class="pt" cx="531.5" cy="264.0" r="3"/>
-<circle class="pt" cx="556.8" cy="52.0" r="3"/>
-<circle class="pt" cx="582.1" cy="264.0" r="3"/>
-<circle class="pt" cx="607.4" cy="264.0" r="3"/>
-<polyline class="ln" points="76.6,52.0 101.9,158.0 127.2,122.7 152.5,105.0 177.7,94.4 203.0,122.7 228.3,142.9 253.5,158.0 278.8,146.2 304.1,158.0 329.4,179.2 354.6,168.6 379.9,168.6 405.2,189.8 430.5,211.0 455.7,211.0 481.0,211.0 506.3,200.4 531.5,221.6 556.8,200.4 582.1,200.4 607.4,211.0"/>
+<circle class="pt" cx="76.1" cy="52.0" r="3"/>
+<circle class="pt" cx="100.3" cy="264.0" r="3"/>
+<circle class="pt" cx="124.4" cy="52.0" r="3"/>
+<circle class="pt" cx="148.6" cy="52.0" r="3"/>
+<circle class="pt" cx="172.8" cy="52.0" r="3"/>
+<circle class="pt" cx="197.0" cy="264.0" r="3"/>
+<circle class="pt" cx="221.1" cy="264.0" r="3"/>
+<circle class="pt" cx="245.3" cy="264.0" r="3"/>
+<circle class="pt" cx="269.5" cy="52.0" r="3"/>
+<circle class="pt" cx="293.7" cy="264.0" r="3"/>
+<circle class="pt" cx="317.8" cy="264.0" r="3"/>
+<circle class="pt" cx="342.0" cy="158.0" r="3"/>
+<circle class="pt" cx="366.2" cy="52.0" r="3"/>
+<circle class="pt" cx="390.3" cy="264.0" r="3"/>
+<circle class="pt" cx="414.5" cy="264.0" r="3"/>
+<circle class="pt" cx="438.7" cy="264.0" r="3"/>
+<circle class="pt" cx="462.9" cy="264.0" r="3"/>
+<circle class="pt" cx="487.0" cy="158.0" r="3"/>
+<circle class="pt" cx="511.2" cy="264.0" r="3"/>
+<circle class="pt" cx="535.4" cy="52.0" r="3"/>
+<circle class="pt" cx="559.6" cy="264.0" r="3"/>
+<circle class="pt" cx="583.7" cy="264.0" r="3"/>
+<circle class="pt" cx="607.9" cy="158.0" r="3"/>
+<polyline class="ln" points="76.1,52.0 100.3,158.0 124.4,122.7 148.6,105.0 172.8,94.4 197.0,122.7 221.1,142.9 245.3,158.0 269.5,146.2 293.7,158.0 317.8,179.2 342.0,168.6 366.2,168.6 390.3,189.8 414.5,211.0 438.7,211.0 462.9,211.0 487.0,200.4 511.2,221.6 535.4,200.4 559.6,200.4 583.7,211.0 607.9,221.6"/>
 <text class="sm" x="342" y="306" text-anchor="middle">attempts, oldest to newest</text>
 </svg>

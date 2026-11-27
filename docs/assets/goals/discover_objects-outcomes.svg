@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">Identifying new objects: how attempts ended</title>
+<desc id="d">Horizontal bars: the number of attempts for each outcome code. nothing_new 12, stopped 5, fell 3, pictures_captured 3.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">Identifying new objects: how attempts ended</text>
+<text class="tx" x="182" y="87.1" text-anchor="end">nothing_new</text>
+<rect class="b3" x="190" y="57.5" width="410.0" height="44.1"/>
+<text class="sm" x="606.0" y="87.1">12</text>
+<text class="tx" x="182" y="150.1" text-anchor="end">stopped</text>
+<rect class="b3" x="190" y="120.5" width="170.8" height="44.1"/>
+<text class="sm" x="366.8" y="150.1">5</text>
+<text class="tx" x="182" y="213.1" text-anchor="end">fell</text>
+<rect class="b3" x="190" y="183.4" width="102.5" height="44.1"/>
+<text class="sm" x="298.5" y="213.1">3</text>
+<text class="tx" x="182" y="276.1" text-anchor="end">pictures_captured</text>
+<rect class="b1" x="190" y="246.4" width="102.5" height="44.1"/>
+<text class="sm" x="298.5" y="276.1">3</text>
+</svg>

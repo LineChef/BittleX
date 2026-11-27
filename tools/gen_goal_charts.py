@@ -3,7 +3,7 @@
 
     python tools/gen_goal_charts.py [--journal ~/Desktop/G2Memory/goals/goal_journal.jsonl] [--out docs/assets/goals] [--goals ball_punt basket] [--check]
 
-For each goal it writes five charts, named <goal>-<chart>.svg:
+For each goal it writes five charts (four for a goal whose attempts have no duration, the walls goal), named <goal>-<chart>.svg:
   success-by-session   the share of attempts that succeeded in each session, with the attempt count under each bar;
   score-per-attempt    every attempt's score and its running average (10 attempts); a change of scoring epoch starts a new line, because scores from two scoring rules are not comparable;
   outcomes             how the attempts ended, as counts of the scorer's outcome codes;
@@ -24,7 +24,10 @@ from collections import Counter, OrderedDict
 
 DEFAULT_JOURNAL = os.path.expanduser("~/Desktop/G2Memory/goals/goal_journal.jsonl")
 DEFAULT_OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "assets", "goals")
-GOALS = {"ball_punt": ("The ball punt", "punt_max_in", "the farthest he punts from, in inches"), "basket": ("The basket", "standoff_in", "the distance he throws from, in inches")}
+GOALS = {"ball_punt": ("The ball punt", "punt_max_in", "the farthest he punts from, in inches"), "basket": ("The basket", "standoff_in", "the distance he throws from, in inches"),
+         "walls": ("Turning away from walls", "wall_turn_in", "the distance he turns away from a wall at, in inches"),
+         "discover_objects": ("Identifying new objects", "roam_s", "how long one roam lasts, in seconds")}
+NO_TIME = {"walls"}       # a wall encounter has no duration (the journal records 0), so a time chart would always be empty
 W, H = 640, 320
 STYLE = ("<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}"
          ".sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}"
@@ -234,6 +237,8 @@ def render_all(rows: list[dict], goals: list[str]) -> dict:
     for g in goals:
         att = attempts(rows, g)
         for name, fn in CHARTS:
+            if name == "seconds-per-attempt" and g in NO_TIME:
+                continue
             files[f"{g}-{name}.svg"] = fn(g, att)
     return files
 

@@ -183,7 +183,9 @@
    "How goals work",
    [
     "goals/ball-punt",
-    "goals/basket"
+    "goals/basket",
+    "goals/walls",
+    "goals/discover-objects"
    ]
   ]
  ]

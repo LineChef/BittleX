@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">Identifying new objects: time per attempt</title>
+<desc id="d">For each of the last 19 sessions, the median seconds an attempt took (bar) and the shortest and longest (line). Medians from 0 to 213 seconds.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">Identifying new objects: time per attempt</text>
+<line class="gr" x1="64" y1="264.0" x2="620" y2="264.0"/>
+<text class="sm" x="58" y="268.0" text-anchor="end">0</text>
+<line class="gr" x1="64" y1="211.0" x2="620" y2="211.0"/>
+<text class="sm" x="58" y="215.0" text-anchor="end">61</text>
+<line class="gr" x1="64" y1="158.0" x2="620" y2="158.0"/>
+<text class="sm" x="58" y="162.0" text-anchor="end">122</text>
+<line class="gr" x1="64" y1="105.0" x2="620" y2="105.0"/>
+<text class="sm" x="58" y="109.0" text-anchor="end">183</text>
+<line class="gr" x1="64" y1="52.0" x2="620" y2="52.0"/>
+<text class="sm" x="58" y="56.0" text-anchor="end">244</text>
+<line class="ax" x1="64" y1="264" x2="620" y2="264"/><line class="ax" x1="64" y1="264" x2="64" y2="52"/>
+<text class="sm" x="16" y="158" transform="rotate(-90 16 158)" text-anchor="middle">seconds</text>
+<rect class="b2" x="68.4" y="95.4" width="20.5" height="168.6"/>
+<line class="ax" x1="78.6" y1="97.2" x2="78.6" y2="94.8"/>
+<rect class="b2" x="97.7" y="79.5" width="20.5" height="184.5"/>
+<line class="ax" x1="107.9" y1="88.8" x2="107.9" y2="52.0"/>
+<rect class="b2" x="126.9" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="137.2" y1="264.0" x2="137.2" y2="264.0"/>
+<rect class="b2" x="156.2" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="166.4" y1="264.0" x2="166.4" y2="264.0"/>
+<rect class="b2" x="185.4" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="195.7" y1="264.0" x2="195.7" y2="264.0"/>
+<rect class="b2" x="214.7" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="224.9" y1="264.0" x2="224.9" y2="264.0"/>
+<rect class="b2" x="244.0" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="254.2" y1="264.0" x2="254.2" y2="264.0"/>
+<rect class="b2" x="273.2" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="283.5" y1="264.0" x2="283.5" y2="264.0"/>
+<rect class="b2" x="302.5" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="312.7" y1="264.0" x2="312.7" y2="264.0"/>
+<rect class="b2" x="331.8" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="342.0" y1="264.0" x2="342.0" y2="264.0"/>
+<rect class="b2" x="361.0" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="371.3" y1="264.0" x2="371.3" y2="264.0"/>
+<rect class="b2" x="390.3" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="400.5" y1="264.0" x2="400.5" y2="264.0"/>
+<rect class="b2" x="419.5" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="429.8" y1="264.0" x2="429.8" y2="264.0"/>
+<rect class="b2" x="448.8" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="459.1" y1="264.0" x2="459.1" y2="264.0"/>
+<rect class="b2" x="478.1" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="488.3" y1="264.0" x2="488.3" y2="264.0"/>
+<rect class="b2" x="507.3" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="517.6" y1="264.0" x2="517.6" y2="264.0"/>
+<rect class="b2" x="536.6" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="546.8" y1="264.0" x2="546.8" y2="264.0"/>
+<rect class="b2" x="565.9" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="576.1" y1="264.0" x2="576.1" y2="264.0"/>
+<rect class="b2" x="595.1" y="264.0" width="20.5" height="0.5"/>
+<line class="ax" x1="605.4" y1="264.0" x2="605.4" y2="264.0"/>
+<text class="sm" x="342" y="306" text-anchor="middle">sessions, oldest to newest</text>
+</svg>

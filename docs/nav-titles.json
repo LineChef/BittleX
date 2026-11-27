@@ -78,5 +78,7 @@
  "blueprints/wiring": "Wiring",
  "goals": "Goals",
  "goals/ball-punt": "Ball punt",
- "goals/basket": "Basket"
+ "goals/basket": "Basket",
+ "goals/walls": "Turning away from walls",
+ "goals/discover-objects": "Identifying new objects"
 }

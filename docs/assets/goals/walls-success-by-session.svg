@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">Turning away from walls: success by session</title>
+<desc id="d">Bars, one per session, newest on the right: the share of attempts that succeeded. 24 sessions, 228 attempts, success rates from 0% to 100%.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">Turning away from walls: success by session</text>
+<line class="gr" x1="64" y1="264.0" x2="620" y2="264.0"/>
+<text class="sm" x="58" y="268.0" text-anchor="end">0%</text>
+<line class="gr" x1="64" y1="211.0" x2="620" y2="211.0"/>
+<text class="sm" x="58" y="215.0" text-anchor="end">25%</text>
+<line class="gr" x1="64" y1="158.0" x2="620" y2="158.0"/>
+<text class="sm" x="58" y="162.0" text-anchor="end">50%</text>
+<line class="gr" x1="64" y1="105.0" x2="620" y2="105.0"/>
+<text class="sm" x="58" y="109.0" text-anchor="end">75%</text>
+<line class="gr" x1="64" y1="52.0" x2="620" y2="52.0"/>
+<text class="sm" x="58" y="56.0" text-anchor="end">100%</text>
+<line class="ax" x1="64" y1="264" x2="620" y2="264"/><line class="ax" x1="64" y1="264" x2="64" y2="52"/>
+<text class="sm" x="16" y="158" transform="rotate(-90 16 158)" text-anchor="middle">attempts that succeeded</text>
+<rect class="b1" x="67.5" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="75.6" y="278" text-anchor="middle">7</text>
+<rect class="b1" x="90.6" y="87.3" width="16.2" height="176.7"/>
+<text class="sm" x="98.8" y="278" text-anchor="middle">6</text>
+<rect class="b1" x="113.8" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="121.9" y="278" text-anchor="middle">11</text>
+<rect class="b1" x="137.0" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="145.1" y="278" text-anchor="middle">56</text>
+<rect class="b1" x="160.1" y="62.3" width="16.2" height="201.7"/>
+<text class="sm" x="168.2" y="278" text-anchor="middle">41</text>
+<rect class="b1" x="183.3" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="191.4" y="278" text-anchor="middle">9</text>
+<rect class="b1" x="206.5" y="69.7" width="16.2" height="194.3"/>
+<text class="sm" x="214.6" y="278" text-anchor="middle">24</text>
+<rect class="b1" x="229.6" y="87.3" width="16.2" height="176.7"/>
+<text class="sm" x="237.8" y="278" text-anchor="middle">6</text>
+<rect class="b1" x="252.8" y="131.5" width="16.2" height="132.5"/>
+<text class="sm" x="260.9" y="278" text-anchor="middle">8</text>
+<rect class="b1" x="276.0" y="78.5" width="16.2" height="185.5"/>
+<text class="sm" x="284.1" y="278" text-anchor="middle">8</text>
+<rect class="b1" x="299.1" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="307.3" y="278" text-anchor="middle">1</text>
+<rect class="b1" x="322.3" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="330.4" y="278" text-anchor="middle">2</text>
+<rect class="b1" x="345.5" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="353.6" y="278" text-anchor="middle">2</text>
+<rect class="b1" x="368.6" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="376.8" y="278" text-anchor="middle">1</text>
+<rect class="b1" x="391.8" y="158.0" width="16.2" height="106.0"/>
+<text class="sm" x="399.9" y="278" text-anchor="middle">2</text>
+<rect class="b1" x="415.0" y="264.0" width="16.2" height="0.5"/>
+<text class="sm" x="423.1" y="278" text-anchor="middle">1</text>
+<rect class="b1" x="438.1" y="264.0" width="16.2" height="0.5"/>
+<text class="sm" x="446.3" y="278" text-anchor="middle">1</text>
+<rect class="b1" x="461.3" y="87.3" width="16.2" height="176.7"/>
+<text class="sm" x="469.4" y="278" text-anchor="middle">6</text>
+<rect class="b1" x="484.5" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="492.6" y="278" text-anchor="middle">2</text>
+<rect class="b1" x="507.6" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="515.8" y="278" text-anchor="middle">1</text>
+<rect class="b1" x="530.8" y="264.0" width="16.2" height="0.5"/>
+<text class="sm" x="538.9" y="278" text-anchor="middle">1</text>
+<rect class="b1" x="554.0" y="105.0" width="16.2" height="159.0"/>
+<text class="sm" x="562.1" y="278" text-anchor="middle">12</text>
+<rect class="b1" x="577.1" y="90.5" width="16.2" height="173.5"/>
+<text class="sm" x="585.3" y="278" text-anchor="middle">11</text>
+<rect class="b1" x="600.3" y="52.0" width="16.2" height="212.0"/>
+<text class="sm" x="608.4" y="278" text-anchor="middle">9</text>
+<text class="sm" x="342" y="306" text-anchor="middle">sessions, oldest to newest (the number under a bar is its attempts)</text>
+</svg>

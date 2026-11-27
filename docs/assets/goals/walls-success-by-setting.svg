@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320" role="img" aria-labelledby="t d">
+<title id="t">Turning away from walls: success by wall turn in</title>
+<desc id="d">Each dot is a value of the setting (the distance he turns away from a wall at, in inches); height is the share of attempts that succeeded, size is how many attempts used it. Values from 24 to 30.</desc>
+<style>.bg{fill:#fff}.ax{stroke:#8a8f98;stroke-width:1;fill:none}.gr{stroke:#e3e5e8;stroke-width:1}.tx{fill:#2b2f36;font:12px system-ui,sans-serif}.tt{fill:#2b2f36;font:600 14px system-ui,sans-serif}.sm{fill:#5b616b;font:11px system-ui,sans-serif}.b1{fill:#2f6fdb}.b2{fill:#d9822b}.b3{fill:#8a8f98}.ln{stroke:#d9822b;stroke-width:2;fill:none}.pt{fill:#2f6fdb;fill-opacity:.45}.ep{stroke:#8a8f98;stroke-dasharray:4 3}@media (prefers-color-scheme:dark){.bg{fill:#14171c}.ax{stroke:#7b818c}.gr{stroke:#2a2f37}.tx,.tt{fill:#e6e8eb}.sm{fill:#a2a8b2}.b1{fill:#6aa3ff}.b2{fill:#f0a35a}.pt{fill:#6aa3ff;fill-opacity:.5}.ln{stroke:#f0a35a}}</style>
+<rect class="bg" x="0" y="0" width="640" height="320"/>
+<text class="tt" x="20" y="26">Turning away from walls: success by wall turn in</text>
+<line class="gr" x1="64" y1="264.0" x2="620" y2="264.0"/>
+<text class="sm" x="58" y="268.0" text-anchor="end">0%</text>
+<line class="gr" x1="64" y1="211.0" x2="620" y2="211.0"/>
+<text class="sm" x="58" y="215.0" text-anchor="end">25%</text>
+<line class="gr" x1="64" y1="158.0" x2="620" y2="158.0"/>
+<text class="sm" x="58" y="162.0" text-anchor="end">50%</text>
+<line class="gr" x1="64" y1="105.0" x2="620" y2="105.0"/>
+<text class="sm" x="58" y="109.0" text-anchor="end">75%</text>
+<line class="gr" x1="64" y1="52.0" x2="620" y2="52.0"/>
+<text class="sm" x="58" y="56.0" text-anchor="end">100%</text>
+<line class="ax" x1="64" y1="264" x2="620" y2="264"/><line class="ax" x1="64" y1="264" x2="64" y2="52"/>
+<text class="sm" x="16" y="158" transform="rotate(-90 16 158)" text-anchor="middle">attempts that succeeded</text>
+<circle class="b1" fill-opacity=".6" cx="84.0" cy="68.7" r="16.0"/>
+<text class="sm" x="84.0" y="278" text-anchor="middle">24</text>
+<text class="sm" x="84.0" y="47.7" text-anchor="middle">228</text>
+<circle class="b1" fill-opacity=".6" cx="256.0" cy="264.0" r="6.0"/>
+<text class="sm" x="256.0" y="278" text-anchor="middle">26</text>
+<text class="sm" x="256.0" y="253.0" text-anchor="middle">1</text>
+<circle class="b1" fill-opacity=".6" cx="428.0" cy="94.4" r="10.3"/>
+<text class="sm" x="428.0" y="278" text-anchor="middle">28</text>
+<text class="sm" x="428.0" y="79.1" text-anchor="middle">10</text>
+<circle class="b1" fill-opacity=".6" cx="600.0" cy="90.5" r="10.6"/>
+<text class="sm" x="600.0" y="278" text-anchor="middle">30</text>
+<text class="sm" x="600.0" y="74.9" text-anchor="middle">11</text>
+<text class="sm" x="342" y="306" text-anchor="middle">the distance he turns away from a wall at, in inches (the number over a dot is its attempts)</text>
+</svg>
