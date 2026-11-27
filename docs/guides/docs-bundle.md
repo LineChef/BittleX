@@ -46,7 +46,7 @@ Each page is also written as `pages/<route>.html`: a single `<article>` that car
 - `pre[data-lang] > code`: A fenced code block
 - `code`, `a[href]`, `img[src][alt]`, `em`, `strong` and `hr`: Inline code, links, images, emphasis and rules
 
-**Sections** are a closed set: `overview`, `specification`, `guides`, `hardware`, `vision`, `rl`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
+**Sections** are a closed set: `overview`, `specification`, `guides`, `hardware`, `vision`, `rl`, `goals`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
 
 **Audience and kind.** `audience` is who a page is for (`visitor`, `builder` or `contributor`) and `kind` is what it is (`overview`, `guide`, `reference` or `concept`). A page sets them in optional front matter (a `---` block at the top with `audience:` and `kind:` lines, removed from the published Markdown); without it the section's default applies. A site can use them for badges and filters.
 

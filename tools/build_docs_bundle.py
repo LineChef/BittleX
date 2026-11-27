@@ -93,7 +93,7 @@ LEFT_OUT = "left-out page: "
 LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
 FENCE = re.compile(r"^(```|~~~)")
 # The closed sets the schema (docs/guides/docs-bundle.schema.json, shipped as schema.json) promises; the build refuses a value outside them, so the schema cannot drift.
-SECTIONS = ["overview", "specification", "guides", "hardware", "vision", "rl", "blueprints", "code", "legal", "about"]
+SECTIONS = ["overview", "specification", "guides", "hardware", "vision", "rl", "goals", "blueprints", "code", "legal", "about"]
 ASSET_KINDS = ["png", "jpg", "jpeg", "gif", "svg", "pdf", "html"]      # one per ASSET_EXT; the files in the bundle today are html and pdf
 SUMMARY_MAX = 220
 

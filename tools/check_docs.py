@@ -75,6 +75,15 @@ def note_voice_hits(text):
 CELL_WORDS, LONG_LINE = 40, 700
 
 
+def unpublished_note(path):
+    """True for a working note the docs bundle leaves out (a published page must not link to it)."""
+    try:
+        import build_docs_bundle as B
+    except ImportError:
+        return False
+    return B.is_excluded(path)
+
+
 def published(path):
     """True for a page the docs bundle publishes (needs tools/build_docs_bundle.py next to this file)."""
     try:
@@ -250,6 +259,9 @@ def check(root, files):
             dest = os.path.normpath(os.path.join(os.path.dirname(full), path_part))
             if not os.path.exists(dest):
                 errors.append(f"{f}:{line_no}: broken link -> {target}")
+                continue
+            if dest.endswith(".md") and published(f) and unpublished_note(os.path.relpath(dest, root)):
+                errors.append(f"{f}:{line_no}: links to a working note the docs bundle leaves out -> {target} (unlink it or publish the page); the bundle build fails on this")
                 continue
             if anchor and dest.endswith(".md"):
                 if dest not in anchor_cache:
